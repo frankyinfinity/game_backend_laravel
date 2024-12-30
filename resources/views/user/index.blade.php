@@ -3,13 +3,17 @@
 @section('title', 'Dashboard')
 
 @section('content_header')
-    <h1>Home</h1>
+    <h1>Utenti</h1>
 @stop
 
 @section('content')
-    <p>You are logged in</p>
+    <p>Hello World.</p>
 @stop
 
 @section('js')
-    <script></script>
+    <script> 
+        $(document).ready(function () {
+
+        });
+    </script>
 @stop
