@@ -22,6 +22,9 @@
     {{-- Custom stylesheets (pre AdminLTE) --}}
     @yield('adminlte_css_pre')
 
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="{{asset('css/utils.css')}}">
+
     {{-- Base Stylesheets (depends on Laravel asset bundling tool) --}}
     @if(config('adminlte.enabled_laravel_mix', false))
         <link rel="stylesheet" href="{{ mix(config('adminlte.laravel_mix_css_path', 'css/app.css')) }}">
@@ -113,6 +116,9 @@
                 <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
                 <script src="{{ asset('vendor/overlayScrollbars/js/jquery.overlayScrollbars.min.js') }}"></script>
                 <script src="{{ asset('vendor/adminlte/dist/js/adminlte.min.js') }}"></script>
+                <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+                <script src="{{asset('js/jsgrid.js')}}"></script>
+                <script src="{{asset('js/utils.js')}}"></script>
         @endswitch
     @endif
 

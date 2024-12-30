@@ -1,0 +1,11 @@
+.column_with_checkbox {
+    display: math !important;
+    border: none !important;
+}
+
+.column_with_checkbox > .form-check {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    margin-left: .75rem;
+}
