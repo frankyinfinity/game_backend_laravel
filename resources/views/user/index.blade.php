@@ -10,21 +10,40 @@
         <h4 class="mb-0">Utenti</h5>
     </div>
     <div class="card-body">
-        <div class="material-datatables">
-            <table id="table_list" class="js-grid table table-no-bordered table-hover" cellspacing="0" width="100%" style="width:100%">
-                <thead>
-                <tr>
-                    <th class="column_with_checkbox">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" onClick="toggle(this, 'selected[]')">
-                        </div>
-                    </th>
-                    <th>Nome</th>
-                    <th>Email</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div class="row">
+            <div class="col-md-12 mb-4">
+                <div class="row">
+                    <div class="col-6"></div>
+                    <div class="col-3">
+                        <button type="button" class="btn btn-danger btn-block btn-sm js-delete" data-list="table_list" data-url="{{ route('users.delete') }}">
+                            <i class="fa fa-trash"></i> Cancella
+                        </button>
+                    </div>
+                    <div class="col-3">
+                        <a href="{{route('users.create')}}">
+                            <button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-plus"></i> Nuovo</button>                    
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="material-datatables">
+                    <table id="table_list" class="js-grid table table-no-bordered table-hover" cellspacing="0" width="100%" style="width:100%">
+                        <thead>
+                        <tr>
+                            <th class="column_with_checkbox">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" onClick="toggle(this, 'selected[]')">
+                                </div>
+                            </th>
+                            <th>Nome</th>
+                            <th>Email</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -65,22 +84,6 @@
                 ],
                 sDom: '<"dataTables_top"lfBr>t<"dataTables_bottom"ip><"clear">',
                 initComplete: function(a, b) {
-                    $(this).closest(".dataTables_wrapper").find(".dataTables__top")
-                        .prepend('<div class="dataTables_buttons actions">' +
-                            '<a href="javascript:void(0)" class="actions__item" title="@lang("datatable.print")" data-table-action="print" ><i class="material-icons">print</i></a>'+
-                            '<a href="javascript:void(0)" class="actions__item" title="@lang("datatable.export")" data-table-action="excel" ><i class="material-icons">cloud_download</i></a>'+
-                            '<a href="javascript:void(0)" class="actions__item" title="@lang("datatable.filter")" data-table-action="modal" data-target="#filterModal"><i class="material-icons">filter_list</i></a>'+
-                            '</div>');
-
-                    $(this).closest(".dataTables_wrapper").find(".dataTables__top")
-                        .prepend('<div class="dataTables_buttons actions">' +
-                            '<div class="form-check" style="display: flex">'+
-
-                                '<a href="javascript:void(0)" class="actions__item text-danger js-delete" title="@lang('datatable.del')" data-list="table_list" data-url="{{ route('users.delete') }}"><i class="material-icons">delete</i></a>' +
-                                '<a href="{{route('users.create')}}" class="actions__item text-primary"><i class="material-icons">add_box</i></a>' +
-
-                            '</div>'+
-                            '</div>');
                     jsgrid();
                 },
                 "drawCallback":function(){
