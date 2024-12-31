@@ -323,6 +323,11 @@ return [
                     'text' => 'Tile',
                     'url'  => '/tiles',
                     'icon' => 'fas fa-square',
+                ],
+                [
+                    'text' => 'Clima',
+                    'url'  => '/climates',
+                    'icon' => 'fas fa-tree',
                 ]
             ]
         ],

@@ -10,5 +10,9 @@ class Tile extends Model
 
     const TYPE_SOLID = 0;
     const TYPE_LIQUID = 1;
+    
+    public function defaultClimates(){
+        return $this->hasMany(Climate::class,'default_tile_id','id');
+    }
 
 }

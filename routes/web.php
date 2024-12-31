@@ -22,4 +22,9 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/tiles/list/table', [App\Http\Controllers\TileController::class, 'listDataTable'])->name('tiles.datatable');
     Route::post('/tiles/delete', [App\Http\Controllers\TileController::class, 'delete'])->name('tiles.delete');
 
+    //Climates
+    Route::resource('climates', App\Http\Controllers\ClimateController::class);
+    Route::post('/climates/list/table', [App\Http\Controllers\ClimateController::class, 'listDataTable'])->name('climates.datatable');
+    Route::post('/climates/delete', [App\Http\Controllers\ClimateController::class, 'delete'])->name('climates.delete');
+
 });
