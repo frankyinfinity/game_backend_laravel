@@ -305,10 +305,16 @@ return [
             'icon' => 'fas fa-home',
         ],
         [
-            'text' => 'Utenti',
-            'url'  => '/users',
-            'icon' => 'fas fa-user',
-        ]
+            'text'    => 'Gestione Utenti',
+            'icon'    => 'fas fa-users',
+            'submenu' => [
+                [
+                    'text' => 'Utenti',
+                    'url'  => '/users',
+                    'icon' => 'fas fa-user',
+                ]
+            ]
+        ],
     ],
 
     /*
