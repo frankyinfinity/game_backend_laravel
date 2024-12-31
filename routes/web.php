@@ -17,4 +17,9 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/users/list/table', [App\Http\Controllers\UserController::class, 'listDataTable'])->name('users.datatable');
     Route::post('/users/delete', [App\Http\Controllers\UserController::class, 'delete'])->name('users.delete');
 
+    //Tiles
+    Route::resource('tiles', App\Http\Controllers\TileController::class);
+    Route::post('/tiles/list/table', [App\Http\Controllers\TileController::class, 'listDataTable'])->name('tiles.datatable');
+    Route::post('/tiles/delete', [App\Http\Controllers\TileController::class, 'delete'])->name('tiles.delete');
+
 });

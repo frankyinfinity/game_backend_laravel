@@ -315,6 +315,17 @@ return [
                 ]
             ]
         ],
+        [
+            'text'    => 'Gestione Pianeti',
+            'icon'    => 'fas fa-globe',
+            'submenu' => [
+                [
+                    'text' => 'Tile',
+                    'url'  => '/tiles',
+                    'icon' => 'fas fa-square',
+                ]
+            ]
+        ],
     ],
 
     /*
