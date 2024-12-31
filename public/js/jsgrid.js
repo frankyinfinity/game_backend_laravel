@@ -89,7 +89,15 @@ function _grid_bind_delete(table, btn)
                         }
                     },
                     error: function () {
-                        $.notify({title: "Ops!", message: "Si è verificato un errore imprevisto."}, {type: "danger"});
+                        Swal.fire({
+                            title: 'Ops!',
+                            text: 'Si è verificato un errore imprevisto.',
+                            type: 'danger',
+                            showCancelButton: false,
+                            buttonsStyling: false,
+                            confirmButtonClass: 'btn btn-info',
+                            confirmButtonText: 'Ho Capito!',
+                        })
                         btn.removeClass('disabled');
                     }
                 });
@@ -104,7 +112,7 @@ function _grid_bind_delete(table, btn)
 }
 
 function _confirm_delete(callback) {
-    swal({
+    Swal.fire({
         title: 'Attenzione',
         text: 'Vuoi davvero eliminare questi dati? L\'operazione è irreversibile.',
         type: 'warning',
@@ -119,7 +127,7 @@ function _confirm_delete(callback) {
 
 
 function _empty_elements(){
-    swal({
+    Swal.fire({
         title: 'Attenzione',
         text: 'Selezionare almento un elemento da cancellare.',
         type: 'warning',

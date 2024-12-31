@@ -27,7 +27,7 @@ class UserController extends Controller
      */
     public function create()
     {
-        //
+        return view("user.create");
     }
 
     /**
@@ -35,7 +35,15 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        //
+
+        User::query()->create([
+            "name" => $request->name,
+            "email" => $request->email,
+            "password" => bcrypt($request->password),
+        ]);
+
+        return redirect(route('users.index'));
+
     }
 
     /**
@@ -43,7 +51,8 @@ class UserController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $user = User::query()->findOrFail($id);
+        return view("user.show", compact("user"));
     }
 
     /**
@@ -59,7 +68,20 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        
+        $user = User::query()->findOrFail($id);
+
+        $fields = [
+            "name" => $request->name,
+            "email" => $request->email,
+        ];
+        if($request->password !== null) {
+            $fields["password"] = bcrypt($request->password);
+        }
+
+        $user->update($fields);
+        return redirect(route('users.index'));
+
     }
 
     /**
@@ -69,4 +91,14 @@ class UserController extends Controller
     {
         //
     }
+
+    public function delete(Request $request){
+        foreach ($request->ids as $id) {
+            $user = User::find($id);
+            if($user == null) continue;
+            $user->delete();
+        }
+        return response()->json(['success' => true]);
+    }
+
 }

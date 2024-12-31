@@ -38,6 +38,7 @@
                             </th>
                             <th>Nome</th>
                             <th>Email</th>
+                            <th>Azioni</th>
                         </tr>
                         </thead>
                         <tbody></tbody>
@@ -53,9 +54,9 @@
     <script> 
         $(document).ready(function () {
 
-            $('#table_list').on('click','tr td:not(.disableEdit):not(.dataTables_empty)',function (e) {
+            $(document).on('click', '.btn_edit', function (e) {
                 var url="{{ route('users.show',['_id_']) }}";
-                url = url.replace('_id_',$(this).closest('tr').data('id'));
+                url = url.replace('_id_',$(this).data('id'));
                 window.location.href = url;
             });
 
@@ -81,6 +82,7 @@
                     },
                     {data:"name", name:"name"},
                     {data:"email", name:"email"},
+                    {data:"id", name:"id"},
                 ],
                 sDom: '<"dataTables_top"lfBr>t<"dataTables_bottom"ip><"clear">',
                 initComplete: function(a, b) {
@@ -98,6 +100,12 @@
                                 '</div>';
                         },
                         targets:   0
+                    },
+                    {
+                        render: function(data, type, row){
+                            return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
+                        },
+                        targets:   3
                     },
                 ],
             });

@@ -117,6 +117,7 @@
                 <script src="{{ asset('vendor/overlayScrollbars/js/jquery.overlayScrollbars.min.js') }}"></script>
                 <script src="{{ asset('vendor/adminlte/dist/js/adminlte.min.js') }}"></script>
                 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+                <script src="{{ asset('assets/js/plugins/sweetalert.min.js') }}"></script>
                 <script src="{{asset('js/jsgrid.js')}}"></script>
                 <script src="{{asset('js/utils.js')}}"></script>
         @endswitch
