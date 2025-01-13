@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('planets', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->longText('description')->nullable();          
             $table->boolean('active')->default(false);
             $table->timestamps();
         });

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('climate_id');
             $table->foreign('climate_id')->references('id')->on('climates');
             $table->string('name');
+            $table->longText('description')->nullable();   
             $table->string('filename');
             $table->timestamps();
         });
