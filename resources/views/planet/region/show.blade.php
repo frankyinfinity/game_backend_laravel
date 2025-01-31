@@ -78,7 +78,7 @@
         </div>
     </div>
     <div class="col-md-7">
-
+        @include('planet.region.map', compact('region'))
     </div>
 </div>
 @stop

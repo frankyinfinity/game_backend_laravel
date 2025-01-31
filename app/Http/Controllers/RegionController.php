@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use App\Models\Planet;
 use App\Models\Region;
 use App\Models\Climate;
+use App\Models\Tile;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class RegionController extends Controller
 {
@@ -32,8 +35,21 @@ class RegionController extends Controller
      */
     public function show($id)
     {
-        $region = Region::query()->where('id', $id)->with(['climate', 'planet'])->first();
-        return view("planet.region.show", compact('region'));
+        
+        $region = Region::query()->where('id', $id)->with(['climate.defaultTile', 'planet'])->first();
+        $tiles = Tile::query()->orderBy('name')->get();
+        foreach($tiles as $tile) {
+            $tile->text_color = 'color: ' . $tile->color;
+        }
+
+        $map = [];
+        if($region->filename !== null) {
+            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$region->filename);
+            $map = json_decode($jsonContent, true);
+        }
+
+        return view("planet.region.show", compact('region', 'tiles', 'map'));
+
     }
 
     /**
@@ -94,6 +110,37 @@ class RegionController extends Controller
             $region->delete();
         }
         return response()->json(['success' => true]);
+    }
+
+    public function updateTile(Request $request) {
+
+        $region = Region::query()->where('id', $request->region_id)->first();
+        $tile = Tile::query()->where('id', $request->tile_id)->first();
+        $tile_i = $request->tile_i;
+        $tile_j = $request->tile_j;
+
+        $json = [];
+        $filename = null;
+        if($region->filename === null) {
+            $filename = uniqid('', true) . '.json';
+        } else {
+            $filename = $region->filename;
+            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
+            $json = json_decode($jsonContent, true);
+        }
+
+        $json[] = [
+            'tile' => $tile,
+            'i' => $tile_i,
+            'j' => $tile_j,
+        ];
+
+        $jsonData = json_encode($json, JSON_PRETTY_PRINT);
+        Storage::disk('regions')->put($region->id.'/'.$filename, $jsonData);
+
+        $region->update(['filename' => $filename]);
+        return response()->json(['success' => true]);
+
     }
 
 }
