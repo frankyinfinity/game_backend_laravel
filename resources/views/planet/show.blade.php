@@ -47,7 +47,7 @@
         </div>
     </div>
     <div class="col-md-7">
-
+        @include('planet.region.index', compact('planet'))
     </div>
 </div>
 @stop

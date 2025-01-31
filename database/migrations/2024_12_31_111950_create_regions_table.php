@@ -21,7 +21,7 @@ return new class extends Migration
             $table->integer('width');
             $table->integer('height');
             $table->longText('description')->nullable();   
-            $table->string('filename');
+            $table->string('filename')->nullable();
             $table->timestamps();
         });
     }

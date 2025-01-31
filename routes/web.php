@@ -29,7 +29,16 @@ Route::group(['middleware' => ['auth']], function (){
 
     //Planets
     Route::resource('planets', App\Http\Controllers\PlanetController::class);
-    Route::post('/planets/list/table', [App\Http\Controllers\PlanetController::class, 'listDataTable'])->name('planets.datatable');
-    Route::post('/planets/delete', [App\Http\Controllers\PlanetController::class, 'delete'])->name('planets.delete');
+    Route::post('/planets/list/table', [App\Http\Controllers\PlanetController::class, 'listDataTable'])->name(name: 'planets.datatable');
+    Route::post('/planets/delete', action: [App\Http\Controllers\PlanetController::class, 'delete'])->name('planets.delete');
+
+    //Regions
+    Route::post('/regions/list/table/{planet_id}', [App\Http\Controllers\RegionController::class, 'listDataTable'])->name(name: 'regions.datatable');
+    Route::get('/regions/page/create/{planet_id}', [App\Http\Controllers\RegionController::class, 'create'])->name(name: 'regions.create');
+    Route::get('/regions/page/show/{id}', [App\Http\Controllers\RegionController::class, 'show'])->name(name: 'regions.show');
+    Route::get('/regions/page/edit/{id}', [App\Http\Controllers\RegionController::class, 'edit'])->name(name: 'regions.edit');
+    Route::post('/regions/action/store', [App\Http\Controllers\RegionController::class, 'store'])->name(name: 'regions.store');
+    Route::put('/regions/action/update/{id}', [App\Http\Controllers\RegionController::class, 'update'])->name(name: 'regions.update');
+    Route::post('/regions/action/delete', action: [App\Http\Controllers\RegionController::class, 'delete'])->name('regions.delete');
 
 });
