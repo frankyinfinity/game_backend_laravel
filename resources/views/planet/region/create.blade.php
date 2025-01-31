@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'Nuovo Pianeta')
+@section('title', 'Nuova Regione')
 
 @section('content_header')@stop
 
