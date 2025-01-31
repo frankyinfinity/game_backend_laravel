@@ -328,6 +328,11 @@ return [
                     'text' => 'Clima',
                     'url'  => '/climates',
                     'icon' => 'fas fa-tree',
+                ],
+                [
+                    'text' => 'Pianeti',
+                    'url'  => '/planets',
+                    'icon' => 'fas fa-globe',
                 ]
             ]
         ],

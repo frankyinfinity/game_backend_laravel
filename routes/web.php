@@ -27,4 +27,9 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/climates/list/table', [App\Http\Controllers\ClimateController::class, 'listDataTable'])->name('climates.datatable');
     Route::post('/climates/delete', [App\Http\Controllers\ClimateController::class, 'delete'])->name('climates.delete');
 
+    //Planets
+    Route::resource('planets', App\Http\Controllers\PlanetController::class);
+    Route::post('/planets/list/table', [App\Http\Controllers\PlanetController::class, 'listDataTable'])->name('planets.datatable');
+    Route::post('/planets/delete', [App\Http\Controllers\PlanetController::class, 'delete'])->name('planets.delete');
+
 });
