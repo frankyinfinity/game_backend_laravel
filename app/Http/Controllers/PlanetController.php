@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Region;
 use Illuminate\Http\Request;
 use App\Models\Planet;
 
@@ -91,6 +92,10 @@ class PlanetController extends Controller
         foreach ($request->ids as $id) {
             $planet = Planet::find($id);
             if($planet == null) continue;
+            $regions = Region::query()->where('planet_id', $planet->id)->get();
+            foreach($regions as $region) {
+                $region->delete();
+            }
             $planet->delete();
         }
         return response()->json(['success' => true]);
