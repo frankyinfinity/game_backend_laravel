@@ -17,4 +17,8 @@ class Region extends Model
         return $this->belongsTo(Climate::class);
     }
 
+    public function birthRegionPlayers(){
+        return $this->belongsTo(Player::class, 'birth_region_id','id');
+    }
+
 }

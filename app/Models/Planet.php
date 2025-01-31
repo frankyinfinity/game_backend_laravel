@@ -12,4 +12,8 @@ class Planet extends Model
         return $this->hasMany(Region::class);
     }
 
+    public function birthPlanetPlayers(){
+        return $this->belongsTo(Player::class, 'birth_planet_id','id');
+    }
+
 }
