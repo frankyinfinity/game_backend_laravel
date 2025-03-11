@@ -17,12 +17,12 @@ class BasicDraw
         $this->color = $color;
     }
 
-    public function printJson() 
+    public function commonJson($extra) 
     {
         return json_encode([
             'type' => $this->type,
             'color' => $this->color
-        ]);
+        ]+$extra);
     }
 
 }
