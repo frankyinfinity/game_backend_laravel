@@ -12,8 +12,8 @@ class Climate extends Model
         return $this->belongsTo(Tile::class,'default_tile_id','id');
     }
 
-    public function regions(){
-        return $this->hasMany(Region::class);
+    public function birthRegions(){
+        return $this->hasMany(BirthRegion::class);
     }
 
 }

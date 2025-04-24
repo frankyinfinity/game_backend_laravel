@@ -10,6 +10,12 @@ use App\Models\Player;
 use App\Models\Specie;
 use App\Models\Entity;
 use App\Models\Genome;
+use App\Models\Planet;
+use App\Models\Region;
+use App\Models\BirthPlanet;
+use App\Models\BirthRegion;
+use App\Models\BirthClimate;
+use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
@@ -31,10 +37,52 @@ class AuthController extends Controller
             'password' => $password
         ]);
 
+        //Clone Planet
+        $planet = Planet::find($birth_planet_id);
+        $region = Region::find($birth_region_id);
+        
+        $birthPlanet = BirthPlanet::query()->create([
+            'name' => $planet->name,
+            'description' => $planet->description,
+        ]);
+        foreach($planet->regions as $region) {
+
+            $birthClimate = BirthClimate::query()->create([
+                "name" => $region->climate->name,
+                "started" => $region->climate->started,
+                "min_temperature" => $region->climate->min_temperature,
+                "max_temperature" => $region->climate->max_temperature,
+                "default_tile_id" => $region->climate->default_tile_id,
+            ]);
+
+            $filename = $region->filename;
+            $birthRegion = BirthRegion::query()->create([
+                'birth_planet_id' => $birthPlanet->id,
+                'birth_climate_id' => $birthClimate->id,
+                'name' => $region->name,
+                'width' => $region->width,
+                'height' => $region->height,
+                'description' => $region->description,
+                'filename' => $filename,
+            ]);
+
+            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
+            $json = json_decode($jsonContent, true);
+            $jsonData = json_encode($json, JSON_PRETTY_PRINT);
+            Storage::disk('birth_regions')->put($birthRegion->id.'/'.$filename, $jsonData);
+            
+        }   
+
+        $searchBirthRegion = BirthRegion::query()
+            ->where('birth_planet_id', $birthPlanet->id)
+            ->where('name', $birthRegion->name)
+            ->first();
+
+        //Create Player
         $player = Player::query()->create([
             'user_id' => $user->id,
-            'birth_planet_id' => $birth_planet_id,
-            'birth_region_id' => $birth_region_id
+            'birth_planet_id' => $birthPlanet->id,
+            'birth_region_id' => $searchBirthRegion->id
         ]);
  
         $specie = Specie::query()->create([

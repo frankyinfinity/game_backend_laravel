@@ -55,6 +55,11 @@ return [
             'root' => storage_path('app/uploads/regions'),
         ],
 
+        'birth_regions' => [
+            'driver' => 'local',
+            'root' => storage_path('app/uploads/birth_regions'),
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

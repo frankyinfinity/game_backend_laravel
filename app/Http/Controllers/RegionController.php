@@ -8,7 +8,6 @@ use App\Models\Planet;
 use App\Models\Region;
 use App\Models\Climate;
 use App\Models\Tile;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class RegionController extends Controller
