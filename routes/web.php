@@ -42,4 +42,8 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/regions/action/delete', action: [App\Http\Controllers\RegionController::class, 'delete'])->name('regions.delete');
     Route::post('/regions/action/tile', action: [App\Http\Controllers\RegionController::class, 'updateTile'])->name('regions.tile');
 
+    //Players
+    Route::resource('players', App\Http\Controllers\PlayerController::class);
+    Route::post('/players/list/table', [App\Http\Controllers\PlayerController::class, 'listDataTable'])->name(name: 'players.datatable');
+
 });

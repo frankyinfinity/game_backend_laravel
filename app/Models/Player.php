@@ -13,6 +13,14 @@ class Player extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function birthPlanet(){
+        return $this->belongsTo(BirthPlanet::class);
+    }
+
+    public function birthRegion(){
+        return $this->belongsTo(BirthRegion::class);
+    }
+
     public function species(){
         return $this->hasMany(Specie::class);
     }
