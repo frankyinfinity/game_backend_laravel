@@ -44,7 +44,8 @@ class PlayerController extends Controller
     public function show(string $id)
     {
         $player = Player::query()->findOrFail($id);
-        return view("player.show", compact("player"));
+        $username = $player->user->name;
+        return view("player.show", compact("player", "username"));
     }
 
     /**
