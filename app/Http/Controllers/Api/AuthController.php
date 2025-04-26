@@ -67,11 +67,10 @@ class AuthController extends Controller
             ]);
 
             if($filename !== null) {
-            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
-            $json = json_decode($jsonContent, true);
-            $jsonData = json_encode($json, JSON_PRETTY_PRINT);
-            Storage::disk('birth_regions')->put($birthRegion->id.'/'.$filename, $jsonData);
-
+                $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
+                $json = json_decode($jsonContent, true);
+                $jsonData = json_encode($json, JSON_PRETTY_PRINT);
+                Storage::disk('birth_regions')->put($birthRegion->id.'/'.$filename, $jsonData);
             }
             
         }   

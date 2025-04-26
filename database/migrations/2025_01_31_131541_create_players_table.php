@@ -16,9 +16,9 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users');
             $table->unsignedBigInteger('birth_planet_id');
-            $table->foreign('birth_planet_id')->references('id')->on('planets');
+            $table->foreign('birth_planet_id')->references('id')->on('birth_planets');
             $table->unsignedBigInteger('birth_region_id');
-            $table->foreign('birth_region_id')->references('id')->on('regions');
+            $table->foreign('birth_region_id')->references('id')->on('birth_regions');
             $table->timestamps();
         });
     }
