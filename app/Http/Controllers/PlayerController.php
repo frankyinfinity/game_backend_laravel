@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helper\Helper;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Player;
@@ -71,4 +72,19 @@ class PlayerController extends Controller
     {
         //
     }
+
+    public function drawMap(Request $request) {
+
+        $player_id = $request->player_id;
+
+        $channel = 'player_channel';
+        $event = 'player_'.$player_id.'_event';
+        Helper::sendEvent($channel, $event, [
+            'type' => 'draw_map'
+        ]);
+
+        return response()->json(['success' => true]);
+
+    }
+
 }

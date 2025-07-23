@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Events\MyEvent;
+use Pusher\Pusher;
 
 class SendEvent extends Command
 {
@@ -26,7 +27,23 @@ class SendEvent extends Command
      */
     public function handle()
     {
-        event(new MyEvent('hello world'));
+
+        $channel = 'player_channel';
+        $event = 'my-event';
+
+        $pusher = new Pusher(
+            'f02185b1bc94c884ce5b',
+            'ed669469b28a7ad8317b',
+            '1981907',
+            [
+                'cluster' => 'eu',
+                'useTLS' => true,
+            ]
+        );
+
+        $pusher->trigger($channel, $event, 'funziona');
+
         return true;
+
     }
 }

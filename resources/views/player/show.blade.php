@@ -36,12 +36,53 @@
 
             var pusher = new Pusher('f02185b1bc94c884ce5b', {
                 cluster: 'eu',
-                forceTLS: true,
             });
 
-            var channel = pusher.subscribe('my-channel');
-            channel.bind('my-event', function(data) {
-                alert(JSON.stringify(data));
+            var channel = pusher.subscribe('player_channel');
+            channel.bind('pusher:subscription_succeeded', function() {
+                
+                $.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    }
+                });
+                $.ajax({
+                    url: "{{ route('players.draw.map') }}",
+                    type: 'POST',
+                    data: { 
+                        player_id: '{{$player->id}}',
+                     },
+                    success: function(result) {
+                        if(!result.success) {
+                            var msg = 'Si è verificato un errore.';
+                            if(result.msg != null) msg = result.msg;
+                            $.notify({title: "Ops!", message: result.msg}, {type: "warning"})
+                        }
+                    },
+                    error: function () {
+                        Swal.fire({
+                            title: 'Ops!',
+                            text: 'Si è verificato un errore imprevisto.',
+                            type: 'danger',
+                            showCancelButton: false,
+                            buttonsStyling: false,
+                            confirmButtonClass: 'btn btn-info',
+                            confirmButtonText: 'Ho Capito!',
+                        })
+                    }
+                });
+
+            });
+            
+            const playerId = {{ $player->id }};
+            let event = 'player_' + playerId + '_event';
+            channel.bind(event, function(data) {
+                
+                let type = data['type'];
+                if(type === 'draw_map') {
+                    alert('draw_map');
+                }
+                
             });
 
         });
