@@ -11,7 +11,9 @@
     </div>
     <div class="card-body">
         <div class="row">
-
+            <div class="col-md-12">
+                <div id="display_container"></div>
+            </div>
             <div class="col-12">
                 <div class="row">
                     <div class="col-3">
@@ -28,8 +30,52 @@
 
 @section('js')
     <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script> 
+
+        let app = null;
+        function initPixi() {
+
+            app = new PIXI.Application({
+                width: 1300, 
+                height: 500,
+                backgroundColor: 0xADD8E6,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+            });
+            document.getElementById('display_container').appendChild(app.view);
+
+            app.renderer.view.style.width = '100%';
+            app.renderer.view.style.height = 'auto';
+            app.renderer.resize(app.view.offsetWidth, app.view.offsetHeight);
+
+            window.addEventListener('resize', () => {
+                app.renderer.resize(app.view.offsetWidth, app.view.offsetHeight);
+            });
+
+        }
+
+        function drawSquare(object) {
+
+            const square = new PIXI.Graphics();
+            square.beginFill(object['color']);
+
+            square.drawRect(
+                object['x'],
+                object['y'],
+                object['size'],
+                object['size']
+            );
+            square.endFill();
+
+            app.stage.addChild(square);
+
+        }
+
         $(document).ready(function () {
+
+            initPixi();
 
             // Enable pusher logging - don't include this in production
             Pusher.logToConsole = true;
@@ -80,7 +126,12 @@
                 
                 let type = data['type'];
                 if(type === 'draw_map') {
-                    alert('draw_map');
+                    for (const item of data['items']) {
+                        let itemType = item['type'];
+                        if(itemType === 'square') {
+                            drawSquare(item);
+                        }
+                    }
                 }
                 
             });

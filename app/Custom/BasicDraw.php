@@ -19,10 +19,10 @@ class BasicDraw
 
     public function commonJson($extra) 
     {
-        return json_encode([
+        return [
             'type' => $this->type,
             'color' => $this->color
-        ]+$extra);
+        ]+$extra;
     }
 
 }

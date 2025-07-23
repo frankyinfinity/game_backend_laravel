@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Custom\Square;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -79,8 +80,25 @@ class PlayerController extends Controller
 
         $channel = 'player_channel';
         $event = 'player_'.$player_id.'_event';
+
+        $items = [];
+
+        $square = new Square();
+        $square->setOrigin(10, 25);
+        $square->setSize(15);
+        $square->setColor(0xFF0000);
+
+        $square2 = new Square();
+        $square2->setOrigin(10, 55);
+        $square2->setSize(15);
+        $square2->setColor(0x00FF00);
+
+        $items[] = $square->buildJson();
+        $items[] = $square2->buildJson();
+
         Helper::sendEvent($channel, $event, [
-            'type' => 'draw_map'
+            'type' => 'draw_map',
+            'items' => $items
         ]);
 
         return response()->json(['success' => true]);
