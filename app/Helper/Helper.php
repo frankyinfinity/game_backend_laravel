@@ -7,6 +7,11 @@ use Pusher\Pusher;
 class Helper
 {
 
+    const TILE_SIZE = 40;
+    public static function getTileSize() {
+        return self::TILE_SIZE;
+    }
+
     public static function sendEvent($channel, $event, $data) {
 
         $pusher = new Pusher(

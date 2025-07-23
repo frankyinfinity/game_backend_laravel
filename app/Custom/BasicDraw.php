@@ -6,6 +6,7 @@ class BasicDraw
 {
     private $type;
     private $color;
+    private $thickness;
 
     public function __construct($type)
     {
@@ -17,11 +18,16 @@ class BasicDraw
         $this->color = $color;
     }
 
+    public function setThickness($thickness) {
+        $this->thickness = $thickness;
+    }
+
     public function commonJson($extra) 
     {
         return [
             'type' => $this->type,
-            'color' => $this->color
+            'color' => $this->color,
+            'thickness' => $this->thickness
         ]+$extra;
     }
 

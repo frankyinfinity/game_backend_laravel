@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Custom\MultiLine;
 use App\Custom\Square;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
@@ -53,7 +54,13 @@ class PlayerController extends Controller
     {
         $player = Player::query()->findOrFail($id);
         $username = $player->user->name;
-        return view("player.show", compact("player", "username"));
+
+        $size = Helper::getTileSize();
+        $width = $player->birthRegion->width * $size;
+        $height = $player->birthRegion->height * $size;
+
+        return view("player.show", compact("player", "username", "width", "height"));
+    
     }
 
     /**
@@ -91,7 +98,7 @@ class PlayerController extends Controller
         $startI = 0;
         $iPos = $startI;
         $jPos = 0;
-        $size = 40;
+        $size = Helper::TILE_SIZE;
 
         $player = Player::find($player_id);
         $birthRegion = $player->birthRegion;
@@ -124,6 +131,16 @@ class PlayerController extends Controller
                 $square->setColor($oxHexValue);
                 $items[] = $square->buildJson();
 
+                $borders = new MultiLine();
+                $borders->setThickness(thickness: 1);
+                $borders->setPoint($iPos, $jPos);
+                $borders->setPoint($iPos, $jPos+$size);
+                $borders->setPoint($iPos+$size, $jPos+$size);
+                $borders->setPoint($iPos+$size, $jPos);
+                $borders->setPoint($iPos, $jPos);
+                $borders->setColor(0xFFFFFF);
+                $items[] = $borders->buildJson();
+
                 $iPos += $size;
 
             }
@@ -154,7 +171,7 @@ class PlayerController extends Controller
             ->where('request_id', $request->request_id)
             ->where('player_id', $request->player_id)
             ->first();
-            
+
         if($drawMapRequest !== null) {
             $items = json_decode($drawMapRequest->items);
             $drawMapRequest->delete();

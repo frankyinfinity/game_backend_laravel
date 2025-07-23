@@ -12,7 +12,7 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-12">
-                <div id="display_container"></div>
+                <div id="display_container" style="max-width: 100%; max-height: 500px; overflow-x: scroll; overflow-y: scroll;"></div>
             </div>
             <div class="col-12">
                 <div class="row">
@@ -37,8 +37,8 @@
         function initPixi() {
 
             app = new PIXI.Application({
-                width: 1300, 
-                height: 500,
+                width: {{ $width }}, 
+                height: {{ $height }},
                 backgroundColor: 0x00000,
                 antialias: true,
                 resolution: window.devicePixelRatio || 1,
@@ -70,6 +70,26 @@
             square.endFill();
 
             app.stage.addChild(square);
+
+        }
+
+        function drawMultiLine(object) {
+
+            console.log(object);
+            const lineGraphics = new PIXI.Graphics();
+
+            const lineColor = object['color'];
+            const lineThickness = object['thickness'];
+
+            let points = object['points'];
+            lineGraphics.moveTo(points[0].x, points[0].y);
+            lineGraphics.lineStyle(lineThickness, lineColor);
+
+            lineGraphics.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                lineGraphics.lineTo(points[i].x, points[i].y);
+            }
+            app.stage.addChild(lineGraphics);
 
         }
 
@@ -138,12 +158,13 @@
                     success: function(result) {
                         if(result.success) {
                             let items = result.items;
-                            console.log(items);
                             for (const item of items) {
-                                console.log(item);
                                 let itemType = item['type'];
                                 if(itemType === 'square') {
                                     drawSquare(item);
+                                }
+                                if(itemType === 'multi_line') {
+                                    drawMultiLine(item);
                                 }
                             }
                         } else {
