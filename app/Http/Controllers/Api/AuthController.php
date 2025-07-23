@@ -16,6 +16,7 @@ use App\Models\BirthPlanet;
 use App\Models\BirthRegion;
 use App\Models\BirthClimate;
 use Illuminate\Support\Facades\Storage;
+use Log;
 
 class AuthController extends Controller
 {
@@ -45,29 +46,29 @@ class AuthController extends Controller
             'name' => $planet->name,
             'description' => $planet->description,
         ]);
-        foreach($planet->regions as $region) {
+        foreach($planet->regions as $itemRegion) {
 
             $birthClimate = BirthClimate::query()->create([
-                "name" => $region->climate->name,
-                "started" => $region->climate->started,
-                "min_temperature" => $region->climate->min_temperature,
-                "max_temperature" => $region->climate->max_temperature,
-                "default_tile" => $region->climate->defaultTile,
+                "name" => $itemRegion->climate->name,
+                "started" => $itemRegion->climate->started,
+                "min_temperature" => $itemRegion->climate->min_temperature,
+                "max_temperature" => $itemRegion->climate->max_temperature,
+                "default_tile" => $itemRegion->climate->defaultTile,
             ]);
 
-            $filename = $region->filename;
+            $filename = $itemRegion->filename;
             $birthRegion = BirthRegion::query()->create([
                 'birth_planet_id' => $birthPlanet->id,
                 'birth_climate_id' => $birthClimate->id,
-                'name' => $region->name,
-                'width' => $region->width,
-                'height' => $region->height,
-                'description' => $region->description,
+                'name' => $itemRegion->name,
+                'width' => $itemRegion->width,
+                'height' => $itemRegion->height,
+                'description' => $itemRegion->description,
                 'filename' => $filename,
             ]);
 
             if($filename !== null) {
-                $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
+                $jsonContent = Storage::disk('regions')->get($itemRegion->id.'/'.$filename);
                 $json = json_decode($jsonContent, true);
                 $jsonData = json_encode($json, JSON_PRETTY_PRINT);
                 Storage::disk('birth_regions')->put($birthRegion->id.'/'.$filename, $jsonData);
@@ -77,7 +78,7 @@ class AuthController extends Controller
 
         $searchBirthRegion = BirthRegion::query()
             ->where('birth_planet_id', $birthPlanet->id)
-            ->where('name', $birthRegion->name)
+            ->where('name', $region->name)
             ->first();
 
         //Create Player
