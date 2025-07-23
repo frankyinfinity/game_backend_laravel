@@ -52,7 +52,7 @@ class AuthController extends Controller
                 "started" => $region->climate->started,
                 "min_temperature" => $region->climate->min_temperature,
                 "max_temperature" => $region->climate->max_temperature,
-                "default_tile_id" => $region->climate->default_tile_id,
+                "default_tile" => $region->climate->defaultTile,
             ]);
 
             $filename = $region->filename;

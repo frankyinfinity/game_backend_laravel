@@ -103,7 +103,7 @@
                     },
                     {
                         render: function(data, type, row){
-                            if(data.toString() === null) return '-';
+                            if(data === null) return '-';
                             return data;
                         },
                         targets:   2
