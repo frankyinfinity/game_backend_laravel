@@ -4,16 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class BirthClimate extends Model
+class DrawMapRequest extends Model
 {
-
     protected $guarded = ['id', 'created_at', 'updated_at'];
     protected $casts = [
-        'default_tile' => 'json',
+        'items' => 'json',
     ];
 
-    public function regions(){
-        return $this->hasMany(Region::class);
+    public function player(){
+        return $this->belongsTo(Player::class);
     }
-    
+
 }

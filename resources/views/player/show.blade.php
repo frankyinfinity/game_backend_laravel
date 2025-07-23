@@ -39,7 +39,7 @@
             app = new PIXI.Application({
                 width: 1300, 
                 height: 500,
-                backgroundColor: 0xADD8E6,
+                backgroundColor: 0x00000,
                 antialias: true,
                 resolution: window.devicePixelRatio || 1,
                 autoDensity: true,
@@ -84,17 +84,18 @@
                 cluster: 'eu',
             });
 
-            var channel = pusher.subscribe('player_channel');
+            const playerId = {{ $player->id }};
+            let channelName = 'player_' + playerId + '_channel';
+
+            var channel = pusher.subscribe(channelName);
             channel.bind('pusher:subscription_succeeded', function() {
                 
-                $.ajaxSetup({
+                $.ajax({
+                    url: "{{ route('players.generate.map') }}",
+                    type: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    }
-                });
-                $.ajax({
-                    url: "{{ route('players.draw.map') }}",
-                    type: 'POST',
+                    },
                     data: { 
                         player_id: '{{$player->id}}',
                      },
@@ -120,19 +121,60 @@
 
             });
             
-            const playerId = {{ $player->id }};
-            let event = 'player_' + playerId + '_event';
-            channel.bind(event, function(data) {
-                
-                let type = data['type'];
+            channel.bind('draw_map', function(data) {
+
+                let request_id = data['request_id'];
+                let player_id = data['player_id'];
+                $.ajax({
+                    url: "{{ route('players.get.map') }}",
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    data: { 
+                        request_id: request_id,
+                        player_id: player_id,
+                     },
+                    success: function(result) {
+                        if(result.success) {
+                            let items = result.items;
+                            console.log(items);
+                            for (const item of items) {
+                                console.log(item);
+                                let itemType = item['type'];
+                                if(itemType === 'square') {
+                                    drawSquare(item);
+                                }
+                            }
+                        } else {
+                            var msg = 'Si è verificato un errore.';
+                            if(result.msg != null) msg = result.msg;
+                            $.notify({title: "Ops!", message: result.msg}, {type: "warning"})
+                        }
+                    },
+                    error: function () {
+                        Swal.fire({
+                            title: 'Ops!',
+                            text: 'Si è verificato un errore imprevisto.',
+                            type: 'danger',
+                            showCancelButton: false,
+                            buttonsStyling: false,
+                            confirmButtonClass: 'btn btn-info',
+                            confirmButtonText: 'Ho Capito!',
+                        })
+                    }
+                });
+
+                /*let type = data['type'];
                 if(type === 'draw_map') {
+                    console.log(data['items']);
                     for (const item of data['items']) {
                         let itemType = item['type'];
                         if(itemType === 'square') {
                             drawSquare(item);
                         }
                     }
-                }
+                }*/
                 
             });
 

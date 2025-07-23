@@ -45,6 +45,7 @@ Route::group(['middleware' => ['auth']], function (){
     //Players
     Route::resource('players', App\Http\Controllers\PlayerController::class);
     Route::post('/players/list/table', [App\Http\Controllers\PlayerController::class, 'listDataTable'])->name(name: 'players.datatable');
-    Route::post('/players/draw/map', [App\Http\Controllers\PlayerController::class, 'drawMap'])->name(name: 'players.draw.map');
+    Route::post('/players/generate/map', [App\Http\Controllers\PlayerController::class, 'generateMap'])->name(name: 'players.generate.map');
+    Route::post('/players/get/map', [App\Http\Controllers\PlayerController::class, 'getMap'])->name(name: 'players.get.map');
 
 });
