@@ -11,7 +11,7 @@ class Circle extends BasicDraw
 
     public function __construct()
     {
-        parent::__construct('radius');
+        parent::__construct('circle');
     }
 
     public function setOrigin($x, $y)

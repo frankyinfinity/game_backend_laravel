@@ -2,18 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Custom\MultiLine;
-use App\Custom\Square;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateMapJob;
 use App\Models\DrawMapRequest;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use App\Models\Player;
 use Log;
-use Illuminate\Support\Facades\Storage;
-use Str;
-use function GuzzleHttp\json_encode;
 
 class PlayerController extends Controller
 {
@@ -88,80 +83,8 @@ class PlayerController extends Controller
     }
 
     public function generateMap(Request $request) {
-
-        $player_id = $request->player_id;
-
-        $channel = 'player_'.$player_id.'_channel';
-        $event = 'draw_map';
-
-        $items = [];
-        $startI = 0;
-        $iPos = $startI;
-        $jPos = 0;
-        $size = Helper::TILE_SIZE;
-
-        $player = Player::find($player_id);
-        $birthRegion = $player->birthRegion;
-        $birthClimate = $birthRegion->birthClimate;
-
-        $tiles = [];
-        if($birthRegion->filename !== null) {
-            $jsonContent = Storage::disk('birth_regions')->get($birthRegion->id.'/'.$birthRegion->filename);
-            $tiles = json_decode($jsonContent, true);
-        }
-        $tiles = collect($tiles);
-
-        for ($i = 0; $i < $birthRegion->height; $i++) {
-            for ($j = 0; $j < $birthRegion->width; $j++) {
-                
-                $tile = $birthClimate->default_tile;
-                $searchTile = $tiles->where('i', $i)->where('j', $j)->first();
-                if($searchTile !== null) {
-                    $tile = $searchTile['tile'];
-                }
-
-                $color = $tile['color'];
-                $hexWithoutHash = ltrim($color, '#');
-                $decimalValue = hexdec($hexWithoutHash);
-                $oxHexValue = '0x' . strtoupper(dechex($decimalValue));
-
-                $square = new Square();
-                $square->setOrigin($iPos, $jPos);
-                $square->setSize($size);
-                $square->setColor($oxHexValue);
-                $items[] = $square->buildJson();
-
-                $borders = new MultiLine();
-                $borders->setThickness(thickness: 1);
-                $borders->setPoint($iPos, $jPos);
-                $borders->setPoint($iPos, $jPos+$size);
-                $borders->setPoint($iPos+$size, $jPos+$size);
-                $borders->setPoint($iPos+$size, $jPos);
-                $borders->setPoint($iPos, $jPos);
-                $borders->setColor(0xFFFFFF);
-                $items[] = $borders->buildJson();
-
-                $iPos += $size;
-
-            }
-            $iPos = $startI;
-            $jPos += $size;
-        }
-
-        $request_id = Str::random(20);
-        DrawMapRequest::query()->create([
-            'request_id' => $request_id,
-            'player_id' => $player_id,
-            'items' => json_encode($items),
-        ]);
-
-        Helper::sendEvent($channel, $event, [
-            'request_id' => $request_id,
-            'player_id' => $player_id,
-        ]);
-
+        GenerateMapJob::dispatch($request->all());
         return response()->json(['success' => true]);
-
     }
 
     public function getMap(Request $request) {

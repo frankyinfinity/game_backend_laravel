@@ -75,7 +75,6 @@
 
         function drawMultiLine(object) {
 
-            console.log(object);
             const lineGraphics = new PIXI.Graphics();
 
             const lineColor = object['color'];
@@ -90,6 +89,23 @@
                 lineGraphics.lineTo(points[i].x, points[i].y);
             }
             app.stage.addChild(lineGraphics);
+
+        }
+
+        function drawCircle(object) {
+
+            const circleGraphics = new PIXI.Graphics();
+
+            const circleX = object['x'];
+            const circleY = object['y'];
+            const circleRadius = object['radius'];
+            const fillColor = object['color'];
+            
+            circleGraphics.beginFill(fillColor);
+            circleGraphics.drawCircle(circleX, circleY, circleRadius);
+            circleGraphics.endFill();
+
+            app.stage.addChild(circleGraphics);
 
         }
 
@@ -165,6 +181,9 @@
                                 }
                                 if(itemType === 'multi_line') {
                                     drawMultiLine(item);
+                                }
+                                if(itemType === 'circle') {
+                                    drawCircle(item);
                                 }
                             }
                         } else {

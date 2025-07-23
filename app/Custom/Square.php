@@ -20,9 +20,9 @@ class Square extends BasicDraw
         $this->y = $y;
     }
 
-   public function setSize($size) {
+    public function setSize($size) {
        $this->size = $size;
-   }
+    }
 
     public function buildJson() {
         return $this->commonJson([
@@ -30,6 +30,24 @@ class Square extends BasicDraw
             'y' => $this->y,
             'size' => $this->size
         ]);
+    }
+
+    private function getCenterX(): float
+    {
+        return $this->x + ($this->size / 2);
+    }
+
+    private function getCenterY(): float
+    {
+        return $this->y + ($this->size / 2);
+    }
+
+    public function getCenter(): array
+    {
+        return [
+            'x' => $this->getCenterX(),
+            'y' => $this->getCenterY(),
+        ];
     }
 
 }

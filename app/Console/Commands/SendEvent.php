@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Events\MyEvent;
 use Pusher\Pusher;
 
 class SendEvent extends Command
