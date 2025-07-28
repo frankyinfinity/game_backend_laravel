@@ -34,6 +34,7 @@
     <script> 
 
         let app = null;
+        let objects = {};
         function initPixi() {
 
             app = new PIXI.Application({
@@ -71,6 +72,9 @@
 
             app.stage.addChild(square);
 
+            let uid = object['uid'];
+            objects[uid] = square;
+
         }
 
         function drawMultiLine(object) {
@@ -88,8 +92,12 @@
             for (let i = 1; i < points.length; i++) {
                 lineGraphics.lineTo(points[i].x, points[i].y);
             }
+
             app.stage.addChild(lineGraphics);
 
+            let uid = object['uid'];
+            objects[uid] = lineGraphics;
+            
         }
 
         function drawCircle(object) {
@@ -106,6 +114,9 @@
             circleGraphics.endFill();
 
             app.stage.addChild(circleGraphics);
+
+            let uid = object['uid'];
+            objects[uid] = circleGraphics;
 
         }
 

@@ -27,6 +27,7 @@ class BasicDraw
     public function commonJson($extra) 
     {
         return [
+            'uid' => $this->uid,
             'type' => $this->type,
             'color' => $this->color,
             'thickness' => $this->thickness
