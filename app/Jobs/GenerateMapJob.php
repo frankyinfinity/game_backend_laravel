@@ -114,9 +114,9 @@ class GenerateMapJob implements ShouldQueue
 
                     $centerSquare = $square->getCenter();
 
-                    $circle = New Circle();
-                    $circle->setOrigin($centerSquare['x'], y: $centerSquare['y']);
-                    $circle->setRadius($size / 3);
+                    $entity = New Circle($searchEntity->uid);
+                    $entity->setOrigin($centerSquare['x'], y: $centerSquare['y']);
+                    $entity->setRadius($size / 3);
 
                     $genomes = $searchEntity->genomes;
 
@@ -142,9 +142,9 @@ class GenerateMapJob implements ShouldQueue
                     $rgbDecimal = ($red << 16) | ($green << 8) | $blue;
                     $hexColorString = str_pad(dechex($rgbDecimal), 6, '0', STR_PAD_LEFT);
                     $formattedColor = "0x" . strtoupper($hexColorString);
-                    $circle->setColor($formattedColor);
+                    $entity->setColor($formattedColor);
 
-                    $items[] = $circle->buildJson();
+                    $items[] = $entity->buildJson();
 
                 }
 

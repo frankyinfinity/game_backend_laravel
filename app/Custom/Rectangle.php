@@ -10,9 +10,12 @@ class Rectangle extends BasicDraw
     private $width;
     private $height;
 
-    public function __construct()
+    public function __construct($uid = null)
     {
-        parent::__construct('rectangle');
+        if($uid == null) {
+            $uid = uniqid();
+        }
+        parent::__construct('rectangle', $uid);
     }
 
     public function setOrigin($x, $y)

@@ -9,9 +9,12 @@ class Circle extends BasicDraw
     private $y;
     private $radius;
 
-    public function __construct()
+    public function __construct($uid = null)
     {
-        parent::__construct('circle');
+        if($uid == null) {
+            $uid = uniqid();
+        }
+        parent::__construct('circle', $uid);
     }
 
     public function setOrigin($x, $y)

@@ -9,9 +9,12 @@ class Square extends BasicDraw
     private $y;
     private $size;
 
-    public function __construct()
+    public function __construct($uid = null)
     {
-        parent::__construct('square');
+        if($uid == null) {
+            $uid = uniqid();
+        }
+        parent::__construct('square', $uid);
     }
 
     public function setOrigin($x, $y)

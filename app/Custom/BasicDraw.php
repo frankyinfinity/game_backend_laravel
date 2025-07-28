@@ -4,13 +4,15 @@ namespace App\Custom;
 
 class BasicDraw
 {
+    private $uid;
     private $type;
     private $color;
     private $thickness;
 
-    public function __construct($type)
+    public function __construct($type, $uid)
     {
         $this->type = $type;
+        $this->uid = $uid;
     }
 
     public function setColor($color)

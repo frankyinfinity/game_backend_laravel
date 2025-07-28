@@ -7,9 +7,12 @@ class MultiLine extends BasicDraw
 
     private $points = [];
 
-    public function __construct()
+    public function __construct($uid = null)
     {
-        parent::__construct('multi_line');
+        if($uid == null) {
+            $uid = uniqid();
+        }
+        parent::__construct('multi_line', $uid);
     }
 
     public function setPoint($x, $y)

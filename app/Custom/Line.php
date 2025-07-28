@@ -10,9 +10,12 @@ class Line extends BasicDraw
     private $x2;
     private $y2;
 
-    public function __construct()
+    public function __construct($uid = null)
     {
-        parent::__construct('line');
+        if($uid == null) {
+            $uid = uniqid();
+        }
+        parent::__construct('line', $uid);
     }
 
     public function setPoint($x1, $y1, $x2, $y2)
