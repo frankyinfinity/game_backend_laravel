@@ -215,19 +215,23 @@
                         })
                     }
                 });
-
-                /*let type = data['type'];
-                if(type === 'draw_map') {
-                    console.log(data['items']);
-                    for (const item of data['items']) {
-                        let itemType = item['type'];
-                        if(itemType === 'square') {
-                            drawSquare(item);
-                        }
-                    }
-                }*/
                 
             });
+
+        channel.bind('move_entity', function(data) {
+
+            let uid = data['uid'];
+            let i = data['i'];
+            let j = data['j'];
+
+            let object = objects [uid];
+
+            object.x += j;
+            object.y += i;
+            object.zIndex = 1000;
+            
+            
+        });
 
         });
     </script>
