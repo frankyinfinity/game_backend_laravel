@@ -218,20 +218,20 @@
                 
             });
 
-        channel.bind('move_entity', function(data) {
+            channel.bind('move_entity', function(data) {
 
-            let uid = data['uid'];
-            let i = data['i'];
-            let j = data['j'];
+                let uid = data['uid'];
+                let i = data['i'];
+                let j = data['j'];
 
-            let object = objects [uid];
+                let object = objects [uid];
 
-            object.x += j;
-            object.y += i;
-            object.zIndex = 1000;
-            
-            
-        });
+                object.x += j;
+                object.y += i;
+                object.zIndex = 1000;
+                
+                
+            });
 
         });
     </script>
