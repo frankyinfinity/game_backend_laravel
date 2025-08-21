@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Custom\Circle;
+use App\Custom\EntityDraw;
 use App\Helper\Helper;
 use App\Models\Gene;
 use App\Models\Genome;
@@ -65,16 +66,7 @@ class GenerateMapJob implements ShouldQueue
             ->whereHas('specie', function ($q) use ($player_id) {
                 $q->where('player_id', $player_id);
             })
-            ->get()
-            ->map(function ($entity) {
-                $entity->genomes->map(function ($genome) {
-                    $genome->gene_key = $genome->gene->key;
-                    $genome->gene_name = $genome->gene->name;
-                    $genome->gene_value = $genome->entityInformations[0]->value;
-                    return $genome; 
-                });
-                return $entity;
-            });
+            ->get();
 
         for ($i = 0; $i < $birthRegion->height; $i++) {
             for ($j = 0; $j < $birthRegion->width; $j++) {
@@ -112,39 +104,12 @@ class GenerateMapJob implements ShouldQueue
                 $searchEntity = $entities->where('tile_i', $i)->where('tile_j', $j)->first();
                 if($searchEntity !== null) {
 
-                    $centerSquare = $square->getCenter();
+                    $entityDraw = new EntityDraw($searchEntity, $square);
 
-                    $entity = New Circle($searchEntity->uid);
-                    $entity->setOrigin($centerSquare['x'], y: $centerSquare['y']);
-                    $entity->setRadius($size / 3);
-
-                    $genomes = $searchEntity->genomes;
-
-                    $red = 0;
-                    $green = 0;
-                    $blue = 0;
-
-                    $genomeRed = collect($genomes)->where('gene_key', Gene::KEY_RED_TEXTURE)->first();
-                    if($genomeRed !== null) {
-                        $red = $genomeRed['gene_value'];
+                    $entityDrawItems = $entityDraw->getItems();
+                    foreach ($entityDrawItems as $entityDrawItem) {
+                        $items[] = $entityDrawItem;
                     }
-
-                    $genomeGreen = collect($genomes)->where('gene_key', Gene::KEY_GREEN_TEXTURE)->first();
-                    if($genomeGreen !== null) {
-                        $green = $genomeGreen['gene_value'];
-                    }
-
-                    $genomeBlue = collect($genomes)->where('gene_key', Gene::KEY_BLUE_TEXTURE)->first();
-                    if($genomeBlue !== null) {
-                        $blue = $genomeBlue['gene_value'];
-                    }
-
-                    $rgbDecimal = ($red << 16) | ($green << 8) | $blue;
-                    $hexColorString = str_pad(dechex($rgbDecimal), 6, '0', STR_PAD_LEFT);
-                    $formattedColor = "0x" . strtoupper($hexColorString);
-                    $entity->setColor($formattedColor);
-
-                    $items[] = $entity->buildJson();
 
                 }
 

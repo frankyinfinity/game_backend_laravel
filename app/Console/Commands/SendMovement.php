@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Models\Entity;
+use App\Helper\Helper;
 
 class SendMovement extends Command
 {
@@ -26,13 +28,13 @@ class SendMovement extends Command
     public function handle()
     {
 
-        $player_id = 2;
+        $player_id = 6;
         $channel = 'player_'.$player_id.'_channel';
         $event = 'move_entity';
 
-        $uid = '1234';
-        $toI = 4;
-        $toJ = 4;
+        $uid = '6880b7ec6e7ac8.76610132';
+        $toI = 1;
+        $toJ = 1;
 
         $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
