@@ -18,7 +18,7 @@
                 <div class="row">
                     <div class="col-3">
                         <a href="{{route('planets.index')}}">
-                            <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>                    
+                            <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
                         </a>
                     </div>
                 </div>
@@ -31,14 +31,14 @@
 @section('js')
     <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
-    <script> 
+    <script>
 
         let app = null;
         let objects = {};
         function initPixi() {
 
             app = new PIXI.Application({
-                width: {{ $width }}, 
+                width: {{ $width }},
                 height: {{ $height }},
                 backgroundColor: 0x00000,
                 antialias: true,
@@ -97,7 +97,7 @@
 
             let uid = object['uid'];
             objects[uid] = lineGraphics;
-            
+
         }
 
         function drawCircle(object) {
@@ -108,7 +108,7 @@
             const circleY = object['y'];
             const circleRadius = object['radius'];
             const fillColor = object['color'];
-            
+
             circleGraphics.beginFill(fillColor);
             circleGraphics.drawCircle(circleX, circleY, circleRadius);
             circleGraphics.endFill();
@@ -129,21 +129,27 @@
 
             var pusher = new Pusher('f02185b1bc94c884ce5b', {
                 cluster: 'eu',
+                authEndpoint: '/broadcasting/auth',
+                auth: {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                }
             });
 
             const playerId = {{ $player->id }};
-            let channelName = 'player_' + playerId + '_channel';
+            let channelName = 'private-player_' + playerId + '_channel';
 
             var channel = pusher.subscribe(channelName);
             channel.bind('pusher:subscription_succeeded', function() {
-                
+
                 $.ajax({
                     url: "{{ route('players.generate.map') }}",
                     type: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
-                    data: { 
+                    data: {
                         player_id: '{{$player->id}}',
                      },
                     success: function(result) {
@@ -167,7 +173,7 @@
                 });
 
             });
-            
+
             channel.bind('draw_map', function(data) {
 
                 let request_id = data['request_id'];
@@ -178,7 +184,7 @@
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
-                    data: { 
+                    data: {
                         request_id: request_id,
                         player_id: player_id,
                      },
@@ -215,7 +221,7 @@
                         })
                     }
                 });
-                
+
             });
 
             channel.bind('move_entity', function(data) {
@@ -229,8 +235,8 @@
                 object.x += j;
                 object.y += i;
                 object.zIndex = 1000;
-                
-                
+
+
             });
 
         });

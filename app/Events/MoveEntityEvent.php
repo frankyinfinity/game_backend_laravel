@@ -37,7 +37,7 @@ class MoveEntityEvent implements ShouldBroadcast
     {
         $channel = $this->channel;
         return [
-            new Channel($channel),
+            new PrivateChannel($channel),
         ];
     }
     public function broadcastAs(): string
