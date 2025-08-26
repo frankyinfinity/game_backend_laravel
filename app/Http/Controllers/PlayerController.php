@@ -54,10 +54,8 @@ class PlayerController extends Controller
         $width = $player->birthRegion->width * $size;
         $height = $player->birthRegion->height * $size;
 
-        //return view("player.show", compact("player", "username", "width", "height"));
-        
-        return view("player.test");
-    
+        return view("player.show", compact("player", "username", "width", "height"));
+            
     }
 
     /**

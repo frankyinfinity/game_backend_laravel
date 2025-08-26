@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use Log;
 use Str;
 use function GuzzleHttp\json_encode;
+use App\Events\DrawMapEvent;
 
 class GenerateMapJob implements ShouldQueue
 {
@@ -127,10 +128,10 @@ class GenerateMapJob implements ShouldQueue
             'items' => json_encode($items),
         ]);
 
-        Helper::sendEvent($channel, $event, [
+        event(new DrawMapEvent($channel, $event, [
             'request_id' => $request_id,
             'player_id' => $player_id,
-        ]);
+        ]));
 
     }
 
