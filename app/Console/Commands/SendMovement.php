@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Events\MoveEntityEvent;
 use Illuminate\Console\Command;
 use App\Models\Entity;
 use App\Helper\Helper;
@@ -47,11 +48,11 @@ class SendMovement extends Command
         $movementI = $diffI * $size;
         $movementJ = $diffJ * $size;
 
-        Helper::sendEvent($channel, $event, [
+        event(new MoveEntityEvent($channel, $event, [
             'uid' => $uid,
             'i' => $movementI,
             'j' => $movementJ
-        ]);
+        ]));
         $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
         
     }
