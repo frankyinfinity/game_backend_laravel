@@ -1,10 +1,15 @@
-FROM node:18-alpine
+# Usa un'immagine base di Node.js
+FROM node:18
 
+# Crea una directory dentro il container
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
 
-# Comando che verrà eseguito quando il container si avvia
-# Passa l'entity ID come argomento
+# Copia i file nella directory di lavoro del container
+COPY entity.js .
+
+# Se ci sono dipendenze (come un package.json), dovresti copiarle e installarle
+# COPY package*.json ./
+# RUN npm install
+
+# Comando per eseguire lo script
 CMD ["node", "entity.js"]
