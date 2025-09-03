@@ -236,6 +236,7 @@
                 object.y += i;
                 object.zIndex = 1000;
 
+                objects[uid] = object;
 
             });
 
