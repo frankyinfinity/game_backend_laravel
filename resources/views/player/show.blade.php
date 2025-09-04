@@ -47,6 +47,7 @@
             });
             document.getElementById('display_container').appendChild(app.view);
 
+            app.stage.sortableChildren = true;
             app.renderer.view.style.width = '100%';
             app.renderer.view.style.height = 'auto';
             app.renderer.resize(app.view.offsetWidth, app.view.offsetHeight);
@@ -230,7 +231,7 @@
                 let i = data['i'];
                 let j = data['j'];
 
-                let object = objects [uid];
+                let object = objects[uid];
 
                 object.x += j;
                 object.y += i;
