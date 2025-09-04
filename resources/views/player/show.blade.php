@@ -35,6 +35,100 @@
 
         let app = null;
         let objects = {};
+
+        class BasicDraw {
+
+            constructor(object) {
+                this.object = object;
+                this.shapeType = object['type'];
+                this.shape = null;
+            }
+
+            render(app) {
+
+                if (!this.shape) return;
+
+                app.stage.addChild(this.shape);
+
+                const uid = this.object['uid'];
+                objects[uid] = this.shape;
+
+            }
+
+        }
+
+        class Square extends BasicDraw {
+
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Graphics();
+            }
+
+            build() {
+                const object = this.object;
+                this.shape.beginFill(object['color']);
+                this.shape.drawRect(
+                    object['x'],
+                    object['y'],
+                    object['size'],
+                    object['size']
+                );
+                this.shape.endFill();
+            }
+
+        }
+
+        class MultiLine extends BasicDraw {
+
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Graphics();
+            }
+
+            build() {
+
+                const object = this.object;
+
+                const lineColor = object['color'];
+                const lineThickness = object['thickness'];
+
+                let points = object['points'];
+                this.shape.moveTo(points[0].x, points[0].y);
+                this.shape.lineStyle(lineThickness, lineColor);
+
+                this.shape.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    this.shape.lineTo(points[i].x, points[i].y);
+                }
+
+            }
+
+        }
+
+        class Circle extends BasicDraw {
+
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Graphics();
+            }
+
+            build() {
+
+                const object = this.object;
+
+                const circleX = object['x'];
+                const circleY = object['y'];
+                const circleRadius = object['radius'];
+                const fillColor = object['color'];
+
+                this.shape.beginFill(fillColor);
+                this.shape.drawCircle(circleX, circleY, circleRadius);
+                this.shape.endFill();
+
+            }
+
+        }
+
         function initPixi() {
 
             app = new PIXI.Application({
@@ -59,66 +153,21 @@
         }
 
         function drawSquare(object) {
-
-            const square = new PIXI.Graphics();
-            square.beginFill(object['color']);
-
-            square.drawRect(
-                object['x'],
-                object['y'],
-                object['size'],
-                object['size']
-            );
-            square.endFill();
-
-            app.stage.addChild(square);
-
-            let uid = object['uid'];
-            objects[uid] = square;
-
+            let draw = new Square(object);
+            draw.build();
+            draw.render(app);
         }
 
         function drawMultiLine(object) {
-
-            const lineGraphics = new PIXI.Graphics();
-
-            const lineColor = object['color'];
-            const lineThickness = object['thickness'];
-
-            let points = object['points'];
-            lineGraphics.moveTo(points[0].x, points[0].y);
-            lineGraphics.lineStyle(lineThickness, lineColor);
-
-            lineGraphics.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                lineGraphics.lineTo(points[i].x, points[i].y);
-            }
-
-            app.stage.addChild(lineGraphics);
-
-            let uid = object['uid'];
-            objects[uid] = lineGraphics;
-
+            let draw = new MultiLine(object);
+            draw.build();
+            draw.render(app);
         }
 
         function drawCircle(object) {
-
-            const circleGraphics = new PIXI.Graphics();
-
-            const circleX = object['x'];
-            const circleY = object['y'];
-            const circleRadius = object['radius'];
-            const fillColor = object['color'];
-
-            circleGraphics.beginFill(fillColor);
-            circleGraphics.drawCircle(circleX, circleY, circleRadius);
-            circleGraphics.endFill();
-
-            app.stage.addChild(circleGraphics);
-
-            let uid = object['uid'];
-            objects[uid] = circleGraphics;
-
+            let draw = new Circle(object);
+            draw.build();
+            draw.render(app);
         }
 
         $(document).ready(function () {
