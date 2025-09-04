@@ -51,7 +51,13 @@
 
                 let object = this.object;
 
+                //Visible
+                this.shape.renderable = object['extra']['renderable'];
+
+                //Interaction
                 this.addInteractive();
+
+                //Add Scene
                 app.stage.addChild(this.shape);
 
                 const uid = object['uid'];
@@ -69,6 +75,7 @@
 
                 let items = object['extra']['interactives']['items'];
                 Object.entries(items).forEach(([event, strFunction]) => {
+                    let shape = this.shape;
                     this.shape.on(event, () => {
                         eval(strFunction);
                     });

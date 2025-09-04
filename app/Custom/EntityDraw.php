@@ -68,6 +68,7 @@ class EntityDraw
 
         $centerSquare = $square->getCenter();
 
+        //Body
         $circle = New Circle($dbEntity->uid);
         $circle->setOrigin($centerSquare['x'], y: $centerSquare['y']);
         $circle->setRadius($size / 3);
@@ -75,13 +76,29 @@ class EntityDraw
         $formattedColor = $this->getColor();
         $circle->setColor($formattedColor);
 
-        $functionString = "function test() {
-            console.log('UID:');
-            console.log(object['uid']);
-        };
-        test();";
+        $functionDownString = "function actionDown() {
 
-        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $functionString);
+            console.log('pointerdown:');
+            console.log(object['uid']);
+
+            object['extra']['renderable'] = false;
+            shape.renderable = false;
+
+        };
+        actionDown();";
+        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $functionDownString);
+
+        $functionUpString = "function actionUp() {
+
+            console.log('pointerup:');
+            console.log(object['uid']);
+
+            object['extra']['renderable'] = true;
+            shape.renderable = true;
+
+        };
+        actionUp();";
+        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_UP, $functionUpString);
 
         $this->items[] = $circle->buildJson();
 
