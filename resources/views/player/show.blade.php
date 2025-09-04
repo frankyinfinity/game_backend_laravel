@@ -5,6 +5,7 @@
 @section('content_header')@stop
 
 @section('content')
+
 <div class="card">
     <div class="card-header pb-0">
         <h4 class="mb-0">Giocatore: <strong>{{$player->user->name}}</strong></h5>
@@ -48,10 +49,30 @@
 
                 if (!this.shape) return;
 
+                let object = this.object;
+
+                this.addInteractive();
                 app.stage.addChild(this.shape);
 
-                const uid = this.object['uid'];
+                const uid = object['uid'];
                 objects[uid] = this.shape;
+
+            }
+
+            addInteractive() {
+
+                let object = this.object;
+                if(object['extra']['interactives']['count'] === 0) return;
+
+                this.shape.interactive = true;
+                this.shape.buttonMode = true;
+
+                let items = object['extra']['interactives']['items'];
+                Object.entries(items).forEach(([event, strFunction]) => {
+                    this.shape.on(event, () => {
+                        eval(strFunction);
+                    });
+                });
 
             }
 

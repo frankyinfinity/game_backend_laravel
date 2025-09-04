@@ -8,11 +8,17 @@ class BasicDraw
     private $type;
     private $color;
     private $thickness;
+    private array $interactives;
+    private int $countInteractives;
+
+    const INTERACTIVE_POINTER_DOWN = 'pointerdown';
 
     public function __construct($type, $uid)
     {
         $this->type = $type;
         $this->uid = $uid;
+        $this->interactives = [];
+        $this->countInteractives = 0;
     }
 
     public function setColor($color)
@@ -24,13 +30,24 @@ class BasicDraw
         $this->thickness = $thickness;
     }
 
-    public function commonJson($extra) 
+    public function setInteractive($event, $function) {
+        $this->interactives[$event] = $function;
+        $this->countInteractives++;
+    }
+
+    public function commonJson($extra)
     {
         return [
             'uid' => $this->uid,
             'type' => $this->type,
             'color' => $this->color,
-            'thickness' => $this->thickness
+            'thickness' => $this->thickness,
+            'extra' => [
+                'interactives' => [
+                    'items' => $this->interactives,
+                    'count' => $this->countInteractives,
+                ],
+            ]
         ]+$extra;
     }
 

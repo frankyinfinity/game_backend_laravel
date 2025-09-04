@@ -8,7 +8,7 @@ use App\Models\Gene;
 use Arr;
 use Str;
 
-class EntityDraw 
+class EntityDraw
 {
 
     private Entity $dbEntity;
@@ -21,7 +21,6 @@ class EntityDraw
         $this->items = [];
         $this->build();
     }
-
     private function getGenomes() {
 
         $dbEntity = $this->dbEntity;
@@ -29,7 +28,7 @@ class EntityDraw
             $genome->gene_key = $genome->gene->key;
             $genome->gene_name = $genome->gene->name;
             $genome->gene_value = $genome->entityInformations[0]->value;
-            return $genome; 
+            return $genome;
         });
 
         return $dbEntity->genomes;
@@ -62,21 +61,29 @@ class EntityDraw
     }
 
     private function build() {
-        
+
         $dbEntity = $this->dbEntity;
         $square = $this->square;
         $size = Helper::getTileSize();
 
         $centerSquare = $square->getCenter();
 
-        $entity = New Circle($dbEntity->uid);
-        $entity->setOrigin($centerSquare['x'], y: $centerSquare['y']);
-        $entity->setRadius($size / 3);
+        $circle = New Circle($dbEntity->uid);
+        $circle->setOrigin($centerSquare['x'], y: $centerSquare['y']);
+        $circle->setRadius($size / 3);
 
         $formattedColor = $this->getColor();
-        $entity->setColor($formattedColor);
+        $circle->setColor($formattedColor);
 
-        $this->items[] = $entity->buildJson();
+        $functionString = "function test() {
+            console.log('UID:');
+            console.log(object['uid']);
+        };
+        test();";
+
+        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $functionString);
+
+        $this->items[] = $circle->buildJson();
 
     }
 
