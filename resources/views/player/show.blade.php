@@ -106,6 +106,27 @@
 
         }
 
+        class Rectangle extends BasicDraw {
+
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Graphics();
+            }
+
+            build() {
+                const object = this.object;
+                this.shape.beginFill(object['color']);
+                this.shape.drawRect(
+                    object['x'],
+                    object['y'],
+                    object['width'],
+                    object['height']
+                );
+                this.shape.endFill();
+            }
+
+        }
+
         class MultiLine extends BasicDraw {
 
             constructor(object) {
@@ -182,6 +203,12 @@
 
         function drawSquare(object) {
             let draw = new Square(object);
+            draw.build();
+            draw.render(app);
+        }
+
+        function drawRectangle(object) {
+            let draw = new Rectangle(object);
             draw.build();
             draw.render(app);
         }
@@ -273,6 +300,9 @@
                                 let itemType = item['type'];
                                 if(itemType === 'square') {
                                     drawSquare(item);
+                                }
+                                if(itemType === 'rectangle') {
+                                    drawRectangle(item);
                                 }
                                 if(itemType === 'multi_line') {
                                     drawMultiLine(item);

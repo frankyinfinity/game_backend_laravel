@@ -78,29 +78,28 @@ class EntityDraw
 
         $functionDownString = "function actionDown() {
 
-            console.log('pointerdown:');
-            console.log(object['uid']);
-
-            object['extra']['renderable'] = false;
-            shape.renderable = false;
+            let entity_uid = object['uid'];
+            let panel_shape = objects[entity_uid+'_panel'];
+            panel_shape.renderable = panel_shape.renderable ? false : true;
+            panel_shape.zIndex = 10000;
 
         };
         actionDown();";
         $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $functionDownString);
 
-        $functionUpString = "function actionUp() {
-
-            console.log('pointerup:');
-            console.log(object['uid']);
-
-            object['extra']['renderable'] = true;
-            shape.renderable = true;
-
-        };
-        actionUp();";
-        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_UP, $functionUpString);
-
         $this->items[] = $circle->buildJson();
+
+        //Panel
+        $panelX = ($dbEntity->specie->player->birthRegion->width*$size) + ($size / 2);
+        $panelY = 25;
+
+        $panel = new Rectangle($dbEntity->uid.'_panel');
+        $panel->setOrigin($panelX, y: $panelY);
+        $panel->setSize(400, 250);
+        $panel->setColor(0xFFFFFF);
+        $panel->setRenderable(false);
+
+        $this->items[] = $panel->buildJson();
 
     }
 
