@@ -178,6 +178,22 @@
 
         }
 
+        class Text extends BasicDraw {
+
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Text('');
+            }
+
+            build() {
+                const object = this.object;
+                this.shape.x = object['x'];
+                this.shape.y = object['y'];
+                this.shape.text = object['text'];
+            }
+
+        }
+
         function initPixi() {
 
             app = new PIXI.Application({
@@ -221,6 +237,12 @@
 
         function drawCircle(object) {
             let draw = new Circle(object);
+            draw.build();
+            draw.render(app);
+        }
+
+        function drawText(object) {
+            let draw = new Text(object);
             draw.build();
             draw.render(app);
         }
@@ -309,6 +331,9 @@
                                 }
                                 if(itemType === 'circle') {
                                     drawCircle(item);
+                                }
+                                if(itemType === 'text') {
+                                    drawText(item);
                                 }
                             }
                         } else {
