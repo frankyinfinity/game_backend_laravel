@@ -78,28 +78,41 @@ class EntityDraw
 
         $functionDownString = "function actionDown() {
 
-            console.log(object);
             let entity_uid = object['uid'];
+            let renderable = shapes[entity_uid+'_panel'].renderable;
 
+            //Close all
+            let keyCloses = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3'];
+            for (const suffix of keyCloses) {
+
+             const suffixObjects = Object.entries(objects).filter(([key, _]) => key.endsWith(suffix)).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
+             for (const [key, obj] of Object.entries(suffixObjects)) {
+               let shape = shapes[key];
+               shape.renderable = false;
+             }
+
+            }
+
+            //Panel
             let panel = shapes[entity_uid+'_panel'];
-            panel.renderable = panel.renderable ? false : true;
+            panel.renderable = renderable ? false : true;
             panel.zIndex = 10000;
 
             //UID
             let text1 = shapes[entity_uid+'_text_row_1'];
-            text1.renderable = text1.renderable ? false : true;
+            text1.renderable = renderable ? false : true;
             text1.zIndex = 10001;
 
             //Tile I
             let text2 = shapes[entity_uid+'_text_row_2'];
             text2.text = 'I: ' + object['attributes']['tile_i'];
-            text2.renderable = text2.renderable ? false : true;
+            text2.renderable = renderable ? false : true;
             text2.zIndex = 10001;
 
             //Tile J
             let text3 = shapes[entity_uid+'_text_row_3'];
             text3.text = 'J: ' + object['attributes']['tile_j'];
-            text3.renderable = text3.renderable ? false : true;
+            text3.renderable = renderable ? false : true;
             text3.zIndex = 10001;
 
         };
