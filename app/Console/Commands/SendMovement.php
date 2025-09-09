@@ -29,13 +29,13 @@ class SendMovement extends Command
     public function handle()
     {
 
-        $player_id = 6;
+        $player_id = 2;
         $channel = 'player_'.$player_id.'_channel';
         $event = 'move_entity';
 
-        $uid = '6880b7ec6e7ac8.76610132';
-        $toI = 1;
-        $toJ = 1;
+        $uid = '6896142b4bba88.66323706';
+        $toI = 4;
+        $toJ = 2;
 
         $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
@@ -51,9 +51,11 @@ class SendMovement extends Command
         event(new MoveEntityEvent($channel, $event, [
             'uid' => $uid,
             'i' => $movementI,
-            'j' => $movementJ
+            'j' => $movementJ,
+            'new_tile_i' => $toI,
+            'new_tile_j' => $toJ
         ]));
         $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
-        
+
     }
 }

@@ -11,6 +11,7 @@ class BasicDraw
     private bool $renderable;
     private array $interactives;
     private int $countInteractives;
+    private array $extraAttributes;
 
     const INTERACTIVE_POINTER_DOWN = 'pointerdown';
     const INTERACTIVE_POINTER_UP = 'pointerupoutside';
@@ -22,6 +23,7 @@ class BasicDraw
         $this->renderable = true;
         $this->interactives = [];
         $this->countInteractives = 0;
+        $this->extraAttributes = [];
     }
 
     public function setColor($color)
@@ -42,20 +44,30 @@ class BasicDraw
         $this->countInteractives++;
     }
 
+    public function addAttributes($key, $value) {
+        $this->extraAttributes[$key] = $value;
+    }
+
     public function commonJson($extra)
     {
+
+        $attributes = [
+            'renderable' => $this->renderable,
+            'interactives' => [
+                'items' => $this->interactives,
+                'count' => $this->countInteractives,
+            ]
+        ];
+        foreach ($this->extraAttributes as $key => $value) {
+            $attributes[$key] = $value;
+        }
+
         return [
             'uid' => $this->uid,
             'type' => $this->type,
             'color' => $this->color,
             'thickness' => $this->thickness,
-            'extra' => [
-                'renderable' => $this->renderable,
-                'interactives' => [
-                    'items' => $this->interactives,
-                    'count' => $this->countInteractives,
-                ],
-            ]
+            'attributes' => $attributes
         ]+$extra;
     }
 

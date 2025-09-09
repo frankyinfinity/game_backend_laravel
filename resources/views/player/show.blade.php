@@ -35,6 +35,7 @@
     <script>
 
         let app = null;
+        let shapes = {};
         let objects = {};
 
         class BasicDraw {
@@ -52,28 +53,29 @@
                 let object = this.object;
 
                 //Visible
-                this.shape.renderable = object['extra']['renderable'];
-
-                //Interaction
-                this.addInteractive();
+                this.shape.renderable = object['attributes']['renderable'];
 
                 //Add Scene
                 app.stage.addChild(this.shape);
 
                 const uid = object['uid'];
-                objects[uid] = this.shape;
+                shapes[uid] = this.shape;
+                objects[uid] = this.object;
+
+                //Interaction
+                this.addInteractive();
 
             }
 
             addInteractive() {
 
-                let object = this.object;
-                if(object['extra']['interactives']['count'] === 0) return;
+                let object = objects[this.object['uid']];
+                if(object['attributes']['interactives']['count'] === 0) return;
 
                 this.shape.interactive = true;
                 this.shape.buttonMode = true;
 
-                let items = object['extra']['interactives']['items'];
+                let items = object['attributes']['interactives']['items'];
                 Object.entries(items).forEach(([event, strFunction]) => {
                     let shape = this.shape;
                     this.shape.on(event, () => {
@@ -363,12 +365,17 @@
                 let i = data['i'];
                 let j = data['j'];
 
+                let shape = shapes[uid];
+
+                shape.x += j;
+                shape.y += i;
+                shape.zIndex = 1000;
+
+                shapes[uid] = shape;
+
                 let object = objects[uid];
-
-                object.x += j;
-                object.y += i;
-                object.zIndex = 1000;
-
+                object['attributes']['tile_i'] = data['new_tile_i'];
+                object['attributes']['tile_j'] = data['new_tile_j'];
                 objects[uid] = object;
 
             });
