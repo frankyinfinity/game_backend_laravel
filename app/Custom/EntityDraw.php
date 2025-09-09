@@ -118,8 +118,9 @@ class EntityDraw
         };
         actionDown();";
         $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $functionDownString);
-        $circle->addAttributes('tile_i', $dbEntity->tile_i);
-        $circle->addAttributes('tile_j', $dbEntity->tile_j);
+        foreach ($dbEntity->getFieldAttributes() as $key => $value) {
+            $circle->addAttributes($key, $value);
+        }
 
         //Panel
         $panelX = ($dbEntity->specie->player->birthRegion->width*$size) + ($size / 2);
