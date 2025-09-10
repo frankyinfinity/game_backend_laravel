@@ -191,6 +191,8 @@
                 const object = this.object;
                 this.shape.x = object['x'];
                 this.shape.y = object['y'];
+                console.log(object);
+                this.shape.fill = object['color'];
                 this.shape.text = object['text'];
             }
 

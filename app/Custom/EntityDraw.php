@@ -84,36 +84,29 @@ class EntityDraw
             //Close all
             let keyCloses = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3'];
             for (const suffix of keyCloses) {
-
-             const suffixObjects = Object.entries(objects).filter(([key, _]) => key.endsWith(suffix)).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
-             for (const [key, obj] of Object.entries(suffixObjects)) {
-               let shape = shapes[key];
-               shape.renderable = false;
-             }
-
+                 const suffixObjects = Object.entries(objects).filter(([key, _]) => key.endsWith(suffix)).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
+                 for (const [key, obj] of Object.entries(suffixObjects)) {
+                   let shape = shapes[key];
+                   shape.renderable = false;
+                 }
             }
 
-            //Panel
-            let panel = shapes[entity_uid+'_panel'];
-            panel.renderable = renderable ? false : true;
-            panel.zIndex = 10000;
-
-            //UID
-            let text1 = shapes[entity_uid+'_text_row_1'];
-            text1.renderable = renderable ? false : true;
-            text1.zIndex = 10001;
-
-            //Tile I
+            //Assign Text
             let text2 = shapes[entity_uid+'_text_row_2'];
             text2.text = 'I: ' + object['attributes']['tile_i'];
-            text2.renderable = renderable ? false : true;
-            text2.zIndex = 10001;
 
-            //Tile J
             let text3 = shapes[entity_uid+'_text_row_3'];
             text3.text = 'J: ' + object['attributes']['tile_j'];
-            text3.renderable = renderable ? false : true;
-            text3.zIndex = 10001;
+
+            //Open all
+            let keyOpens = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3', '_up_button', '_up_button_text',
+                '_left_button', '_left_button_text', '_down_button', '_down_button_text',
+                '_right_button', '_right_button_text'];
+            for (const suffix of keyOpens) {
+              let shape = shapes[entity_uid+suffix];
+              shape.renderable = !renderable;
+              shape.zIndex = 10000;
+            }
 
         };
         actionDown();";
@@ -152,11 +145,75 @@ class EntityDraw
         $text3->setText("");
         $text3->setRenderable(false);
 
+        //Buttons
+        $sizeButton = $size * 0.7;
+        $colorButton = 0x0000FF;
+
+        //Up
+        $panelY += 50;
+        $upButton = new Square($dbEntity->uid.'_up_button');
+        $upButton->setOrigin($panelX, $panelY);
+        $upButton->setSize($sizeButton);
+        $upButton->setColor($colorButton);
+        $upButton->setRenderable(false);
+
+        $upButtonText = new Text($dbEntity->uid.'_up_button_text');
+        $upButtonText->setOrigin($panelX, $panelY);
+        $upButtonText->setText("^");
+        $upButtonText->setRenderable(false);
+
+        //Left
+        $panelX += $sizeButton * 2;
+        $leftButton = new Square($dbEntity->uid.'_left_button');
+        $leftButton->setOrigin($panelX, $panelY);
+        $leftButton->setSize($sizeButton);
+        $leftButton->setColor($colorButton);
+        $leftButton->setRenderable(false);
+
+        $leftButtonText = new Text($dbEntity->uid.'_left_button_text');
+        $leftButtonText->setOrigin($panelX, $panelY);
+        $leftButtonText->setText("<");
+        $leftButtonText->setRenderable(false);
+
+        //Down
+        $panelX += $sizeButton * 2;
+        $downButton = new Square($dbEntity->uid.'_down_button');
+        $downButton->setOrigin($panelX, $panelY);
+        $downButton->setSize($sizeButton);
+        $downButton->setColor($colorButton);
+        $downButton->setRenderable(false);
+
+        $downButtonText = new Text($dbEntity->uid.'_down_button_text');
+        $downButtonText->setOrigin($panelX, $panelY);
+        $downButtonText->setText("v");
+        $downButtonText->setRenderable(false);
+
+        //Right
+        $panelX += $sizeButton * 2;
+        $rightButton = new Square($dbEntity->uid.'_right_button');
+        $rightButton->setOrigin($panelX, $panelY);
+        $rightButton->setSize($sizeButton);
+        $rightButton->setColor($colorButton);
+        $rightButton->setRenderable(false);
+
+        $rightButtonText = new Text($dbEntity->uid.'_right_button_text');
+        $rightButtonText->setOrigin($panelX, $panelY);
+        $rightButtonText->setText(">");
+        $rightButtonText->setRenderable(false);
+
         $this->items[] = $circle->buildJson();
         $this->items[] = $panel->buildJson();
         $this->items[] = $text1->buildJson();
         $this->items[] = $text2->buildJson();
         $this->items[] = $text3->buildJson();
+        $this->items[] = $upButton->buildJson();
+        $this->items[] = $upButtonText->buildJson();
+        $this->items[] = $leftButton->buildJson();
+        $this->items[] = $leftButtonText->buildJson();
+        $this->items[] = $downButton->buildJson();
+        $this->items[] = $downButtonText->buildJson();
+        $this->items[] = $rightButton->buildJson();
+        $this->items[] = $rightButtonText->buildJson();
 
     }
 
