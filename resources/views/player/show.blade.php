@@ -184,15 +184,17 @@
 
             constructor(object) {
                 super(object);
-                this.shape = new PIXI.Text('');
+                this.shape = new PIXI.Text('',  {});
             }
 
             build() {
                 const object = this.object;
                 this.shape.x = object['x'];
                 this.shape.y = object['y'];
-                console.log(object);
-                this.shape.fill = object['color'];
+                if(object['color'] !== null) {
+                    const hexValue = object['color'];
+                    this.shape.style.fill = '#' + hexValue.toString(16).padStart(6, '0');
+                }
                 this.shape.text = object['text'];
             }
 

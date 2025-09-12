@@ -6,7 +6,7 @@ class BasicDraw
 {
     private $uid;
     private $type;
-    private $color;
+    protected $color;
     private $thickness;
     private bool $renderable;
     private array $interactives;

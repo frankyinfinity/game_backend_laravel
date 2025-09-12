@@ -148,6 +148,7 @@ class EntityDraw
         //Buttons
         $sizeButton = $size * 0.7;
         $colorButton = 0x0000FF;
+        $colorText = 0xFFFFFF;
 
         //Up
         $panelY += 50;
@@ -160,6 +161,7 @@ class EntityDraw
         $upButtonText = new Text($dbEntity->uid.'_up_button_text');
         $upButtonText->setOrigin($panelX, $panelY);
         $upButtonText->setText("^");
+        $upButtonText->setColor($colorText);
         $upButtonText->setRenderable(false);
 
         //Left
@@ -173,6 +175,7 @@ class EntityDraw
         $leftButtonText = new Text($dbEntity->uid.'_left_button_text');
         $leftButtonText->setOrigin($panelX, $panelY);
         $leftButtonText->setText("<");
+        $leftButtonText->setColor($colorText);
         $leftButtonText->setRenderable(false);
 
         //Down
@@ -186,6 +189,7 @@ class EntityDraw
         $downButtonText = new Text($dbEntity->uid.'_down_button_text');
         $downButtonText->setOrigin($panelX, $panelY);
         $downButtonText->setText("v");
+        $downButtonText->setColor($colorText);
         $downButtonText->setRenderable(false);
 
         //Right
@@ -199,6 +203,7 @@ class EntityDraw
         $rightButtonText = new Text($dbEntity->uid.'_right_button_text');
         $rightButtonText->setOrigin($panelX, $panelY);
         $rightButtonText->setText(">");
+        $rightButtonText->setColor($colorText);
         $rightButtonText->setRenderable(false);
 
         $this->items[] = $circle->buildJson();
