@@ -5,8 +5,7 @@ namespace App\Custom;
 use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\Gene;
-use Arr;
-use Str;
+use App\Custom\ButtonDraw;
 
 class EntityDraw
 {
@@ -14,6 +13,10 @@ class EntityDraw
     private Entity $dbEntity;
     private Square $square;
     private array $items;
+    public function getItems(): array
+    {
+        return $this->items;
+    }
 
     public function __construct(Entity $dbEntity, Square $square) {
         $this->dbEntity = $dbEntity;
@@ -99,9 +102,12 @@ class EntityDraw
             text3.text = 'J: ' + object['attributes']['tile_j'];
 
             //Open all
-            let keyOpens = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3', '_up_button', '_up_button_text',
-                '_left_button', '_left_button_text', '_down_button', '_down_button_text',
-                '_right_button', '_right_button_text'];
+            let keyOpens = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3',
+                '_button_up_rect', '_button_up_text',
+                '_button_left_rect', '_button_left_text',
+                '_button_down_rect', '_button_down_text',
+                '_button_right_rect', '_button_right_text'
+            ];
             for (const suffix of keyOpens) {
               let shape = shapes[entity_uid+suffix];
               shape.renderable = !renderable;
@@ -148,82 +154,66 @@ class EntityDraw
         //Buttons
         $sizeButton = $size * 0.7;
         $colorButton = 0x0000FF;
-        $colorText = 0xFFFFFF;
+        $colorString = 0xFFFFFF;
 
         //Up
         $panelY += 50;
-        $upButton = new Square($dbEntity->uid.'_up_button');
+        $upButton = new ButtonDraw($dbEntity->uid.'_button_up');
+        $upButton->setSize($sizeButton, $sizeButton);
         $upButton->setOrigin($panelX, $panelY);
-        $upButton->setSize($sizeButton);
-        $upButton->setColor($colorButton);
-        $upButton->setRenderable(false);
-
-        $upButtonText = new Text($dbEntity->uid.'_up_button_text');
-        $upButtonText->setOrigin($panelX, $panelY);
-        $upButtonText->setText("^");
-        $upButtonText->setColor($colorText);
-        $upButtonText->setRenderable(false);
+        $upButton->setString('^');
+        $upButton->setColorButton($colorButton);
+        $upButton->setColorString($colorString);
+        $upButton->build();
 
         //Left
         $panelX += $sizeButton * 2;
-        $leftButton = new Square($dbEntity->uid.'_left_button');
+        $leftButton = new ButtonDraw($dbEntity->uid.'_button_left');
+        $leftButton->setSize($sizeButton, $sizeButton);
         $leftButton->setOrigin($panelX, $panelY);
-        $leftButton->setSize($sizeButton);
-        $leftButton->setColor($colorButton);
-        $leftButton->setRenderable(false);
-
-        $leftButtonText = new Text($dbEntity->uid.'_left_button_text');
-        $leftButtonText->setOrigin($panelX, $panelY);
-        $leftButtonText->setText("<");
-        $leftButtonText->setColor($colorText);
-        $leftButtonText->setRenderable(false);
+        $leftButton->setString('<');
+        $leftButton->setColorButton($colorButton);
+        $leftButton->setColorString($colorString);
+        $leftButton->build();
 
         //Down
         $panelX += $sizeButton * 2;
-        $downButton = new Square($dbEntity->uid.'_down_button');
+        $downButton = new ButtonDraw($dbEntity->uid.'_button_down');
+        $downButton->setSize($sizeButton, $sizeButton);
         $downButton->setOrigin($panelX, $panelY);
-        $downButton->setSize($sizeButton);
-        $downButton->setColor($colorButton);
-        $downButton->setRenderable(false);
-
-        $downButtonText = new Text($dbEntity->uid.'_down_button_text');
-        $downButtonText->setOrigin($panelX, $panelY);
-        $downButtonText->setText("v");
-        $downButtonText->setColor($colorText);
-        $downButtonText->setRenderable(false);
+        $downButton->setString('v');
+        $downButton->setColorButton($colorButton);
+        $downButton->setColorString($colorString);
+        $downButton->build();
 
         //Right
         $panelX += $sizeButton * 2;
-        $rightButton = new Square($dbEntity->uid.'_right_button');
+        $rightButton = new ButtonDraw($dbEntity->uid.'_button_right');
+        $rightButton->setSize($sizeButton, $sizeButton);
         $rightButton->setOrigin($panelX, $panelY);
-        $rightButton->setSize($sizeButton);
-        $rightButton->setColor($colorButton);
-        $rightButton->setRenderable(false);
-
-        $rightButtonText = new Text($dbEntity->uid.'_right_button_text');
-        $rightButtonText->setOrigin($panelX, $panelY);
-        $rightButtonText->setText(">");
-        $rightButtonText->setColor($colorText);
-        $rightButtonText->setRenderable(false);
+        $rightButton->setString('>');
+        $rightButton->setColorButton($colorButton);
+        $rightButton->setColorString($colorString);
+        $rightButton->build();
 
         $this->items[] = $circle->buildJson();
         $this->items[] = $panel->buildJson();
         $this->items[] = $text1->buildJson();
         $this->items[] = $text2->buildJson();
         $this->items[] = $text3->buildJson();
-        $this->items[] = $upButton->buildJson();
-        $this->items[] = $upButtonText->buildJson();
-        $this->items[] = $leftButton->buildJson();
-        $this->items[] = $leftButtonText->buildJson();
-        $this->items[] = $downButton->buildJson();
-        $this->items[] = $downButtonText->buildJson();
-        $this->items[] = $rightButton->buildJson();
-        $this->items[] = $rightButtonText->buildJson();
+        foreach ($upButton->getItems() as $item) {
+            $this->items[] = $item->buildJson();
+        }
+        foreach ($leftButton->getItems() as $item) {
+            $this->items[] = $item->buildJson();
+        }
+        foreach ($downButton->getItems() as $item) {
+            $this->items[] = $item->buildJson();
+        }
+        foreach ($rightButton->getItems() as $item) {
+            $this->items[] = $item->buildJson();
+        }
 
-    }
-
-    public function getItems() {
-        return $this->items;
     }
 
 }
