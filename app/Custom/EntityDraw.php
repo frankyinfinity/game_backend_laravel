@@ -85,13 +85,13 @@ class EntityDraw
             let renderable = shapes[entity_uid+'_panel'].renderable;
 
             //Close all
-            let keyCloses = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3'];
-            for (const suffix of keyCloses) {
-                 const suffixObjects = Object.entries(objects).filter(([key, _]) => key.endsWith(suffix)).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
-                 for (const [key, obj] of Object.entries(suffixObjects)) {
-                   let shape = shapes[key];
+            const objectPanels = Object.entries(objects).filter(([key, _]) => key.endsWith('_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
+            for (const [key, objectPanel] of Object.entries(objectPanels)) {
+                let children = objectPanel['children'];
+                for (const [key, childUid] of Object.entries(children)) {
+                   let shape = shapes[childUid];
                    shape.renderable = false;
-                 }
+                }
             }
 
             //Assign Text
@@ -101,17 +101,17 @@ class EntityDraw
             let text3 = shapes[entity_uid+'_text_row_3'];
             text3.text = 'J: ' + object['attributes']['tile_j'];
 
-            //Open all
-            let keyOpens = ['_panel', '_text_row_1', '_text_row_2', '_text_row_3',
-                '_button_up_rect', '_button_up_text',
-                '_button_left_rect', '_button_left_text',
-                '_button_down_rect', '_button_down_text',
-                '_button_right_rect', '_button_right_text'
-            ];
-            for (const suffix of keyOpens) {
-              let shape = shapes[entity_uid+suffix];
-              shape.renderable = !renderable;
-              shape.zIndex = 10000;
+            //Open Panel
+            let shapePanel = shapes[entity_uid+'_panel'];
+            shapePanel.renderable = !renderable;
+            shapePanel.zIndex = 10000;
+
+            //Open Panel (Children)
+            let panelChildren = objects[entity_uid+'_panel']['children'];
+            for (const [key, childUid] of Object.entries(panelChildren)) {
+                let shape = shapes[childUid];
+                shape.renderable = !renderable;
+                shape.zIndex = 10000;
             }
 
         };
@@ -196,6 +196,24 @@ class EntityDraw
         $rightButton->setColorString($colorString);
         $rightButton->build();
 
+        //Set Children (Panel)
+        $panel->addChild($text1->getUid());
+        $panel->addChild($text2->getUid());
+        $panel->addChild($text3->getUid());
+        foreach ($upButton->getItems() as $item) {
+            $panel->addChild($item->getUid());
+        }
+        foreach ($leftButton->getItems() as $item) {
+            $panel->addChild($item->getUid());
+        }
+        foreach ($downButton->getItems() as $item) {
+            $panel->addChild($item->getUid());
+        }
+        foreach ($rightButton->getItems() as $item) {
+            $panel->addChild($item->getUid());
+        }
+
+        //Get JSON
         $this->items[] = $circle->buildJson();
         $this->items[] = $panel->buildJson();
         $this->items[] = $text1->buildJson();

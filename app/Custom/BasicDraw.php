@@ -5,6 +5,9 @@ namespace App\Custom;
 class BasicDraw
 {
     private $uid;
+    public function getUid() {
+        return $this->uid;
+    }
     private $type;
     protected $color;
     private $thickness;
@@ -12,6 +15,7 @@ class BasicDraw
     private array $interactives;
     private int $countInteractives;
     private array $extraAttributes;
+    private array $children;
 
     const INTERACTIVE_POINTER_DOWN = 'pointerdown';
     const INTERACTIVE_POINTER_UP = 'pointerupoutside';
@@ -24,6 +28,7 @@ class BasicDraw
         $this->interactives = [];
         $this->countInteractives = 0;
         $this->extraAttributes = [];
+        $this->children = [];
     }
 
     public function setColor($color)
@@ -48,6 +53,11 @@ class BasicDraw
         $this->extraAttributes[$key] = $value;
     }
 
+    public function addChild($uid): void
+    {
+        $this->children[] = $uid;
+    }
+
     public function commonJson($extra)
     {
 
@@ -67,7 +77,8 @@ class BasicDraw
             'type' => $this->type,
             'color' => $this->color,
             'thickness' => $this->thickness,
-            'attributes' => $attributes
+            'attributes' => $attributes,
+            'children' => $this->children
         ]+$extra;
     }
 
