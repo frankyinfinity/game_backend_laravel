@@ -99,13 +99,6 @@ class EntityDraw
 
             }
 
-            //Assign Text
-            let text2 = shapes[entity_uid+'_text_row_2'];
-            text2.text = 'I: ' + object['attributes']['tile_i'];
-
-            let text3 = shapes[entity_uid+'_text_row_3'];
-            text3.text = 'J: ' + object['attributes']['tile_j'];
-
             //Open Panel
             let shapePanel = shapes[entity_uid+'_panel'];
             shapePanel.renderable = !renderable;
@@ -147,13 +140,13 @@ class EntityDraw
         $panelY += 35;
         $text2 = new Text($dbEntity->uid.'_text_row_2');
         $text2->setOrigin($panelX, $panelY);
-        $text2->setText("");
+        $text2->setText("I: " . $dbEntity->tile_i);
         $text2->setRenderable(false);
 
         $panelY += 35;
         $text3 = new Text($dbEntity->uid.'_text_row_3');
         $text3->setOrigin($panelX, $panelY);
-        $text3->setText("");
+        $text3->setText("J: " . $dbEntity->tile_j);
         $text3->setRenderable(false);
 
         //Buttons
