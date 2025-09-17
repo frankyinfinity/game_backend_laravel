@@ -87,11 +87,16 @@ class EntityDraw
             //Close all
             const objectPanels = Object.entries(objects).filter(([key, _]) => key.endsWith('_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
             for (const [key, objectPanel] of Object.entries(objectPanels)) {
+
+                let shapePanel = shapes[key];
+                shapePanel.renderable = false;
+
                 let children = objectPanel['children'];
                 for (const [key, childUid] of Object.entries(children)) {
                    let shape = shapes[childUid];
                    shape.renderable = false;
                 }
+
             }
 
             //Assign Text
