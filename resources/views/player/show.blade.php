@@ -382,6 +382,12 @@
                 object['attributes']['tile_j'] = data['new_tile_j'];
                 objects[uid] = object;
 
+                let text2 = shapes[uid+'_text_row_2'];
+                text2.text = 'I: ' + data['new_tile_i'];
+
+                let text3 = shapes[uid+'_text_row_3'];
+                text3.text = 'J: ' + data['new_tile_j'];
+
             });
 
         });

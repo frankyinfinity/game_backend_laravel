@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MoveEntityEvent;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateMapJob;
 use App\Models\DrawMapRequest;
+use App\Models\Entity;
 use Illuminate\Http\Request;
 use App\Models\Player;
 use Log;
@@ -55,7 +57,7 @@ class PlayerController extends Controller
         $height = $player->birthRegion->height * $size;
 
         return view("player.show", compact("player", "username", "width", "height"));
-            
+
     }
 
     /**
@@ -88,7 +90,7 @@ class PlayerController extends Controller
     }
 
     public function getMap(Request $request) {
-        
+
         $items = [];
         $drawMapRequest = DrawMapRequest::query()
             ->where('request_id', $request->request_id)
@@ -99,8 +101,56 @@ class PlayerController extends Controller
             $items = json_decode($drawMapRequest->items);
             $drawMapRequest->delete();
         }
- 
+
         return response()->json(['success' => true, 'items' => $items]);
+
+    }
+
+    public function movement(Request $request) {
+
+        $player_id = $request->player_id;
+        $channel = 'player_'.$player_id.'_channel';
+        $event = 'move_entity';
+
+        $uid = $request->entity_uid;
+        $entity = Entity::query()->where('uid', $uid)->first();
+        $fromI = $entity->tile_i;
+        $fromJ = $entity->tile_j;
+
+        $toI = 0;
+        $toJ = 0;
+        $action = $request->action;
+        if($action === 'up') {
+            $toI = $fromI - 1;
+            $toJ = $fromJ + 0;
+        } else if($action === 'down') {
+            $toI = $fromI + 1;
+            $toJ = $fromJ + 0;
+        } else if($action === 'left') {
+            $toI = $fromI + 0;
+            $toJ = $fromJ - 1;
+        } else if($action === 'right') {
+            $toI = $fromI + 0;
+            $toJ = $fromJ + 1;
+        }
+
+        $diffI = $toI - $fromI;
+        $diffJ = $toJ - $fromJ;
+
+        $size = Helper::getTileSize();
+        $movementI = $diffI * $size;
+        $movementJ = $diffJ * $size;
+
+        event(new MoveEntityEvent($channel, $event, [
+            'uid' => $uid,
+            'i' => $movementI,
+            'j' => $movementJ,
+            'new_tile_i' => $toI,
+            'new_tile_j' => $toJ
+        ]));
+        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
+
+        return response()->json(['success' => true]);
 
     }
 

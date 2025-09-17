@@ -156,20 +156,121 @@ class EntityDraw
         $colorButton = 0x0000FF;
         $colorString = 0xFFFFFF;
 
+        $player_id = $this->dbEntity->specie->player_id;
         $functionUpButton = "function buttonUp() {
-            console.log('up');
+
+            let button_uid = object['uid'];
+            let entity_uid = button_uid.split('_')[0];
+            let player_id = '".$player_id."';
+
+            let token = $('meta[name=\"csrf-token\"]').attr('content');
+
+            let url = '".route("players.entity.movement")."';
+            url = url.replace('localhost', 'localhost:8082');
+
+             $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': token
+                },
+                data: {
+                    action: 'up',
+                    entity_uid: entity_uid,
+                    player_id: player_id,
+                 },
+                success: function(result) {
+
+                },
+            });
+
         };
         buttonUp();";
         $functionLeftButton = "function buttonLeft() {
-            console.log('left');
+
+           let button_uid = object['uid'];
+            let entity_uid = button_uid.split('_')[0];
+            let player_id = '".$player_id."';
+
+            let token = $('meta[name=\"csrf-token\"]').attr('content');
+
+            let url = '".route("players.entity.movement")."';
+            url = url.replace('localhost', 'localhost:8082');
+
+             $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': token
+                },
+                data: {
+                    action: 'left',
+                    entity_uid: entity_uid,
+                    player_id: player_id,
+                 },
+                success: function(result) {
+
+                },
+            });
+
         };
         buttonLeft();";
         $functionDownButton = "function buttonDown() {
-            console.log('down');
+
+            let button_uid = object['uid'];
+            let entity_uid = button_uid.split('_')[0];
+            let player_id = '".$player_id."';
+
+            let token = $('meta[name=\"csrf-token\"]').attr('content');
+
+            let url = '".route("players.entity.movement")."';
+            url = url.replace('localhost', 'localhost:8082');
+
+             $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': token
+                },
+                data: {
+                    action: 'down',
+                    entity_uid: entity_uid,
+                    player_id: player_id,
+                 },
+                success: function(result) {
+
+                },
+            });
+
         };
         buttonDown();";
         $functionRightButton = "function buttonRight() {
-            console.log('right');
+
+            let button_uid = object['uid'];
+            let entity_uid = button_uid.split('_')[0];
+            let player_id = '".$player_id."';
+
+            let token = $('meta[name=\"csrf-token\"]').attr('content');
+
+            let url = '".route("players.entity.movement")."';
+            url = url.replace('localhost', 'localhost:8082');
+
+             $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': token
+                },
+                data: {
+                    action: 'right',
+                    entity_uid: entity_uid,
+                    player_id: player_id,
+                 },
+                success: function(result) {
+
+                },
+            });
+
         };
         buttonRight();";
 
