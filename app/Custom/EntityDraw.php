@@ -156,6 +156,23 @@ class EntityDraw
         $colorButton = 0x0000FF;
         $colorString = 0xFFFFFF;
 
+        $functionUpButton = "function buttonUp() {
+            console.log('up');
+        };
+        buttonUp();";
+        $functionLeftButton = "function buttonLeft() {
+            console.log('left');
+        };
+        buttonLeft();";
+        $functionDownButton = "function buttonDown() {
+            console.log('down');
+        };
+        buttonDown();";
+        $functionRightButton = "function buttonRight() {
+            console.log('right');
+        };
+        buttonRight();";
+
         //Up
         $panelY += 50;
         $upButton = new ButtonDraw($dbEntity->uid.'_button_up');
@@ -164,6 +181,7 @@ class EntityDraw
         $upButton->setString('^');
         $upButton->setColorButton($colorButton);
         $upButton->setColorString($colorString);
+        $upButton->setOnClick($functionUpButton);
         $upButton->build();
 
         //Left
@@ -174,6 +192,7 @@ class EntityDraw
         $leftButton->setString('<');
         $leftButton->setColorButton($colorButton);
         $leftButton->setColorString($colorString);
+        $leftButton->setOnClick($functionLeftButton);
         $leftButton->build();
 
         //Down
@@ -184,6 +203,7 @@ class EntityDraw
         $downButton->setString('v');
         $downButton->setColorButton($colorButton);
         $downButton->setColorString($colorString);
+        $downButton->setOnClick($functionDownButton);
         $downButton->build();
 
         //Right
@@ -194,24 +214,17 @@ class EntityDraw
         $rightButton->setString('>');
         $rightButton->setColorButton($colorButton);
         $rightButton->setColorString($colorString);
+        $rightButton->setOnClick($functionRightButton);
         $rightButton->build();
 
         //Set Children (Panel)
         $panel->addChild($text1->getUid());
         $panel->addChild($text2->getUid());
         $panel->addChild($text3->getUid());
-        foreach ($upButton->getItems() as $item) {
-            $panel->addChild($item->getUid());
-        }
-        foreach ($leftButton->getItems() as $item) {
-            $panel->addChild($item->getUid());
-        }
-        foreach ($downButton->getItems() as $item) {
-            $panel->addChild($item->getUid());
-        }
-        foreach ($rightButton->getItems() as $item) {
-            $panel->addChild($item->getUid());
-        }
+        foreach ($upButton->getItems() as $item) {$panel->addChild($item->getUid());}
+        foreach ($leftButton->getItems() as $item) {$panel->addChild($item->getUid());}
+        foreach ($downButton->getItems() as $item) {$panel->addChild($item->getUid());}
+        foreach ($rightButton->getItems() as $item) {$panel->addChild($item->getUid());}
 
         //Get JSON
         $this->items[] = $circle->buildJson();
@@ -219,18 +232,10 @@ class EntityDraw
         $this->items[] = $text1->buildJson();
         $this->items[] = $text2->buildJson();
         $this->items[] = $text3->buildJson();
-        foreach ($upButton->getItems() as $item) {
-            $this->items[] = $item->buildJson();
-        }
-        foreach ($leftButton->getItems() as $item) {
-            $this->items[] = $item->buildJson();
-        }
-        foreach ($downButton->getItems() as $item) {
-            $this->items[] = $item->buildJson();
-        }
-        foreach ($rightButton->getItems() as $item) {
-            $this->items[] = $item->buildJson();
-        }
+        foreach ($upButton->getItems() as $item) {$this->items[] = $item->buildJson();}
+        foreach ($leftButton->getItems() as $item) {$this->items[] = $item->buildJson();}
+        foreach ($downButton->getItems() as $item) {$this->items[] = $item->buildJson();}
+        foreach ($rightButton->getItems() as $item) {$this->items[] = $item->buildJson();}
 
     }
 

@@ -23,6 +23,7 @@ class ButtonDraw {
     private $string;
     private $colorButton;
     private $colorString;
+    private $onClickFunction;
 
     public function setSize($width, $height): void
     {
@@ -51,6 +52,11 @@ class ButtonDraw {
         $this->colorString = $color;
     }
 
+    public function setOnClick($onClickFunction): void
+    {
+        $this->onClickFunction = $onClickFunction;
+    }
+
     public function build() {
 
         $uid = $this->uid;
@@ -68,6 +74,11 @@ class ButtonDraw {
         $rect->setOrigin($x, $y);
         $rect->setColor($colorButton);
         $rect->setRenderable(false);
+
+        if($this->onClickFunction !== null) {
+            $onClickFunction = $this->onClickFunction;
+            $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $onClickFunction);
+        }
 
         //Text
         $text = new Text($uid.'_text');
