@@ -99,13 +99,6 @@ class EntityDraw
 
             }
 
-            //Assign Text
-            let text2 = shapes[entity_uid+'_text_row_2'];
-            text2.text = 'I: ' + object['attributes']['tile_i'];
-
-            let text3 = shapes[entity_uid+'_text_row_3'];
-            text3.text = 'J: ' + object['attributes']['tile_j'];
-
             //Open Panel
             let shapePanel = shapes[entity_uid+'_panel'];
             shapePanel.renderable = !renderable;
