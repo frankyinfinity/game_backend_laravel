@@ -6,6 +6,8 @@ use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\Gene;
 use App\Custom\ButtonDraw;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EntityDraw
 {
@@ -155,122 +157,29 @@ class EntityDraw
         $colorString = 0xFFFFFF;
 
         $player_id = $this->dbEntity->specie->player_id;
-        $functionUpButton = "function buttonUp() {
 
-            let button_uid = object['uid'];
-            let entity_uid = button_uid.split('_')[0];
-            let player_id = '".$player_id."';
+        $urlMovement = route('players.entity.movement');
+        $urlMovement = str_replace('localhost', 'localhost:8082', $urlMovement);
 
-            let token = $('meta[name=\"csrf-token\"]').attr('content');
+        $jsPathMov = resource_path('js/function/entity/movement.blade.php');
+        $jsContentMov = file_get_contents($jsPathMov);
+        $jsContentMov = str_replace('<script>', '', $jsContentMov);
+        $jsContentMov = str_replace('</script>', '', $jsContentMov);
+        $jsContentMov = str_replace('__url__', $urlMovement, $jsContentMov);
+        $jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
+        $jsContentMov = str_replace('__player_id__', $player_id, $jsContentMov);
 
-            let url = '".route("players.entity.movement")."';
-            url = url.replace('localhost', 'localhost:8082');
+        $jsContentMovUp = str_replace('__action__', 'up', $jsContentMov);
+        $jsContentMovUp = str_replace('__name__', Str::random(20), $jsContentMovUp);
 
-             $.ajax({
-                url: url,
-                type: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': token
-                },
-                data: {
-                    action: 'up',
-                    entity_uid: entity_uid,
-                    player_id: player_id,
-                 },
-                success: function(result) {
+        $jsContentMovLeft = str_replace('__action__', 'left', $jsContentMov);
+        $jsContentMovLeft = str_replace('__name__', Str::random(20), $jsContentMovLeft);
 
-                },
-            });
+        $jsContentMovDown = str_replace('__action__', 'down', $jsContentMov);
+        $jsContentMovDown = str_replace('__name__', Str::random(20), $jsContentMovDown);
 
-        };
-        buttonUp();";
-        $functionLeftButton = "function buttonLeft() {
-
-           let button_uid = object['uid'];
-            let entity_uid = button_uid.split('_')[0];
-            let player_id = '".$player_id."';
-
-            let token = $('meta[name=\"csrf-token\"]').attr('content');
-
-            let url = '".route("players.entity.movement")."';
-            url = url.replace('localhost', 'localhost:8082');
-
-             $.ajax({
-                url: url,
-                type: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': token
-                },
-                data: {
-                    action: 'left',
-                    entity_uid: entity_uid,
-                    player_id: player_id,
-                 },
-                success: function(result) {
-
-                },
-            });
-
-        };
-        buttonLeft();";
-        $functionDownButton = "function buttonDown() {
-
-            let button_uid = object['uid'];
-            let entity_uid = button_uid.split('_')[0];
-            let player_id = '".$player_id."';
-
-            let token = $('meta[name=\"csrf-token\"]').attr('content');
-
-            let url = '".route("players.entity.movement")."';
-            url = url.replace('localhost', 'localhost:8082');
-
-             $.ajax({
-                url: url,
-                type: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': token
-                },
-                data: {
-                    action: 'down',
-                    entity_uid: entity_uid,
-                    player_id: player_id,
-                 },
-                success: function(result) {
-
-                },
-            });
-
-        };
-        buttonDown();";
-        $functionRightButton = "function buttonRight() {
-
-            let button_uid = object['uid'];
-            let entity_uid = button_uid.split('_')[0];
-            let player_id = '".$player_id."';
-
-            let token = $('meta[name=\"csrf-token\"]').attr('content');
-
-            let url = '".route("players.entity.movement")."';
-            url = url.replace('localhost', 'localhost:8082');
-
-             $.ajax({
-                url: url,
-                type: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': token
-                },
-                data: {
-                    action: 'right',
-                    entity_uid: entity_uid,
-                    player_id: player_id,
-                 },
-                success: function(result) {
-
-                },
-            });
-
-        };
-        buttonRight();";
+        $jsContentMovRight = str_replace('__action__', 'right', $jsContentMov);
+        $jsContentMovRight = str_replace('__name__', Str::random(20), $jsContentMovRight);
 
         //Up
         $panelY += 50;
@@ -280,7 +189,7 @@ class EntityDraw
         $upButton->setString('^');
         $upButton->setColorButton($colorButton);
         $upButton->setColorString($colorString);
-        $upButton->setOnClick($functionUpButton);
+        $upButton->setOnClick($jsContentMovUp);
         $upButton->build();
 
         //Left
@@ -291,7 +200,7 @@ class EntityDraw
         $leftButton->setString('<');
         $leftButton->setColorButton($colorButton);
         $leftButton->setColorString($colorString);
-        $leftButton->setOnClick($functionLeftButton);
+        $leftButton->setOnClick($jsContentMovLeft);
         $leftButton->build();
 
         //Down
@@ -302,7 +211,7 @@ class EntityDraw
         $downButton->setString('v');
         $downButton->setColorButton($colorButton);
         $downButton->setColorString($colorString);
-        $downButton->setOnClick($functionDownButton);
+        $downButton->setOnClick($jsContentMovDown);
         $downButton->build();
 
         //Right
@@ -313,7 +222,7 @@ class EntityDraw
         $rightButton->setString('>');
         $rightButton->setColorButton($colorButton);
         $rightButton->setColorString($colorString);
-        $rightButton->setOnClick($functionRightButton);
+        $rightButton->setOnClick($jsContentMovRight);
         $rightButton->build();
 
         //Set Children (Panel)

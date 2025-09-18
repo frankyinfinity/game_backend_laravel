@@ -34,6 +34,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
 
+        window.AppData = {
+            csrfToken: '{{ csrf_token() }}'
+        };
+
         let app = null;
         let shapes = {};
         let objects = {};
