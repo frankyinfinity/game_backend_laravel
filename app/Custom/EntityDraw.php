@@ -81,42 +81,12 @@ class EntityDraw
         $formattedColor = $this->getColor();
         $circle->setColor($formattedColor);
 
-        $functionDownString = "function actionDown() {
+        $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
+        $jsContentClickEntity = file_get_contents($jsPathClickEntity);
+        $jsContentClickEntity = str_replace('<script>', '', $jsContentClickEntity);
+        $jsContentClickEntity = str_replace('</script>', '', $jsContentClickEntity);
 
-            let entity_uid = object['uid'];
-            let renderable = shapes[entity_uid+'_panel'].renderable;
-
-            //Close all
-            const objectPanels = Object.entries(objects).filter(([key, _]) => key.endsWith('_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
-            for (const [key, objectPanel] of Object.entries(objectPanels)) {
-
-                let shapePanel = shapes[key];
-                shapePanel.renderable = false;
-
-                let children = objectPanel['children'];
-                for (const [key, childUid] of Object.entries(children)) {
-                   let shape = shapes[childUid];
-                   shape.renderable = false;
-                }
-
-            }
-
-            //Open Panel
-            let shapePanel = shapes[entity_uid+'_panel'];
-            shapePanel.renderable = !renderable;
-            shapePanel.zIndex = 10000;
-
-            //Open Panel (Children)
-            let panelChildren = objects[entity_uid+'_panel']['children'];
-            for (const [key, childUid] of Object.entries(panelChildren)) {
-                let shape = shapes[childUid];
-                shape.renderable = !renderable;
-                shape.zIndex = 10000;
-            }
-
-        };
-        actionDown();";
-        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $functionDownString);
+        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickEntity);
         foreach ($dbEntity->getFieldAttributes() as $key => $value) {
             $circle->addAttributes($key, $value);
         }
