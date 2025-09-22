@@ -83,8 +83,7 @@ class EntityDraw
 
         $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
         $jsContentClickEntity = file_get_contents($jsPathClickEntity);
-        $jsContentClickEntity = str_replace('<script>', '', $jsContentClickEntity);
-        $jsContentClickEntity = str_replace('</script>', '', $jsContentClickEntity);
+        $jsContentClickEntity = Helper::setCommonJsCode($jsContentClickEntity, Str::random(20));
 
         $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickEntity);
         foreach ($dbEntity->getFieldAttributes() as $key => $value) {
@@ -131,25 +130,22 @@ class EntityDraw
         $urlMovement = route('players.entity.movement');
         $urlMovement = str_replace('localhost', 'localhost:8082', $urlMovement);
 
-        $jsPathMov = resource_path('js/function/entity/movement.blade.php');
-        $jsContentMov = file_get_contents($jsPathMov);
-        $jsContentMov = str_replace('<script>', '', $jsContentMov);
-        $jsContentMov = str_replace('</script>', '', $jsContentMov);
-        $jsContentMov = str_replace('__url__', $urlMovement, $jsContentMov);
-        $jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
-        $jsContentMov = str_replace('__player_id__', $player_id, $jsContentMov);
+        $jsMovPaths = [];
+        $directions = ['up', 'left', 'down', 'right'];
+        foreach ($directions as $direction) {
 
-        $jsContentMovUp = str_replace('__action__', 'up', $jsContentMov);
-        $jsContentMovUp = str_replace('__name__', Str::random(20), $jsContentMovUp);
+            $jsPathMov = resource_path('js/function/entity/movement.blade.php');
+            $jsContentMov = file_get_contents($jsPathMov);
+            $jsContentMov = Helper::setCommonJsCode($jsContentMov, Str::random(20));
 
-        $jsContentMovLeft = str_replace('__action__', 'left', $jsContentMov);
-        $jsContentMovLeft = str_replace('__name__', Str::random(20), $jsContentMovLeft);
+            $jsContentMov = str_replace('__url__', $urlMovement, $jsContentMov);
+            $jsContentMov = str_replace('__action__', $direction, $jsContentMov);
+            $jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
+            $jsContentMov = str_replace('__player_id__', $player_id, $jsContentMov);
 
-        $jsContentMovDown = str_replace('__action__', 'down', $jsContentMov);
-        $jsContentMovDown = str_replace('__name__', Str::random(20), $jsContentMovDown);
+            $jsMovPaths[$direction] = $jsContentMov;
 
-        $jsContentMovRight = str_replace('__action__', 'right', $jsContentMov);
-        $jsContentMovRight = str_replace('__name__', Str::random(20), $jsContentMovRight);
+        }
 
         //Up
         $panelY += 50;
@@ -159,7 +155,7 @@ class EntityDraw
         $upButton->setString('^');
         $upButton->setColorButton($colorButton);
         $upButton->setColorString($colorString);
-        $upButton->setOnClick($jsContentMovUp);
+        $upButton->setOnClick($jsMovPaths['up']);
         $upButton->build();
 
         //Left
@@ -170,7 +166,7 @@ class EntityDraw
         $leftButton->setString('<');
         $leftButton->setColorButton($colorButton);
         $leftButton->setColorString($colorString);
-        $leftButton->setOnClick($jsContentMovLeft);
+        $leftButton->setOnClick($jsMovPaths['left']);
         $leftButton->build();
 
         //Down
@@ -181,7 +177,7 @@ class EntityDraw
         $downButton->setString('v');
         $downButton->setColorButton($colorButton);
         $downButton->setColorString($colorString);
-        $downButton->setOnClick($jsContentMovDown);
+        $downButton->setOnClick($jsMovPaths['down']);
         $downButton->build();
 
         //Right
@@ -192,7 +188,7 @@ class EntityDraw
         $rightButton->setString('>');
         $rightButton->setColorButton($colorButton);
         $rightButton->setColorString($colorString);
-        $rightButton->setOnClick($jsContentMovRight);
+        $rightButton->setOnClick($jsMovPaths['right']);
         $rightButton->build();
 
         //Set Children (Panel)
