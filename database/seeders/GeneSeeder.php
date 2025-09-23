@@ -14,26 +14,30 @@ class GeneSeeder extends Seeder
     public function run(): void
     {
         Gene::query()->updateOrCreate(['key' => Gene::KEY_RED_TEXTURE], [
+            "type" => Gene::TYPE_STATIC_RANGE,
             "name" => "Colore Rosso",
-            "started" => true,
+            "show_on_registration" => true,
             "min" => 0,
             "max" => 255,
         ]);
         Gene::query()->updateOrCreate(['key' => Gene::KEY_GREEN_TEXTURE], [
+            "type" => Gene::TYPE_STATIC_RANGE,
             "name" => "Colore Verde",
-            "started" => true,
+            "show_on_registration" => true,
             "min" => 0,
             "max" => 255,
         ]);
         Gene::query()->updateOrCreate(['key' => Gene::KEY_BLUE_TEXTURE], [
+            "type" => Gene::TYPE_STATIC_RANGE,
             "name" => "Colore Blu",
-            "started" => true,
+            "show_on_registration" => true,
             "min" => 0,
             "max" => 255,
         ]);
         Gene::query()->updateOrCreate(['key' => Gene::KEY_LIFEPOINT], [
+            "type" => Gene::DYNAMIC_MAX,
             "name" => "Punti Vita",
-            "started" => true,
+            "show_on_registration" => true,
             "min" => 1,
             "max" => null,
             "max_from" => 90,
