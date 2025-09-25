@@ -5,11 +5,11 @@ FROM node:18
 WORKDIR /app
 
 # Copia i file nella directory di lavoro del container
-COPY entity.js .
+COPY index.js .
 
 # Se ci sono dipendenze (come un package.json), dovresti copiarle e installarle
 # COPY package*.json ./
 # RUN npm install
 
 # Comando per eseguire lo script
-CMD ["node", "entity.js"]
+CMD ["node", "index.js"]
