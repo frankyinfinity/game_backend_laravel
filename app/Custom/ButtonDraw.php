@@ -82,6 +82,7 @@ class ButtonDraw {
 
         //Text
         $text = new Text($uid.'_text');
+        $text->setFontSize(22);
         $text->setOrigin($x, $y);
         $text->setText($string);
         $text->setColor($colorString);

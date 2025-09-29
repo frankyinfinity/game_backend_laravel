@@ -199,6 +199,8 @@
                     const hexValue = object['color'];
                     this.shape.style.fill = '#' + hexValue.toString(16).padStart(6, '0');
                 }
+                this.shape.style.fontFamily = object['fontFamily'];
+                this.shape.style.fontSize = object['fontSize'];
                 this.shape.text = object['text'];
             }
 

@@ -104,12 +104,14 @@ class EntityDraw
         $panelX += 10;
         $panelY += 10;
         $text1 = new Text($dbEntity->uid.'_text_row_1');
+        $text1->setFontSize(22);
         $text1->setOrigin($panelX, $panelY);
         $text1->setText("UID: " . $dbEntity->uid);
         $text1->setRenderable(false);
 
         $panelY += 35;
         $text2 = new Text($dbEntity->uid.'_text_row_2');
+        $text2->setFontSize(22);
         $text2->setOrigin($panelX, $panelY);
         $text2->setText("I: " . $dbEntity->tile_i . ' - J: ' . $dbEntity->tile_j);
         $text2->setRenderable(false);
