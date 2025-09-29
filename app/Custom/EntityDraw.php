@@ -111,14 +111,8 @@ class EntityDraw
         $panelY += 35;
         $text2 = new Text($dbEntity->uid.'_text_row_2');
         $text2->setOrigin($panelX, $panelY);
-        $text2->setText("I: " . $dbEntity->tile_i);
+        $text2->setText("I: " . $dbEntity->tile_i . ' - J: ' . $dbEntity->tile_j);
         $text2->setRenderable(false);
-
-        $panelY += 35;
-        $text3 = new Text($dbEntity->uid.'_text_row_3');
-        $text3->setOrigin($panelX, $panelY);
-        $text3->setText("J: " . $dbEntity->tile_j);
-        $text3->setRenderable(false);
 
         //Buttons
         $sizeButton = $size * 0.7;
@@ -194,7 +188,6 @@ class EntityDraw
         //Set Children (Panel)
         $panel->addChild($text1->getUid());
         $panel->addChild($text2->getUid());
-        $panel->addChild($text3->getUid());
         foreach ($upButton->getItems() as $item) {$panel->addChild($item->getUid());}
         foreach ($leftButton->getItems() as $item) {$panel->addChild($item->getUid());}
         foreach ($downButton->getItems() as $item) {$panel->addChild($item->getUid());}
@@ -205,7 +198,6 @@ class EntityDraw
         $this->items[] = $panel->buildJson();
         $this->items[] = $text1->buildJson();
         $this->items[] = $text2->buildJson();
-        $this->items[] = $text3->buildJson();
         foreach ($upButton->getItems() as $item) {$this->items[] = $item->buildJson();}
         foreach ($leftButton->getItems() as $item) {$this->items[] = $item->buildJson();}
         foreach ($downButton->getItems() as $item) {$this->items[] = $item->buildJson();}

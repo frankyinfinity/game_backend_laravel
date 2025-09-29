@@ -8,7 +8,7 @@
 
 <div class="card">
     <div class="card-header pb-0">
-        <h4 class="mb-0">Giocatore: <strong>{{$player->user->name}}</strong></h5>
+        <h4 class="mb-0">Giocatore: <strong>{{$player->user->name}}</strong></h4>
     </div>
     <div class="card-body">
         <div class="row">
@@ -387,10 +387,7 @@
                 objects[uid] = object;
 
                 let text2 = shapes[uid+'_text_row_2'];
-                text2.text = 'I: ' + data['new_tile_i'];
-
-                let text3 = shapes[uid+'_text_row_3'];
-                text3.text = 'J: ' + data['new_tile_j'];
+                text2.text = 'I: ' + data['new_tile_i'] + ' - J: ' + data['new_tile_j'];
 
             });
 
