@@ -13,7 +13,7 @@ use App\Custom\MultiLine;
 use App\Custom\Square;
 use App\Models\Entity;
 use App\Models\Player;
-use App\Models\DrawMapRequest;
+use App\Models\DrawRequest;
 use Illuminate\Support\Facades\Storage;
 use Log;
 use Str;
@@ -38,7 +38,7 @@ class GenerateMapJob implements ShouldQueue
      */
     public function handle(): void
     {
-    
+
         $requestArray = $this->requestArray;
         $player_id = $requestArray['player_id'];
 
@@ -61,7 +61,7 @@ class GenerateMapJob implements ShouldQueue
             $tiles = json_decode($jsonContent, true);
         }
         $tiles = collect($tiles);
-        
+
         $entities = Entity::query()
             ->where('state', Entity::STATE_LIFE)
             ->whereHas('specie', function ($q) use ($player_id) {
@@ -71,7 +71,7 @@ class GenerateMapJob implements ShouldQueue
 
         for ($i = 0; $i < $birthRegion->height; $i++) {
             for ($j = 0; $j < $birthRegion->width; $j++) {
-                
+
                 $tile = $birthClimate->default_tile;
                 $searchTile = $tiles->where('i', $i)->where('j', $j)->first();
                 if($searchTile !== null) {
@@ -122,7 +122,7 @@ class GenerateMapJob implements ShouldQueue
         }
 
         $request_id = Str::random(20);
-        DrawMapRequest::query()->create([
+        DrawRequest::query()->create([
             'request_id' => $request_id,
             'player_id' => $player_id,
             'items' => json_encode($items),

@@ -6,7 +6,7 @@ use App\Events\MoveEntityEvent;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateMapJob;
-use App\Models\DrawMapRequest;
+use App\Models\DrawRequest;
 use App\Models\Entity;
 use Illuminate\Http\Request;
 use App\Models\Player;
@@ -92,14 +92,14 @@ class PlayerController extends Controller
     public function getMap(Request $request) {
 
         $items = [];
-        $drawMapRequest = DrawMapRequest::query()
+        $drawRequest = DrawRequest::query()
             ->where('request_id', $request->request_id)
             ->where('player_id', $request->player_id)
             ->first();
 
-        if($drawMapRequest !== null) {
-            $items = json_decode($drawMapRequest->items);
-            $drawMapRequest->delete();
+        if($drawRequest !== null) {
+            $items = json_decode($drawRequest->items);
+            $drawRequest->delete();
         }
 
         return response()->json(['success' => true, 'items' => $items]);
