@@ -53,8 +53,16 @@ class SendMovement extends Command
         $mapSolidTiles[$toJ][$toI] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
 
-        Log::debug('$pathFinding');
-        Log::debug(json_encode($pathFinding));
+        foreach ($pathFinding as $path) {
+            $i = $path[1];
+            $j = $path[0];
+            $mapSolidTiles[$j][$j] = '.';
+        }
+
+        foreach ($mapSolidTiles as $mapSolidTile) {
+            Log::debug(json_encode($mapSolidTile));
+        }
+
 
         /*$diffI = $toI - $fromI;
         $diffJ = $toJ - $fromJ;

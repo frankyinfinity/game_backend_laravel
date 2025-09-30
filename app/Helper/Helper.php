@@ -75,37 +75,44 @@ class Helper
 
     }
 
-    public static function calculatePathFinding(array $grid) {
+    public static function calculatePathFinding(array $grid): ?array {
 
         $rows = count($grid);
         $cols = count($grid[0]);
-        $directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // up, down, left, right
+        $directions = [[-1,0], [1,0], [0,-1], [0,1]]; // up, down, left, right
 
         $start = $end = null;
 
         // Find 'A' and 'B'
-        for ($i = 0; $i < $rows; $i++) {
-            for ($j = 0; $j < $cols; $j++) {
-                if ($grid[$i][$j] === 'A') $start = [$i, $j];
-                if ($grid[$i][$j] === 'B') $end = [$i, $j];
+        for ($i=0; $i<$rows; $i++) {
+            for ($j=0; $j<$cols; $j++) {
+                if ($grid[$i][$j] === 'A') $start = [$i,$j];
+                if ($grid[$i][$j] === 'B') $end = [$i,$j];
             }
         }
 
-        if (!$start || !$end) {
-            return null; // A or B not found
-        }
+        if (!$start || !$end) return null; // no start or end
 
-        // BFS queue: each element is [row, col, path_so_far]
-        $queue = [[$start[0], $start[1], []]];
         $visited = array_fill(0, $rows, array_fill(0, $cols, false));
+        $parent = array_fill(0, $rows, array_fill(0, $cols, null));
+
+        $queue = [];
+        $queue[] = $start;
         $visited[$start[0]][$start[1]] = true;
 
         while (!empty($queue)) {
-            [$r, $c, $path] = array_shift($queue);
-            $path[] = [$r, $c];
+            [$r, $c] = array_shift($queue);
 
             if ($r === $end[0] && $c === $end[1]) {
-                return $path; // path found
+                // reconstruct path by backtracking parents
+                $path = [];
+                while ($r !== null && $c !== null) {
+                    array_unshift($path, [$r, $c]);
+                    $p = $parent[$r][$c];
+                    if ($p === null) break;
+                    [$r, $c] = $p;
+                }
+                return $path;
             }
 
             foreach ($directions as [$dr, $dc]) {
@@ -119,7 +126,8 @@ class Helper
                     ($grid[$nr][$nc] === '0' || $grid[$nr][$nc] === 'B')
                 ) {
                     $visited[$nr][$nc] = true;
-                    $queue[] = [$nr, $nc, $path];
+                    $parent[$nr][$nc] = [$r, $c];
+                    $queue[] = [$nr, $nc];
                 }
             }
         }
