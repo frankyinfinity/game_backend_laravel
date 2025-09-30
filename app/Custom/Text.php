@@ -2,6 +2,8 @@
 
 namespace App\Custom;
 
+use App\Helper\Helper;
+
 class Text extends BasicDraw
 {
 
@@ -9,16 +11,18 @@ class Text extends BasicDraw
     private $x;
     private $y;
     private $text;
-    private $fontFamily;
-    private $fontSize;
+    private string $fontFamily;
+    private int $fontSize;
+    private bool $centerAnchor;
 
     public function __construct($uid = null)
     {
         if($uid == null) {
             $uid = uniqid();
         }
-        $this->fontFamily = 'Arial';
-        $this->fontSize = 16;
+        $this->fontFamily = Helper::getDefaultFontFamily();
+        $this->fontSize = Helper::getDefaultFontSize();
+        $this->centerAnchor = false;
         parent::__construct('text', $uid);
     }
 
@@ -32,12 +36,19 @@ class Text extends BasicDraw
         $this->text = $text;
     }
 
-    public function setFontSize($value) {
+    public function setFontSize(int $value): void
+    {
         $this->fontSize = $value;
     }
 
-    public function setFontFamily($value) {
+    public function setFontFamily(string $value): void
+    {
         $this->fontFamily = $value;
+    }
+
+    public function setCenterAnchor(bool $value): void
+    {
+        $this->centerAnchor = $value;
     }
 
     public function buildJson() {
@@ -46,6 +57,7 @@ class Text extends BasicDraw
             'y' => $this->y,
             'fontFamily' => $this->fontFamily,
             'fontSize' => $this->fontSize,
+            'centerAnchor' => $this->centerAnchor,
             'text' => $this->text,
         ]);
     }

@@ -148,9 +148,10 @@ class EntityDraw
         $upButton = new ButtonDraw($dbEntity->uid.'_button_up');
         $upButton->setSize($sizeButton, $sizeButton);
         $upButton->setOrigin($panelX, $panelY);
-        $upButton->setString('^');
+        $upButton->setString('↑');
         $upButton->setColorButton($colorButton);
         $upButton->setColorString($colorString);
+        $upButton->setTextFontSize(22);
         $upButton->setOnClick($jsMovPaths['up']);
         $upButton->build();
 
@@ -159,9 +160,10 @@ class EntityDraw
         $leftButton = new ButtonDraw($dbEntity->uid.'_button_left');
         $leftButton->setSize($sizeButton, $sizeButton);
         $leftButton->setOrigin($panelX, $panelY);
-        $leftButton->setString('<');
+        $leftButton->setString('←');
         $leftButton->setColorButton($colorButton);
         $leftButton->setColorString($colorString);
+        $leftButton->setTextFontSize(22);
         $leftButton->setOnClick($jsMovPaths['left']);
         $leftButton->build();
 
@@ -170,9 +172,10 @@ class EntityDraw
         $downButton = new ButtonDraw($dbEntity->uid.'_button_down');
         $downButton->setSize($sizeButton, $sizeButton);
         $downButton->setOrigin($panelX, $panelY);
-        $downButton->setString('v');
+        $downButton->setString('↓');
         $downButton->setColorButton($colorButton);
         $downButton->setColorString($colorString);
+        $downButton->setTextFontSize(22);
         $downButton->setOnClick($jsMovPaths['down']);
         $downButton->build();
 
@@ -181,9 +184,10 @@ class EntityDraw
         $rightButton = new ButtonDraw($dbEntity->uid.'_button_right');
         $rightButton->setSize($sizeButton, $sizeButton);
         $rightButton->setOrigin($panelX, $panelY);
-        $rightButton->setString('>');
+        $rightButton->setString('→');
         $rightButton->setColorButton($colorButton);
         $rightButton->setColorString($colorString);
+        $rightButton->setTextFontSize(22);
         $rightButton->setOnClick($jsMovPaths['right']);
         $rightButton->build();
 

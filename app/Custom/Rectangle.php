@@ -38,4 +38,22 @@ class Rectangle extends BasicDraw
         ]);
     }
 
+    private function getCenterX(): float
+    {
+        return $this->x + ($this->width / 2);
+    }
+
+    private function getCenterY(): float
+    {
+        return $this->y + ($this->height / 2);
+    }
+
+    public function getCenter(): array
+    {
+        return [
+            'x' => $this->getCenterX(),
+            'y' => $this->getCenterY(),
+        ];
+    }
+
 }

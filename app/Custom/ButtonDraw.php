@@ -2,12 +2,15 @@
 
 namespace App\Custom;
 use App\Custom\Text;
+use App\Helper\Helper;
 
 class ButtonDraw {
 
     private $uid;
     public function __construct($uid) {
         $this->uid = $uid;
+        $this->textFontFamily = Helper::getDefaultFontFamily();
+        $this->textFontSize = Helper::getDefaultFontSize();
     }
 
     private array $items = [];
@@ -23,6 +26,8 @@ class ButtonDraw {
     private $string;
     private $colorButton;
     private $colorString;
+    private string $textFontFamily;
+    private int $textFontSize;
     private $onClickFunction;
 
     public function setSize($width, $height): void
@@ -50,6 +55,16 @@ class ButtonDraw {
     public function setColorString($color): void
     {
         $this->colorString = $color;
+    }
+
+    public function setTextFontSize(int $value): void
+    {
+        $this->textFontSize = $value;
+    }
+
+    public function setTextFontFamily(string $value): void
+    {
+        $this->textFontFamily = $value;
     }
 
     public function setOnClick($onClickFunction): void
@@ -81,8 +96,16 @@ class ButtonDraw {
         }
 
         //Text
+        $centerRect = $rect->getCenter();
+        $x = $centerRect['x'];
+        $y = $centerRect['y'];
+        $fontFamily = $this->textFontFamily;
+        $fontSize = $this->textFontSize;
+
         $text = new Text($uid.'_text');
-        $text->setFontSize(22);
+        $text->setCenterAnchor(true);
+        $text->setFontFamily($fontFamily);
+        $text->setFontSize($fontSize);
         $text->setOrigin($x, $y);
         $text->setText($string);
         $text->setColor($colorString);

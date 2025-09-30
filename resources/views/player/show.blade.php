@@ -202,6 +202,9 @@
                 this.shape.style.fontFamily = object['fontFamily'];
                 this.shape.style.fontSize = object['fontSize'];
                 this.shape.text = object['text'];
+                if(object['centerAnchor']) {
+                    this.shape.pivot.set(this.shape.width / 2, this.shape.height / 2);
+                }
             }
 
         }
