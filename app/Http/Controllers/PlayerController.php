@@ -4,13 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Events\MoveEntityEvent;
 use App\Helper\Helper;
-use App\Http\Controllers\Controller;
 use App\Jobs\GenerateMapJob;
 use App\Models\DrawRequest;
 use App\Models\Entity;
 use Illuminate\Http\Request;
 use App\Models\Player;
-use Log;
 
 class PlayerController extends Controller
 {

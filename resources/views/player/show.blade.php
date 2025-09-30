@@ -316,7 +316,7 @@
 
             });
 
-            channel.bind('draw_map', function(data) {
+            channel.bind('draw_interface', function(data) {
 
                 let request_id = data['request_id'];
                 let player_id = data['player_id'];

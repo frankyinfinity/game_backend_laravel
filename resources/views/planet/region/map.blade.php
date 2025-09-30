@@ -29,7 +29,7 @@
 </div>
 
 @section('js')
-    <script> 
+    <script>
         $(document).ready(function () {
 
             let tile_selected_id = '{{$region->climate->defaultTile->id}}';
@@ -37,7 +37,6 @@
 
             //Init Map
             let map = {!! json_encode($map) !!};
-            console.log(map);
             map.forEach(item => {
                 let tile = item.tile;
                 let i = item.i;
@@ -46,11 +45,11 @@
             });
 
             $(document).on('click', '.button_tile', function () {
-                
+
                 let el = $(this);
                 let tile_id = el.attr('id').split('_')[2];
                 let tile_color = el.data('color');
-                
+
                 //Reset all
                 tile_selected_id = null;
                 tile_selected_color = null;
@@ -64,7 +63,7 @@
                         $("#icon_tile_"+element.id.split('_')[2]).css("color", item.data('color'));
                     }
                 });
-                
+
                 //Click
                 tile_selected_id = tile_id;
                 tile_selected_color = tile_color;
@@ -76,11 +75,11 @@
             });
 
             $(document).on('click', '.tile', function () {
-                
+
                 let tile = $(this);
                 let tile_i = tile.attr('id').split('_')[1];
                 let tile_j = tile.attr('id').split('_')[2];
-                
+
                 $.ajaxSetup({
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -89,7 +88,7 @@
                 $.ajax({
                     url: "{{ route('regions.tile') }}",
                     type: 'POST',
-                    data: { 
+                    data: {
                         region_id: '{{$region->id}}',
                         tile_id: tile_selected_id,
                         tile_i: tile_i,

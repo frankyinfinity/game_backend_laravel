@@ -43,7 +43,7 @@ class GenerateMapJob implements ShouldQueue
         $player_id = $requestArray['player_id'];
 
         $channel = 'player_'.$player_id.'_channel';
-        $event = 'draw_map';
+        $event = 'draw_interface';
 
         $items = [];
         $startI = 0;
@@ -55,12 +55,7 @@ class GenerateMapJob implements ShouldQueue
         $birthRegion = $player->birthRegion;
         $birthClimate = $birthRegion->birthClimate;
 
-        $tiles = [];
-        if($birthRegion->filename !== null) {
-            $jsonContent = Storage::disk('birth_regions')->get($birthRegion->id.'/'.$birthRegion->filename);
-            $tiles = json_decode($jsonContent, true);
-        }
-        $tiles = collect($tiles);
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
 
         $entities = Entity::query()
             ->where('state', Entity::STATE_LIFE)

@@ -3,9 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Events\MoveEntityEvent;
+use App\Models\Player;
 use Illuminate\Console\Command;
 use App\Models\Entity;
 use App\Helper\Helper;
+use Illuminate\Support\Facades\Log;
 
 class SendMovement extends Command
 {
@@ -29,19 +31,32 @@ class SendMovement extends Command
     public function handle()
     {
 
-        $player_id = 2;
+        $player_id = 4;
         $channel = 'player_'.$player_id.'_channel';
-        $event = 'move_entity';
+        $event = 'draw_interface';
 
-        $uid = '6896142b4bba88.66323706';
-        $toI = 4;
-        $toJ = 2;
+        $uid = '68dbf7b5ad3f47.54880339';
+        $toI = 21;
+        $toJ = 5;
 
         $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
         $fromJ = $entity->tile_j;
 
-        $diffI = $toI - $fromI;
+        //Get Path
+        $player = Player::find($player_id);
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
+
+        $mapSolidTiles[$fromJ][$fromI] = 'A';
+        $mapSolidTiles[$toJ][$toI] = 'B';
+        $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
+
+        Log::debug('$pathFinding');
+        Log::debug(json_encode($pathFinding));
+
+        /*$diffI = $toI - $fromI;
         $diffJ = $toJ - $fromJ;
 
         $size = Helper::getTileSize();
@@ -55,7 +70,7 @@ class SendMovement extends Command
             'new_tile_i' => $toI,
             'new_tile_j' => $toJ
         ]));
-        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
+        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);*/
 
     }
 }
