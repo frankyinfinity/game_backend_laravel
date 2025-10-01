@@ -156,7 +156,7 @@ class EntityDraw
         $upButton->build();
 
         //Left
-        $panelX += $sizeButton * 2;
+        $panelX += $sizeButton * 1.2;
         $leftButton = new ButtonDraw($dbEntity->uid.'_button_left');
         $leftButton->setSize($sizeButton, $sizeButton);
         $leftButton->setOrigin($panelX, $panelY);
@@ -168,7 +168,7 @@ class EntityDraw
         $leftButton->build();
 
         //Down
-        $panelX += $sizeButton * 2;
+        $panelX += $sizeButton * 1.2;
         $downButton = new ButtonDraw($dbEntity->uid.'_button_down');
         $downButton->setSize($sizeButton, $sizeButton);
         $downButton->setOrigin($panelX, $panelY);
@@ -180,7 +180,7 @@ class EntityDraw
         $downButton->build();
 
         //Right
-        $panelX += $sizeButton * 2;
+        $panelX += $sizeButton * 1.2;
         $rightButton = new ButtonDraw($dbEntity->uid.'_button_right');
         $rightButton->setSize($sizeButton, $sizeButton);
         $rightButton->setOrigin($panelX, $panelY);
