@@ -21,6 +21,8 @@ class Helper
 
     const DRAW_REQUEST_TYPE_DRAW = 'draw';
     public static function getDrawRequestTypeDraw(): string { return self::DRAW_REQUEST_TYPE_DRAW; }
+    const DRAW_REQUEST_TYPE_UPDATE = 'update';
+    public static function getUpdateRequestTypeDraw(): string { return self::DRAW_REQUEST_TYPE_UPDATE; }
 
     public static function setCommonJsCode($code, $name): array|string
     {
@@ -135,6 +137,15 @@ class Helper
         return [
             'type' => self::getDrawRequestTypeDraw(),
             'object' => $object
+        ];
+    }
+
+    public static function buildItemUpdate(string $uid, $attributes): array
+    {
+        return [
+            'type' => self::getUpdateRequestTypeDraw(),
+            'uid' => $uid,
+            'attributes' => $attributes
         ];
     }
 

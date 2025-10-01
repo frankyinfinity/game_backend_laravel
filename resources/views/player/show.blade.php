@@ -34,6 +34,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
 
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
         window.AppData = {
             csrfToken: '{{ csrf_token() }}'
         };
@@ -330,7 +334,7 @@
                         request_id: request_id,
                         player_id: player_id,
                      },
-                    success: function(result) {
+                    success: async function(result) {
                         if(result.success) {
                             let items = result.items;
                             for (const item of items) {
@@ -357,6 +361,21 @@
                                     if(objectType === 'text') {
                                         drawText(object);
                                     }
+
+                                }
+
+                                //Update
+                                if(itemType === '{{\App\Helper\Helper::getUpdateRequestTypeDraw()}}') {
+
+                                    let uid = item['uid'];
+                                    let attributes = item['attributes'];
+                                    let shape = shapes[uid];
+                                    $.each(attributes, function( attribute, value ) {
+                                        shape[attribute] = value;
+                                    });
+                                    shapes[uid] = shape;
+
+                                    await sleep(250);
 
                                 }
 

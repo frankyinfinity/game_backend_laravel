@@ -3,11 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Custom\Circle;
-use App\Custom\Line;
 use App\Custom\MultiLine;
 use App\Custom\Square;
 use App\Events\DrawMapEvent;
-use App\Events\MoveEntityEvent;
 use App\Models\DrawRequest;
 use App\Models\Player;
 use Illuminate\Console\Command;
@@ -15,7 +13,6 @@ use App\Models\Entity;
 use App\Helper\Helper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use function GuzzleHttp\json_encode;
 
 class SendMovement extends Command
 {
@@ -44,8 +41,8 @@ class SendMovement extends Command
         $event = 'draw_interface';
 
         $uid = '68dbf7b5ad3f47.54880339';
-        $toI = 9;
-        $toJ = 15;
+        $toI = 6;
+        $toJ = 21;
 
         $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
@@ -61,6 +58,7 @@ class SendMovement extends Command
         $mapSolidTiles[$toI][$toJ] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
 
+        $xyUpdates = [];
         $items = [];
         foreach ($pathFinding as $key => $path) {
 
@@ -103,6 +101,16 @@ class SendMovement extends Command
 
             }
 
+            $xyUpdates[] = [
+                'x' => $size*($startJ-1),
+                'y' => $size*($startI-1),
+                'zIndex' => 1000
+            ];
+
+        }
+
+        foreach ($xyUpdates as $xyUpdate) {
+            $items[] = Helper::buildItemUpdate($uid, $xyUpdate);
         }
 
         $request_id = Str::random(20);
