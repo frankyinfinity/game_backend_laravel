@@ -334,22 +334,32 @@
                         if(result.success) {
                             let items = result.items;
                             for (const item of items) {
-                                let itemType = item['type'];
-                                if(itemType === 'square') {
-                                    drawSquare(item);
+
+                                let itemType = item['type'].toString();
+
+                                //Draw
+                                if(itemType === '{{\App\Helper\Helper::getDrawRequestTypeDraw()}}') {
+
+                                    let object = item['object'];
+                                    let objectType = object['type'];
+                                    if(objectType === 'square') {
+                                        drawSquare(object);
+                                    }
+                                    if(objectType === 'rectangle') {
+                                        drawRectangle(object);
+                                    }
+                                    if(objectType === 'multi_line') {
+                                        drawMultiLine(object);
+                                    }
+                                    if(objectType === 'circle') {
+                                        drawCircle(object);
+                                    }
+                                    if(objectType === 'text') {
+                                        drawText(object);
+                                    }
+
                                 }
-                                if(itemType === 'rectangle') {
-                                    drawRectangle(item);
-                                }
-                                if(itemType === 'multi_line') {
-                                    drawMultiLine(item);
-                                }
-                                if(itemType === 'circle') {
-                                    drawCircle(item);
-                                }
-                                if(itemType === 'text') {
-                                    drawText(item);
-                                }
+
                             }
                         } else {
                             var msg = 'Si è verificato un errore.';

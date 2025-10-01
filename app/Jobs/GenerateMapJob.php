@@ -49,7 +49,7 @@ class GenerateMapJob implements ShouldQueue
         $startI = 0;
         $iPos = $startI;
         $jPos = 0;
-        $size = Helper::TILE_SIZE;
+        $size = Helper::getTileSize();
 
         $player = Player::find($player_id);
         $birthRegion = $player->birthRegion;
@@ -83,7 +83,7 @@ class GenerateMapJob implements ShouldQueue
                 $square->setOrigin($iPos, $jPos);
                 $square->setSize($size);
                 $square->setColor($oxHexValue);
-                $items[] = $square->buildJson();
+                $items[] = Helper::buildItemDraw($square->buildJson());
 
                 //Borders
                 $borders = new MultiLine();
@@ -94,7 +94,7 @@ class GenerateMapJob implements ShouldQueue
                 $borders->setPoint($iPos+$size, $jPos);
                 $borders->setPoint($iPos, $jPos);
                 $borders->setColor(0xFFFFFF);
-                $items[] = $borders->buildJson();
+                $items[] = Helper::buildItemDraw($borders->buildJson());
 
                 //Entity
                 $searchEntity = $entities->where('tile_i', $i)->where('tile_j', $j)->first();
@@ -104,7 +104,7 @@ class GenerateMapJob implements ShouldQueue
 
                     $entityDrawItems = $entityDraw->getItems();
                     foreach ($entityDrawItems as $entityDrawItem) {
-                        $items[] = $entityDrawItem;
+                        $items[] = Helper::buildItemDraw($entityDrawItem);
                     }
 
                 }
