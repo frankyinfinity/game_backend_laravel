@@ -36,8 +36,8 @@ class SendMovement extends Command
         $event = 'draw_interface';
 
         $uid = '68dbf7b5ad3f47.54880339';
-        $toI = 21;
-        $toJ = 5;
+        $toI = 5;
+        $toJ = 21;
 
         $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
@@ -49,14 +49,16 @@ class SendMovement extends Command
         $tiles = Helper::getBirthRegionTiles($birthRegion);
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
 
-        $mapSolidTiles[$fromJ][$fromI] = 'A';
-        $mapSolidTiles[$toJ][$toI] = 'B';
+        $mapSolidTiles[$fromI][$fromJ] = 'A';
+        $mapSolidTiles[$toI][$toJ] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
 
         foreach ($pathFinding as $path) {
-            $i = $path[1];
-            $j = $path[0];
-            $mapSolidTiles[$j][$j] = '.';
+            $i = $path[0];
+            $j = $path[1];
+            if($mapSolidTiles[$i][$j] !== 'A' && $mapSolidTiles[$i][$j] !== 'B') {
+                $mapSolidTiles[$i][$j] = '.';
+            }
         }
 
         foreach ($mapSolidTiles as $mapSolidTile) {
