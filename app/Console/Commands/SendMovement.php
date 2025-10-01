@@ -135,21 +135,5 @@ class SendMovement extends Command
             'player_id' => $player_id,
         ]));
 
-        /*$diffI = $toI - $fromI;
-        $diffJ = $toJ - $fromJ;
-
-        $size = Helper::getTileSize();
-        $movementI = $diffI * $size;
-        $movementJ = $diffJ * $size;
-
-        event(new MoveEntityEvent($channel, $event, [
-            'uid' => $uid,
-            'i' => $movementI,
-            'j' => $movementJ,
-            'new_tile_i' => $toI,
-            'new_tile_j' => $toJ
-        ]));
-        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);*/
-
     }
 }

@@ -6,7 +6,6 @@ use App\Custom\Circle;
 use App\Custom\MultiLine;
 use App\Custom\Square;
 use App\Events\DrawMapEvent;
-use App\Events\MoveEntityEvent;
 use App\Helper\Helper;
 use App\Jobs\GenerateMapJob;
 use App\Models\DrawRequest;
@@ -198,15 +197,31 @@ class PlayerController extends Controller
             }
 
             $updates[] = [
-                'x' => $size*($startJ-1),
-                'y' => $size*($startI-1),
-                'zIndex' => 1000
+                'uid' => $uid,
+                'attributes' => [
+                    'x' => $size*($startJ-1),
+                    'y' => $size*($startI-1),
+                    'zIndex' => 100
+                ]
             ];
+
+            if((sizeof($pathFinding)-1) !== $key) {
+
+                $endI = $pathFinding[$key + 1][0];
+                $endJ = $pathFinding[$key + 1][1];
+                $updates[] = [
+                    'uid' => $uid . '_text_row_2',
+                    'attributes' => [
+                        'text' => 'I: ' . $endI . ' - J: ' . $endJ,
+                    ]
+                ];
+
+            }
 
         }
 
         foreach ($updates as $update) {
-            $items[] = Helper::buildItemUpdate($uid, $update);
+            $items[] = Helper::buildItemUpdate($update);
         }
         foreach ($clears as $clear) {
             $items[] = Helper::buildItemClear($clear);

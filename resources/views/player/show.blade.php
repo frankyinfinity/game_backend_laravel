@@ -409,30 +409,6 @@
 
             });
 
-            channel.bind('move_entity', function(data) {
-
-                let uid = data['uid'];
-                let i = data['i'];
-                let j = data['j'];
-
-                let shape = shapes[uid];
-
-                shape.x += j;
-                shape.y += i;
-                shape.zIndex = 1000;
-
-                shapes[uid] = shape;
-
-                let object = objects[uid];
-                object['attributes']['tile_i'] = data['new_tile_i'];
-                object['attributes']['tile_j'] = data['new_tile_j'];
-                objects[uid] = object;
-
-                let text2 = shapes[uid+'_text_row_2'];
-                text2.text = 'I: ' + data['new_tile_i'] + ' - J: ' + data['new_tile_j'];
-
-            });
-
         });
     </script>
 @stop

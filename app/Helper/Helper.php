@@ -142,12 +142,12 @@ class Helper
         ];
     }
 
-    public static function buildItemUpdate(string $uid, $attributes): array
+    public static function buildItemUpdate($data): array
     {
         return [
             'type' => self::getUpdateRequestTypeDraw(),
-            'uid' => $uid,
-            'attributes' => $attributes
+            'uid' => $data['uid'],
+            'attributes' => $data['attributes']
         ];
     }
 
