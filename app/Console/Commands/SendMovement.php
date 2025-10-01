@@ -58,7 +58,8 @@ class SendMovement extends Command
         $mapSolidTiles[$toI][$toJ] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
 
-        $xyUpdates = [];
+        $updates = [];
+        $clears = [];
         $items = [];
         foreach ($pathFinding as $key => $path) {
 
@@ -74,7 +75,10 @@ class SendMovement extends Command
             $xStartCircle = $startCenterSquare['x'];
             $yStartCircle = $startCenterSquare['y'];
 
-            $circle = new Circle(Str::random(20));
+            $circleName = 'circle_' . Str::random(20);
+            $clears[] = $circleName;
+
+            $circle = new Circle($circleName);
             $circle->setOrigin($xStartCircle, $yStartCircle);
             $circle->setRadius($size / 6);
             $circle->setColor('#FF0000');
@@ -92,7 +96,10 @@ class SendMovement extends Command
                 $xEndCircle = $endCenterSquare['x'];
                 $yEndCircle = $endCenterSquare['y'];
 
-                $linePath = new MultiLine();
+                $multilineName = 'multiline_' . Str::random(20);
+                $clears[] = $multilineName;
+
+                $linePath = new MultiLine($multilineName);
                 $linePath->setPoint($xStartCircle, $yStartCircle);
                 $linePath->setPoint($xEndCircle, $yEndCircle);
                 $linePath->setColor('#FF0000');
@@ -101,7 +108,7 @@ class SendMovement extends Command
 
             }
 
-            $xyUpdates[] = [
+            $updates[] = [
                 'x' => $size*($startJ-1),
                 'y' => $size*($startI-1),
                 'zIndex' => 1000
@@ -109,8 +116,11 @@ class SendMovement extends Command
 
         }
 
-        foreach ($xyUpdates as $xyUpdate) {
-            $items[] = Helper::buildItemUpdate($uid, $xyUpdate);
+        foreach ($updates as $update) {
+            $items[] = Helper::buildItemUpdate($uid, $update);
+        }
+        foreach ($clears as $clear) {
+            $items[] = Helper::buildItemClear($clear);
         }
 
         $request_id = Str::random(20);

@@ -379,6 +379,14 @@
 
                                 }
 
+                                //Clear
+                                if(itemType === '{{\App\Helper\Helper::getClearRequestTypeDraw()}}') {
+                                    let uid = item['uid'];
+                                    let shape = shapes[uid];
+                                    shape.clear();
+                                    delete shapes[uid];
+                                }
+
                             }
                         } else {
                             var msg = 'Si è verificato un errore.';
