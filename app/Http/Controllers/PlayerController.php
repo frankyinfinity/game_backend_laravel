@@ -12,6 +12,7 @@ use App\Models\DrawRequest;
 use App\Models\Entity;
 use Illuminate\Http\Request;
 use App\Models\Player;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PlayerController extends Controller
@@ -118,23 +119,20 @@ class PlayerController extends Controller
         $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
         $fromJ = $entity->tile_j;
+        $toI = $entity->tile_i;
+        $toJ = $entity->tile_j;
 
-        $toI = 0;
-        $toJ = 0;
         $action = $request->action;
         if($action === 'up') {
-            $toI = $fromI - 1;
-            $toJ = $fromJ + 0;
+            $toI--;
         } else if($action === 'down') {
-            $toI = $fromI + 1;
-            $toJ = $fromJ + 0;
+            $toI++;
         } else if($action === 'left') {
-            $toI = $fromI + 0;
-            $toJ = $fromJ - 1;
+            $toJ--;
         } else if($action === 'right') {
-            $toI = $fromI + 0;
-            $toJ = $fromJ + 1;
+            $toJ++;
         }
+        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
 
         //Get Path
         $player = Player::find($player_id);
@@ -160,14 +158,14 @@ class PlayerController extends Controller
             $startSquare->setOrigin($size*$startJ, $size*$startI);
             $startSquare->setSize($size);
             $startCenterSquare = $startSquare->getCenter();
-            $xStartCircle = $startCenterSquare['x'];
-            $yStartCircle = $startCenterSquare['y'];
+            $xStart = $startCenterSquare['x'];
+            $yStart = $startCenterSquare['y'];
 
             $circleName = 'circle_' . Str::random(20);
             $clears[] = $circleName;
 
             $circle = new Circle($circleName);
-            $circle->setOrigin($xStartCircle, $yStartCircle);
+            $circle->setOrigin($xStart, $yStart);
             $circle->setRadius($size / 6);
             $circle->setColor('#FF0000');
             $items[] = Helper::buildItemDraw($circle->buildJson());
@@ -178,37 +176,31 @@ class PlayerController extends Controller
                 $endJ = $pathFinding[$key+1][1];
 
                 $endSquare = new Square();
-                $endSquare->setOrigin($size*$endJ, $size*$endI);
                 $endSquare->setSize($size);
+                $endSquare->setOrigin($size*$endJ, $size*$endI);
                 $endCenterSquare = $endSquare->getCenter();
-                $xEndCircle = $endCenterSquare['x'];
-                $yEndCircle = $endCenterSquare['y'];
+                $xEnd = $endCenterSquare['x'];
+                $yEnd = $endCenterSquare['y'];
 
                 $multilineName = 'multiline_' . Str::random(20);
                 $clears[] = $multilineName;
 
                 $linePath = new MultiLine($multilineName);
-                $linePath->setPoint($xStartCircle, $yStartCircle);
-                $linePath->setPoint($xEndCircle, $yEndCircle);
+                $linePath->setPoint($xStart, $yStart);
+                $linePath->setPoint($xEnd, $yEnd);
                 $linePath->setColor('#FF0000');
                 $linePath->setThickness(2);
                 $items[] = Helper::buildItemDraw($linePath->buildJson());
 
-            }
+                $updates[] = [
+                    'uid' => $uid,
+                    'attributes' => [
+                        'x' => $xEnd,
+                        'y' => $yEnd,
+                        'zIndex' => 100
+                    ]
+                ];
 
-            $updates[] = [
-                'uid' => $uid,
-                'attributes' => [
-                    'x' => $size*($startJ-1),
-                    'y' => $size*($startI-1),
-                    'zIndex' => 100
-                ]
-            ];
-
-            if((sizeof($pathFinding)-1) !== $key) {
-
-                $endI = $pathFinding[$key + 1][0];
-                $endJ = $pathFinding[$key + 1][1];
                 $updates[] = [
                     'uid' => $uid . '_text_row_2',
                     'attributes' => [
@@ -238,8 +230,6 @@ class PlayerController extends Controller
             'request_id' => $request_id,
             'player_id' => $player_id,
         ]));
-
-        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
         return response()->json(['success' => true]);
 
     }

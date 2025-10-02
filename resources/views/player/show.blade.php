@@ -181,7 +181,9 @@
                 const fillColor = object['color'];
 
                 this.shape.beginFill(fillColor);
-                this.shape.drawCircle(circleX, circleY, circleRadius);
+                this.shape.drawCircle(0, 0, circleRadius);
+                this.shape.x = circleX;
+                this.shape.y = circleY;
                 this.shape.endFill();
 
             }

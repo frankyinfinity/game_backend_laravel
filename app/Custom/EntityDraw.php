@@ -59,13 +59,12 @@ class EntityDraw
 
         $rgbDecimal = ($red << 16) | ($green << 8) | $blue;
         $hexColorString = str_pad(dechex($rgbDecimal), 6, '0', STR_PAD_LEFT);
-        $formattedColor = "0x" . strtoupper($hexColorString);
-
-        return $formattedColor;
+        return "0x" . strtoupper($hexColorString);
 
     }
 
-    private function build() {
+    private function build(): void
+    {
 
         $dbEntity = $this->dbEntity;
         $square = $this->square;

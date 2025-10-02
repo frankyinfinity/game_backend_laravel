@@ -17,17 +17,19 @@ class Circle extends BasicDraw
         parent::__construct('circle', $uid);
     }
 
-    public function setOrigin($x, $y)
+    public function setOrigin($x, $y): void
     {
         $this->x = $x;
         $this->y = $y;
     }
 
-   public function setRadius($radius) {
+   public function setRadius($radius): void
+   {
        $this->radius = $radius;
    }
 
-    public function buildJson() {
+    public function buildJson(): array
+    {
         return $this->commonJson([
             'x' => $this->x,
             'y' => $this->y,
