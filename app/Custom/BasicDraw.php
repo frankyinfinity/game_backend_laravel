@@ -19,6 +19,8 @@ class BasicDraw
 
     const INTERACTIVE_POINTER_DOWN = 'pointerdown';
     const INTERACTIVE_POINTER_UP = 'pointerupoutside';
+    const INTERACTIVE_POINTER_OVER = 'pointerover';
+    const INTERACTIVE_POINTER_OUT = 'pointerout';
 
     public function __construct($type, $uid)
     {

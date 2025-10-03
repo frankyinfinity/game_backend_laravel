@@ -99,19 +99,19 @@
 
             constructor(object) {
                 super(object);
-                this.shape = new PIXI.Graphics();
+                this.shape = new PIXI.Sprite(PIXI.Texture.WHITE);
             }
 
             build() {
+
                 const object = this.object;
-                this.shape.beginFill(object['color']);
-                this.shape.drawRect(
-                    object['x'],
-                    object['y'],
-                    object['size'],
-                    object['size']
-                );
-                this.shape.endFill();
+
+                this.shape.width = object['size'];
+                this.shape.height = object['size'];
+                this.shape.x = object['x'];
+                this.shape.y = object['y'];
+                this.shape.tint = object['color'];
+
             }
 
         }
@@ -120,19 +120,19 @@
 
             constructor(object) {
                 super(object);
-                this.shape = new PIXI.Graphics();
+                this.shape = new PIXI.Sprite(PIXI.Texture.WHITE);
             }
 
             build() {
+
                 const object = this.object;
-                this.shape.beginFill(object['color']);
-                this.shape.drawRect(
-                    object['x'],
-                    object['y'],
-                    object['width'],
-                    object['height']
-                );
-                this.shape.endFill();
+
+                this.shape.width = object['width'];
+                this.shape.height = object['height'];
+                this.shape.x = object['x'];
+                this.shape.y = object['y'];
+                this.shape.tint = object['color'];
+
             }
 
         }
@@ -182,9 +182,10 @@
 
                 this.shape.beginFill(fillColor);
                 this.shape.drawCircle(0, 0, circleRadius);
+                this.shape.endFill();
+
                 this.shape.x = circleX;
                 this.shape.y = circleY;
-                this.shape.endFill();
 
             }
 

@@ -80,9 +80,11 @@ class GenerateMapJob implements ShouldQueue
                 $oxHexValue = '0x' . strtoupper(dechex($decimalValue));
 
                 //Square
+                $uidSquare = 'square_'.$i.'_'.$j;
                 $urlMovement = route('players.entity.movement');
                 $urlMovement = str_replace('localhost', 'localhost:8082', $urlMovement);
 
+                //Click
                 $jsPathClickTile = resource_path('js/function/entity/click_tile.blade.php');
                 $jsContentClickTile = file_get_contents($jsPathClickTile);
                 $jsContentClickTile = Helper::setCommonJsCode($jsContentClickTile, \Illuminate\Support\Str::random(20));
@@ -90,11 +92,25 @@ class GenerateMapJob implements ShouldQueue
                 $jsContentClickTile = str_replace('__j__', $j, $jsContentClickTile);
                 $jsContentClickTile = str_replace('__url__', $urlMovement, $jsContentClickTile);
 
-                $square = new Square();
+                //Pointer
+                $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
+                $jsContentPointerTile = file_get_contents($jsPathPointerTile);
+
+                $jsContentPointerOverTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
+                $jsContentPointerOverTile = str_replace('__uid__', $uidSquare, $jsContentPointerOverTile);
+                $jsContentPointerOverTile = str_replace('__color__', '#FF0000', $jsContentPointerOverTile);
+
+                $jsContentPointerOutTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
+                $jsContentPointerOutTile = str_replace('__uid__', $uidSquare, $jsContentPointerOutTile);
+                $jsContentPointerOutTile = str_replace('__color__', $oxHexValue, $jsContentPointerOutTile);
+
+                $square = new Square($uidSquare);
                 $square->setOrigin($iPos, $jPos);
                 $square->setSize($size);
                 $square->setColor($oxHexValue);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
+                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
+                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
                 $items[] = Helper::buildItemDraw($square->buildJson());
 
                 //Borders
