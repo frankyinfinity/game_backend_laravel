@@ -93,21 +93,24 @@ class GenerateMapJob implements ShouldQueue
                 $jsContentClickTile = str_replace('__url__', $urlMovement, $jsContentClickTile);
 
                 //Pointer
+                $squareColor = $oxHexValue;
+                $overlaySquareColor = '#FF0000';
+
                 $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
                 $jsContentPointerTile = file_get_contents($jsPathPointerTile);
 
                 $jsContentPointerOverTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
                 $jsContentPointerOverTile = str_replace('__uid__', $uidSquare, $jsContentPointerOverTile);
-                $jsContentPointerOverTile = str_replace('__color__', '#FF0000', $jsContentPointerOverTile);
+                $jsContentPointerOverTile = str_replace('__color__', $overlaySquareColor, $jsContentPointerOverTile);
 
                 $jsContentPointerOutTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
                 $jsContentPointerOutTile = str_replace('__uid__', $uidSquare, $jsContentPointerOutTile);
-                $jsContentPointerOutTile = str_replace('__color__', $oxHexValue, $jsContentPointerOutTile);
+                $jsContentPointerOutTile = str_replace('__color__', $squareColor, $jsContentPointerOutTile);
 
                 $square = new Square($uidSquare);
                 $square->setOrigin($iPos, $jPos);
                 $square->setSize($size);
-                $square->setColor($oxHexValue);
+                $square->setColor($squareColor);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
