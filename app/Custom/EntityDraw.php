@@ -136,7 +136,6 @@ class EntityDraw
             $jsContentMov = str_replace('__url__', $urlMovement, $jsContentMov);
             $jsContentMov = str_replace('__action__', $direction, $jsContentMov);
             $jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
-            $jsContentMov = str_replace('__player_id__', $player_id, $jsContentMov);
 
             $jsMovPaths[$direction] = $jsContentMov;
 

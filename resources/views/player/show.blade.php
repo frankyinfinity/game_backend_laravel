@@ -39,7 +39,7 @@
         }
 
         window.AppData = {
-            csrfToken: '{{ csrf_token() }}'
+            csrfToken: '{{ csrf_token() }}',
         };
 
         let app = null;

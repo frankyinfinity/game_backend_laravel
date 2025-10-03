@@ -111,27 +111,35 @@ class PlayerController extends Controller
 
     public function movement(Request $request) {
 
-        $player_id = $request->player_id;
+        $uid = $request->entity_uid;
+        $entity = Entity::query()->where('uid', $uid)->with(['specie'])->first();
+
+        $player_id = $entity->specie->player_id;
         $channel = 'player_'.$player_id.'_channel';
         $event = 'draw_interface';
 
-        $uid = $request->entity_uid;
-        $entity = Entity::query()->where('uid', $uid)->first();
         $fromI = $entity->tile_i;
         $fromJ = $entity->tile_j;
         $toI = $entity->tile_i;
         $toJ = $entity->tile_j;
 
-        $action = $request->action;
-        if($action === 'up') {
-            $toI--;
-        } else if($action === 'down') {
-            $toI++;
-        } else if($action === 'left') {
-            $toJ--;
-        } else if($action === 'right') {
-            $toJ++;
+        if($request->has('action')) {
+            $action = $request->action;
+            if ($action === 'up') {
+                $toI--;
+            } else if ($action === 'down') {
+                $toI++;
+            } else if ($action === 'left') {
+                $toJ--;
+            } else if ($action === 'right') {
+                $toJ++;
+            }
+        } else if($request->has('target_i') && $request->has('target_j')) {
+            $toI = intval($request->target_i);
+            $toJ = intval($request->target_j);
         }
+
+        //Update position
         $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
 
         //Get Path

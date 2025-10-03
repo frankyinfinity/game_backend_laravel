@@ -25,6 +25,12 @@
         shapePanel.renderable = !renderable;
         shapePanel.zIndex = 10000;
 
+        let actual_focus_uid_entity = null;
+        if(shapePanel.renderable) {
+            actual_focus_uid_entity = entity_uid;
+        }
+        AppData.actual_focus_uid_entity = actual_focus_uid_entity;
+
         //Open Panel (Children)
         let panelChildren = objects[entity_uid+'_panel']['children'];
         for (const [key, childUid] of Object.entries(panelChildren)) {
