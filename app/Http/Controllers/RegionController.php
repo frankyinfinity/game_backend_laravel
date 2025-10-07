@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 class RegionController extends Controller
 {
-    
+
     public function listDataTable(Request $request, $planet_id)
     {
         $query = Region::query()->where('planet_id', $planet_id)->with(['climate'])->get();
@@ -34,7 +34,7 @@ class RegionController extends Controller
      */
     public function show($id)
     {
-        
+
         $region = Region::query()->where('id', $id)->with(['climate.defaultTile', 'planet'])->first();
         $tiles = Tile::query()->orderBy('name')->get();
         foreach($tiles as $tile) {
@@ -85,7 +85,7 @@ class RegionController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        
+
         $region = Region::query()->findOrFail($id);
 
         $fields = [
@@ -128,6 +128,12 @@ class RegionController extends Controller
             $json = json_decode($jsonContent, true);
         }
 
+        //Delete
+        $json = array_filter($json, function($item) use ($tile_i, $tile_j) {
+            return !($item['i'] === $tile_i && $item['j'] === $tile_j);
+        });
+
+        //Add
         $json[] = [
             'tile' => $tile,
             'i' => $tile_i,
