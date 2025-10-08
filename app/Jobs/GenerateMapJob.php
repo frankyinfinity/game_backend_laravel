@@ -8,6 +8,7 @@ use App\Custom\EntityDraw;
 use App\Helper\Helper;
 use App\Models\Gene;
 use App\Models\Genome;
+use App\Models\Tile;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use App\Custom\MultiLine;
@@ -73,6 +74,7 @@ class GenerateMapJob implements ShouldQueue
                 if($searchTile !== null) {
                     $tile = $searchTile['tile'];
                 }
+                \Illuminate\Support\Facades\Log::debug($tile);
 
                 $color = $tile['color'];
                 $hexWithoutHash = ltrim($color, '#');
@@ -111,9 +113,11 @@ class GenerateMapJob implements ShouldQueue
                 $square->setOrigin($iPos, $jPos);
                 $square->setSize($size);
                 $square->setColor($squareColor);
-                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
-                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
-                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
+                if($tile['type'] == Tile::TYPE_LIQUID) {
+                    $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
+                    $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
+                    $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
+                }
                 $items[] = Helper::buildItemDraw($square->buildJson());
 
                 //Borders
