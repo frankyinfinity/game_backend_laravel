@@ -74,7 +74,6 @@ class GenerateMapJob implements ShouldQueue
                 if($searchTile !== null) {
                     $tile = $searchTile['tile'];
                 }
-                \Illuminate\Support\Facades\Log::debug($tile);
 
                 $color = $tile['color'];
                 $hexWithoutHash = ltrim($color, '#');
