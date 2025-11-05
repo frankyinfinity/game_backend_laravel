@@ -99,6 +99,8 @@ class PlayerController extends Controller
             ->where('request_id', $request->request_id)
             ->where('player_id', $request->player_id)
             ->first();
+            Log::debug('drawREquest');
+            Log::debug($drawRequest);
 
         if($drawRequest !== null) {
             $items = json_decode($drawRequest->items);
