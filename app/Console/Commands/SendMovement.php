@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Custom\Circle;
 use App\Custom\MultiLine;
 use App\Custom\Square;
-use App\Events\DrawMapEvent;
+use App\Events\CustomEvent;
 use App\Models\DrawRequest;
 use App\Models\Player;
 use Illuminate\Console\Command;
@@ -130,7 +130,7 @@ class SendMovement extends Command
             'items' => json_encode($items),
         ]);
 
-        event(new DrawMapEvent($channel, $event, [
+        event(new CustomEvent($channel, $event, [
             'request_id' => $request_id,
             'player_id' => $player_id,
         ]));

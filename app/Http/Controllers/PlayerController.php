@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Custom\Circle;
 use App\Custom\MultiLine;
 use App\Custom\Square;
-use App\Events\DrawMapEvent;
+use App\Events\CustomEvent;
 use App\Helper\Helper;
 use App\Jobs\GenerateMapJob;
 use App\Models\DrawRequest;
@@ -236,7 +236,7 @@ class PlayerController extends Controller
             'items' => json_encode($items),
         ]);
 
-        event(new DrawMapEvent($channel, $event, [
+        event(new CustomEvent($channel, $event, [
             'request_id' => $request_id,
             'player_id' => $player_id,
         ]));

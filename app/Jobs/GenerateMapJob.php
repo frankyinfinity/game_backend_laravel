@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Log;
 use Str;
 use function GuzzleHttp\json_encode;
-use App\Events\DrawMapEvent;
+use App\Events\CustomEvent;
 
 class GenerateMapJob implements ShouldQueue
 {
@@ -157,7 +157,7 @@ class GenerateMapJob implements ShouldQueue
             'items' => json_encode($items),
         ]);
 
-        event(new DrawMapEvent($channel, $event, [
+        event(new CustomEvent($channel, $event, [
             'request_id' => $request_id,
             'player_id' => $player_id,
         ]));

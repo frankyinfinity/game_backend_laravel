@@ -8,30 +8,14 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::post('/broadcasting/auth', function (Request $request) {
-    
-    if (! $request->user()) {
-        abort(403, 'Non autorizzato.');
-    }
-
-    $socketId = $request->input('socket_id');
-    $channelName = $request->input('channel_name');
-    
-    // **USA IL DRIVER DI LARAVEL INVECE DELL'INIZIALIZZAZIONE MANUALE**
-    $pusher = Broadcast::driver('pusher')->getPusher(); // Ottieni l'istanza Pusher
-
-    // Autorizza il Canale
-    $response = $pusher->authorizeChannel($channelName, $socketId);
-
-    return response($response, 200)->header('Content-Type', 'application/json');
-
-})->middleware('auth');
-
 Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::group(['middleware' => ['auth']], function (){
+
+    //Broadcasting
+    Route::post('/broadcasting/auth', [App\Http\Controllers\BroadcastingController::class, 'auth']);
 
     //Users
     Route::resource('users', App\Http\Controllers\UserController::class);
