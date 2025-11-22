@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Custom\BasicDraw;
 use App\Custom\Circle;
 use App\Custom\EntityDraw;
+use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Models\Gene;
 use App\Models\Genome;
@@ -20,7 +21,6 @@ use Illuminate\Support\Facades\Storage;
 use Log;
 use Str;
 use function GuzzleHttp\json_encode;
-use App\Events\CustomEvent;
 
 class GenerateMapJob implements ShouldQueue
 {
@@ -43,9 +43,6 @@ class GenerateMapJob implements ShouldQueue
 
         $requestArray = $this->requestArray;
         $player_id = $requestArray['player_id'];
-
-        $channel = 'player_'.$player_id.'_channel';
-        $event = 'draw_interface';
 
         $items = [];
         $startI = 0;
@@ -157,10 +154,7 @@ class GenerateMapJob implements ShouldQueue
             'items' => json_encode($items),
         ]);
 
-        event(new CustomEvent($channel, $event, [
-            'request_id' => $request_id,
-            'player_id' => $player_id,
-        ]));
+        event(new DrawInterfaceEvent($player, $request_id));
 
     }
 

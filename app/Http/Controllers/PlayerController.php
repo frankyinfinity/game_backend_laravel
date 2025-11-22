@@ -5,14 +5,13 @@ namespace App\Http\Controllers;
 use App\Custom\Circle;
 use App\Custom\MultiLine;
 use App\Custom\Square;
-use App\Events\CustomEvent;
+use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Jobs\GenerateMapJob;
 use App\Models\DrawRequest;
 use App\Models\Entity;
 use Illuminate\Http\Request;
 use App\Models\Player;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PlayerController extends Controller
@@ -99,8 +98,6 @@ class PlayerController extends Controller
             ->where('request_id', $request->request_id)
             ->where('player_id', $request->player_id)
             ->first();
-            Log::debug('drawREquest');
-            Log::debug($drawRequest);
 
         if($drawRequest !== null) {
             $items = json_decode($drawRequest->items);
@@ -117,8 +114,6 @@ class PlayerController extends Controller
         $entity = Entity::query()->where('uid', $uid)->with(['specie'])->first();
 
         $player_id = $entity->specie->player_id;
-        $channel = 'player_'.$player_id.'_channel';
-        $event = 'draw_interface';
 
         $fromI = $entity->tile_i;
         $fromJ = $entity->tile_j;
@@ -236,10 +231,8 @@ class PlayerController extends Controller
             'items' => json_encode($items),
         ]);
 
-        event(new CustomEvent($channel, $event, [
-            'request_id' => $request_id,
-            'player_id' => $player_id,
-        ]));
+        event(new DrawInterfaceEvent($player, $request_id));
+
         return response()->json(['success' => true]);
 
     }
