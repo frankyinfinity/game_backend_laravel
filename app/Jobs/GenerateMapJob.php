@@ -2,22 +2,19 @@
 
 namespace App\Jobs;
 
-use App\Custom\BasicDraw;
-use App\Custom\Circle;
-use App\Custom\EntityDraw;
+use App\Custom\Draw\BasicDraw;
+use App\Custom\Draw\EntityDraw;
+use App\Custom\Draw\MultiLine;
+use App\Custom\Draw\Square;
+use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
-use App\Models\Gene;
-use App\Models\Genome;
+use App\Models\DrawRequest;
+use App\Models\Entity;
+use App\Models\Player;
 use App\Models\Tile;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use App\Custom\MultiLine;
-use App\Custom\Square;
-use App\Models\Entity;
-use App\Models\Player;
-use App\Models\DrawRequest;
-use Illuminate\Support\Facades\Storage;
 use Log;
 use Str;
 use function GuzzleHttp\json_encode;
@@ -114,7 +111,10 @@ class GenerateMapJob implements ShouldQueue
                     $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
                     $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
                 }
-                $items[] = Helper::buildItemDraw($square->buildJson());
+
+                //Draw
+                $var = new ObjectDraw($square->buildJson());
+                $items[] = $var->get();
 
                 //Borders
                 $borders = new MultiLine();
@@ -125,7 +125,10 @@ class GenerateMapJob implements ShouldQueue
                 $borders->setPoint($iPos+$size, $jPos);
                 $borders->setPoint($iPos, $jPos);
                 $borders->setColor(0xFFFFFF);
-                $items[] = Helper::buildItemDraw($borders->buildJson());
+
+                //Draw
+                $var = new ObjectDraw($borders->buildJson());
+                $items[] = $var->get();
 
                 //Entity
                 $searchEntity = $entities->where('tile_i', $i)->where('tile_j', $j)->first();
@@ -135,7 +138,9 @@ class GenerateMapJob implements ShouldQueue
 
                     $entityDrawItems = $entityDraw->getItems();
                     foreach ($entityDrawItems as $entityDrawItem) {
-                        $items[] = Helper::buildItemDraw($entityDrawItem);
+                        //Draw
+                        $var = new ObjectDraw($entityDrawItem);
+                        $items[] = $var->get();
                     }
 
                 }

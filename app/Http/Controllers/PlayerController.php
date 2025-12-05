@@ -2,16 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Custom\Circle;
-use App\Custom\MultiLine;
-use App\Custom\Square;
+use App\Custom\Draw\Circle;
+use App\Custom\Draw\MultiLine;
+use App\Custom\Draw\Square;
+use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectDraw;
+use App\Custom\Manipulation\ObjectUpdate;
 use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Jobs\GenerateMapJob;
 use App\Models\DrawRequest;
 use App\Models\Entity;
-use Illuminate\Http\Request;
 use App\Models\Player;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class PlayerController extends Controller
@@ -173,7 +176,10 @@ class PlayerController extends Controller
             $circle->setOrigin($xStart, $yStart);
             $circle->setRadius($size / 6);
             $circle->setColor('#FF0000');
-            $items[] = Helper::buildItemDraw($circle->buildJson());
+
+            //Draw
+            $var = new ObjectDraw($circle->buildJson());
+            $items[] = $var->get();
 
             if((sizeof($pathFinding)-1) !== $key) {
 
@@ -195,33 +201,31 @@ class PlayerController extends Controller
                 $linePath->setPoint($xEnd, $yEnd);
                 $linePath->setColor('#FF0000');
                 $linePath->setThickness(2);
-                $items[] = Helper::buildItemDraw($linePath->buildJson());
 
-                $updates[] = [
-                    'uid' => $uid,
-                    'attributes' => [
-                        'x' => $xEnd,
-                        'y' => $yEnd,
-                        'zIndex' => 100
-                    ]
-                ];
+                //Draw
+                $var = new ObjectDraw($linePath->buildJson());
+                $items[] = $var->get();
 
-                $updates[] = [
-                    'uid' => $uid . '_text_row_2',
-                    'attributes' => [
-                        'text' => 'I: ' . $endI . ' - J: ' . $endJ,
-                    ]
-                ];
+                //Update
+                $obj = new ObjectUpdate($uid);
+                $obj->setAttributes('x', $xEnd);
+                $obj->setAttributes('y', $yEnd);
+                $obj->setAttributes('zIndex', 100);
+                $updates[] = $obj->get();
+
+                //Update
+                $obj = new ObjectUpdate($uid . '_text_row_2');
+                $obj->setAttributes('text', 'I: ' . $endI . ' - J: ' . $endJ);
+                $updates[] = $obj->get();
 
             }
 
         }
 
-        foreach ($updates as $update) {
-            $items[] = Helper::buildItemUpdate($update);
-        }
+        foreach ($updates as $update) $items[] = $update;
         foreach ($clears as $clear) {
-            $items[] = Helper::buildItemClear($clear);
+            $var = new ObjectClear($clear);
+            $items[] = $var->get();
         }
 
         $request_id = Str::random(20);

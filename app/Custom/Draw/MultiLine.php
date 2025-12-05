@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Custom;
+namespace App\Custom\Draw;
 
 class MultiLine extends BasicDraw
 {

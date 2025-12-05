@@ -1,12 +1,10 @@
 <?php
 
-namespace App\Custom;
+namespace App\Custom\Draw;
 
 use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\Gene;
-use App\Custom\ButtonDraw;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class EntityDraw

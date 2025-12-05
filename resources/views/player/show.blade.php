@@ -345,7 +345,7 @@
                                 let itemType = item['type'].toString();
 
                                 //Draw
-                                if(itemType === '{{\App\Helper\Helper::getDrawRequestTypeDraw()}}') {
+                                if(itemType === '{{\App\Helper\Helper::DRAW_REQUEST_TYPE_DRAW}}') {
 
                                     let object = item['object'];
                                     let objectType = object['type'];
@@ -368,7 +368,7 @@
                                 }
 
                                 //Update
-                                if(itemType === '{{\App\Helper\Helper::getUpdateRequestTypeDraw()}}') {
+                                if(itemType === '{{\App\Helper\Helper::DRAW_REQUEST_TYPE_UPDATE}}') {
 
                                     let uid = item['uid'];
                                     let attributes = item['attributes'];
@@ -383,7 +383,7 @@
                                 }
 
                                 //Clear
-                                if(itemType === '{{\App\Helper\Helper::getClearRequestTypeDraw()}}') {
+                                if(itemType === '{{\App\Helper\Helper::DRAW_REQUEST_TYPE_CLEAR}}') {
                                     let uid = item['uid'];
                                     let shape = shapes[uid];
                                     shape.clear();

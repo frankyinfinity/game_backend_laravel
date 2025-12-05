@@ -20,11 +20,8 @@ class Helper
     public static function getDefaultFontFamily(): string {return self::DEFAULT_FONT_FAMILY;}
 
     const DRAW_REQUEST_TYPE_DRAW = 'draw';
-    public static function getDrawRequestTypeDraw(): string { return self::DRAW_REQUEST_TYPE_DRAW; }
     const DRAW_REQUEST_TYPE_UPDATE = 'update';
-    public static function getUpdateRequestTypeDraw(): string { return self::DRAW_REQUEST_TYPE_UPDATE; }
     const DRAW_REQUEST_TYPE_CLEAR = 'clear';
-    public static function getClearRequestTypeDraw(): string { return self::DRAW_REQUEST_TYPE_CLEAR; }
 
     public static function setCommonJsCode($code, $name): array|string
     {
@@ -132,31 +129,6 @@ class Helper
 
         return null;
 
-    }
-
-    public static function buildItemDraw($object): array
-    {
-        return [
-            'type' => self::getDrawRequestTypeDraw(),
-            'object' => $object
-        ];
-    }
-
-    public static function buildItemUpdate($data): array
-    {
-        return [
-            'type' => self::getUpdateRequestTypeDraw(),
-            'uid' => $data['uid'],
-            'attributes' => $data['attributes']
-        ];
-    }
-
-    public static function buildItemClear(string $uid): array
-    {
-        return [
-            'type' => self::getClearRequestTypeDraw(),
-            'uid' => $uid,
-        ];
     }
 
 }
