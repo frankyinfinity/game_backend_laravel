@@ -169,6 +169,7 @@ class PlayerController extends Controller
             $xStart = $startCenterSquare['x'];
             $yStart = $startCenterSquare['y'];
 
+            //Clear
             $circleName = 'circle_' . Str::random(20);
             $clears[] = $circleName;
 
@@ -193,6 +194,7 @@ class PlayerController extends Controller
                 $xEnd = $endCenterSquare['x'];
                 $yEnd = $endCenterSquare['y'];
 
+                //Clear
                 $multilineName = 'multiline_' . Str::random(20);
                 $clears[] = $multilineName;
 
@@ -224,6 +226,7 @@ class PlayerController extends Controller
 
         foreach ($updates as $update) $items[] = $update;
         foreach ($clears as $clear) {
+            //Clear
             $var = new ObjectClear($clear);
             $items[] = $var->get();
         }
