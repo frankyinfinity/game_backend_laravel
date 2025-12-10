@@ -57,7 +57,7 @@ class PlayerController extends Controller
         $player = Player::query()->findOrFail($id);
         $username = $player->user->name;
 
-        $size = Helper::getTileSize();
+        $size = Helper::TILE_SIZE;
         $width = $player->birthRegion->width * $size;
         $height = $player->birthRegion->height * $size;
 
@@ -160,7 +160,7 @@ class PlayerController extends Controller
             $startI = $path[0];
             $startJ = $path[1];
 
-            $size = Helper::getTileSize();
+            $size = Helper::TILE_SIZE;
 
             $startSquare = new Square();
             $startSquare->setOrigin($size*$startJ, $size*$startI);

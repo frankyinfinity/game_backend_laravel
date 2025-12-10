@@ -20,8 +20,8 @@ class Text extends BasicDraw
         if($uid == null) {
             $uid = uniqid();
         }
-        $this->fontFamily = Helper::getDefaultFontFamily();
-        $this->fontSize = Helper::getDefaultFontSize();
+        $this->fontFamily = Helper::DEFAULT_FONT_FAMILY;
+        $this->fontSize = Helper::DEFAULT_FONT_SIZE;
         $this->centerAnchor = false;
         parent::__construct('text', $uid);
     }

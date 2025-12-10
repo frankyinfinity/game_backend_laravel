@@ -45,7 +45,7 @@ class GenerateMapJob implements ShouldQueue
         $startI = 0;
         $iPos = $startI;
         $jPos = 0;
-        $size = Helper::getTileSize();
+        $size = Helper::TILE_SIZE;
 
         $player = Player::find($player_id);
         $birthRegion = $player->birthRegion;

@@ -9,8 +9,8 @@ class ButtonDraw {
     private $uid;
     public function __construct($uid) {
         $this->uid = $uid;
-        $this->textFontFamily = Helper::getDefaultFontFamily();
-        $this->textFontSize = Helper::getDefaultFontSize();
+        $this->textFontFamily = Helper::DEFAULT_FONT_FAMILY;
+        $this->textFontSize = Helper::DEFAULT_FONT_SIZE;
     }
 
     private array $items = [];

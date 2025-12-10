@@ -66,7 +66,7 @@ class EntityDraw
 
         $dbEntity = $this->dbEntity;
         $square = $this->square;
-        $size = Helper::getTileSize();
+        $size = Helper::TILE_SIZE;
 
         $centerSquare = $square->getCenter();
 
