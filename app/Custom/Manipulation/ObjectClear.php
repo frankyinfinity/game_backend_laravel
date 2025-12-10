@@ -8,9 +8,11 @@ class ObjectClear
 {
 
     private $uid;
-    public function __construct($uid)
+    private string $sessionId;
+    public function __construct($uid, $sessionId)
     {
         $this->uid = $uid;
+        $this->sessionId = $sessionId;
     }
 
     public function get(): array

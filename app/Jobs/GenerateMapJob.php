@@ -113,7 +113,7 @@ class GenerateMapJob implements ShouldQueue
                 }
 
                 //Draw
-                $var = new ObjectDraw($square->buildJson());
+                $var = new ObjectDraw($square->buildJson(), $player->actual_session_id);
                 $items[] = $var->get();
 
                 //Borders
@@ -127,7 +127,7 @@ class GenerateMapJob implements ShouldQueue
                 $borders->setColor(0xFFFFFF);
 
                 //Draw
-                $var = new ObjectDraw($borders->buildJson());
+                $var = new ObjectDraw($borders->buildJson(), $player->actual_session_id);
                 $items[] = $var->get();
 
                 //Entity
@@ -139,7 +139,7 @@ class GenerateMapJob implements ShouldQueue
                     $entityDrawItems = $entityDraw->getItems();
                     foreach ($entityDrawItems as $entityDrawItem) {
                         //Draw
-                        $var = new ObjectDraw($entityDrawItem);
+                        $var = new ObjectDraw($entityDrawItem, $player->actual_session_id);
                         $items[] = $var->get();
                     }
 

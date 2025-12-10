@@ -185,7 +185,7 @@ class PlayerController extends Controller
             $circle->setColor('#FF0000');
 
             //Draw
-            $var = new ObjectDraw($circle->buildJson());
+            $var = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
             $items[] = $var->get();
 
             if((sizeof($pathFinding)-1) !== $key) {
@@ -211,18 +211,18 @@ class PlayerController extends Controller
                 $linePath->setThickness(2);
 
                 //Draw
-                $var = new ObjectDraw($linePath->buildJson());
+                $var = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
                 $items[] = $var->get();
 
                 //Update
-                $obj = new ObjectUpdate($uid);
+                $obj = new ObjectUpdate($uid, $player->actual_session_id);
                 $obj->setAttributes('x', $xEnd);
                 $obj->setAttributes('y', $yEnd);
                 $obj->setAttributes('zIndex', 100);
                 $updates[] = $obj->get();
 
                 //Update
-                $obj = new ObjectUpdate($uid . '_text_row_2');
+                $obj = new ObjectUpdate($uid . '_text_row_2', $player->actual_session_id);
                 $obj->setAttributes('text', 'I: ' . $endI . ' - J: ' . $endJ);
                 $updates[] = $obj->get();
 
@@ -233,7 +233,7 @@ class PlayerController extends Controller
         foreach ($updates as $update) $items[] = $update;
         foreach ($clears as $clear) {
             //Clear
-            $var = new ObjectClear($clear);
+            $var = new ObjectClear($clear, $player->actual_session_id);
             $items[] = $var->get();
         }
 
