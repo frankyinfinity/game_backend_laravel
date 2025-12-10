@@ -52,7 +52,7 @@ class PlayerController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $id): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application
     {
         $player = Player::query()->findOrFail($id);
         $username = $player->user->name;
@@ -61,7 +61,9 @@ class PlayerController extends Controller
         $width = $player->birthRegion->width * $size;
         $height = $player->birthRegion->height * $size;
 
-        return view("player.show", compact("player", "username", "width", "height"));
+        $actual_session_id = Helper::generateSessionIdPlayer($player);
+
+        return view("player.show", compact("player", "username", "width", "height", "actual_session_id"));
 
     }
 
@@ -89,15 +91,18 @@ class PlayerController extends Controller
         //
     }
 
-    public function generateMap(Request $request) {
+    public function generateMap(Request $request): \Illuminate\Http\JsonResponse
+    {
         GenerateMapJob::dispatch($request->all());
         return response()->json(['success' => true]);
     }
 
-    public function getMap(Request $request) {
+    public function getMap(Request $request): \Illuminate\Http\JsonResponse
+    {
 
         $items = [];
         $drawRequest = DrawRequest::query()
+            ->where('session_id', $request->session_id)
             ->where('request_id', $request->request_id)
             ->where('player_id', $request->player_id)
             ->first();
@@ -111,7 +116,8 @@ class PlayerController extends Controller
 
     }
 
-    public function movement(Request $request) {
+    public function movement(Request $request): \Illuminate\Http\JsonResponse
+    {
 
         $uid = $request->entity_uid;
         $entity = Entity::query()->where('uid', $uid)->with(['specie'])->first();
@@ -233,6 +239,7 @@ class PlayerController extends Controller
 
         $request_id = Str::random(20);
         DrawRequest::query()->create([
+            'session_id' => $player->actual_session_id,
             'request_id' => $request_id,
             'player_id' => $player_id,
             'items' => json_encode($items),

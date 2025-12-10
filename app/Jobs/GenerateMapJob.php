@@ -154,6 +154,7 @@ class GenerateMapJob implements ShouldQueue
 
         $request_id = Str::random(20);
         DrawRequest::query()->create([
+            'session_id' => $player->actual_session_id,
             'request_id' => $request_id,
             'player_id' => $player_id,
             'items' => json_encode($items),

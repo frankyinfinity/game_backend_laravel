@@ -3,9 +3,12 @@
 namespace App\Helper;
 
 use App\Models\BirthRegion;
+use App\Models\DrawRequest;
+use App\Models\Player;
 use App\Models\Tile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Psy\Util\Str;
 
 class Helper
 {
@@ -123,6 +126,24 @@ class Helper
         }
 
         return null;
+
+    }
+
+    public static function generateSessionIdPlayer(Player $player): string
+    {
+
+        //Reset
+        if($player->actual_session_id !== null) {
+
+            DrawRequest::query()->where('session_id', $player->actual_session_id)->delete();
+
+        }
+
+        //Set
+        $session_id = uniqid(\Illuminate\Support\Str::random(16), true);
+        $player->update(['actual_session_id' => $session_id]);
+
+        return $session_id;
 
     }
 

@@ -334,6 +334,7 @@
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
                     data: {
+                        session_id: '{{$actual_session_id}}',
                         request_id: request_id,
                         player_id: player_id,
                      },
