@@ -121,7 +121,7 @@ class EntityDraw
         $player_id = $this->dbEntity->specie->player_id;
 
         $urlMovement = route('players.entity.movement');
-        $urlMovement = str_replace('localhost', 'localhost:8082', $urlMovement);
+        $urlMovement = str_replace('localhost', 'localhost:8085', $urlMovement);
 
         $jsMovPaths = [];
         $directions = ['up', 'left', 'down', 'right'];

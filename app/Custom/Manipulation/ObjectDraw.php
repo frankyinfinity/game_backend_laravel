@@ -22,17 +22,24 @@ class ObjectDraw
 
         $object = $this->object;
 
-        $path = '/json/object/' . $this->sessionId . '.json';
+        $folder = 'json';
+        $subFolder = 'object';
+        $path = $folder.'/'.$subFolder.'/'.$this->sessionId.'.json';
 
-        $directory = dirname($path);
+        $fullPath = storage_path($path);
+        $directory = dirname($fullPath);
         if (!File::exists($directory)) {
             File::makeDirectory($directory, 0755, true);
         }
 
-        $store = Valuestore::make(storage_path($path));
-        $store->put($object['uid'], $object);
+        $store = Valuestore::make($fullPath);
+        $store->put($object['uid'], [
+            'uid' => $object['uid'],
+            'children' => $object['children']
+        ]);
 
     }
+
 
     public function get(): array
     {
