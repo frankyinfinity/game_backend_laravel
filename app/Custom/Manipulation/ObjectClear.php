@@ -3,6 +3,7 @@
 namespace App\Custom\Manipulation;
 
 use App\Helper\Helper;
+use Illuminate\Support\Facades\Cache;
 
 class ObjectClear
 {
@@ -13,6 +14,19 @@ class ObjectClear
     {
         $this->uid = $uid;
         $this->sessionId = $sessionId;
+    }
+
+    private function write(): void
+    {
+
+        $object = $this->object;
+
+        $key = "objects:{$this->sessionId}";
+        $data = Cache::get($key, []);
+
+        unset($data[$object['uid']]);
+        Cache::put($key, $data);
+
     }
 
     public function get(): array

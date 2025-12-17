@@ -13,7 +13,7 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-12">
-                <div id="display_container" style="max-width: 100%; max-height: 500px; overflow-x: scroll; overflow-y: scroll;"></div>
+                <div id="display_container" style="min-width: 85vw;max-width: 85vw; min-height: 75vh;max-height: 75vh; overflow-x: scroll; overflow-y: scroll;"></div>
             </div>
             <div class="col-12">
                 <div class="row">

@@ -3,6 +3,8 @@
 namespace App\Custom\Manipulation;
 
 use App\Helper\Helper;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Spatie\Valuestore\Valuestore;
 use Illuminate\Support\Facades\File;
 
@@ -17,33 +19,23 @@ class ObjectDraw
         $this->sessionId = $sessionId;
     }
 
-    private function writeFile(): void
+    private function write(): void
     {
 
         $object = $this->object;
 
-        $folder = 'json';
-        $subFolder = 'object';
-        $path = $folder.'/'.$subFolder.'/'.$this->sessionId.'.json';
+        $key = "objects:{$this->sessionId}";
+        $data = Cache::get($key, []);
 
-        $fullPath = storage_path($path);
-        $directory = dirname($fullPath);
-        if (!File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
-        }
-
-        $store = Valuestore::make($fullPath);
-        $store->put($object['uid'], [
-            'uid' => $object['uid'],
-            'children' => $object['children']
-        ]);
+        $data[$object['uid']] = $object;
+        Cache::put($key, $data);
 
     }
 
 
     public function get(): array
     {
-        $this->writeFile();
+        $this->write();
         return [
             'type' => Helper::DRAW_REQUEST_TYPE_DRAW,
             'object' => $this->object,

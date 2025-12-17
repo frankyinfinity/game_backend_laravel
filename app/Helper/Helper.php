@@ -6,6 +6,7 @@ use App\Models\BirthRegion;
 use App\Models\DrawRequest;
 use App\Models\Player;
 use App\Models\Tile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -135,14 +136,8 @@ class Helper
 
         //Reset
         if($player->actual_session_id !== null) {
-
-            DrawRequest::query()->where('session_id', $player->actual_session_id)->delete();
-
-            $path = storage_path('json/object/'.$player->actual_session_id.'.json');
-            if (File::exists($path)) {
-                File::delete($path);
-            }
-
+            $key = "objects:{$player->actual_session_id}";
+            Cache::forget($key);
         }
 
         //Set
