@@ -33,7 +33,7 @@ class ObjectUpdate
 
         $data = Cache::get($key, []);
         foreach ($attributes as $key => $value) {
-            $data[$key] = $value;
+            $data[$uid][$key] = $value;
         }
 
         Cache::put($key, $data);
