@@ -5,8 +5,6 @@ namespace App\Custom\Draw\Primitive;
 class Square extends BasicDraw
 {
 
-    private $x;
-    private $y;
     private $size;
 
     public function __construct($uid = null)
@@ -17,17 +15,13 @@ class Square extends BasicDraw
         parent::__construct('square', $uid);
     }
 
-    public function setOrigin($x, $y)
+    public function setSize($size): void
     {
-        $this->x = $x;
-        $this->y = $y;
-    }
-
-    public function setSize($size) {
        $this->size = $size;
     }
 
-    public function buildJson() {
+    public function buildJson(): array
+    {
         return $this->commonJson([
             'x' => $this->x,
             'y' => $this->y,

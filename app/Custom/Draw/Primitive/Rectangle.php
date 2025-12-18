@@ -5,8 +5,6 @@ namespace App\Custom\Draw\Primitive;
 class Rectangle extends BasicDraw
 {
 
-    private $x;
-    private $y;
     private $width;
     private $height;
 
@@ -18,18 +16,14 @@ class Rectangle extends BasicDraw
         parent::__construct('rectangle', $uid);
     }
 
-    public function setOrigin($x, $y)
-    {
-        $this->x = $x;
-        $this->y = $y;
-    }
-
-   public function setSize($width, $height) {
+   public function setSize($width, $height): void
+   {
        $this->width = $width;
        $this->height = $height;
    }
 
-    public function buildJson() {
+    public function buildJson(): array
+    {
         return $this->commonJson([
             'x' => $this->x,
             'y' => $this->y,

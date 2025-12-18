@@ -10,6 +10,8 @@ class BasicDraw
     }
     private $type;
     protected $color;
+    protected $x;
+    protected $y;
     private $thickness;
     private bool $renderable;
     private array $interactives;
@@ -33,25 +35,35 @@ class BasicDraw
         $this->children = [];
     }
 
-    public function setColor($color)
+    public function setColor($color): void
     {
         $this->color = $color;
     }
 
-    public function setThickness($thickness) {
+    public function setOrigin($x, $y): void
+    {
+        $this->x = $x;
+        $this->y = $y;
+    }
+
+    public function setThickness($thickness): void
+    {
         $this->thickness = $thickness;
     }
 
-    public function setRenderable(bool $renderable) {
+    public function setRenderable(bool $renderable): void
+    {
         $this->renderable = $renderable;
     }
 
-    public function setInteractive($event, $function) {
+    public function setInteractive($event, $function): void
+    {
         $this->interactives[$event] = $function;
         $this->countInteractives++;
     }
 
-    public function addAttributes($key, $value) {
+    public function addAttributes($key, $value): void
+    {
         $this->extraAttributes[$key] = $value;
     }
 
@@ -60,7 +72,7 @@ class BasicDraw
         $this->children[] = $uid;
     }
 
-    public function commonJson($extra)
+    public function commonJson($extra): array
     {
 
         $attributes = [

@@ -5,8 +5,6 @@ namespace App\Custom\Draw\Primitive;
 class Circle extends BasicDraw
 {
 
-    private $x;
-    private $y;
     private $radius;
 
     public function __construct($uid = null)
@@ -15,12 +13,6 @@ class Circle extends BasicDraw
             $uid = uniqid();
         }
         parent::__construct('circle', $uid);
-    }
-
-    public function setOrigin($x, $y): void
-    {
-        $this->x = $x;
-        $this->y = $y;
     }
 
    public function setRadius($radius): void

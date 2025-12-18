@@ -7,9 +7,6 @@ use App\Helper\Helper;
 class Text extends BasicDraw
 {
 
-    private $uid;
-    private $x;
-    private $y;
     private $text;
     private string $fontFamily;
     private int $fontSize;
@@ -26,13 +23,8 @@ class Text extends BasicDraw
         parent::__construct('text', $uid);
     }
 
-    public function setOrigin($x, $y)
+    public function setText($text): void
     {
-        $this->x = $x;
-        $this->y = $y;
-    }
-
-    public function setText($text) {
         $this->text = $text;
     }
 
@@ -51,7 +43,8 @@ class Text extends BasicDraw
         $this->centerAnchor = $value;
     }
 
-    public function buildJson() {
+    public function buildJson(): array
+    {
         return $this->commonJson([
             'x' => $this->x,
             'y' => $this->y,
