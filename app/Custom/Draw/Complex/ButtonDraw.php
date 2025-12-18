@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Custom\Draw;
-use App\Custom\Draw;
+namespace App\Custom\Draw\Complex;
+use App\Custom\Draw\Primitive;
+use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
 
 class ButtonDraw {
@@ -84,7 +86,7 @@ class ButtonDraw {
         $colorString = $this->colorString;
 
         //Rect
-        $rect = new Draw\Rectangle($uid.'_rect');
+        $rect = new Primitive\Rectangle($uid.'_rect');
         $rect->setSize($width, $height);
         $rect->setOrigin($x, $y);
         $rect->setColor($colorButton);

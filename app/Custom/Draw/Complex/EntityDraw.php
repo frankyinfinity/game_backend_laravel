@@ -1,7 +1,12 @@
 <?php
 
-namespace App\Custom\Draw;
+namespace App\Custom\Draw\Complex;
 
+use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\Gene;

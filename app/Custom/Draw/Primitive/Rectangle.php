@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Custom\Draw;
+namespace App\Custom\Draw\Primitive;
 
 class Rectangle extends BasicDraw
 {

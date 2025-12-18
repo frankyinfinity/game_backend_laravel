@@ -2,10 +2,10 @@
 
 namespace App\Jobs;
 
-use App\Custom\Draw\BasicDraw;
-use App\Custom\Draw\EntityDraw;
-use App\Custom\Draw\MultiLine;
-use App\Custom\Draw\Square;
+use App\Custom\Draw\Complex\EntityDraw;
+use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\MultiLine;
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;

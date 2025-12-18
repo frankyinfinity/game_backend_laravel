@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Custom\Draw\Circle;
-use App\Custom\Draw\MultiLine;
-use App\Custom\Draw\Square;
+use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\MultiLine;
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Manipulation\ObjectUpdate;
