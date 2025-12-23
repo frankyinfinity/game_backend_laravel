@@ -219,12 +219,20 @@ class PlayerController extends Controller
                 $obj->setAttributes('x', $xEnd);
                 $obj->setAttributes('y', $yEnd);
                 $obj->setAttributes('zIndex', 100);
-                $updates[] = $obj->get();
+
+                $datas = $obj->get();
+                foreach ($datas as $data) {
+                    $updates[] = $data;
+                }
 
                 //Update
                 $obj = new ObjectUpdate($uid . '_text_row_2', $player->actual_session_id);
                 $obj->setAttributes('text', 'I: ' . $endI . ' - J: ' . $endJ);
-                $updates[] = $obj->get();
+
+                $datas = $obj->get();
+                foreach ($datas as $data) {
+                    $updates[] = $data;
+                }
 
             }
 

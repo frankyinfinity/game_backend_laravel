@@ -42,12 +42,18 @@ class ObjectUpdate
 
     public function get(): array
     {
+        
         $this->write();
-        return [
+
+        $items = [];
+        $items[] = [
             'type' => Helper::DRAW_REQUEST_TYPE_UPDATE,
             'uid' => $this->uid,
             'attributes' => $this->attributes
         ];
+        
+        return $items;
+
     }
 
 }
