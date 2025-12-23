@@ -46,8 +46,6 @@ class Text extends BasicDraw
     public function buildJson(): array
     {
         return $this->commonJson([
-            'x' => $this->x,
-            'y' => $this->y,
             'fontFamily' => $this->fontFamily,
             'fontSize' => $this->fontSize,
             'centerAnchor' => $this->centerAnchor,

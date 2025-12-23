@@ -25,8 +25,6 @@ class Rectangle extends BasicDraw
     public function buildJson(): array
     {
         return $this->commonJson([
-            'x' => $this->x,
-            'y' => $this->y,
             'width' => $this->width,
             'height' => $this->height
         ]);

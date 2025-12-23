@@ -23,8 +23,6 @@ class Square extends BasicDraw
     public function buildJson(): array
     {
         return $this->commonJson([
-            'x' => $this->x,
-            'y' => $this->y,
             'size' => $this->size
         ]);
     }

@@ -17,6 +17,10 @@ class MultiLine extends BasicDraw
 
     public function setPoint($x, $y): void
     {
+        if(sizeof($this->points) === 0) {
+            $this->x = $x;
+            $this->y = $y;
+        }
         $this->points[] = ['x' => $x, 'y' => $y];
     }
 

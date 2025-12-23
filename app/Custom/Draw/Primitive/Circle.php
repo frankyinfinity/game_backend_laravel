@@ -23,8 +23,6 @@ class Circle extends BasicDraw
     public function buildJson(): array
     {
         return $this->commonJson([
-            'x' => $this->x,
-            'y' => $this->y,
             'radius' => $this->radius
         ]);
     }

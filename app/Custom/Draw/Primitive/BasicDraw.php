@@ -12,6 +12,8 @@ class BasicDraw
     protected $color;
     protected $x;
     protected $y;
+    protected $relativeX;
+    protected $relativeY;
     private $thickness;
     private bool $renderable;
     private array $interactives;
@@ -67,10 +69,32 @@ class BasicDraw
         $this->extraAttributes[$key] = $value;
     }
 
+    private function setRelativePosition($draw): void
+    {
+
+        $json = $draw->buildJson();
+        $parentX = $this->x;
+        $parentY = $this->y;
+        $x = $json['x'];
+        $y = $json['y'];
+        $relativeX = $x - $parentX;
+        $relativeY = $y - $parentY;
+
+        $this->relativeX = $relativeX;
+        $this->relativeY = $relativeY;
+
+    }
+
     public function addChild($draw): void
     {
+
         $uid = $draw->getUid();
+
+        //Actions
+        $this->setRelativePosition($draw);
+
         $this->children[] = $uid;
+
     }
 
     public function commonJson($extra): array
@@ -90,6 +114,10 @@ class BasicDraw
         return [
             'uid' => $this->uid,
             'type' => $this->type,
+            'x' => $this->x,
+            'y' => $this->y,
+            'relative_x' => $this->relativeX,
+            'relative_y' => $this->relativeY,
             'color' => $this->color,
             'thickness' => $this->thickness,
             'attributes' => $attributes,
