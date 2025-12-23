@@ -193,12 +193,12 @@ class EntityDraw
         $rightButton->build();
 
         //Set Children (Panel)
-        $panel->addChild($text1->getUid());
-        $panel->addChild($text2->getUid());
-        foreach ($upButton->getItems() as $item) {$panel->addChild($item->getUid());}
-        foreach ($leftButton->getItems() as $item) {$panel->addChild($item->getUid());}
-        foreach ($downButton->getItems() as $item) {$panel->addChild($item->getUid());}
-        foreach ($rightButton->getItems() as $item) {$panel->addChild($item->getUid());}
+        $panel->addChild($text1);
+        $panel->addChild($text2);
+        foreach ($upButton->getItems() as $item) {$panel->addChild($item);}
+        foreach ($leftButton->getItems() as $item) {$panel->addChild($item);}
+        foreach ($downButton->getItems() as $item) {$panel->addChild($item);}
+        foreach ($rightButton->getItems() as $item) {$panel->addChild($item);}
 
         //Get JSON
         $this->items[] = $circle->buildJson();

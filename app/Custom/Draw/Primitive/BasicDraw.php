@@ -67,8 +67,9 @@ class BasicDraw
         $this->extraAttributes[$key] = $value;
     }
 
-    public function addChild($uid): void
+    public function addChild($draw): void
     {
+        $uid = $draw->getUid();
         $this->children[] = $uid;
     }
 
