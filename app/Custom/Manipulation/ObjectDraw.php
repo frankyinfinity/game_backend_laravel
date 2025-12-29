@@ -26,7 +26,7 @@ class ObjectDraw
 
         $key = "objects:{$this->sessionId}";
         $data = Cache::get($key, []);
-
+ 
         $data[$object['uid']] = $object;
         Cache::put($key, $data);
 

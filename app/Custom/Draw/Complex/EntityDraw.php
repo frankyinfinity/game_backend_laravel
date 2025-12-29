@@ -93,8 +93,8 @@ class EntityDraw
         }
 
         //Panel
-        $panelX = ($dbEntity->specie->player->birthRegion->width*$size) + ($size / 2);
-        $panelY = 25;
+        $panelX = $centerSquare['x'] + ($size / 3);
+        $panelY = $centerSquare['y'] + ($size / 3);
 
         $panel = new Rectangle($dbEntity->uid.'_panel');
         $panel->setOrigin($panelX, y: $panelY);

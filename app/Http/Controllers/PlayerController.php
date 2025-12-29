@@ -214,7 +214,7 @@ class PlayerController extends Controller
                 $var = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
                 $items[] = $var->get();
 
-                //Update
+                //Update Entity
                 $obj = new ObjectUpdate($uid, $player->actual_session_id);
                 $obj->setAttributes('x', $xEnd);
                 $obj->setAttributes('y', $yEnd);
@@ -225,9 +225,20 @@ class PlayerController extends Controller
                     $updates[] = $data;
                 }
 
-                //Update
+                //Update Text
                 $obj = new ObjectUpdate($uid . '_text_row_2', $player->actual_session_id);
                 $obj->setAttributes('text', 'I: ' . $endI . ' - J: ' . $endJ);
+
+                $datas = $obj->get();
+                foreach ($datas as $data) {
+                    $updates[] = $data;
+                }
+
+                //Update Panel
+                $obj = new ObjectUpdate($uid . '_panel', $player->actual_session_id);
+                $obj->setAttributes('x', $xEnd + ($size/3));
+                $obj->setAttributes('y', $yEnd + ($size/3));
+                $obj->setAttributes('zIndex', 100);
 
                 $datas = $obj->get();
                 foreach ($datas as $data) {

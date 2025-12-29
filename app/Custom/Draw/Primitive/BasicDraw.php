@@ -2,6 +2,8 @@
 
 namespace App\Custom\Draw\Primitive;
 
+use Illuminate\Support\Facades\Log;
+
 class BasicDraw
 {
     private $uid;
@@ -13,7 +15,7 @@ class BasicDraw
     protected $x;
     protected $y;
     protected $relativeX;
-    protected $relativeY;
+    public $relativeY;
     private $thickness;
     private bool $renderable;
     private array $interactives;
@@ -80,8 +82,8 @@ class BasicDraw
         $relativeX = $x - $parentX;
         $relativeY = $y - $parentY;
 
-        $this->relativeX = $relativeX;
-        $this->relativeY = $relativeY;
+        $draw->relativeX = $relativeX;
+        $draw->relativeY = $relativeY;
 
     }
 
