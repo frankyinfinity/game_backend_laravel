@@ -98,7 +98,7 @@ class EntityDraw
 
         $panel = new Rectangle($dbEntity->uid.'_panel');
         $panel->setOrigin($panelX, y: $panelY);
-        $panel->setSize(600, 250);
+        $panel->setSize(400, 145);
         $panel->setColor(0xFFFFFF);
         $panel->setRenderable(false);
 

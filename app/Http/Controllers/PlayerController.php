@@ -215,7 +215,7 @@ class PlayerController extends Controller
                 $items[] = $var->get();
 
                 //Update Entity
-                $obj = new ObjectUpdate($uid, $player->actual_session_id);
+                $obj = new ObjectUpdate($uid, $player->actual_session_id, 250);
                 $obj->setAttributes('x', $xEnd);
                 $obj->setAttributes('y', $yEnd);
                 $obj->setAttributes('zIndex', 100);

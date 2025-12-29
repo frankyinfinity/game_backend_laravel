@@ -10,12 +10,14 @@ class ObjectUpdate
 {
 
     private string $uid;
+    private int $sleep;
     private string $sessionId;
     private array $attributes = [];
 
-    public function __construct(string $uid, string $sessionId)
+    public function __construct(string $uid, string $sessionId, int $sleep = 0)
     {
         $this->uid = $uid;
+        $this->sleep = $sleep;
         $this->sessionId = $sessionId;
     }
 
@@ -53,7 +55,8 @@ class ObjectUpdate
         $items[] = [
             'type' => Helper::DRAW_REQUEST_TYPE_UPDATE,
             'uid' => $uid,
-            'attributes' => $attributes
+            'attributes' => $attributes,
+            'sleep' => $this->sleep
         ];
 
         if(array_key_exists('x', $attributes) || array_key_exists('y', $attributes)) {
@@ -83,7 +86,8 @@ class ObjectUpdate
                                 'attributes' => [
                                     'x' => $newX,
                                     'y' => $newY
-                                ]
+                                ],
+                                'sleep' => $this->sleep
                             ];
 
                         }

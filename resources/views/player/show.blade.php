@@ -371,6 +371,10 @@
                                 //Update
                                 if(itemType === '{{\App\Helper\Helper::DRAW_REQUEST_TYPE_UPDATE}}') {
 
+                                    if(item.hasOwnProperty('sleep')) {
+                                        await sleep(item['sleep']);
+                                    }
+
                                     let uid = item['uid'];
                                     let attributes = item['attributes'];
                                     let shape = shapes[uid];
@@ -378,8 +382,6 @@
                                         shape[attribute] = value;
                                     });
                                     shapes[uid] = shape;
-
-                                    await sleep(250);
 
                                 }
 
