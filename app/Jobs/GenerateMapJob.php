@@ -18,6 +18,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Log;
 use Str;
 use function GuzzleHttp\json_encode;
+use App\Custom\Manipulation\ObjectCache;
 
 class GenerateMapJob implements ShouldQueue
 {
@@ -59,6 +60,8 @@ class GenerateMapJob implements ShouldQueue
                 $q->where('player_id', $player_id);
             })
             ->get();
+
+        ObjectCache::buffer($player->actual_session_id);
 
         for ($i = 0; $i < $birthRegion->height; $i++) {
             for ($j = 0; $j < $birthRegion->width; $j++) {
@@ -151,6 +154,8 @@ class GenerateMapJob implements ShouldQueue
             $iPos = $startI;
             $jPos += $size;
         }
+
+        ObjectCache::flush($player->actual_session_id);
 
         $request_id = Str::random(20);
         DrawRequest::query()->create([

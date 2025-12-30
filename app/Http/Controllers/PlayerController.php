@@ -16,6 +16,7 @@ use App\Models\Entity;
 use App\Models\Player;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use App\Custom\Manipulation\ObjectCache;
 
 class PlayerController extends Controller
 {
@@ -161,6 +162,8 @@ class PlayerController extends Controller
         $updates = [];
         $clears = [];
         $items = [];
+        ObjectCache::buffer($player->actual_session_id);
+
         foreach ($pathFinding as $key => $path) {
 
             $startI = $path[0];
@@ -255,6 +258,7 @@ class PlayerController extends Controller
             $var = new ObjectClear($clear, $player->actual_session_id);
             $items[] = $var->get();
         }
+        ObjectCache::flush($player->actual_session_id);
 
         $request_id = Str::random(20);
         DrawRequest::query()->create([

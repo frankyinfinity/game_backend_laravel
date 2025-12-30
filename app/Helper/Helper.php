@@ -136,8 +136,7 @@ class Helper
 
         //Reset
         if($player->actual_session_id !== null) {
-            $key = "objects:{$player->actual_session_id}";
-            Cache::forget($key);
+            \App\Custom\Manipulation\ObjectCache::clear($player->actual_session_id);
         }
 
         //Set

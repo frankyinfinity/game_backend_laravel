@@ -21,15 +21,7 @@ class ObjectDraw
 
     private function write(): void
     {
-
-        $object = $this->object;
-
-        $key = "objects:{$this->sessionId}";
-        $data = Cache::get($key, []);
- 
-        $data[$object['uid']] = $object;
-        Cache::put($key, $data);
-
+        ObjectCache::put($this->sessionId, $this->object);
     }
 
 

@@ -28,19 +28,7 @@ class ObjectUpdate
 
     private function write(): void
     {
-
-        $key = "objects:{$this->sessionId}";
-
-        $uid = $this->uid;
-        $attributes = $this->attributes;
-
-        $data = Cache::get($key, []);
-        foreach ($attributes as $key => $value) {
-            $data[$uid][$key] = $value;
-        }
-
-        Cache::put($key, $data);
-
+        ObjectCache::update($this->sessionId, $this->uid, $this->attributes);
     }
 
     public function get(): array
@@ -64,16 +52,17 @@ class ObjectUpdate
             $x = $attributes['x'];
             $y = $attributes['y'];
          
-            $key = "objects:{$this->sessionId}";
-            $data = Cache::get($key, []);
-            if(array_key_exists($uid, $data)) {
-                $dataDraw = $data[$uid];
-                $drawChildren = $dataDraw['children'];
-                if(sizeof($drawChildren) > 0) {
-                    foreach($drawChildren as $uidChild) {
-                        if(array_key_exists($uidChild, $data)) {
+            $dataDraw = ObjectCache::find($this->sessionId, $uid);
 
-                            $dataChild = $data[$uidChild];
+            if($dataDraw !== null) {
+                $drawChildren = $dataDraw['children'] ?? [];
+                if(is_array($drawChildren) && count($drawChildren) > 0) {
+                    foreach($drawChildren as $uidChild) {
+                        
+                        $dataChild = ObjectCache::find($this->sessionId, $uidChild);
+                        
+                        if($dataChild !== null) {
+
                             $relativeX = $dataChild['relative_x'];
                             $relativeY = $dataChild['relative_y'];
 

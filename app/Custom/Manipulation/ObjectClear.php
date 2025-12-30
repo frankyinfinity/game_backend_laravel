@@ -18,15 +18,7 @@ class ObjectClear
 
     private function write(): void
     {
-
-        $object = $this->object;
-
-        $key = "objects:{$this->sessionId}";
-        $data = Cache::get($key, []);
-
-        unset($data[$object['uid']]);
-        Cache::put($key, $data);
-
+        ObjectCache::forget($this->sessionId, $this->uid);
     }
 
     public function get(): array
