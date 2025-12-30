@@ -120,34 +120,34 @@ class PlayerController extends Controller
     public function movement(Request $request): \Illuminate\Http\JsonResponse
     {
 
-        $uid = $request->entity_uid;
-        $entity = Entity::query()->where('uid', $uid)->with(['specie'])->first();
+        $entityUid = $request->entity_uid;
+        $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
 
         $player_id = $entity->specie->player_id;
 
-        $fromI = $entity->tile_i;
-        $fromJ = $entity->tile_j;
-        $toI = $entity->tile_i;
-        $toJ = $entity->tile_j;
+        $currentTileI = $entity->tile_i;
+        $currentTileJ = $entity->tile_j;
+        $targetTileI = $entity->tile_i;
+        $targetTileJ = $entity->tile_j;
 
         if($request->has('action')) {
             $action = $request->action;
             if ($action === 'up') {
-                $toI--;
+                $targetTileI--;
             } else if ($action === 'down') {
-                $toI++;
+                $targetTileI++;
             } else if ($action === 'left') {
-                $toJ--;
+                $targetTileJ--;
             } else if ($action === 'right') {
-                $toJ++;
+                $targetTileJ++;
             }
         } else if($request->has('target_i') && $request->has('target_j')) {
-            $toI = intval($request->target_i);
-            $toJ = intval($request->target_j);
+            $targetTileI = intval($request->target_i);
+            $targetTileJ = intval($request->target_j);
         }
 
         //Update position
-        $entity->update(['tile_i' => $toI, 'tile_j' => $toJ]);
+        $entity->update(['tile_i' => $targetTileI, 'tile_j' => $targetTileJ]);
 
         //Get Path
         $player = Player::find($player_id);
@@ -155,57 +155,57 @@ class PlayerController extends Controller
         $tiles = Helper::getBirthRegionTiles($birthRegion);
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
 
-        $mapSolidTiles[$fromI][$fromJ] = 'A';
-        $mapSolidTiles[$toI][$toJ] = 'B';
+        $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
+        $mapSolidTiles[$targetTileI][$targetTileJ] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
 
-        $updates = [];
-        $clears = [];
-        $items = [];
+        $updateCommands = [];
+        $idsToClear = [];
+        $drawCommands = [];
         ObjectCache::buffer($player->actual_session_id);
 
         foreach ($pathFinding as $key => $path) {
 
-            $startI = $path[0];
-            $startJ = $path[1];
+            $pathNodeI = $path[0];
+            $pathNodeJ = $path[1];
 
-            $size = Helper::TILE_SIZE;
+            $tileSize = Helper::TILE_SIZE;
 
             $startSquare = new Square();
-            $startSquare->setOrigin($size*$startJ, $size*$startI);
-            $startSquare->setSize($size);
+            $startSquare->setOrigin($tileSize*$pathNodeJ, $tileSize*$pathNodeI);
+            $startSquare->setSize($tileSize);
             $startCenterSquare = $startSquare->getCenter();
             $xStart = $startCenterSquare['x'];
             $yStart = $startCenterSquare['y'];
 
             //Clear
             $circleName = 'circle_' . Str::random(20);
-            $clears[] = $circleName;
+            $idsToClear[] = $circleName;
 
             $circle = new Circle($circleName);
             $circle->setOrigin($xStart, $yStart);
-            $circle->setRadius($size / 6);
+            $circle->setRadius($tileSize / 6);
             $circle->setColor('#FF0000');
 
             //Draw
-            $var = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
-            $items[] = $var->get();
+            $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
+            $drawCommands[] = $drawObject->get();
 
             if((sizeof($pathFinding)-1) !== $key) {
 
-                $endI = $pathFinding[$key+1][0];
-                $endJ = $pathFinding[$key+1][1];
+                $nextPathNodeI = $pathFinding[$key+1][0];
+                $nextPathNodeJ = $pathFinding[$key+1][1];
 
                 $endSquare = new Square();
-                $endSquare->setSize($size);
-                $endSquare->setOrigin($size*$endJ, $size*$endI);
+                $endSquare->setSize($tileSize);
+                $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
                 $endCenterSquare = $endSquare->getCenter();
                 $xEnd = $endCenterSquare['x'];
                 $yEnd = $endCenterSquare['y'];
 
                 //Clear
                 $multilineName = 'multiline_' . Str::random(20);
-                $clears[] = $multilineName;
+                $idsToClear[] = $multilineName;
 
                 $linePath = new MultiLine($multilineName);
                 $linePath->setPoint($xStart, $yStart);
@@ -214,49 +214,49 @@ class PlayerController extends Controller
                 $linePath->setThickness(2);
 
                 //Draw
-                $var = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
-                $items[] = $var->get();
+                $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
+                $drawCommands[] = $drawObject->get();
 
                 //Update Entity
-                $obj = new ObjectUpdate($uid, $player->actual_session_id, 250);
-                $obj->setAttributes('x', $xEnd);
-                $obj->setAttributes('y', $yEnd);
-                $obj->setAttributes('zIndex', 100);
+                $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
+                $updateObject->setAttributes('x', $xEnd);
+                $updateObject->setAttributes('y', $yEnd);
+                $updateObject->setAttributes('zIndex', 100);
 
-                $datas = $obj->get();
-                foreach ($datas as $data) {
-                    $updates[] = $data;
+                $updateData = $updateObject->get();
+                foreach ($updateData as $data) {
+                    $updateCommands[] = $data;
                 }
 
                 //Update Text
-                $obj = new ObjectUpdate($uid . '_text_row_2', $player->actual_session_id);
-                $obj->setAttributes('text', 'I: ' . $endI . ' - J: ' . $endJ);
+                $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
+                $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
 
-                $datas = $obj->get();
-                foreach ($datas as $data) {
-                    $updates[] = $data;
+                $updateData = $updateObject->get();
+                foreach ($updateData as $data) {
+                    $updateCommands[] = $data;
                 }
 
                 //Update Panel
-                $obj = new ObjectUpdate($uid . '_panel', $player->actual_session_id);
-                $obj->setAttributes('x', $xEnd + ($size/3));
-                $obj->setAttributes('y', $yEnd + ($size/3));
-                $obj->setAttributes('zIndex', 100);
+                $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
+                $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
+                $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                $updateObject->setAttributes('zIndex', 100);
 
-                $datas = $obj->get();
-                foreach ($datas as $data) {
-                    $updates[] = $data;
+                $updateData = $updateObject->get();
+                foreach ($updateData as $data) {
+                    $updateCommands[] = $data;
                 }
 
             }
 
         }
 
-        foreach ($updates as $update) $items[] = $update;
-        foreach ($clears as $clear) {
+        foreach ($updateCommands as $update) $drawCommands[] = $update;
+        foreach ($idsToClear as $idToClear) {
             //Clear
-            $var = new ObjectClear($clear, $player->actual_session_id);
-            $items[] = $var->get();
+            $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
+            $drawCommands[] = $clearObject->get();
         }
         ObjectCache::flush($player->actual_session_id);
 
@@ -265,7 +265,7 @@ class PlayerController extends Controller
             'session_id' => $player->actual_session_id,
             'request_id' => $request_id,
             'player_id' => $player_id,
-            'items' => json_encode($items),
+            'items' => json_encode($drawCommands),
         ]);
 
         event(new DrawInterfaceEvent($player, $request_id));

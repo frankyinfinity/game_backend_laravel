@@ -24,13 +24,13 @@ class GenerateMapJob implements ShouldQueue
 {
     use Queueable;
 
-    private Array $requestArray;
+    private Array $jobPayload;
     /**
      * Create a new job instance.
      */
-    public function __construct(Array $requestArray)
+    public function __construct(Array $jobPayload)
     {
-        $this->requestArray = $requestArray;
+        $this->jobPayload = $jobPayload;
     }
 
     /**
@@ -39,14 +39,14 @@ class GenerateMapJob implements ShouldQueue
     public function handle(): void
     {
 
-        $requestArray = $this->requestArray;
-        $player_id = $requestArray['player_id'];
+        $jobPayload = $this->jobPayload;
+        $player_id = $jobPayload['player_id'];
 
-        $items = [];
-        $startI = 0;
-        $iPos = $startI;
-        $jPos = 0;
-        $size = Helper::TILE_SIZE;
+        $drawItems = [];
+        $startPixelX = 0;
+        $pixelX = $startPixelX;
+        $pixelY = 0;
+        $tileSize = Helper::TILE_SIZE;
 
         $player = Player::find($player_id);
         $birthRegion = $player->birthRegion;
@@ -75,12 +75,12 @@ class GenerateMapJob implements ShouldQueue
                 $color = $tile['color'];
                 $hexWithoutHash = ltrim($color, '#');
                 $decimalValue = hexdec($hexWithoutHash);
-                $oxHexValue = '0x' . strtoupper(dechex($decimalValue));
+                $formattedHexColor = '0x' . strtoupper(dechex($decimalValue));
 
                 //Square
-                $uidSquare = 'square_'.$i.'_'.$j;
-                $urlMovement = route('players.entity.movement');
-                $urlMovement = str_replace('localhost', 'localhost:8085', $urlMovement);
+                $squareUid = 'square_'.$i.'_'.$j;
+                $movementUrl = route('players.entity.movement');
+                $movementUrl = str_replace('localhost', 'localhost:8085', $movementUrl);
 
                 //Click
                 $jsPathClickTile = resource_path('js/function/entity/click_tile.blade.php');
@@ -88,26 +88,26 @@ class GenerateMapJob implements ShouldQueue
                 $jsContentClickTile = Helper::setCommonJsCode($jsContentClickTile, \Illuminate\Support\Str::random(20));
                 $jsContentClickTile = str_replace('__i__', $i, $jsContentClickTile);
                 $jsContentClickTile = str_replace('__j__', $j, $jsContentClickTile);
-                $jsContentClickTile = str_replace('__url__', $urlMovement, $jsContentClickTile);
+                $jsContentClickTile = str_replace('__url__', $movementUrl, $jsContentClickTile);
 
                 //Pointer
-                $squareColor = $oxHexValue;
+                $squareColor = $formattedHexColor;
                 $overlaySquareColor = '#FF0000';
 
                 $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
                 $jsContentPointerTile = file_get_contents($jsPathPointerTile);
 
                 $jsContentPointerOverTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
-                $jsContentPointerOverTile = str_replace('__uid__', $uidSquare, $jsContentPointerOverTile);
+                $jsContentPointerOverTile = str_replace('__uid__', $squareUid, $jsContentPointerOverTile);
                 $jsContentPointerOverTile = str_replace('__color__', $overlaySquareColor, $jsContentPointerOverTile);
 
                 $jsContentPointerOutTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
-                $jsContentPointerOutTile = str_replace('__uid__', $uidSquare, $jsContentPointerOutTile);
+                $jsContentPointerOutTile = str_replace('__uid__', $squareUid, $jsContentPointerOutTile);
                 $jsContentPointerOutTile = str_replace('__color__', $squareColor, $jsContentPointerOutTile);
 
-                $square = new Square($uidSquare);
-                $square->setOrigin($iPos, $jPos);
-                $square->setSize($size);
+                $square = new Square($squareUid);
+                $square->setOrigin($pixelX, $pixelY);
+                $square->setSize($tileSize);
                 $square->setColor($squareColor);
                 if($tile['type'] == Tile::TYPE_LIQUID) {
                     $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
@@ -116,22 +116,22 @@ class GenerateMapJob implements ShouldQueue
                 }
 
                 //Draw
-                $var = new ObjectDraw($square->buildJson(), $player->actual_session_id);
-                $items[] = $var->get();
+                $objectDraw = new ObjectDraw($square->buildJson(), $player->actual_session_id);
+                $drawItems[] = $objectDraw->get();
 
                 //Borders
-                $borders = new MultiLine();
-                $borders->setThickness(thickness: 1);
-                $borders->setPoint($iPos, $jPos);
-                $borders->setPoint($iPos, $jPos+$size);
-                $borders->setPoint($iPos+$size, $jPos+$size);
-                $borders->setPoint($iPos+$size, $jPos);
-                $borders->setPoint($iPos, $jPos);
-                $borders->setColor(0xFFFFFF);
+                $tileBorders = new MultiLine();
+                $tileBorders->setThickness(thickness: 1);
+                $tileBorders->setPoint($pixelX, $pixelY);
+                $tileBorders->setPoint($pixelX, $pixelY+$tileSize);
+                $tileBorders->setPoint($pixelX+$tileSize, $pixelY+$tileSize);
+                $tileBorders->setPoint($pixelX+$tileSize, $pixelY);
+                $tileBorders->setPoint($pixelX, $pixelY);
+                $tileBorders->setColor(0xFFFFFF);
 
                 //Draw
-                $var = new ObjectDraw($borders->buildJson(), $player->actual_session_id);
-                $items[] = $var->get();
+                $objectDraw = new ObjectDraw($tileBorders->buildJson(), $player->actual_session_id);
+                $drawItems[] = $objectDraw->get();
 
                 //Entity
                 $searchEntity = $entities->where('tile_i', $i)->where('tile_j', $j)->first();
@@ -142,17 +142,17 @@ class GenerateMapJob implements ShouldQueue
                     $entityDrawItems = $entityDraw->getItems();
                     foreach ($entityDrawItems as $entityDrawItem) {
                         //Draw
-                        $var = new ObjectDraw($entityDrawItem, $player->actual_session_id);
-                        $items[] = $var->get();
+                        $objectDraw = new ObjectDraw($entityDrawItem, $player->actual_session_id);
+                        $drawItems[] = $objectDraw->get();
                     }
 
                 }
 
-                $iPos += $size;
+                $pixelX += $tileSize;
 
             }
-            $iPos = $startI;
-            $jPos += $size;
+            $pixelX = $startPixelX;
+            $pixelY += $tileSize;
         }
 
         ObjectCache::flush($player->actual_session_id);
@@ -162,7 +162,7 @@ class GenerateMapJob implements ShouldQueue
             'session_id' => $player->actual_session_id,
             'request_id' => $request_id,
             'player_id' => $player_id,
-            'items' => json_encode($items),
+            'items' => json_encode($drawItems),
         ]);
 
         event(new DrawInterfaceEvent($player, $request_id));
