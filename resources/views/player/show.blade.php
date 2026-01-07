@@ -415,6 +415,36 @@
 
             });
 
+            // Gestisci la disconnessione di Pusher
+            pusher.connection.bind('disconnected', function() {
+                console.log('Disconnesso da Pusher');
+                sendCloseRequest();
+            });
+
+            // Flag per evitare molteplici chiamate
+            let closeSent = false;
+
+            // Funzione per inviare richiesta di chiusura
+            function sendCloseRequest() {
+                if (closeSent) return;
+                closeSent = true;
+
+                const formData = new FormData();
+                formData.append('player_id', playerId);
+                formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
+                
+                navigator.sendBeacon("{{ route('players.close') }}", formData);
+            }
+
+            // Intercetta chiusura pagina / cambio pagina
+            window.addEventListener('beforeunload', function() {
+                sendCloseRequest();
+            });
+
+            window.addEventListener('pagehide', function() {
+                sendCloseRequest();
+            });
+
         });
     </script>
 @stop

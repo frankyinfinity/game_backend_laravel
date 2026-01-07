@@ -11,6 +11,7 @@ use App\Custom\Manipulation\ObjectUpdate;
 use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Jobs\GenerateMapJob;
+use App\Jobs\StopPlayerContainersJob;
 use App\Models\DrawRequest;
 use App\Models\Entity;
 use App\Models\Player;
@@ -272,6 +273,25 @@ class PlayerController extends Controller
 
         return response()->json(['success' => true]);
 
+    }
+
+    public function close(Request $request)
+    {
+        $player_id = $request->input('player_id');
+        
+        \Log::info("Player connection closed", [
+            'player_id' => $player_id,
+            'timestamp' => now(),
+            'ip' => $request->ip()
+        ]);
+
+        $player = Player::find($player_id);
+        if ($player) {
+            StopPlayerContainersJob::dispatch($player);
+            \Log::info("StopPlayerContainersJob dispatched for player {$player_id}");
+        }
+
+        return response()->json(['success' => true, 'message' => 'Connection closed successfully']);
     }
 
 }
