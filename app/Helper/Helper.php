@@ -2,6 +2,7 @@
 
 namespace App\Helper;
 
+use App\Jobs\StartPlayerContainersJob;
 use App\Models\BirthRegion;
 use App\Models\DrawRequest;
 use App\Models\Player;
@@ -142,6 +143,9 @@ class Helper
         //Set
         $session_id = uniqid(\Illuminate\Support\Str::random(16), true);
         $player->update(['actual_session_id' => $session_id]);
+
+        // Dispatch job to start containers
+        StartPlayerContainersJob::dispatch($player);
 
         return $session_id;
 

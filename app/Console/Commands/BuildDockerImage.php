@@ -40,6 +40,9 @@ class BuildDockerImage extends Command
             return 1;
         }
 
+        // Imposta la connessione a Docker su TCP
+        putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+
         // Usa il comando docker build via shell
         $command = sprintf(
             'docker build -t %s "%s"',
