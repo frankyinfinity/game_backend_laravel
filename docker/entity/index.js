@@ -7,6 +7,8 @@ const entityUid = process.env.ENTITY_UID;
 const entityTileI = process.env.ENTITY_TILE_I;
 const entityTileJ = process.env.ENTITY_TILE_J;
 const backendUrl = process.env.BACKEND_URL;
+const apiUserEmail = process.env.API_USER_EMAIL;
+const apiUserPassword = process.env.API_USER_PASSWORD;
 
 console.log(`Entity service started.`);
 console.log(`Entity UID: ${entityUid}`);
@@ -27,6 +29,7 @@ function fetchCurrentPosition() {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': 'Basic ' + Buffer.from(apiUserEmail + ':' + apiUserPassword).toString('base64')
     },
   };
 
