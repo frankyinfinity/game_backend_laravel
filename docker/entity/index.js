@@ -19,8 +19,103 @@ console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' :
 let currentTileI = entityTileI;
 let currentTileJ = entityTileJ;
 
-// Funzione per recuperare la posizione attuale dall'API
+// function to handle login and session
+let sessionCookie = null;
+let xsrfToken = null;
+
+function parseCookies(response) {
+  const list = {};
+  const rc = response.headers['set-cookie'];
+
+  rc && rc.forEach(function (cookie) {
+    const parts = cookie.split(';');
+    const pair = parts[0].split('=');
+    list[pair[0].trim()] = decodeURIComponent(pair[1]);
+  });
+  return list;
+}
+
+function getCookiesFromHeader(response) {
+  return response.headers['set-cookie'] || [];
+}
+
+function updateSession(response) {
+  const cookies = getCookiesFromHeader(response);
+  if (cookies.length > 0) {
+    // Simple cookie jar: just join all set-cookie headers
+    sessionCookie = cookies.map(c => c.split(';')[0]).join('; ');
+
+    // Extract XSRF-TOKEN if present
+    const parsed = parseCookies(response);
+    if (parsed['XSRF-TOKEN']) {
+      xsrfToken = parsed['XSRF-TOKEN'];
+    }
+  }
+}
+
+function performLogin() {
+  console.log('Attempting login...');
+
+  // Step 1: GET / to get initial cookies and CSRF token
+  const optionsGet = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: '/login',
+    method: 'GET',
+  };
+
+  const reqGet = http.request(optionsGet, (res) => {
+    updateSession(res);
+
+    // Prepare post data
+    const postData = new URLSearchParams({
+      'email': apiUserEmail,
+      'password': apiUserPassword,
+    }).toString();
+
+    // Step 2: POST /login
+    const optionsPost = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: '/login',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      }
+    };
+
+    const reqPost = http.request(optionsPost, (resPost) => {
+      updateSession(resPost);
+
+      if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
+        console.log('Login successful (or redirect received), starting creation loop...');
+        setInterval(fetchCurrentPosition, 5000);
+        fetchCurrentPosition();
+      } else {
+        console.error(`Login failed with status: ${resPost.statusCode}`);
+        // Try reading body for error
+        resPost.on('data', d => console.error(d.toString()));
+      }
+    });
+
+    reqPost.on('error', (e) => console.error(`Login POST error: ${e.message}`));
+    reqPost.write(postData);
+    reqPost.end();
+  });
+
+  reqGet.on('error', (e) => console.error(`Initial GET error: ${e.message}`));
+  reqGet.end();
+}
+
 function fetchCurrentPosition() {
+  if (!sessionCookie) {
+    console.log('No session cookie, skipping fetch...');
+    return;
+  }
+
   const path = `/entities/position?uid=${entityUid}`;
 
   const options = {
@@ -31,7 +126,7 @@ function fetchCurrentPosition() {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Authorization': 'Basic ' + Buffer.from(apiUserEmail + ':' + apiUserPassword).toString('base64')
+      'Cookie': sessionCookie
     },
   };
 
@@ -50,23 +145,24 @@ function fetchCurrentPosition() {
           currentTileJ = response.tile_j;
           console.log(`[Entity ${entityUid}] Still alive... Position: (${currentTileI}, ${currentTileJ})`);
         } else {
-          console.error(`Errore nel recupero della posizione: ${response.message}`);
+          console.error(`Status ${res.statusCode}: ${response.message || 'Unknown error'}`);
         }
       } catch (error) {
-        console.error(`Errore nel parsing della risposta: ${error.message}`);
-        console.error(`Risposta ricevuta (primi 500 caratteri): ${data.substring(0, 500)}`);
+        if (res.statusCode === 401 || res.statusCode === 419) {
+          console.error('Session expired or unauthorized, maybe re-login needed?');
+        } else {
+          console.error(`Error parsing response: ${error.message}. Status: ${res.statusCode}`);
+        }
       }
     });
   });
 
   req.on('error', (error) => {
-    console.error(`Errore nella richiesta della posizione: ${error.message}`);
+    console.error(`Error fetching position: ${error.message}`);
   });
 
   req.end();
 }
 
-// Timer ogni 5 secondi che chiama l'API
-setInterval(() => {
-  fetchCurrentPosition();
-}, 5000);
+// Start flow
+performLogin();
