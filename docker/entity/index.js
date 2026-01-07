@@ -13,6 +13,7 @@ const apiUserPassword = process.env.API_USER_PASSWORD;
 console.log(`Entity service started.`);
 console.log(`Entity UID: ${entityUid}`);
 console.log(`Tile Position: (${entityTileI}, ${entityTileJ})`);
+console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
 
 // Variabili per tracciare la posizione attuale
 let currentTileI = entityTileI;
@@ -29,6 +30,7 @@ function fetchCurrentPosition() {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       'Authorization': 'Basic ' + Buffer.from(apiUserEmail + ':' + apiUserPassword).toString('base64')
     },
   };
@@ -52,6 +54,7 @@ function fetchCurrentPosition() {
         }
       } catch (error) {
         console.error(`Errore nel parsing della risposta: ${error.message}`);
+        console.error(`Risposta ricevuta (primi 500 caratteri): ${data.substring(0, 500)}`);
       }
     });
   });

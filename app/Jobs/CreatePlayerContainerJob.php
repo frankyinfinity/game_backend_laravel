@@ -86,8 +86,8 @@ class CreatePlayerContainerJob implements ShouldQueue
                     'ENTITY_TILE_J=' . $entity->tile_j,
                     'ENTITY_PLAYER_ID=' . $this->player->id,
                     'BACKEND_URL=' . $backendUrl,
-                    'API_USER_EMAIL=' . env('API_USER_EMAIL', 'api@email.it'),
-                    'API_USER_PASSWORD=' . env('API_USER_PASSWORD', 'api'),
+                    'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+                    'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
                 ]);
                 
                 $container = $docker->containerCreate($containerConfig);
