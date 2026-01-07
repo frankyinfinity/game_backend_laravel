@@ -63,7 +63,8 @@ class TestDocker extends Command
 
             $this->info("Creazione del container...");
             $container = $docker->containerCreate([
-                'Image' => $imageName
+                'Image' => $imageName,
+                'Name' => 'entity_' . Str::random(10),
             ]);
             
             $containerId = $container->getId();
