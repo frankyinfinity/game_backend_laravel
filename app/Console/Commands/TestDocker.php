@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Docker\Docker;
+use Docker\Context\Context;
 
 class TestDocker extends Command
 {
@@ -41,26 +42,32 @@ class TestDocker extends Command
             if (!$imageExists) {
                 $this->info("Immagine '$imageName' non trovata. Costruisco l'immagine...");
                 
-                // Leggi il Dockerfile
-                $dockerfilePath = base_path('docker/entity/Dockerfile');
-                if (!file_exists($dockerfilePath)) {
-                    $this->error("Dockerfile non trovato in: $dockerfilePath");
+                // Definisci la directory di build
+                $buildPath = base_path('docker/entity');
+                
+                if (!is_dir($buildPath)) {
+                    $this->error("Directory di build non trovata in: $buildPath");
                     return 1;
                 }
-                
+
+                $context = new Context($buildPath);
+                $inputStream = $context->toStream();
+
                 // Costruisci l'immagine
-                $docker->imageBuild(
-                    fopen($dockerfilePath, 'r'),
-                    [
-                        'dockerfile' => 'Dockerfile',
-                        't' => $imageName,
-                    ]
-                );
+                $docker->imageBuild($inputStream, ['t' => $imageName]);
                 
                 $this->info("Immagine '$imageName' costruita con successo!");
             } else {
                 $this->info("Immagine '$imageName' già presente.");
             }
+
+            $this->info("Creazione del container...");
+            $container = $docker->containerCreate([
+                'Image' => $imageName
+            ]);
+            
+            $containerId = $container->getId();
+            $this->info("Container creato: " . $containerId);
         } catch (\Exception $e) {
             $this->error("Errore nel controllo/costruzione dell'immagine: " . $e->getMessage());
             return 1;
