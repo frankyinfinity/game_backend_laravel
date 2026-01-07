@@ -68,10 +68,24 @@ class CreatePlayerContainerJob implements ShouldQueue
                 $containerConfig->setHostname('entity_' . $entity->uid);
                 
                 // Passa i parametri come variabili d'ambiente
+                $appUrl = config('app.url') ?: 'http://localhost';
+                $backendPort = env('BACKEND_PORT', '8085');
+                $parsedUrl = parse_url($appUrl);
+                $backendHost = $parsedUrl['host'] ?? 'localhost';
+                
+                // Rimpiazza localhost con host.docker.internal per accesso da container
+                if ($backendHost === 'localhost' || $backendHost === '127.0.0.1') {
+                    $backendHost = 'host.docker.internal';
+                }
+                
+                $backendUrl = $parsedUrl['scheme'] . '://' . $backendHost . ':' . $backendPort;
+                
                 $containerConfig->setEnv([
                     'ENTITY_UID=' . $entity->uid,
                     'ENTITY_TILE_I=' . $entity->tile_i,
                     'ENTITY_TILE_J=' . $entity->tile_j,
+                    'ENTITY_PLAYER_ID=' . $this->player->id,
+                    'BACKEND_URL=' . $backendUrl,
                 ]);
                 
                 $container = $docker->containerCreate($containerConfig);
