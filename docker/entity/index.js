@@ -18,9 +18,8 @@ let currentTileJ = entityTileJ;
 
 // Funzione per recuperare la posizione attuale dall'API
 function fetchCurrentPosition() {
-  const query = encodeURIComponent(`uid=${entityUid}`);
-  const path = `/api/entities/position?uid=${entityUid}`;
-  
+  const path = `/entities/position?uid=${entityUid}`;
+
   const options = {
     hostname: new URL(backendUrl).hostname,
     port: new URL(backendUrl).port || 80,
