@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\CreatePlayerContainerJob;
 use App\Models\EntityInformation;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -16,7 +17,6 @@ use App\Models\BirthPlanet;
 use App\Models\BirthRegion;
 use App\Models\BirthClimate;
 use Illuminate\Support\Facades\Storage;
-use Log;
 
 class AuthController extends Controller
 {
@@ -124,6 +124,7 @@ class AuthController extends Controller
             
         }
 
+        CreatePlayerContainerJob::dispatch($player);
         return response()->json(['success' => true]);
 
     }
