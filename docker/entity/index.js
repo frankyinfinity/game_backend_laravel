@@ -1,6 +1,7 @@
 // entity.js
 
 const http = require('http');
+const WebSocket = require('ws');
 
 // Leggi i parametri dalle variabili d'ambiente
 const entityUid = process.env.ENTITY_UID;
@@ -9,6 +10,7 @@ const entityTileJ = process.env.ENTITY_TILE_J;
 const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
+const wsPort = process.env.WS_PORT || 8080;
 
 console.log(`Entity service started.`);
 console.log(`Entity UID: ${entityUid}`);
@@ -179,5 +181,133 @@ function scheduleNextCycle() {
   }, 5000);
 }
 
+// ========== WebSocket Server ==========
+const wss = new WebSocket.Server({ port: wsPort });
+
+console.log(`WebSocket server listening on port ${wsPort}`);
+
+wss.on('connection', (ws) => {
+  console.log(`[WebSocket] Client connected to entity ${entityUid}`);
+
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      console.log(`[WebSocket] Received command:`, data);
+
+      // Gestisci i comandi ricevuti
+      handleWebSocketCommand(data, ws);
+    } catch (error) {
+      console.error(`[WebSocket] Error parsing message:`, error.message);
+      ws.send(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+    }
+  });
+
+  ws.on('close', () => {
+    console.log(`[WebSocket] Client disconnected`);
+  });
+
+  ws.on('error', (error) => {
+    console.error(`[WebSocket] Error:`, error.message);
+  });
+
+  // Invia messaggio di benvenuto
+  ws.send(JSON.stringify({
+    success: true,
+    message: 'Connected to entity',
+    entity_uid: entityUid,
+    position: { i: currentTileI, j: currentTileJ }
+  }));
+});
+
+// Funzione per gestire i comandi WebSocket
+function handleWebSocketCommand(data, ws) {
+  const { command, params } = data;
+
+  switch (command) {
+    case 'move':
+      // Esegui un movimento con azione specifica (up, down, left, right)
+      if (params && params.action) {
+        performMovement(params.action, (result) => {
+          ws.send(JSON.stringify(result));
+        });
+      } else {
+        ws.send(JSON.stringify({ success: false, error: 'Missing action parameter' }));
+      }
+      break;
+
+    case 'get_position':
+      // Ritorna la posizione corrente
+      ws.send(JSON.stringify({
+        success: true,
+        entity_uid: entityUid,
+        position: { i: currentTileI, j: currentTileJ }
+      }));
+      break;
+
+    default:
+      ws.send(JSON.stringify({
+        success: false,
+        error: `Unknown command: ${command}`
+      }));
+  }
+}
+
+// Funzione per eseguire un movimento specifico
+function performMovement(action, callback) {
+  if (!sessionCookie) {
+    callback({ success: false, error: 'No session cookie' });
+    return;
+  }
+
+  const postData = JSON.stringify({
+    entity_uid: entityUid,
+    action: action
+  });
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: '/entities/movement',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+      'Accept': 'application/json',
+      'Cookie': sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          console.log(`[Entity ${entityUid}] Movement performed: ${action}`);
+          callback({ success: true, action: action, message: 'Movement executed' });
+        } else {
+          callback({ success: false, error: response.message || 'Movement failed' });
+        }
+      } catch (error) {
+        callback({ success: false, error: `Parse error: ${error.message}` });
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    callback({ success: false, error: error.message });
+  });
+
+  req.write(postData);
+  req.end();
+}
+
 // Start flow
+
 performLogin();

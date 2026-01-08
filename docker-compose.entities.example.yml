@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # Entity 1
+  entity_1:
+    build: ./docker/entity
+    container_name: entity_1
+    environment:
+      - ENTITY_UID=entity_uid_1
+      - ENTITY_TILE_I=5
+      - ENTITY_TILE_J=5
+      - BACKEND_URL=http://host.docker.internal
+      - API_USER_EMAIL=api@email.it
+      - API_USER_PASSWORD=api
+      - WS_PORT=8080
+    ports:
+      - "9001:8080"  # Porta WebSocket: host:container
+    networks:
+      - backend_network
+
+  # Entity 2
+  entity_2:
+    build: ./docker/entity
+    container_name: entity_2
+    environment:
+      - ENTITY_UID=entity_uid_2
+      - ENTITY_TILE_I=10
+      - ENTITY_TILE_J=10
+      - BACKEND_URL=http://host.docker.internal
+      - API_USER_EMAIL=api@email.it
+      - API_USER_PASSWORD=api
+      - WS_PORT=8080
+    ports:
+      - "9002:8080"  # Porta WebSocket: host:container
+    networks:
+      - backend_network
+
+  # Entity 3
+  entity_3:
+    build: ./docker/entity
+    container_name: entity_3
+    environment:
+      - ENTITY_UID=entity_uid_3
+      - ENTITY_TILE_I=15
+      - ENTITY_TILE_J=15
+      - BACKEND_URL=http://host.docker.internal
+      - API_USER_EMAIL=api@email.it
+      - API_USER_PASSWORD=api
+      - WS_PORT=8080
+    ports:
+      - "9003:8080"  # Porta WebSocket: host:container
+    networks:
+      - backend_network
+
+networks:
+  backend_network:
+    driver: bridge

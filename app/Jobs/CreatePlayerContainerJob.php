@@ -63,6 +63,11 @@ class CreatePlayerContainerJob implements ShouldQueue
 
             // Crea un container per ogni entity
             foreach ($entities as $entity) {
+                
+                // Calcola una porta per il WebSocket
+                $maxPort = Container::query()->max('ws_port') ?? 9000;
+                $wsPort = $maxPort + 1;
+
                 $containerConfig = new ContainersCreatePostBody();
                 $containerConfig->setImage($imageName);
                 $containerConfig->setHostname('entity_' . $entity->uid);
@@ -88,7 +93,19 @@ class CreatePlayerContainerJob implements ShouldQueue
                     'BACKEND_URL=' . $backendUrl,
                     'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
                     'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+                    'WS_PORT=8080', // Porta interna del container
                 ]);
+
+                // Configura Port Mapping (Host port $wsPort -> Container port 8080)
+                $portBinding = new \Docker\API\Model\PortBinding();
+                $portBinding->setHostPort((string)$wsPort);
+
+                $hostConfig = new \Docker\API\Model\HostConfig();
+                $hostConfig->setPortBindings([
+                    '8080/tcp' => [$portBinding]
+                ]);
+                
+                $containerConfig->setHostConfig($hostConfig);
                 
                 $container = $docker->containerCreate($containerConfig);
                 $containerId = $container->getId();
@@ -99,6 +116,7 @@ class CreatePlayerContainerJob implements ShouldQueue
                     'name' => 'entity_' . $entity->uid,
                     'parent_type' => Container::PARENT_TYPE_ENTITY,
                     'parent_id' => $entity->id,
+                    'ws_port' => $wsPort,
                 ]);
             }
 
