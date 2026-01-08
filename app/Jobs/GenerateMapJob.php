@@ -79,7 +79,7 @@ class GenerateMapJob implements ShouldQueue
 
                 //Square
                 $squareUid = 'square_'.$i.'_'.$j;
-                $movementUrl = route('entities.movement');
+                $movementUrl = route('entities.ws_movement');
                 $movementUrl = str_replace('localhost', 'localhost:8085', $movementUrl);
 
                 //Click

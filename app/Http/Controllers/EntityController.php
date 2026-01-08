@@ -234,11 +234,13 @@ class EntityController extends Controller
     {
         $uid = $request->input('entity_uid');
         $action = $request->input('action');
+        $targetI = $request->input('target_i');
+        $targetJ = $request->input('target_j');
 
-        if (!$uid || !$action) {
+        if (!$uid || (!$action && $targetI === null && $targetJ === null)) {
             return response()->json([
                 'success' => false,
-                'message' => 'UID o Azione mancante'
+                'message' => 'Parametri insufficienti'
             ], 400);
         }
 
@@ -261,18 +263,23 @@ class EntityController extends Controller
             ], 404);
         }
 
+        $params = [];
+        if ($action) {
+            $params['action'] = $action;
+        } else {
+            $params['target_i'] = $targetI;
+            $params['target_j'] = $targetJ;
+        }
+
         $payload = [
             'command' => 'move',
-            'params' => [
-                'action' => $action
-            ]
+            'params' => $params
         ];
 
         $wsUrl = "ws://localhost:{$container->ws_port}";
         $result = WebSocketService::send($wsUrl, $payload);
 
         return response()->json($result);
-        
     }
 
 }

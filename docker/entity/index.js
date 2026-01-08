@@ -225,13 +225,13 @@ function handleWebSocketCommand(data, ws) {
 
   switch (command) {
     case 'move':
-      // Esegui un movimento con azione specifica (up, down, left, right)
-      if (params && params.action) {
-        performMovement(params.action, (result) => {
+      // Esegui un movimento con azione specifica (up, down, left, right) o coordinate target
+      if (params && (params.action || (params.target_i !== undefined && params.target_j !== undefined))) {
+        performMovement(params, (result) => {
           ws.send(JSON.stringify(result));
         });
       } else {
-        ws.send(JSON.stringify({ success: false, error: 'Missing action parameter' }));
+        ws.send(JSON.stringify({ success: false, error: 'Missing action or target coordinates' }));
       }
       break;
 
@@ -253,16 +253,24 @@ function handleWebSocketCommand(data, ws) {
 }
 
 // Funzione per eseguire un movimento specifico
-function performMovement(action, callback) {
+function performMovement(params, callback) {
   if (!sessionCookie) {
     callback({ success: false, error: 'No session cookie' });
     return;
   }
 
-  const postData = JSON.stringify({
-    entity_uid: entityUid,
-    action: action
-  });
+  const payload = {
+    entity_uid: entityUid
+  };
+
+  if (params.action) {
+    payload.action = params.action;
+  } else if (params.target_i !== undefined && params.target_j !== undefined) {
+    payload.target_i = params.target_i;
+    payload.target_j = params.target_j;
+  }
+
+  const postData = JSON.stringify(payload);
 
   const options = {
     hostname: new URL(backendUrl).hostname,
@@ -289,8 +297,8 @@ function performMovement(action, callback) {
       try {
         const response = JSON.parse(data);
         if (response.success) {
-          console.log(`[Entity ${entityUid}] Movement performed: ${action}`);
-          callback({ success: true, action: action, message: 'Movement executed' });
+          console.log(`[Entity ${entityUid}] Movement performed:`, params);
+          callback({ success: true, params: params, message: 'Movement executed' });
         } else {
           callback({ success: false, error: response.message || 'Movement failed' });
         }
