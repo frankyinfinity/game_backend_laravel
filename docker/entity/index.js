@@ -92,8 +92,8 @@ function performLogin() {
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
         console.log('Login successful (or redirect received), starting creation loop...');
-        setInterval(fetchCurrentPosition, 5000);
-        fetchCurrentPosition();
+        // Avvia il primo ciclo
+        scheduleNextCycle();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         // Try reading body for error
@@ -113,6 +113,7 @@ function performLogin() {
 function fetchCurrentPosition() {
   if (!sessionCookie) {
     console.log('No session cookie, skipping fetch...');
+    scheduleNextCycle(); // Riprogramma il prossimo ciclo anche se non c'è la sessione
     return;
   }
 
@@ -144,8 +145,12 @@ function fetchCurrentPosition() {
           currentTileI = response.tile_i;
           currentTileJ = response.tile_j;
           console.log(`[Entity ${entityUid}] Still alive... Position: (${currentTileI}, ${currentTileJ})`);
+
+          // Dopo aver ottenuto la posizione, esegui un movimento randomico
+          performRandomMovement();
         } else {
           console.error(`Status ${res.statusCode}: ${response.message || 'Unknown error'}`);
+          scheduleNextCycle(); // Riprogramma anche in caso di errore
         }
       } catch (error) {
         if (res.statusCode === 401 || res.statusCode === 419) {
@@ -153,15 +158,86 @@ function fetchCurrentPosition() {
         } else {
           console.error(`Error parsing response: ${error.message}. Status: ${res.statusCode}`);
         }
+        scheduleNextCycle(); // Riprogramma anche in caso di errore
       }
     });
   });
 
   req.on('error', (error) => {
     console.error(`Error fetching position: ${error.message}`);
+    scheduleNextCycle(); // Riprogramma anche in caso di errore di rete
   });
 
   req.end();
+}
+
+function performRandomMovement() {
+  if (!sessionCookie) {
+    console.log('No session cookie, skipping movement...');
+    scheduleNextCycle(); // Riprogramma anche se non c'è la sessione
+    return;
+  }
+
+  // Genera un movimento randomico
+  const movements = ['up', 'down', 'left', 'right'];
+  const randomAction = movements[Math.floor(Math.random() * movements.length)];
+
+  const postData = JSON.stringify({
+    entity_uid: entityUid,
+    action: randomAction
+  });
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: '/entities/movement',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+      'Accept': 'application/json',
+      'Cookie': sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          console.log(`[Entity ${entityUid}] Movement performed: ${randomAction}`);
+        } else {
+          console.error(`Movement failed: ${response.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error(`Error parsing movement response: ${error.message}. Status: ${res.statusCode}`);
+      }
+      // Programma il prossimo ciclo dopo aver completato il movimento
+      scheduleNextCycle();
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`Error performing movement: ${error.message}`);
+    scheduleNextCycle(); // Riprogramma anche in caso di errore di rete
+  });
+
+  req.write(postData);
+  req.end();
+}
+
+// Funzione per programmare il prossimo ciclo
+function scheduleNextCycle() {
+  setTimeout(() => {
+    fetchCurrentPosition();
+  }, 5000);
 }
 
 // Start flow

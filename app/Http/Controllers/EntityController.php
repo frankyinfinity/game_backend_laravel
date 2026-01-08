@@ -17,6 +17,7 @@ use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectCache;
+use Illuminate\Support\Facades\Log;
 
 class EntityController extends Controller
 {
@@ -84,13 +85,27 @@ class EntityController extends Controller
             $targetTileJ = intval($request->target_j);
         }
 
+        //Get Tile
+        $player = Player::find($player_id);
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        
+        //Check
+        if($targetTileI < 0 || $targetTileI >= $birthRegion->height || $targetTileJ < 0 || $targetTileJ >= $birthRegion->width) {
+            return response()->json(['success' => true]);
+        }
+        
+        $tile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
+        if($tile !== null) {
+            if($tile['tile']['type'] === Tile::TYPE_SOLID) {
+                return response()->json(['success' => true]);
+            }
+        }
+
         //Update position
         $entity->update(['tile_i' => $targetTileI, 'tile_j' => $targetTileJ]);
 
         //Get Path
-        $player = Player::find($player_id);
-        $birthRegion = $player->birthRegion;
-        $tiles = Helper::getBirthRegionTiles($birthRegion);
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
 
         $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
