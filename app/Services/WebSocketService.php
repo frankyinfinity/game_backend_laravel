@@ -1,99 +1,17 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Services;
 
-use Illuminate\Console\Command;
-use App\Models\Entity;
-use App\Models\Container;
-
-class SendEntityCommand extends Command
+class WebSocketService
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'entity:send {uid} {action_command} {--action=} {--params=}';
-
-    /**
-     * The console description of the console command.
-     *
-     * @var string
-     */
-    protected $description = 'Invia un comando via WebSocket a un container entity specifico';
-
-    /**
-     * Execute the console command.
-     */
-    public function handle()
-    {
-        $uid = $this->argument('uid');
-        $command = $this->argument('action_command');
-        $action = $this->option('action');
-        $paramsJson = $this->option('params');
-
-        // Trova l'entity nel database
-        $entity = Entity::where('uid', $uid)->first();
-
-        if (!$entity) {
-            $this->error("Entity con UID '{$uid}' non trovata!");
-            return 1;
-        }
-
-        // Recupera il container associato per ottenere la porta
-        $container = Container::where('parent_type', Container::PARENT_TYPE_ENTITY)
-            ->where('parent_id', $entity->id)
-            ->first();
-
-        if (!$container || !$container->ws_port) {
-            $this->error("Container o porta WebSocket non trovati per l'entity UID '{$uid}'!");
-            return 1;
-        }
-
-        $wsPort = $container->ws_port;
-        $wsUrl = "ws://localhost:{$wsPort}";
-
-        $this->info("Connessione a {$wsUrl} per entity UID: {$uid}");
-
-        try {
-            // Prepara il payload
-            $payload = [
-                'command' => $command,
-            ];
-
-            // Aggiungi parametri se presenti
-            if ($action) {
-                $payload['params'] = ['action' => $action];
-            } elseif ($paramsJson) {
-                $payload['params'] = json_decode($paramsJson, true);
-            }
-
-            // Invia il comando via WebSocket
-            $result = $this->sendWebSocketMessage($wsUrl, $payload);
-
-            if ($result['success']) {
-                $this->info("✅ Comando inviato con successo!");
-                $this->line("Risposta: " . json_encode($result['response'], JSON_PRETTY_PRINT));
-                return 0;
-            } else {
-                $this->error("❌ Errore nell'invio del comando: " . $result['error']);
-                return 1;
-            }
-
-        } catch (\Exception $e) {
-            $this->error("❌ Eccezione: " . $e->getMessage());
-            return 1;
-        }
-    }
-
     /**
      * Invia un messaggio via WebSocket e ritorna la risposta
      */
-    private function sendWebSocketMessage($url, $payload)
+    public static function send($url, $payload)
     {
         // Parse dell'URL
         $urlParts = parse_url($url);
-        $host = $urlParts['host'];
+        $host = $urlParts['host'] ?? 'localhost';
         $port = $urlParts['port'] ?? 80;
         $path = $urlParts['path'] ?? '/';
 
@@ -140,7 +58,7 @@ class SendEntityCommand extends Command
 
         // Invia il messaggio
         $message = json_encode($payload);
-        $frame = $this->encodeWebSocketFrame($message);
+        $frame = self::encodeFrame($message);
         fwrite($socket, $frame);
 
         // Leggi la risposta (con timeout)
@@ -150,7 +68,7 @@ class SendEntityCommand extends Command
         fclose($socket);
 
         if ($responseFrame) {
-            $decoded = $this->decodeWebSocketFrame($responseFrame);
+            $decoded = self::decodeFrame($responseFrame);
             return [
                 'success' => true,
                 'response' => json_decode($decoded, true) ?? $decoded
@@ -166,7 +84,7 @@ class SendEntityCommand extends Command
     /**
      * Codifica un messaggio in un frame WebSocket
      */
-    private function encodeWebSocketFrame($message)
+    private static function encodeFrame($message)
     {
         $length = strlen($message);
         $header = chr(0x81); // Text frame, FIN bit set
@@ -197,7 +115,7 @@ class SendEntityCommand extends Command
     /**
      * Decodifica un frame WebSocket
      */
-    private function decodeWebSocketFrame($data)
+    private static function decodeFrame($data)
     {
         if (strlen($data) < 2) {
             return '';
@@ -216,7 +134,7 @@ class SendEntityCommand extends Command
 
         $decoded = '';
         for ($i = 0; $i < $length; $i++) {
-            $decoded .= $data[$maskStart + $i];
+            $decoded .= $data[$maskStart + $i] ?? '';
         }
 
         return $decoded;

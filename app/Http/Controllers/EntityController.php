@@ -18,6 +18,8 @@ use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectCache;
 use Illuminate\Support\Facades\Log;
+use App\Models\Container;
+use App\Services\WebSocketService;
 
 class EntityController extends Controller
 {
@@ -222,9 +224,55 @@ class EntityController extends Controller
         ]);
 
         event(new DrawInterfaceEvent($player, $request_id));
-
         return response()->json(['success' => true]);
+    }
 
+    /**
+     * Invia un comando di movimento via WebSocket al container dell'entity
+     */
+    public function wsMovement(Request $request)
+    {
+        $uid = $request->input('entity_uid');
+        $action = $request->input('action');
+
+        if (!$uid || !$action) {
+            return response()->json([
+                'success' => false,
+                'message' => 'UID o Azione mancante'
+            ], 400);
+        }
+
+        $entity = Entity::where('uid', $uid)->first();
+        if (!$entity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity non trovata'
+            ], 404);
+        }
+
+        $container = Container::where('parent_type', Container::PARENT_TYPE_ENTITY)
+            ->where('parent_id', $entity->id)
+            ->first();
+
+        if (!$container || !$container->ws_port) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Container o porta WS non trovati'
+            ], 404);
+        }
+
+        $payload = [
+            'command' => 'move',
+            'params' => [
+                'action' => $action
+            ]
+        ];
+
+        $wsUrl = "ws://localhost:{$container->ws_port}";
+        $result = WebSocketService::send($wsUrl, $payload);
+
+        return response()->json($result);
+        
     }
 
 }
