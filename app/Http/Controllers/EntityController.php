@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Entity;
@@ -9,11 +9,14 @@ use App\Models\Player;
 use App\Helper\Helper;
 use App\Models\DrawRequest;
 use App\Events\DrawInterfaceEvent;
-use App\Models\ObjectCache;
-use App\Models\ObjectDraw;
-use App\Models\ObjectUpdate;
-use App\Models\ObjectClear;
 use Illuminate\Support\Str;
+use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\MultiLine;
+use App\Custom\Manipulation\ObjectDraw;
+use App\Custom\Manipulation\ObjectUpdate;
+use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectCache;
 
 class EntityController extends Controller
 {
