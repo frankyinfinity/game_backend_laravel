@@ -13,7 +13,7 @@ class SendEntityCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'entity:send {uid} {command} {--action=} {--params=}';
+    protected $signature = 'entity:send {uid} {action_command} {--action=} {--params=}';
 
     /**
      * The console description of the console command.
@@ -28,7 +28,7 @@ class SendEntityCommand extends Command
     public function handle()
     {
         $uid = $this->argument('uid');
-        $command = $this->argument('command');
+        $command = $this->argument('action_command');
         $action = $this->option('action');
         $paramsJson = $this->option('params');
 
