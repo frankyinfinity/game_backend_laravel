@@ -146,8 +146,8 @@ function fetchCurrentPosition() {
           currentTileJ = response.tile_j;
           console.log(`[Entity ${entityUid}] Still alive... Position: (${currentTileI}, ${currentTileJ})`);
 
-          // Dopo aver ottenuto la posizione, esegui un movimento randomico
-          performRandomMovement();
+
+          scheduleNextCycle();
         } else {
           console.error(`Status ${res.statusCode}: ${response.message || 'Unknown error'}`);
           scheduleNextCycle(); // Riprogramma anche in caso di errore
@@ -171,67 +171,6 @@ function fetchCurrentPosition() {
   req.end();
 }
 
-function performRandomMovement() {
-  if (!sessionCookie) {
-    console.log('No session cookie, skipping movement...');
-    scheduleNextCycle(); // Riprogramma anche se non c'è la sessione
-    return;
-  }
-
-  // Genera un movimento randomico
-  const movements = ['up', 'down', 'left', 'right'];
-  const randomAction = movements[Math.floor(Math.random() * movements.length)];
-
-  const postData = JSON.stringify({
-    entity_uid: entityUid,
-    action: randomAction
-  });
-
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: '/entities/movement',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(postData),
-      'Accept': 'application/json',
-      'Cookie': sessionCookie,
-      'X-XSRF-TOKEN': xsrfToken
-    },
-  };
-
-  const req = http.request(options, (res) => {
-    let data = '';
-
-    res.on('data', (chunk) => {
-      data += chunk;
-    });
-
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success) {
-          console.log(`[Entity ${entityUid}] Movement performed: ${randomAction}`);
-        } else {
-          console.error(`Movement failed: ${response.message || 'Unknown error'}`);
-        }
-      } catch (error) {
-        console.error(`Error parsing movement response: ${error.message}. Status: ${res.statusCode}`);
-      }
-      // Programma il prossimo ciclo dopo aver completato il movimento
-      scheduleNextCycle();
-    });
-  });
-
-  req.on('error', (error) => {
-    console.error(`Error performing movement: ${error.message}`);
-    scheduleNextCycle(); // Riprogramma anche in caso di errore di rete
-  });
-
-  req.write(postData);
-  req.end();
-}
 
 // Funzione per programmare il prossimo ciclo
 function scheduleNextCycle() {
