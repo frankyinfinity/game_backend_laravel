@@ -313,68 +313,63 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.genes) {
-                        genesContainer.innerHTML = '';
+                        genesContainer.innerHTML = `
+                            <div class="row font-weight-bold small text-muted mb-2 border-bottom pb-1">
+                                <div class="col-md-3">Nome Gene</div>
+                                <div class="col-md-1 text-center">Min</div>
+                                <div class="col-md-3 text-center">Range Max (Da-A)</div>
+                                <div class="col-md-2">Iniziale <span class="text-danger">*</span></div>
+                                <div class="col-md-3">Max Sincronizzato</div>
+                            </div>
+                        `;
                         const geneIds = [];
                         
                         data.genes.forEach(gene => {
                             geneIds.push(gene.id);
                             
                             const isMaxDefinitive = gene.max !== null;
-                            const geneRow = document.createElement('div');
-                            geneRow.className = 'row mb-4 p-3 border rounded bg-light align-items-center';
+                            const defaultValue = (!isMaxDefinitive && gene.max_from !== null) ? gene.max_from : (gene.min || 0);
                             
-                            let rangeSectionHtml = '';
+                            const geneRow = document.createElement('div');
+                            geneRow.className = 'row mb-1 py-1 border-bottom align-items-center bg-white';
+                            
+                            let rangeHtml = '';
                             if (!isMaxDefinitive) {
-                                rangeSectionHtml = `
-                                    <div class="col-md-3 text-center border-left border-right">
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <label class="small d-block mb-0 text-muted">Max Da</label>
-                                                <strong>${gene.max_from || 0}</strong>
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="small d-block mb-0 text-muted">Max A</label>
-                                                <strong>${gene.max_to || 0}</strong>
-                                            </div>
-                                        </div>
+                                rangeHtml = `
+                                    <div class="col-md-3 text-center">
+                                        <span class="small font-weight-bold text-primary">${gene.max_from || 0}</span>
+                                        <span class="small text-muted mx-1">/</span>
+                                        <span class="small font-weight-bold text-primary">${gene.max_to || 0}</span>
                                     </div>`;
                             } else {
-                                rangeSectionHtml = `
-                                    <div class="col-md-3 text-center border-left border-right">
-                                        <span class="badge badge-secondary p-2">Limite Fisso: ${gene.max}</span>
+                                rangeHtml = `
+                                    <div class="col-md-3 text-center">
+                                        <span class="badge badge-secondary px-3">Fisso: ${gene.max}</span>
                                     </div>`;
                             }
 
-                            const defaultValue = (!isMaxDefinitive && gene.max_from !== null) ? gene.max_from : (gene.min || 0);
-
                             geneRow.innerHTML = `
-                                <div class="col-md-2">
-                                    <label class="mb-0 font-weight-bold d-block">${gene.name || gene.key}</label>
-                                    <small class="text-muted d-block" style="font-size: 0.75rem;">${gene.key}</small>
+                                <div class="col-md-3">
+                                    <span class="font-weight-bold small d-block mb-0">${gene.name || gene.key}</span>
+                                    <small class="text-muted" style="font-size: 0.7rem;">${gene.key}</small>
                                 </div>
-                                <div class="col-md-2 text-center">
-                                    <div class="form-group mb-0">
-                                        <label class="small text-muted d-block mb-0">Minimo</label>
-                                        <input type="hidden" name="gene_min_${gene.id}" value="${gene.min || 0}">
-                                        <strong>${gene.min || 0}</strong>
-                                    </div>
+                                <div class="col-md-1 text-center">
+                                    <input type="hidden" name="gene_min_${gene.id}" value="${gene.min || 0}">
+                                    <span class="small font-weight-bold">${gene.min || 0}</span>
                                 </div>
-                                ${rangeSectionHtml}
+                                ${rangeHtml}
                                 <div class="col-md-2">
-                                    <div class="form-group mb-0">
-                                        <label class="small text-muted font-weight-bold">Iniziale</label>
-                                        <input type="number" name="gene_value_id_${gene.id}" id="initial_${gene.id}" 
-                                               class="form-control form-control-sm" value="${defaultValue}" step="1" required>
-                                    </div>
+                                    <input type="number" name="gene_value_id_${gene.id}" id="initial_${gene.id}" 
+                                           class="form-control form-control-sm" value="${defaultValue}" step="1" required
+                                           min="${isMaxDefinitive ? (gene.min || 0) : (gene.max_from || 0)}" 
+                                           max="${isMaxDefinitive ? gene.max : (gene.max_to || 999999)}">
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="form-group mb-0">
-                                        <label class="small text-muted">Valore Max (Sinc.)</label>
-                                        <input type="number" name="gene_max_${gene.id}" id="max_sync_${gene.id}" 
-                                               class="form-control form-control-sm bg-white" 
-                                               value="${isMaxDefinitive ? gene.max : defaultValue}" 
-                                               readonly>
-                                    </div>
+                                    <input type="number" name="gene_max_${gene.id}" id="max_sync_${gene.id}" 
+                                           class="form-control form-control-sm" 
+                                           style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;"
+                                           value="${isMaxDefinitive ? gene.max : defaultValue}" 
+                                           readonly>
                                 </div>
                             `;
                             genesContainer.appendChild(geneRow);
