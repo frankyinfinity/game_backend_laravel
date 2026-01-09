@@ -5,10 +5,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 Auth::routes();
+
+Route::get('/register-custom', function () {
+    return view('auth.custom_register');
+})->name('register.custom');
+
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
