@@ -32,7 +32,7 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <form action="{{ route('register') }}" method="post">
+                            <form action="{{ route('register') }}" method="post" id="register-form">
                                 @csrf
 
                                 <div class="row">
@@ -359,7 +359,7 @@
                                 </div>
                                 ${rangeHtml}
                                 <div class="col-md-2">
-                                    <input type="number" name="gene_value_id_${gene.id}" id="initial_${gene.id}" 
+                                    <input type="number" name="gene_value_${gene.id}" id="initial_${gene.id}" 
                                            class="form-control form-control-sm" value="${defaultValue}" step="1" required
                                            min="${isMaxDefinitive ? (gene.min || 0) : (gene.max_from || 0)}" 
                                            max="${isMaxDefinitive ? gene.max : (gene.max_to || 999999)}">
@@ -394,6 +394,53 @@
                     console.error('Error fetching genes:', error);
                     genesContainer.innerHTML = '<p class="text-danger">Errore di connessione durante il caricamento dei geni.</p>';
                 });
+
+            // Handle Form Submission via API
+            const registerForm = document.getElementById('register-form');
+            const submitBtn = registerForm.querySelector('button[type="submit"]');
+
+            registerForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                // Validation check
+                if (!registerForm.checkValidity()) {
+                    registerForm.reportValidity();
+                    return;
+                }
+
+                // Show loading state
+                const originalBtnContent = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrazione in corso...';
+
+                const formData = new FormData(this);
+
+                fetch('/api/auth/register', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Registrazione completata con successo!');
+                        window.location.href = '/login';
+                    } else {
+                        alert('Errore durante la registrazione: ' + (data.message || 'Controlla i dati inseriti.'));
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnContent;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error submitting form:', error);
+                    alert('Errore di connessione durante la registrazione.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnContent;
+                });
+            });
         });
     </script>
 @stop
