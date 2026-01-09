@@ -145,19 +145,19 @@
                                         </div>
                                     </div>
 
-                                    {{-- Name Space field --}}
+                                    {{-- Name Specie field --}}
                                     <div class="col-md-4">
                                         <div class="form-group mb-3">
-                                            <label for="name_space">Nome Specie <span class="text-danger">*</span></label>
+                                            <label for="name_specie">Nome Specie <span class="text-danger">*</span></label>
                                             <div class="input-group">
-                                                <input type="text" name="name_space" id="name_space" class="form-control @error('name_space') is-invalid @enderror"
-                                                       value="{{ old('name_space') }}" placeholder="Nome della specie" required>
+                                                <input type="text" name="name_specie" id="name_specie" class="form-control @error('name_specie') is-invalid @enderror"
+                                                       value="{{ old('name_specie') }}" placeholder="Nome della specie" required>
                                                 <div class="input-group-append">
                                                     <div class="input-group-text">
                                                         <span class="fas fa-dna"></span>
                                                     </div>
                                                 </div>
-                                                @error('name_space')
+                                                @error('name_specie')
                                                     <span class="invalid-feedback" role="alert">
                                                         <strong>{{ $message }}</strong>
                                                     </span>
@@ -210,6 +210,13 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <hr>
+                                <h5>Geni della Specie</h5>
+                                <div id="genes-container" class="mt-3">
+                                    <p class="text-muted">Caricamento geni...</p>
+                                </div>
+                                <input type="hidden" name="gene_ids" id="gene_ids_hidden">
 
                                 {{-- Register button --}}
                                 <div class="row mt-3">
@@ -297,6 +304,101 @@
                         regionSelect.innerHTML = '<option value="">Errore di connessione</option>';
                     });
             });
+
+            // Load Genes
+            const genesContainer = document.getElementById('genes-container');
+            const geneIdsHidden = document.getElementById('gene_ids_hidden');
+
+            fetch('/api/registration_genes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.genes) {
+                        genesContainer.innerHTML = '';
+                        const geneIds = [];
+                        
+                        data.genes.forEach(gene => {
+                            geneIds.push(gene.id);
+                            
+                            const isMaxDefinitive = gene.max !== null;
+                            const geneRow = document.createElement('div');
+                            geneRow.className = 'row mb-4 p-3 border rounded bg-light align-items-center';
+                            
+                            let rangeSectionHtml = '';
+                            if (!isMaxDefinitive) {
+                                rangeSectionHtml = `
+                                    <div class="col-md-3 text-center border-left border-right">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <label class="small d-block mb-0 text-muted">Max Da</label>
+                                                <strong>${gene.max_from || 0}</strong>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="small d-block mb-0 text-muted">Max A</label>
+                                                <strong>${gene.max_to || 0}</strong>
+                                            </div>
+                                        </div>
+                                    </div>`;
+                            } else {
+                                rangeSectionHtml = `
+                                    <div class="col-md-3 text-center border-left border-right">
+                                        <span class="badge badge-secondary p-2">Limite Fisso: ${gene.max}</span>
+                                    </div>`;
+                            }
+
+                            const defaultValue = (!isMaxDefinitive && gene.max_from !== null) ? gene.max_from : (gene.min || 0);
+
+                            geneRow.innerHTML = `
+                                <div class="col-md-2">
+                                    <label class="mb-0 font-weight-bold d-block">${gene.name || gene.key}</label>
+                                    <small class="text-muted d-block" style="font-size: 0.75rem;">${gene.key}</small>
+                                </div>
+                                <div class="col-md-2 text-center">
+                                    <div class="form-group mb-0">
+                                        <label class="small text-muted d-block mb-0">Minimo</label>
+                                        <input type="hidden" name="gene_min_${gene.id}" value="${gene.min || 0}">
+                                        <strong>${gene.min || 0}</strong>
+                                    </div>
+                                </div>
+                                ${rangeSectionHtml}
+                                <div class="col-md-2">
+                                    <div class="form-group mb-0">
+                                        <label class="small text-muted font-weight-bold">Iniziale</label>
+                                        <input type="number" name="gene_value_id_${gene.id}" id="initial_${gene.id}" 
+                                               class="form-control form-control-sm" value="${defaultValue}" step="1" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group mb-0">
+                                        <label class="small text-muted">Valore Max (Sinc.)</label>
+                                        <input type="number" name="gene_max_${gene.id}" id="max_sync_${gene.id}" 
+                                               class="form-control form-control-sm bg-white" 
+                                               value="${isMaxDefinitive ? gene.max : defaultValue}" 
+                                               readonly>
+                                    </div>
+                                </div>
+                            `;
+                            genesContainer.appendChild(geneRow);
+
+                            // Sync logic for non-definitive max
+                            if (!isMaxDefinitive) {
+                                const initialInput = document.getElementById(`initial_${gene.id}`);
+                                const maxSyncInput = document.getElementById(`max_sync_${gene.id}`);
+                                
+                                initialInput.addEventListener('input', function() {
+                                    maxSyncInput.value = this.value;
+                                });
+                            }
+                        });
+                        
+                        geneIdsHidden.value = geneIds.join(',');
+                    } else {
+                        genesContainer.innerHTML = '<p class="text-danger">Errore nel caricamento dei geni.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching genes:', error);
+                    genesContainer.innerHTML = '<p class="text-danger">Errore di connessione durante il caricamento dei geni.</p>';
+                });
         });
     </script>
 @stop
