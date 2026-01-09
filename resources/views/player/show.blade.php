@@ -2,28 +2,36 @@
 
 @section('title', "Giocatore $username")
 
+@if($isPlayer)
+    @section('classes_body', 'sidebar-collapse')
+@endif
+
 @section('content_header')@stop
 
 @section('content')
 
 <div class="card">
-    <div class="card-header pb-0">
-        <h4 class="mb-0">Giocatore: <strong>{{$player->user->name}}</strong></h4>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-12">
-                <div id="display_container" style="min-width: 85vw;max-width: 85vw; min-height: 75vh;max-height: 75vh; overflow-x: scroll; overflow-y: scroll;"></div>
+    @if(!$isPlayer)
+        <div class="card-header pb-0">
+            <h4 class="mb-0">Giocatore: <strong>{{$player->user->name}}</strong></h4>
+        </div>
+    @endif
+    <div class="card-body {{ $isPlayer ? 'p-0' : '' }}">
+        <div class="row m-0">
+            <div class="col-md-12 p-0">
+                <div id="display_container" style="min-width: 100%; width: 100vw; height: 90vh; overflow: auto; background: #000;"></div>
             </div>
-            <div class="col-12">
-                <div class="row">
-                    <div class="col-3">
-                        <a href="{{route('planets.index')}}">
-                            <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
-                        </a>
+            @if(!$isPlayer)
+                <div class="col-12 mt-3 mb-3">
+                    <div class="row">
+                        <div class="col-3">
+                            <a href="{{route('planets.index')}}">
+                                <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @endif
         </div>
     </div>
 </div>
