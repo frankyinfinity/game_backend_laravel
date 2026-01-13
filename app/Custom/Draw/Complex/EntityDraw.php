@@ -10,6 +10,7 @@ use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\Gene;
+use App\Models\Container;
 use Illuminate\Support\Str;
 
 class EntityDraw
@@ -125,20 +126,23 @@ class EntityDraw
 
         $player_id = $this->dbEntity->specie->player_id;
 
-        $urlMovement = route('entities.ws_movement');
-        $urlMovement = str_replace('localhost', 'localhost:8085', $urlMovement);
+        //WS Port
+        $container = Container::where('parent_type', 'Entity')
+            ->where('parent_id', $this->dbEntity->id) // dbEntity is the Entity model instance
+            ->first();
+        $wsPort = $container ? $container->ws_port : null;
 
         $jsMovPaths = [];
         $directions = ['up', 'left', 'down', 'right'];
         foreach ($directions as $direction) {
 
-            $jsPathMov = resource_path('js/function/entity/movement.blade.php');
+            $jsPathMov = resource_path('js/function/entity/movement_ws.blade.php');
             $jsContentMov = file_get_contents($jsPathMov);
             $jsContentMov = Helper::setCommonJsCode($jsContentMov, Str::random(20));
 
-            $jsContentMov = str_replace('__url__', $urlMovement, $jsContentMov);
+            $jsContentMov = str_replace('__port__', $wsPort, $jsContentMov);
             $jsContentMov = str_replace('__action__', $direction, $jsContentMov);
-            $jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
+            //$jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
 
             $jsMovPaths[$direction] = $jsContentMov;
 

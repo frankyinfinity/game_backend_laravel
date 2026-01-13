@@ -11,6 +11,7 @@ use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Models\DrawRequest;
 use App\Models\Entity;
+use App\Models\Container;
 use App\Models\Player;
 use App\Models\Tile;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -61,6 +62,20 @@ class GenerateMapJob implements ShouldQueue
             })
             ->get();
 
+        $entityIds = $entities->pluck('id');
+        $containers = Container::where('parent_type', 'Entity')
+            ->whereIn('parent_id', $entityIds)
+            ->get();
+
+        $ports = [];
+        foreach ($entities as $entity) {
+            $container = $containers->where('parent_id', $entity->id)->first();
+            if ($container && $container->ws_port) {
+                $ports[$entity->uid] = $container->ws_port;
+            }
+        }
+        $portsJson = json_encode($ports);
+
         ObjectCache::buffer($player->actual_session_id);
 
         for ($i = 0; $i < $birthRegion->height; $i++) {
@@ -79,16 +94,14 @@ class GenerateMapJob implements ShouldQueue
 
                 //Square
                 $squareUid = 'square_'.$i.'_'.$j;
-                $movementUrl = route('entities.ws_movement');
-                $movementUrl = str_replace('localhost', 'localhost:8085', $movementUrl);
 
                 //Click
-                $jsPathClickTile = resource_path('js/function/entity/click_tile.blade.php');
+                $jsPathClickTile = resource_path('js/function/entity/click_tile_ws.blade.php');
                 $jsContentClickTile = file_get_contents($jsPathClickTile);
                 $jsContentClickTile = Helper::setCommonJsCode($jsContentClickTile, \Illuminate\Support\Str::random(20));
                 $jsContentClickTile = str_replace('__i__', $i, $jsContentClickTile);
                 $jsContentClickTile = str_replace('__j__', $j, $jsContentClickTile);
-                $jsContentClickTile = str_replace('__url__', $movementUrl, $jsContentClickTile);
+                $jsContentClickTile = str_replace('__ports__', $portsJson, $jsContentClickTile);
 
                 //Pointer
                 $squareColor = $formattedHexColor;

@@ -227,59 +227,6 @@ class EntityController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Invia un comando di movimento via WebSocket al container dell'entity
-     */
-    public function wsMovement(Request $request)
-    {
-        $uid = $request->input('entity_uid');
-        $action = $request->input('action');
-        $targetI = $request->input('target_i');
-        $targetJ = $request->input('target_j');
 
-        if (!$uid || (!$action && $targetI === null && $targetJ === null)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Parametri insufficienti'
-            ], 400);
-        }
-
-        $entity = Entity::where('uid', $uid)->first();
-        if (!$entity) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Entity non trovata'
-            ], 404);
-        }
-
-        $container = Container::where('parent_type', Container::PARENT_TYPE_ENTITY)
-            ->where('parent_id', $entity->id)
-            ->first();
-
-        if (!$container || !$container->ws_port) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Container o porta WS non trovati'
-            ], 404);
-        }
-
-        $params = [];
-        if ($action) {
-            $params['action'] = $action;
-        } else {
-            $params['target_i'] = $targetI;
-            $params['target_j'] = $targetJ;
-        }
-
-        $payload = [
-            'command' => 'move',
-            'params' => $params
-        ];
-
-        $wsUrl = "ws://localhost:{$container->ws_port}";
-        $result = WebSocketService::send($wsUrl, $payload);
-
-        return response()->json($result);
-    }
 
 }
