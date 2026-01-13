@@ -64,8 +64,9 @@ class PlayerController extends Controller
         $height = $player->birthRegion->height * $size;
 
         $actual_session_id = Helper::generateSessionIdPlayer($player);
+        $isPlayer = \App\Models\Player::query()->where('user_id', auth()->id())->exists();
 
-        return view("player.show", compact("player", "username", "width", "height", "actual_session_id"));
+        return view("player.show", compact("player", "username", "width", "height", "actual_session_id", "isPlayer"));
 
     }
 
