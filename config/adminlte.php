@@ -341,9 +341,9 @@ return [
             'icon'    => 'fas fa-gamepad',
             'submenu' => [
                 [
-                    'text' => 'Giocatori',
-                    'url'  => '/players',
-                    'icon' => 'fas fa-gamepad',
+                    'text' => 'Test',
+                    'url'  => '/test',
+                    'icon' => 'fas fa-flask',
                 ],
             ]
         ],

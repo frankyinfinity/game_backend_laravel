@@ -21,78 +21,7 @@ use App\Custom\Manipulation\ObjectCache;
 
 class PlayerController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        return view("player.index");
-    }
 
-    public function listDataTable(Request $request)
-    {
-        $query = Player::query()->with(['user', 'birthPlanet', 'birthRegion'])->get();
-        return datatables($query)->toJson();
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application
-    {
-        $player = Player::query()->findOrFail($id);
-        $username = $player->user->name;
-
-        $size = Helper::TILE_SIZE;
-        $width = $player->birthRegion->width * $size;
-        $height = $player->birthRegion->height * $size;
-
-        $actual_session_id = Helper::generateSessionIdPlayer($player);
-        $isPlayer = \App\Models\Player::query()->where('user_id', auth()->id())->exists();
-
-        return view("player.show", compact("player", "username", "width", "height", "actual_session_id", "isPlayer"));
-
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
 
     public function generateMap(Request $request): \Illuminate\Http\JsonResponse
     {

@@ -24,13 +24,6 @@ class HomeController extends Controller
      */
     public function index()
     {
-        $user = auth()->user();
-        $player = Player::query()->where('user_id', $user->id)->first();
-
-        if ($player !== null) {
-            return redirect()->route('players.show', $player->id);
-        }
-
         return view('home');
     }
 }

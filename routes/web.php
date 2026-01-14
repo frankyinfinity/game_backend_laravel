@@ -8,7 +8,12 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Auth::routes();
+Auth::routes([
+    'login' => false,
+]);
+
+Route::get('/login', [App\Http\Controllers\Auth\LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [App\Http\Controllers\Auth\LoginController::class, 'login']);
 
 Route::get('/register-custom', function () {
     return view('auth.custom_register');
@@ -16,6 +21,8 @@ Route::get('/register-custom', function () {
 
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
+Route::get('/test', [App\Http\Controllers\TestController::class, 'index'])->name('test');
 
 Route::group(['middleware' => ['auth']], function (){
 
@@ -58,6 +65,7 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/players/generate/map', [App\Http\Controllers\PlayerController::class, 'generateMap'])->name(name: 'players.generate.map');
     Route::post('/players/get/map', [App\Http\Controllers\PlayerController::class, 'getMap'])->name(name: 'players.get.map');
     // Route::post('/players/close', [App\Http\Controllers\PlayerController::class, 'close'])->name('players.close');
+
 
     //Entity
     Route::get('entities/position', [App\Http\Controllers\EntityController::class, 'position']);
