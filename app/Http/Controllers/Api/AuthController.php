@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\CreatePlayerContainerJob;
+use App\Jobs\StopPlayerContainersJob;
 use App\Models\EntityInformation;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -154,5 +155,17 @@ class AuthController extends Controller
             'success' => false,
             'message' => 'Credenziali non valide.'
         ], 401);
+    }
+
+    public function logout(Request $request)
+    {
+        $playerId = $request->player_id;
+        $player = Player::find($playerId);
+
+        if ($player) {
+            StopPlayerContainersJob::dispatch($player);
+        }
+
+        return response()->json(['success' => true]);
     }
 }
