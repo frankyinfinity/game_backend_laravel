@@ -57,7 +57,7 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/players/list/table', [App\Http\Controllers\PlayerController::class, 'listDataTable'])->name(name: 'players.datatable');
     Route::post('/players/generate/map', [App\Http\Controllers\PlayerController::class, 'generateMap'])->name(name: 'players.generate.map');
     Route::post('/players/get/map', [App\Http\Controllers\PlayerController::class, 'getMap'])->name(name: 'players.get.map');
-    Route::post('/players/close', [App\Http\Controllers\PlayerController::class, 'close'])->name('players.close');
+    // Route::post('/players/close', [App\Http\Controllers\PlayerController::class, 'close'])->name('players.close');
 
     //Entity
     Route::get('entities/position', [App\Http\Controllers\EntityController::class, 'position']);

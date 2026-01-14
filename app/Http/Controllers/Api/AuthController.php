@@ -126,7 +126,33 @@ class AuthController extends Controller
 
         CreatePlayerContainerJob::dispatch($player);
         return response()->json(['success' => true]);
-
     }
 
+    public function login(Request $request)
+    {
+        $credentials = $request->only('email', 'password');
+
+        if (\Illuminate\Support\Facades\Auth::attempt($credentials)) {
+            $user = \Illuminate\Support\Facades\Auth::user();
+            $player = $user->players()->first();
+            
+            $sessionId = null;
+            if ($player) {
+                $sessionId = \App\Helper\Helper::generateSessionIdPlayer($player);
+            }
+
+            return response()->json([
+                'success' => true,
+                'is_player' => !is_null($player),
+                'player' => $player,
+                'session_id' => $sessionId,
+                'user' => $user
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Credenziali non valide.'
+        ], 401);
+    }
 }

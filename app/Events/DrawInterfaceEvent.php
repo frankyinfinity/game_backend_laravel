@@ -36,7 +36,7 @@ class DrawInterfaceEvent implements ShouldBroadcast
     {
         $channel = 'player_'.$this->player->id.'_channel';
         return [
-            new PrivateChannel($channel),
+            new Channel($channel),
         ];
     }
     public function broadcastAs(): string
