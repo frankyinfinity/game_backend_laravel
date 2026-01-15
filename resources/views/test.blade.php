@@ -1,44 +1,32 @@
-<!DOCTYPE html>
-<html lang="it">
+@extends('adminlte::page')
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Page - Player Environment</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+@section('title', 'Test Page - Player Environment')
+
+@section('content_header')
+    <h1>Test Page - Player Environment</h1>
+@stop
+
+@section('content')
+    <div id="display_container" style="width: 100%; height: 80vh; background: #000;"></div>
+    <div class="status-msg" style="position: absolute; bottom: 10px; right: 10px; opacity: 0.5; background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 5px; font-size: 0.8rem; color: white;">Test Page - Inizializzazione...</div>
+@stop
+
+@section('css')
     <style>
         body {
             margin: 0;
             padding: 0;
             background: #000;
-            color: white;
+            color: black;
             font-family: Arial, sans-serif;
             overflow: hidden;
         }
-        #display_container {
-            width: 100vw;
-            height: 100vh;
-            background: #000;
-        }
-        .status-msg {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            opacity: 0.5;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 0.8rem;
-        }
     </style>
-</head>
+@stop
 
-<body>
-    <div id="display_container"></div>
-    <div class="status-msg">Test Page - Inizializzazione...</div>
-
+@section('js')
+    <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
         const BACK_URL = '{{ url("/") }}';
         const config = {
@@ -46,7 +34,7 @@
             PUSHER_CLUSTER: '{{ config("broadcasting.connections.pusher.options.cluster") }}'
         };
         const testPlayerId = 1; // Use existing player ID
-        const sessionId = 'test_session_' + Date.now();
+        const sessionId = 'test_session_fixed';
         const hostname = new URL(BACK_URL).hostname;
 
         window.AppData = { actual_focus_uid_entity: null };
@@ -337,5 +325,4 @@
             };
         });
     </script>
-</body>
-</html>
+@stop

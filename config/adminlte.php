@@ -305,6 +305,11 @@ return [
             'icon' => 'fas fa-home',
         ],
         [
+            'text' => 'Test',
+            'url'  => '/test',
+            'icon' => 'fas fa-flask',
+        ],
+        [
             'text'    => 'Gestione Utenti',
             'icon'    => 'fas fa-users',
             'submenu' => [
@@ -340,11 +345,6 @@ return [
             'text'    => 'Gestione Giocatori',
             'icon'    => 'fas fa-gamepad',
             'submenu' => [
-                [
-                    'text' => 'Test',
-                    'url'  => '/test',
-                    'icon' => 'fas fa-flask',
-                ],
             ]
         ],
     ],

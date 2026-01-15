@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Manipulation\ObjectCache;
+use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
@@ -33,7 +34,7 @@ class TestDrawCommand extends Command
     public function handle()
     {
         $requestId = Str::uuid()->toString();
-        $sessionId = 'test_session_' . now()->timestamp;
+        $sessionId = 'test_session_fixed';
 
         // Use player ID 1 for test
         $playerId = 1;
@@ -48,9 +49,19 @@ class TestDrawCommand extends Command
 
         $items = [];
 
+        // Clear all existing elements before drawing
+        $existingObjects = ObjectCache::all($sessionId);
+        foreach ($existingObjects as $uid => $object) {
+            $objectClear = new ObjectClear($uid, $sessionId);
+            $items[] = $objectClear->get();
+        }
+
+        // Clear the cache after sending clears
+        ObjectCache::clear($sessionId);
+
         // Draw a circle using the Circle class
         $circle = new Circle('test_circle_' . time());
-        $circle->setOrigin(20, 300);
+        $circle->setOrigin(rand(100, 500), 300);
         $circle->setRadius(50);
         $circle->setColor(0xFFFFFF);
         $circle->addAttributes('z_index', 1);
