@@ -11,6 +11,7 @@ use App\Models\DrawRequest;
 use App\Models\Player;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use App\Custom\Draw\Complex\Form\Input;
 
 class TestDrawCommand extends Command
 {
@@ -59,16 +60,19 @@ class TestDrawCommand extends Command
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        // Draw a circle using the Circle class
-        $circle = new Circle('test_circle_' . time());
-        $circle->setOrigin(rand(100, 500), 300);
-        $circle->setRadius(50);
-        $circle->setColor(0xFFFFFF);
-        $circle->addAttributes('z_index', 1);
-
-        // Use ObjectDraw to store in cache and get the draw item
-        $objectDraw = new ObjectDraw($circle->buildJson(), $sessionId);
-        $items[] = $objectDraw->get();
+        //Input Email
+        $input = new Input(Str::random(20), $sessionId);
+        $input->setName('email');
+        $input->setPlaceholder('Digita indirizzo email');
+        $input->setOrigin(50, 50);
+        $input->setSize(500, 50);
+        $input->build();
+        
+        $listItems = $input->getItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $items[] = $objectDraw->get();
+        }
 
         // Flush to cache
         ObjectCache::flush($sessionId);
@@ -77,5 +81,6 @@ class TestDrawCommand extends Command
         DrawInterfaceEvent::dispatch($player, $requestId, $items);
 
         $this->info('Test draw event sent. Check the /test page.');
+
     }
 }
