@@ -75,10 +75,18 @@ class Input {
         $placeholder = new Text($this->uid.'_placeholder');
         $placeholder->setFontSize(20);
         $placeholder->setColor(0x808080);
-        $placeholder->setOrigin($x+15, $y+($height/3.2));
+        $placeholder->setOrigin($x+12, $y+($height/3.2));
         $placeholder->setText($this->placeholder);
         $placeholder->setRenderable(true);
         $items[] = $placeholder->buildJson();
+
+        //Box Icon
+        $boxIcon = new Rectangle($this->uid.'_box_icon');
+        $boxIcon->setOrigin($x+($width-$x), $y);
+        $boxIcon->setSize($height, $height);
+        $boxIcon->setColor(0xCCCCCC);
+        $boxIcon->setRenderable(true);
+        $items[] = $boxIcon->buildJson();
 
         $this->items = $items;
 
