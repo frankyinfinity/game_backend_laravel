@@ -11,7 +11,7 @@ use App\Models\DrawRequest;
 use App\Models\Player;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
-use App\Custom\Draw\Complex\Form\Input;
+use App\Custom\Draw\Complex\Form\InputDraw;
 
 class TestDrawCommand extends Command
 {
@@ -61,7 +61,7 @@ class TestDrawCommand extends Command
         ObjectCache::clear($sessionId);
 
         //Input Email
-        $input = new Input(Str::random(20), $sessionId);
+        $input = new InputDraw(Str::random(20), $sessionId);
         $input->setName('email');
         $input->setPlaceholder('Digita indirizzo email');
         $input->setOrigin(50, 50);

@@ -3,10 +3,11 @@
 namespace App\Custom\Draw\Complex\Form;
 
 use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Manipulation\ObjectDraw;
 
-class Input {
+class InputDraw {
 
     private string $uid;
     private string $sessionId;
@@ -81,12 +82,23 @@ class Input {
         $items[] = $placeholder->buildJson();
 
         //Box Icon
-        $boxIcon = new Rectangle($this->uid.'_box_icon');
+        $boxIcon = new Square($this->uid.'_box_icon');
         $boxIcon->setOrigin($x+($width-$x), $y);
         $boxIcon->setSize($height, $height);
         $boxIcon->setColor(0xCCCCCC);
         $boxIcon->setRenderable(true);
         $items[] = $boxIcon->buildJson();
+
+        //Box Icon Text
+        $centerSquare = $boxIcon->getCenter();
+
+        $boxIconText = new Text($this->uid.'_box_icon_text');
+        $boxIconText->setCenterAnchor(true);
+        $boxIconText->setFontSize(24);
+        $boxIconText->setOrigin($centerSquare['x'], $centerSquare['y']);
+        $boxIconText->setText('I');
+        $boxIconText->setRenderable(true);
+        $items[] = $boxIconText->buildJson();
 
         $this->items = $items;
 
