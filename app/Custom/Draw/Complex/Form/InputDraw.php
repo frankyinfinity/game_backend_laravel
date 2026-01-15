@@ -2,10 +2,13 @@
 
 namespace App\Custom\Draw\Complex\Form;
 
+use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Manipulation\ObjectDraw;
+use App\Helper\Helper;
+use Illuminate\Support\Str;
 
 class InputDraw {
 
@@ -70,6 +73,12 @@ class InputDraw {
         $body->setSize($width, $height);
         $body->setColor(0xFFFFFF);
         $body->setRenderable(true);
+
+        $jsPathClickInput = resource_path('js/function/entity/click_input.blade.php');
+        $jsPathClickInput = file_get_contents($jsPathClickInput);
+        $jsPathClickInput = Helper::setCommonJsCode($jsPathClickInput, Str::random(20));
+        $body->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickInput);
+
         $items[] = $body->buildJson();
 
         //Placeholder

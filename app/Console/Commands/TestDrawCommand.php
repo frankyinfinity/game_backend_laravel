@@ -61,14 +61,28 @@ class TestDrawCommand extends Command
         ObjectCache::clear($sessionId);
 
         //Input Email
-        $input = new InputDraw(Str::random(20), $sessionId);
-        $input->setName('email');
-        $input->setPlaceholder('Digita indirizzo email');
-        $input->setOrigin(50, 50);
-        $input->setSize(500, 50);
-        $input->build();
+        $inputEmail = new InputDraw(Str::random(20), $sessionId);
+        $inputEmail->setName('email');
+        $inputEmail->setPlaceholder('Digita indirizzo email');
+        $inputEmail->setOrigin(50, 50);
+        $inputEmail->setSize(500, 50);
+        $inputEmail->build();
         
-        $listItems = $input->getItems();
+        $listItems = $inputEmail->getItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $items[] = $objectDraw->get();
+        }
+
+        //Input Password
+        $inputPassword = new InputDraw(Str::random(20), $sessionId);
+        $inputPassword->setName('email');
+        $inputPassword->setPlaceholder('Digita password');
+        $inputPassword->setOrigin(50, 150);
+        $inputPassword->setSize(500, 50);
+        $inputPassword->build();
+        
+        $listItems = $inputPassword->getItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $items[] = $objectDraw->get();
