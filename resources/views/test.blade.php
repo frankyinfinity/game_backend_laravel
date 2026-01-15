@@ -243,6 +243,14 @@
                 console.log('Test player channel subscribed:', channelName);
             });
 
+            // Keep connection open
+            setInterval(() => {
+                if (pusher.connection.state !== 'connected') {
+                    console.log('Pusher not connected, reconnecting...');
+                    pusher.connect();
+                }
+            }, 10000); // Check every 10 seconds
+
             channel.bind('draw_interface', function (data) {
                 console.log('Draw interface event received:', data);
                 status('Evento di disegno ricevuto...');
