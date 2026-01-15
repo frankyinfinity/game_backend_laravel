@@ -76,7 +76,7 @@ class TestDrawCommand extends Command
 
         //Input Password
         $inputPassword = new InputDraw(Str::random(20), $sessionId);
-        $inputPassword->setName('email');
+        $inputPassword->setName('password');
         $inputPassword->setPlaceholder('Digita password');
         $inputPassword->setOrigin(50, 150);
         $inputPassword->setSize(500, 50);
