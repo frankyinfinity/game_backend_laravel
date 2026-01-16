@@ -90,6 +90,11 @@ class InputDraw {
         $this->boxIconTextColor = $boxIconTextColor;
     }
 
+    private $valueColor;
+    public function setValueColor($valueColor) {
+        $this->valueColor = $valueColor;
+    }
+
     private $items = [];
     public function getItems() {
         return $this->items;
@@ -127,6 +132,10 @@ class InputDraw {
         $jsPathClickInput = Helper::setCommonJsCode($jsPathClickInput, Str::random(20));
         $body->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickInput);
 
+        $body->addAttributes('border_not_active_color', $this->borderColor);
+        $body->addAttributes('border_active_color', 0x0000FF);
+        $body->addAttributes('active', false);
+
         $items[] = $body->buildJson();
 
         //Border
@@ -141,14 +150,14 @@ class InputDraw {
         $border->setRenderable(true);
         $items[] = $border->buildJson();
 
-        //Placeholder
-        /*$placeholder = new Text($this->uid.'_placeholder');
-        $placeholder->setFontSize(20);
-        $placeholder->setColor($this->placeholderColor);
-        $placeholder->setOrigin($x+12, $y+($height/3.2));
-        $placeholder->setText($this->placeholder);
-        $placeholder->setRenderable(true);
-        $items[] = $placeholder->buildJson();*/
+        //Value
+        $valueText = new Text($this->uid.'_value_text');
+        $valueText->setFontSize(20);
+        $valueText->setColor($this->valueColor);
+        $valueText->setOrigin($x+12, $y+($height/3.2));
+        $valueText->setText('');
+        $valueText->setRenderable(false);
+        $items[] = $valueText->buildJson();
 
         //Box Icon
         $boxIcon = new Square($this->uid.'_box_icon');
