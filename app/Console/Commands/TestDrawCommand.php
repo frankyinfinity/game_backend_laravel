@@ -12,6 +12,7 @@ use App\Models\Player;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
+use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
 use function GuzzleHttp\json_encode;
 
@@ -77,13 +78,7 @@ class TestDrawCommand extends Command
         $inputEmail->setBackgroundColor(0xFFFFFF);
         $inputEmail->setBoxIconColor(0xCCCCCC);
         $inputEmail->setBoxIconTextColor(0x000000);
-        $inputEmail->build();
-        
-        $listItems = $inputEmail->getItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $items[] = $objectDraw->get();
-        }       
+        $inputEmail->build();   
 
         //Input Password
         $y += 100;
@@ -100,12 +95,6 @@ class TestDrawCommand extends Command
         $inputPassword->setBoxIconColor(0xCCCCCC);
         $inputPassword->setBoxIconTextColor(0x000000);
         $inputPassword->build();
-        
-        $listItems = $inputPassword->getItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $items[] = $objectDraw->get();
-        }
 
         //Button
         $y += 100;
@@ -120,6 +109,25 @@ class TestDrawCommand extends Command
         $submitButton->setColorString($colorString);
         $submitButton->setTextFontSize(22);
         $submitButton->build();
+
+        //Form
+        $form = new ActionForm();
+        $form->setInput($inputEmail);
+        $form->setInput($inputPassword);
+        $form->setButton($submitButton);
+
+        //Get all
+        $listItems = $inputEmail->getItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $items[] = $objectDraw->get();
+        }    
+        
+        $listItems = $inputPassword->getItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $items[] = $objectDraw->get();
+        }
 
         $listItems = $submitButton->getItems();
         foreach($listItems as $listItem) {
