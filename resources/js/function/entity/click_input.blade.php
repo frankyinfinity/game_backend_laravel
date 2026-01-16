@@ -8,8 +8,24 @@
         let notActiveColor = objectBody.attributes.border_not_active_color;
         let activeColor = objectBody.attributes.border_active_color;
 
-        objectBody.attributes.active = !objectBody.attributes.active;
-        let active = objectBody.attributes.active;
+        // Deactivate all other inputs
+        for (let key in objects) {
+            if (key.endsWith('_body_input') && key !== input_uid + '_body_input') {
+                let otherUid = key.split('_')[0];
+                let otherObjectBody = objects[key];
+                otherObjectBody.attributes.active = false;
+                let otherShapeBorder = shapes[otherUid + '_border_input'];
+                otherShapeBorder.tint = otherObjectBody.attributes.border_not_active_color;
+                // Remove listener
+                if (window['keydown_' + otherUid]) {
+                    document.removeEventListener('keydown', window['keydown_' + otherUid]);
+                    delete window['keydown_' + otherUid];
+                }
+            }
+        }
+
+        objectBody.attributes.active = true;
+        let active = true;
 
         let shapeBorder = shapes[input_uid+'_border_input'];
         shapeBorder.tint = active ? activeColor : notActiveColor;
