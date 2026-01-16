@@ -17,16 +17,14 @@ class DrawInterfaceEvent implements ShouldBroadcast
 
     private Player $player;
     private string $requestId;
-    private ?array $items;
 
     /**
      * Create a new event instance.
      */
-    public function __construct($player, $requestId, $items = null)
+    public function __construct($player, $requestId)
     {
         $this->player = $player;
         $this->requestId = $requestId;
-        $this->items = $items;
     }
 
     /**
@@ -52,11 +50,6 @@ class DrawInterfaceEvent implements ShouldBroadcast
             'request_id' => $this->requestId,
             'player_id' => $this->player->id
         ];
-
-        if ($this->items !== null) {
-            $data['items'] = $this->items;
-        }
-
         return $data;
     }
 

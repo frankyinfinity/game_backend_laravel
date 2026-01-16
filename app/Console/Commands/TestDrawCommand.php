@@ -130,17 +130,14 @@ class TestDrawCommand extends Command
         // Flush to cache
         ObjectCache::flush($sessionId);
 
+        // Dispatch event
         DrawRequest::query()->create([
             'session_id' => $sessionId,
             'request_id' => $requestId,
             'player_id' => $playerId,
             'items' => json_encode($items),
         ]);
-
         event(new DrawInterfaceEvent($player, $requestId));
-
-        // Dispatch event with items directly (no DrawRequest for test)
-        //DrawInterfaceEvent::dispatch($player, $requestId, $items);
 
         $this->info('Test draw event sent. Check the /test page.');
 

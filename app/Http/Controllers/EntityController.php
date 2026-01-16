@@ -222,8 +222,8 @@ class EntityController extends Controller
             'player_id' => $player_id,
             'items' => json_encode($drawCommands),
         ]);
-
         event(new DrawInterfaceEvent($player, $request_id));
+        
         return response()->json(['success' => true]);
     }
 

@@ -177,7 +177,6 @@ class GenerateMapJob implements ShouldQueue
             'player_id' => $player_id,
             'items' => json_encode($drawItems),
         ]);
-
         event(new DrawInterfaceEvent($player, $request_id));
 
     }
