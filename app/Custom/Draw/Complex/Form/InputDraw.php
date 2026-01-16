@@ -26,10 +26,10 @@ class InputDraw {
         $this->y = 0;
         $this->width = 0;
         $this->height = 0;
+        $this->titleColor = 0x000000;
         $this->backgroundColor = 0x000000;
         $this->borderColor = 0x000000;
         $this->borderThickness = 0;
-        $this->placeholderColor = 0x000000;
         $this->boxIconColor = 0x000000;
         $this->boxIconTextColor = 0x000000;
         $this->items = [];
@@ -41,9 +41,9 @@ class InputDraw {
         $this->name = $name;
     }
 
-    private string $placeholder;
-    public function setPlaceholder($placeholder) {
-        $this->placeholder = $placeholder;
+    private string $title;
+    public function setTitle($title) {
+        $this->title = $title;
     }
 
     private $x;
@@ -60,6 +60,11 @@ class InputDraw {
         $this->height = $height;
     }
 
+    private $titleColor;
+    public function setTitleColor($titleColor) {
+        $this->titleColor = $titleColor;
+    }
+
     private $backgroundColor;
     public function setBackgroundColor($backgroundColor) {
         $this->backgroundColor = $backgroundColor;
@@ -73,11 +78,6 @@ class InputDraw {
     private $borderThickness;
     public function setBorderThickness($borderThickness) {
         $this->borderThickness = $borderThickness;
-    }
-
-    private $placeholderColor;
-    public function setPlaceholderColor($placeholderColor) {
-        $this->placeholderColor = $placeholderColor;
     }
 
     private $boxIconColor;
@@ -103,6 +103,17 @@ class InputDraw {
         $y = $this->y;
         $width = $this->width;
         $height = $this->height;
+
+        //Title
+        $title = new Text($this->uid.'_title');
+        $title->setFontSize(20);
+        $title->setColor($this->titleColor);
+        $title->setOrigin($x, $y);
+        $title->setText($this->title);
+        $title->setRenderable(true);
+        $items[] = $title->buildJson();
+
+        $y += 25;
 
         //Body
         $body = new Rectangle($this->uid.'_body_input');
@@ -131,13 +142,13 @@ class InputDraw {
         $items[] = $border->buildJson();
 
         //Placeholder
-        $placeholder = new Text($this->uid.'_placeholder');
+        /*$placeholder = new Text($this->uid.'_placeholder');
         $placeholder->setFontSize(20);
         $placeholder->setColor($this->placeholderColor);
         $placeholder->setOrigin($x+12, $y+($height/3.2));
         $placeholder->setText($this->placeholder);
         $placeholder->setRenderable(true);
-        $items[] = $placeholder->buildJson();
+        $items[] = $placeholder->buildJson();*/
 
         //Box Icon
         $boxIcon = new Square($this->uid.'_box_icon');
