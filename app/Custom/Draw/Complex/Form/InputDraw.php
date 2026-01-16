@@ -53,6 +53,26 @@ class InputDraw {
         $this->height = $height;
     }
 
+    private $backgroundColor;
+    public function setBackgroundColor($backgroundColor) {
+        $this->backgroundColor = $backgroundColor;
+    }
+
+    private $placeholderColor;
+    public function setPlaceholderColor($placeholderColor) {
+        $this->placeholderColor = $placeholderColor;
+    }
+
+    private $boxIconColor;
+    public function setBoxIconColor($boxIconColor) {
+        $this->boxIconColor = $boxIconColor;
+    }
+
+    private $boxIconTextColor;
+    public function setBoxIconTextColor($boxIconTextColor) {
+        $this->boxIconTextColor = $boxIconTextColor;
+    }
+
     private $items = [];
     public function getItems() {
         return $this->items;
@@ -71,7 +91,7 @@ class InputDraw {
         $body = new Rectangle($this->uid.'_body_input');
         $body->setOrigin($x, $y);
         $body->setSize($width, $height);
-        $body->setColor(0xFFFFFF);
+        $body->setColor($this->backgroundColor);
         $body->setRenderable(true);
 
         $jsPathClickInput = resource_path('js/function/entity/click_input.blade.php');
@@ -84,7 +104,7 @@ class InputDraw {
         //Placeholder
         $placeholder = new Text($this->uid.'_placeholder');
         $placeholder->setFontSize(20);
-        $placeholder->setColor(0x808080);
+        $placeholder->setColor($this->placeholderColor);
         $placeholder->setOrigin($x+12, $y+($height/3.2));
         $placeholder->setText($this->placeholder);
         $placeholder->setRenderable(true);
@@ -94,7 +114,7 @@ class InputDraw {
         $boxIcon = new Square($this->uid.'_box_icon');
         $boxIcon->setOrigin($x+($width-$x), $y);
         $boxIcon->setSize($height, $height);
-        $boxIcon->setColor(0xCCCCCC);
+        $boxIcon->setColor($this->boxIconColor);
         $boxIcon->setRenderable(true);
         $items[] = $boxIcon->buildJson();
 
@@ -105,6 +125,7 @@ class InputDraw {
         $boxIconText->setCenterAnchor(true);
         $boxIconText->setFontSize(24);
         $boxIconText->setOrigin($centerSquare['x'], $centerSquare['y']);
+        $boxIconText->setColor($this->boxIconTextColor);
         $boxIconText->setText('I');
         $boxIconText->setRenderable(true);
         $items[] = $boxIconText->buildJson();

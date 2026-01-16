@@ -66,13 +66,17 @@ class TestDrawCommand extends Command
         $inputEmail->setPlaceholder('Digita indirizzo email');
         $inputEmail->setOrigin(50, 50);
         $inputEmail->setSize(500, 50);
+        $inputEmail->setPlaceholderColor(0x808080);   
+        $inputEmail->setBackgroundColor(0xFFFFFF);
+        $inputEmail->setBoxIconColor(0xCCCCCC);
+        $inputEmail->setBoxIconTextColor(0x000000);
         $inputEmail->build();
         
         $listItems = $inputEmail->getItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $items[] = $objectDraw->get();
-        }
+        }       
 
         //Input Password
         $inputPassword = new InputDraw(Str::random(20), $sessionId);
@@ -80,6 +84,10 @@ class TestDrawCommand extends Command
         $inputPassword->setPlaceholder('Digita password');
         $inputPassword->setOrigin(50, 150);
         $inputPassword->setSize(500, 50);
+        $inputPassword->setPlaceholderColor(0x808080);
+        $inputPassword->setBackgroundColor(0xFFFFFF);
+        $inputPassword->setBoxIconColor(0xCCCCCC);
+        $inputPassword->setBoxIconTextColor(0x000000);
         $inputPassword->build();
         
         $listItems = $inputPassword->getItems();
