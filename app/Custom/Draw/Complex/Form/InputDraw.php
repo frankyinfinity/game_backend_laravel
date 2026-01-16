@@ -156,7 +156,7 @@ class InputDraw {
         $valueText->setColor($this->valueColor);
         $valueText->setOrigin($x+12, $y+($height/3.2));
         $valueText->setText('');
-        $valueText->setRenderable(false);
+        $valueText->setRenderable(true);
         $items[] = $valueText->buildJson();
 
         //Box Icon
