@@ -13,6 +13,7 @@ class ButtonDraw {
         $this->uid = $uid;
         $this->textFontFamily = Helper::DEFAULT_FONT_FAMILY;
         $this->textFontSize = Helper::DEFAULT_FONT_SIZE;
+        $this->renderable = true;
     }
 
     private array $items = [];
@@ -74,6 +75,11 @@ class ButtonDraw {
         $this->onClickFunction = $onClickFunction;
     }
 
+    private $renderable;
+    public function setRenderable($renderable) {
+        $this->renderable = false;
+    }
+
     public function build() {
 
         $uid = $this->uid;
@@ -90,7 +96,7 @@ class ButtonDraw {
         $rect->setSize($width, $height);
         $rect->setOrigin($x, $y);
         $rect->setColor($colorButton);
-        $rect->setRenderable(false);
+        $rect->setRenderable($this->renderable);
 
         if($this->onClickFunction !== null) {
             $onClickFunction = $this->onClickFunction;
@@ -111,7 +117,7 @@ class ButtonDraw {
         $text->setOrigin($x, $y);
         $text->setText($string);
         $text->setColor($colorString);
-        $text->setRenderable(false);
+        $text->setRenderable($this->renderable);
 
         $this->items[] = $rect;
         $this->items[] = $text;

@@ -12,6 +12,8 @@ use App\Models\Player;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
+use App\Custom\Draw\Complex\ButtonDraw;
+use function GuzzleHttp\json_encode;
 
 class TestDrawCommand extends Command
 {
@@ -61,10 +63,13 @@ class TestDrawCommand extends Command
         ObjectCache::clear($sessionId);
 
         //Input Email
+        $x = 50;
+        $y = 50;
+
         $inputEmail = new InputDraw(Str::random(20), $sessionId);
         $inputEmail->setName('email');
         $inputEmail->setTitle('Email');
-        $inputEmail->setOrigin(50, 50);
+        $inputEmail->setOrigin($x, $y);
         $inputEmail->setSize(500, 50);
         $inputEmail->setBorderThickness(2);
         $inputEmail->setBorderColor(0xFF0000);
@@ -81,10 +86,12 @@ class TestDrawCommand extends Command
         }       
 
         //Input Password
+        $y += 100;
+
         $inputPassword = new InputDraw(Str::random(20), $sessionId);
         $inputPassword->setName('password');
         $inputPassword->setTitle('Password');
-        $inputPassword->setOrigin(50, 150);
+        $inputPassword->setOrigin($x, $y);
         $inputPassword->setSize(500, 50);
         $inputPassword->setBorderThickness(2);
         $inputPassword->setBorderColor(0xFF0000);
@@ -100,11 +107,40 @@ class TestDrawCommand extends Command
             $items[] = $objectDraw->get();
         }
 
+        //Button
+        $y += 100;
+        $colorButton = 0x0000FF;
+        $colorString = 0xFFFFFF;
+
+        $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
+        $submitButton->setSize(500, 50);
+        $submitButton->setOrigin($x, $y);
+        $submitButton->setString('Accedi');
+        $submitButton->setColorButton($colorButton);
+        $submitButton->setColorString($colorString);
+        $submitButton->setTextFontSize(22);
+        $submitButton->build();
+
+        $listItems = $submitButton->getItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
+            $items[] = $objectDraw->get();
+        }
+
         // Flush to cache
         ObjectCache::flush($sessionId);
 
+        DrawRequest::query()->create([
+            'session_id' => $sessionId,
+            'request_id' => $requestId,
+            'player_id' => $playerId,
+            'items' => json_encode($items),
+        ]);
+
+        event(new DrawInterfaceEvent($player, $requestId));
+
         // Dispatch event with items directly (no DrawRequest for test)
-        DrawInterfaceEvent::dispatch($player, $requestId, $items);
+        //DrawInterfaceEvent::dispatch($player, $requestId, $items);
 
         $this->info('Test draw event sent. Check the /test page.');
 

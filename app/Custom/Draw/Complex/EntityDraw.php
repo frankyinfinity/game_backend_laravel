@@ -142,7 +142,6 @@ class EntityDraw
 
             $jsContentMov = str_replace('__port__', $wsPort, $jsContentMov);
             $jsContentMov = str_replace('__action__', $direction, $jsContentMov);
-            //$jsContentMov = str_replace('__uid__', $this->dbEntity->uid, $jsContentMov);
 
             $jsMovPaths[$direction] = $jsContentMov;
 
@@ -158,6 +157,7 @@ class EntityDraw
         $upButton->setColorString($colorString);
         $upButton->setTextFontSize(22);
         $upButton->setOnClick($jsMovPaths['up']);
+        $upButton->setRenderable(false);
         $upButton->build();
 
         //Left
@@ -170,6 +170,7 @@ class EntityDraw
         $leftButton->setColorString($colorString);
         $leftButton->setTextFontSize(22);
         $leftButton->setOnClick($jsMovPaths['left']);
+        $leftButton->setRenderable(false);
         $leftButton->build();
 
         //Down
@@ -182,6 +183,7 @@ class EntityDraw
         $downButton->setColorString($colorString);
         $downButton->setTextFontSize(22);
         $downButton->setOnClick($jsMovPaths['down']);
+        $downButton->setRenderable(false);
         $downButton->build();
 
         //Right
@@ -194,6 +196,7 @@ class EntityDraw
         $rightButton->setColorString($colorString);
         $rightButton->setTextFontSize(22);
         $rightButton->setOnClick($jsMovPaths['right']);
+        $rightButton->setRenderable(false);
         $rightButton->build();
 
         //Set Children (Panel)
