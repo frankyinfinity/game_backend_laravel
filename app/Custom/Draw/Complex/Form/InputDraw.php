@@ -3,6 +3,7 @@
 namespace App\Custom\Draw\Complex\Form;
 
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
@@ -25,6 +26,12 @@ class InputDraw {
         $this->y = 0;
         $this->width = 0;
         $this->height = 0;
+        $this->backgroundColor = 0x000000;
+        $this->borderColor = 0x000000;
+        $this->borderThickness = 0;
+        $this->placeholderColor = 0x000000;
+        $this->boxIconColor = 0x000000;
+        $this->boxIconTextColor = 0x000000;
         $this->items = [];
 
     }
@@ -56,6 +63,16 @@ class InputDraw {
     private $backgroundColor;
     public function setBackgroundColor($backgroundColor) {
         $this->backgroundColor = $backgroundColor;
+    }
+
+    private $borderColor;
+    public function setBorderColor($borderColor) {
+        $this->borderColor = $borderColor;
+    }
+
+    private $borderThickness;
+    public function setBorderThickness($borderThickness) {
+        $this->borderThickness = $borderThickness;
     }
 
     private $placeholderColor;
@@ -100,6 +117,18 @@ class InputDraw {
         $body->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickInput);
 
         $items[] = $body->buildJson();
+
+        //Border
+        $border = new MultiLine($this->uid.'_border_input');
+        $border->setPoint($x, $y);
+        $border->setPoint($x+$width, $y);
+        $border->setPoint($x+$width, $y+$height);
+        $border->setPoint($x, $y+$height);
+        $border->setPoint($x, $y);
+        $border->setThickness($this->borderThickness);
+        $border->setColor($this->borderColor);
+        $border->setRenderable(true);
+        $items[] = $border->buildJson();
 
         //Placeholder
         $placeholder = new Text($this->uid.'_placeholder');

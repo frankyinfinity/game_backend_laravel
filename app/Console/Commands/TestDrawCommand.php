@@ -66,6 +66,8 @@ class TestDrawCommand extends Command
         $inputEmail->setPlaceholder('Digita indirizzo email');
         $inputEmail->setOrigin(50, 50);
         $inputEmail->setSize(500, 50);
+        $inputEmail->setBorderThickness(2);
+        $inputEmail->setBorderColor(0xFF0000);
         $inputEmail->setPlaceholderColor(0x808080);   
         $inputEmail->setBackgroundColor(0xFFFFFF);
         $inputEmail->setBoxIconColor(0xCCCCCC);
@@ -84,6 +86,8 @@ class TestDrawCommand extends Command
         $inputPassword->setPlaceholder('Digita password');
         $inputPassword->setOrigin(50, 150);
         $inputPassword->setSize(500, 50);
+        $inputPassword->setBorderThickness(2);
+        $inputPassword->setBorderColor(0xFF0000);
         $inputPassword->setPlaceholderColor(0x808080);
         $inputPassword->setBackgroundColor(0xFFFFFF);
         $inputPassword->setBoxIconColor(0xCCCCCC);

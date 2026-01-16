@@ -7,8 +7,10 @@
 @stop
 
 @section('content')
-    <div id="display_container" style="width: 100%; height: 80vh; background: #000;"></div>
-    <div class="status-msg" style="position: absolute; bottom: 10px; right: 10px; opacity: 0.5; background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 5px; font-size: 0.8rem; color: white;">Test Page - Inizializzazione...</div>
+    <div id="display_container" style="width: 100%; height: 80vh; background: #fff;"></div>
+    <div class="status-msg"
+        style="position: absolute; bottom: 10px; right: 10px; opacity: 0.5; background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 5px; font-size: 0.8rem; color: white;">
+        Test Page - Inizializzazione...</div>
 @stop
 
 @section('css')
@@ -16,7 +18,7 @@
         body {
             margin: 0;
             padding: 0;
-            background: #000;
+            background: #fff;
             color: black;
             font-family: Arial, sans-serif;
             overflow: hidden;
@@ -28,16 +30,18 @@
     <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
-        const BACK_URL = '{{ url("/") }}';
+        const BACK_URL = '{{ url('/') }}';
         const config = {
-            PUSHER_KEY: '{{ config("broadcasting.connections.pusher.key") }}',
-            PUSHER_CLUSTER: '{{ config("broadcasting.connections.pusher.options.cluster") }}'
+            PUSHER_KEY: '{{ config('broadcasting.connections.pusher.key') }}',
+            PUSHER_CLUSTER: '{{ config('broadcasting.connections.pusher.options.cluster') }}'
         };
         const testPlayerId = 1; // Use existing player ID
         const sessionId = 'test_session_fixed';
         const hostname = new URL(BACK_URL).hostname;
 
-        window.AppData = { actual_focus_uid_entity: null };
+        window.AppData = {
+            actual_focus_uid_entity: null
+        };
         window.gameWebSockets = {};
 
         let app = null;
@@ -49,7 +53,9 @@
             document.querySelector('.status-msg').textContent = msg;
         }
 
-        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
 
         class BasicDraw {
             constructor(object) {
@@ -69,9 +75,9 @@
                     delete shapes[uid];
                 }
 
-                this.shape.renderable = object['attributes'] && object['attributes']['renderable'] !== undefined
-                    ? !!object['attributes']['renderable']
-                    : true;
+                this.shape.renderable = object['attributes'] && object['attributes']['renderable'] !== undefined ?
+                    !!object['attributes']['renderable'] :
+                    true;
 
                 if (object['attributes'] && object['attributes']['z_index'] !== undefined) {
                     this.shape.zIndex = object['attributes']['z_index'];
@@ -84,7 +90,9 @@
             }
             addInteractive() {
                 const object = objects[this.object['uid']];
-                if (!object['attributes'] || !object['attributes']['interactives'] || object['attributes']['interactives']['count'] === 0) return;
+                if (!object['attributes'] || !object['attributes']['interactives'] || object['attributes'][
+                        'interactives'
+                    ]['count'] === 0) return;
 
                 this.shape.interactive = true;
                 this.shape.cursor = 'pointer';
@@ -100,17 +108,22 @@
                     targetShape.on(event, () => {
                         console.log(`Interaction: ${event} on ${object.uid}`);
                         try {
-                            (function (object, shape, shapes, objects, AppData) {
+                            (function(object, shape, shapes, objects, AppData) {
                                 eval(processedScript);
                             })(object, targetShape, shapes, objects, AppData);
-                        } catch (e) { console.error('Error executing interaction script:', e); }
+                        } catch (e) {
+                            console.error('Error executing interaction script:', e);
+                        }
                     });
                 });
             }
         }
 
         class Square extends BasicDraw {
-            constructor(object) { super(object); this.shape = new PIXI.Sprite(PIXI.Texture.WHITE); }
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Sprite(PIXI.Texture.WHITE);
+            }
             build() {
                 const object = this.object;
                 this.shape.width = object['size'];
@@ -122,7 +135,10 @@
         }
 
         class Rectangle extends BasicDraw {
-            constructor(object) { super(object); this.shape = new PIXI.Sprite(PIXI.Texture.WHITE); }
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Sprite(PIXI.Texture.WHITE);
+            }
             build() {
                 const object = this.object;
                 this.shape.width = object['width'];
@@ -134,7 +150,10 @@
         }
 
         class MultiLine extends BasicDraw {
-            constructor(object) { super(object); this.shape = new PIXI.Graphics(); }
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Graphics();
+            }
             build() {
                 const object = this.object;
                 const lineColor = object['color'];
@@ -152,7 +171,10 @@
         }
 
         class Circle extends BasicDraw {
-            constructor(object) { super(object); this.shape = new PIXI.Graphics(); }
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Graphics();
+            }
             build() {
                 const object = this.object;
                 this.shape.beginFill(0xFFFFFF);
@@ -165,7 +187,10 @@
         }
 
         class Text extends BasicDraw {
-            constructor(object) { super(object); this.shape = new PIXI.Text('', {}); }
+            constructor(object) {
+                super(object);
+                this.shape = new PIXI.Text('', {});
+            }
             build() {
                 const object = this.object;
                 this.shape.x = object['x'];
@@ -187,7 +212,7 @@
             app = new PIXI.Application({
                 width: window.innerWidth,
                 height: window.innerHeight,
-                backgroundColor: 0x000000,
+                backgroundColor: 0xffffff,
                 antialias: true,
                 resolution: window.devicePixelRatio || 1,
                 autoDensity: true
@@ -226,7 +251,7 @@
             d.render(app);
         }
 
-        $(document).ready(function () {
+        $(document).ready(function() {
             initPixi();
             status('PixiJS Avviato - Connessione a Pusher...');
 
@@ -238,7 +263,7 @@
             const channelName = 'player_' + testPlayerId + '_channel';
             let channel = pusher.subscribe(channelName);
 
-            channel.bind('pusher:subscription_succeeded', function () {
+            channel.bind('pusher:subscription_succeeded', function() {
                 status('Connesso a Pusher - In attesa di eventi di disegno...');
                 console.log('Test player channel subscribed:', channelName);
             });
@@ -251,7 +276,7 @@
                 }
             }, 10000); // Check every 10 seconds
 
-            channel.bind('draw_interface', function (data) {
+            channel.bind('draw_interface', function(data) {
                 console.log('Draw interface event received:', data);
                 status('Evento di disegno ricevuto...');
 
@@ -266,14 +291,18 @@
                     $.ajax({
                         url: `${BACK_URL}/api/players/get-map`,
                         type: 'POST',
-                        data: { request_id, player_id: testPlayerId, session_id: sessionId },
-                        success: async function (result) {
+                        data: {
+                            request_id,
+                            player_id: testPlayerId,
+                            session_id: sessionId
+                        },
+                        success: async function(result) {
                             if (result.success) {
                                 items = result.items;
                                 processItems(items);
                             }
                         },
-                        error: function (err) {
+                        error: function(err) {
                             status('Errore nel caricamento dati');
                             console.error('Error loading map data:', err);
                         }
