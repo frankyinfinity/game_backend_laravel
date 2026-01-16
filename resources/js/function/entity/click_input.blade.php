@@ -24,8 +24,8 @@
             }
         }
 
-        objectBody.attributes.active = true;
-        let active = true;
+        objectBody.attributes.active = !objectBody.attributes.active;
+        let active = objectBody.attributes.active;
 
         let shapeBorder = shapes[input_uid+'_border_input'];
         shapeBorder.tint = active ? activeColor : notActiveColor;
