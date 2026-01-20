@@ -70,6 +70,7 @@ class TestDrawCommand extends Command
 
         $inputEmail = new InputDraw(Str::random(20), $sessionId);
         $inputEmail->setName('email');
+        $inputEmail->setRequired(true);
         $inputEmail->setTitle('Email');
         $inputEmail->setOrigin($x, $y);
         $inputEmail->setSize(500, 50);
@@ -86,6 +87,7 @@ class TestDrawCommand extends Command
 
         $inputPassword = new InputDraw(Str::random(20), $sessionId);
         $inputPassword->setName('password');
+        $inputPassword->setRequired(true);
         $inputPassword->setTitle('Password');
         $inputPassword->setOrigin($x, $y);
         $inputPassword->setSize(500, 50);

@@ -21,7 +21,7 @@ class InputDraw {
         $this->sessionId = $sessionId;
 
         $this->name = '';
-        $this->placeholder = '';
+        $this->required = false;
         $this->x = 0;
         $this->y = 0;
         $this->width = 0;
@@ -39,6 +39,11 @@ class InputDraw {
     private string $name;
     public function setName($name) {
         $this->name = $name;
+    }
+
+    private bool $required;
+    public function setRequired(bool $required) {
+        $this->required = $required;
     }
 
     private string $title;
@@ -114,7 +119,7 @@ class InputDraw {
         $title->setFontSize(20);
         $title->setColor($this->titleColor);
         $title->setOrigin($x, $y);
-        $title->setText($this->title);
+        $title->setText($this->title.($this->required?'*':''));
         $title->setRenderable(true);
         $items[] = $title->buildJson();
 
