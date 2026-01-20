@@ -20,8 +20,18 @@ class ActionForm {
 
     public function setButton(ButtonDraw $button) {
 
+        $datas = [];
+        $inputs = $this->inputs;
+        foreach ($inputs as $input) {
+            $name = $input->getName();
+            $uid = $input->getUidValueElement();
+            $datas['field_'.$name] = $uid;
+        }
+
         $jsPathClick = resource_path('js/function/entity/click_button_form.blade.php');
         $jsPathClick = file_get_contents($jsPathClick);
+        $jsPathClick = str_replace('__FIELDS__', json_encode($datas), $jsPathClick);
+
         $jsPathClick = Helper::setCommonJsCode($jsPathClick, Str::random(20));
 
         $button->setOnClick($jsPathClick);

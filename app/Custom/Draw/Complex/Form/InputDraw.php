@@ -40,6 +40,9 @@ class InputDraw {
     public function setName($name) {
         $this->name = $name;
     }
+    public function getName() {
+        return $this->name;
+    }
 
     private bool $required;
     public function setRequired(bool $required) {
@@ -100,6 +103,11 @@ class InputDraw {
         $this->valueColor = $valueColor;
     }
 
+    private string $uidValueElement;
+    public function getUidValueElement() {
+        return $this->uidValueElement;
+    }
+
     private $items = [];
     public function getItems() {
         return $this->items;
@@ -132,14 +140,14 @@ class InputDraw {
         $body->setColor($this->backgroundColor);
         $body->setRenderable(true);
 
+        $body->addAttributes('border_not_active_color', $this->borderColor);
+        $body->addAttributes('border_active_color', 0x0000FF);
+        $body->addAttributes('active', false);
+
         $jsPathClickInput = resource_path('js/function/entity/click_input.blade.php');
         $jsPathClickInput = file_get_contents($jsPathClickInput);
         $jsPathClickInput = Helper::setCommonJsCode($jsPathClickInput, Str::random(20));
         $body->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickInput);
-
-        $body->addAttributes('border_not_active_color', $this->borderColor);
-        $body->addAttributes('border_active_color', 0x0000FF);
-        $body->addAttributes('active', false);
 
         $items[] = $body->buildJson();
 
@@ -156,7 +164,8 @@ class InputDraw {
         $items[] = $border->buildJson();
 
         //Value
-        $valueText = new Text($this->uid.'_value_text');
+        $this->uidValueElement = $this->uid.'_value_text';
+        $valueText = new Text($this->uidValueElement);
         $valueText->setFontSize(20);
         $valueText->setColor($this->valueColor);
         $valueText->setOrigin($x+12, $y+($height/3.2));
@@ -189,4 +198,3 @@ class InputDraw {
     }
 
 }
-
