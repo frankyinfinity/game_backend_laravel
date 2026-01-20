@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Colors;
 use function GuzzleHttp\json_encode;
 
 class TestDrawCommand extends Command
@@ -73,11 +74,11 @@ class TestDrawCommand extends Command
         $inputEmail->setOrigin($x, $y);
         $inputEmail->setSize(500, 50);
         $inputEmail->setBorderThickness(2);
-        $inputEmail->setBorderColor(0xFF0000);
-        $inputEmail->setTitleColor(0x000000);   
-        $inputEmail->setBackgroundColor(0xFFFFFF);
-        $inputEmail->setBoxIconColor(0xCCCCCC);
-        $inputEmail->setBoxIconTextColor(0x000000);
+        $inputEmail->setBorderColor(Colors::DARK_GRAY);
+        $inputEmail->setTitleColor(Colors::BLACK);
+        $inputEmail->setBackgroundColor(Colors::WHITE);
+        $inputEmail->setBoxIconColor(Colors::LIGHT_GRAY);
+        $inputEmail->setBoxIconTextColor(Colors::BLACK);
         $inputEmail->build();   
 
         //Input Password
@@ -89,24 +90,22 @@ class TestDrawCommand extends Command
         $inputPassword->setOrigin($x, $y);
         $inputPassword->setSize(500, 50);
         $inputPassword->setBorderThickness(2);
-        $inputPassword->setBorderColor(0xFF0000);
-        $inputPassword->setTitleColor(0x000000);
-        $inputPassword->setBackgroundColor(0xFFFFFF);
-        $inputPassword->setBoxIconColor(0xCCCCCC);
-        $inputPassword->setBoxIconTextColor(0x000000);
+        $inputPassword->setBorderColor(Colors::DARK_GRAY);
+        $inputPassword->setTitleColor(Colors::BLACK);
+        $inputPassword->setBackgroundColor(Colors::WHITE);
+        $inputPassword->setBoxIconColor(Colors::LIGHT_GRAY);
+        $inputPassword->setBoxIconTextColor(Colors::BLACK);
         $inputPassword->build();
 
         //Button
         $y += 100;
-        $colorButton = 0x0000FF;
-        $colorString = 0xFFFFFF;
 
         $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
         $submitButton->setSize(500, 50);
         $submitButton->setOrigin($x, $y);
         $submitButton->setString('Accedi');
-        $submitButton->setColorButton($colorButton);
-        $submitButton->setColorString($colorString);
+        $submitButton->setColorButton(Colors::BLUE);
+        $submitButton->setColorString(Colors::WHITE);
         $submitButton->setTextFontSize(22);
         $submitButton->build();
 
