@@ -115,6 +115,7 @@ class TestDrawCommand extends Command
         $form = new ActionForm();
         $form->setInput($inputEmail);
         $form->setInput($inputPassword);
+        $form->setUrlRequest('/test/action');
         $form->setButton($submitButton);
 
         //Get all

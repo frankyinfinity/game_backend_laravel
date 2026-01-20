@@ -18,6 +18,11 @@ class ActionForm {
         $this->inputs[] = $input;
     }
 
+    private $urlRequest;
+    public function setUrlRequest($urlRequest) {
+        $this->urlRequest = $urlRequest;
+    }
+
     public function setButton(ButtonDraw $button) {
 
         $datas = [];
@@ -31,6 +36,7 @@ class ActionForm {
         $jsPathClick = resource_path('js/function/entity/click_button_form.blade.php');
         $jsPathClick = file_get_contents($jsPathClick);
         $jsPathClick = str_replace('__FIELDS__', json_encode($datas), $jsPathClick);
+        $jsPathClick = str_replace('__URL__', $this->urlRequest, $jsPathClick);
 
         $jsPathClick = Helper::setCommonJsCode($jsPathClick, Str::random(20));
 

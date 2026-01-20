@@ -21,6 +21,19 @@
         }
         console.log('Datas:', datas);
 
+        let url = '__URL__';
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(datas)
+        })
+        .then(response => response.json())
+        .then(data => console.log('Response:', data))
+        .catch(error => console.error('Error:', error));
+
     }
     window['__name__']();
 
