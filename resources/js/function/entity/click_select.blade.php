@@ -58,10 +58,12 @@
         let currentStart = objectBody.attributes.currentStart || 0;
         let optionShowDisplay = objectBody.attributes.optionShowDisplay;
         let totalOptions = objectBody.attributes.totalOptions;
+        let heightOption = objectBody.attributes.heightOption;
         let optionIds = objectBody.attributes.optionIds;
         if (currentStart > 0) {
             currentStart--;
             objectBody.attributes.currentStart = currentStart;
+            moveShapes(window.input_uid, heightOption, optionIds, totalOptions);
             updateVisibility(window.input_uid, currentStart, optionShowDisplay, optionIds, totalOptions);
         }
     };
@@ -71,11 +73,22 @@
         let currentStart = objectBody.attributes.currentStart || 0;
         let optionShowDisplay = objectBody.attributes.optionShowDisplay;
         let totalOptions = objectBody.attributes.totalOptions;
+        let heightOption = objectBody.attributes.heightOption;
         let optionIds = objectBody.attributes.optionIds;
         if (currentStart + optionShowDisplay < totalOptions) {
             currentStart++;
             objectBody.attributes.currentStart = currentStart;
+            moveShapes(window.input_uid, -heightOption, optionIds, totalOptions);
             updateVisibility(window.input_uid, currentStart, optionShowDisplay, optionIds, totalOptions);
+        }
+    };
+
+    function moveShapes(uid, deltaY, optionIds, totalOptions) {
+        for (let idx = 0; idx < totalOptions; idx++) {
+            let id = optionIds[idx];
+            shapes[uid + '_option_rect_' + id].y += deltaY;
+            shapes[uid + '_option_border_' + id].y += deltaY;
+            shapes[uid + '_option_text_' + id].y += deltaY;
         }
     };
 
