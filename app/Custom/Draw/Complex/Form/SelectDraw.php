@@ -224,7 +224,7 @@ class SelectDraw {
 
         //Options
         $options = $this->options;
-        
+        $options = array_slice($options, 0, $optionShowDisplay);
 
         $heightOption = $heightPanel / $optionShowDisplay;
         $optionId = $this->optionId;
