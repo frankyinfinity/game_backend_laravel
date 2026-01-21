@@ -192,7 +192,7 @@ class SelectDraw {
 
         //Box Icon
         $boxIcon = new Square($this->uid.'_box_icon');
-        $boxIcon->setOrigin($x+($width-$x), $y);
+        $boxIcon->setOrigin($x + $width - $height, $y);
         $boxIcon->setSize($height, $height);
         $boxIcon->setColor($this->boxIconColor);
         $boxIcon->setRenderable(true);
@@ -211,14 +211,15 @@ class SelectDraw {
         $drawItems[] = $boxIconText->buildJson();
 
         //Panel
-        $y+= ($height+5);
+        $y += ($height + 5);
         $optionShowDisplay = $this->optionShowDisplay;
         $heightPanel = $height * $optionShowDisplay;
+        $colorPanel = Colors::LIGHT_GRAY;
 
         $panel = new Rectangle($this->uid.'_panel_select');
         $panel->setOrigin($x, $y);
         $panel->setSize($width, $heightPanel);
-        $panel->setColor(Colors::LIGHT_GRAY);
+        $panel->setColor($colorPanel);
         $panel->setRenderable(false);
 
         //Options
@@ -228,21 +229,39 @@ class SelectDraw {
         $optionText = $this->optionText;
 
         foreach ($options as $option) {
-
             $id = $option[$optionId];
             $text = $option[$optionText];
 
-            $optionText = new Text($this->uid.'_option_'.$id);
-            $optionText->setOrigin($x, $y);
-            $optionText->setFontSize(20);
-            $optionText->setColor($this->valueColor);
-            $optionText->setText($text);
-            $optionText->setRenderable(false);
-            $panel->addChild($optionText);
-            $drawItems[] = $optionText->buildJson();
+            $optionRect = new Rectangle($this->uid.'_option_rect_'.$id);
+            $optionRect->setOrigin($x, $y);
+            $optionRect->setSize($width, $heightOption);
+            $optionRect->setColor($colorPanel);
+            $optionRect->setRenderable(false);
+            $panel->addChild($optionRect);
+            $drawItems[] = $optionRect->buildJson();
 
-            $y+= $heightOption;
+            $optionBorder = new MultiLine($this->uid.'_option_border_'.$id);
+            $optionBorder->setPoint($x, $y);
+            $optionBorder->setPoint($x+$width, $y);
+            $optionBorder->setPoint($x+$width, $y+$heightOption);
+            $optionBorder->setPoint($x, $y+$heightOption);
+            $optionBorder->setPoint($x, $y);
+            $optionBorder->setThickness($this->borderThickness);
+            $optionBorder->setColor($this->borderColor);
+            $optionBorder->setRenderable(false);
+            $panel->addChild($optionBorder);
+            $drawItems[] = $optionBorder->buildJson();
 
+            $optionTextObj = new Text($this->uid.'_option_text_'.$id);
+            $optionTextObj->setOrigin($x + 5, $y + ($heightOption - 20)/2);
+            $optionTextObj->setFontSize(20);
+            $optionTextObj->setColor($this->valueColor);
+            $optionTextObj->setText($text);
+            $optionTextObj->setRenderable(false);
+            $panel->addChild($optionTextObj);
+            $drawItems[] = $optionTextObj->buildJson();
+
+            $y += $heightOption;
         }
 
         $drawItems[] = $panel->buildJson();

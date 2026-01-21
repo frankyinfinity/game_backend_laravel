@@ -31,7 +31,7 @@
         shapeBorder.tint = active ? activeColor : notActiveColor;
 
         let shapeValueText = shapes[input_uid + '_box_icon_text'];
-        shapeValueText.text = active ? '∧' : 'V';
+        shapeValueText.text = active ? 'V' : '∧';
 
         let shapePanel = shapes[input_uid + '_panel_select'];
         shapePanel.renderable = active;
