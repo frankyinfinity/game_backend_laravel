@@ -12,9 +12,11 @@ use App\Models\Player;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
+use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Colors;
+use Illuminate\Support\Facades\Log;
 use function GuzzleHttp\json_encode;
 
 class TestDrawCommand extends Command
@@ -52,20 +54,52 @@ class TestDrawCommand extends Command
         // Use the cache system
         ObjectCache::buffer($sessionId);
 
-        $items = [];
+        $drawItems = [];
 
         // Clear all existing elements before drawing
         $existingObjects = ObjectCache::all($sessionId);
         foreach ($existingObjects as $uid => $object) {
             $objectClear = new ObjectClear($uid, $sessionId);
-            $items[] = $objectClear->get();
+            $drawItems[] = $objectClear->get();
         }
 
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        //Input Email
+        $request = \Illuminate\Http\Request::create('/api/planets', 'GET');
+        $kernel = app()->make(\Illuminate\Contracts\Http\Kernel::class);
+        $response = $kernel->handle($request);
+        $responseBody = json_decode($response->getContent(), true);
+        $planets = $responseBody['planets'] ?? [];
+
+        //Select
         $x = 50;
+        $y = 50;
+
+        $select = new SelectDraw(Str::random(20), $sessionId);
+        $select->setName('birth_planet_id');
+        $select->setRequired(true);
+        $select->setTitle('Pianeta Natale');
+        $select->setOrigin($x, $y);
+        $select->setSize(500, 50);
+        $select->setBorderThickness(2);
+        $select->setBorderColor(Colors::DARK_GRAY);
+        $select->setTitleColor(Colors::BLACK);
+        $select->setBackgroundColor(Colors::WHITE);
+        $select->setBoxIconColor(Colors::LIGHT_GRAY);
+        $select->setBoxIconTextColor(Colors::BLACK);
+        $select->build();  
+
+        //Get all
+        $listItems = $select->getDrawItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        //Input
+        //Input Email
+        /*$x = 50;
         $y = 50;
 
         $inputEmail = new InputDraw(Str::random(20), $sessionId);
@@ -119,23 +153,23 @@ class TestDrawCommand extends Command
         $form->setButton($submitButton);
 
         //Get all
-        $listItems = $inputEmail->getItems();
+        $listItems = $inputEmail->getDrawItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $items[] = $objectDraw->get();
+            $drawItems[] = $objectDraw->get();
         }    
         
-        $listItems = $inputPassword->getItems();
+        $listItems = $inputPassword->getDrawItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $items[] = $objectDraw->get();
+            $drawItems[] = $objectDraw->get();
         }
 
-        $listItems = $submitButton->getItems();
+        $listItems = $submitButton->getDrawItems(); 
         foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
-            $items[] = $objectDraw->get();
-        }
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }*/
 
         // Flush to cache
         ObjectCache::flush($sessionId);
@@ -145,7 +179,7 @@ class TestDrawCommand extends Command
             'session_id' => $sessionId,
             'request_id' => $requestId,
             'player_id' => $playerId,
-            'items' => json_encode($items),
+            'items' => json_encode($drawItems),
         ]);
         event(new DrawInterfaceEvent($player, $requestId));
 

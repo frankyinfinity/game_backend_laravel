@@ -11,7 +11,7 @@ use App\Custom\Manipulation\ObjectDraw;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
 
-class InputDraw {
+class SelectDraw {
 
     private string $uid;
     private string $sessionId;
@@ -134,7 +134,7 @@ class InputDraw {
         $y += 25;
 
         //Body
-        $body = new Rectangle($this->uid.'_body_input');
+        $body = new Rectangle($this->uid.'_body_select');
         $body->setOrigin($x, $y);
         $body->setSize($width, $height);
         $body->setColor($this->backgroundColor);
@@ -144,7 +144,7 @@ class InputDraw {
         $body->addAttributes('border_active_color', 0x0000FF);
         $body->addAttributes('active', false);
 
-        $jsPathClickInput = resource_path('js/function/entity/click_input.blade.php');
+        $jsPathClickInput = resource_path('js/function/entity/click_select.blade.php');
         $jsPathClickInput = file_get_contents($jsPathClickInput);
         $jsPathClickInput = Helper::setCommonJsCode($jsPathClickInput, Str::random(20));
         $body->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickInput);
@@ -152,7 +152,7 @@ class InputDraw {
         $drawItems[] = $body->buildJson();
 
         //Border
-        $border = new MultiLine($this->uid.'_border_input');
+        $border = new MultiLine($this->uid.'_border_select');
         $border->setPoint($x, $y);
         $border->setPoint($x+$width, $y);
         $border->setPoint($x+$width, $y+$height);
@@ -162,16 +162,6 @@ class InputDraw {
         $border->setColor($this->borderColor);
         $border->setRenderable(true);
         $drawItems[] = $border->buildJson();
-
-        //Value
-        $this->uidValueElement = $this->uid.'_value_text';
-        $valueText = new Text($this->uidValueElement);
-        $valueText->setFontSize(20);
-        $valueText->setColor($this->valueColor);
-        $valueText->setOrigin($x+12, $y+($height/3.2));
-        $valueText->setText('');
-        $valueText->setRenderable(true);
-        $drawItems[] = $valueText->buildJson();
 
         //Box Icon
         $boxIcon = new Square($this->uid.'_box_icon');
@@ -189,7 +179,7 @@ class InputDraw {
         $boxIconText->setFontSize(24);
         $boxIconText->setOrigin($centerSquare['x'], $centerSquare['y']);
         $boxIconText->setColor($this->boxIconTextColor);
-        $boxIconText->setText('I');
+        $boxIconText->setText('V');
         $boxIconText->setRenderable(true);
         $drawItems[] = $boxIconText->buildJson();
 
