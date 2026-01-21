@@ -88,6 +88,7 @@ class TestDrawCommand extends Command
         $select->setBorderThickness(2);
         $select->setBorderColor(Colors::DARK_GRAY);
         $select->setTitleColor(Colors::BLACK);
+        $select->setValueColor(Colors::BLACK);
         $select->setBackgroundColor(Colors::WHITE);
         $select->setBoxIconColor(Colors::LIGHT_GRAY);
         $select->setBoxIconTextColor(Colors::BLACK);

@@ -221,6 +221,30 @@ class SelectDraw {
         $panel->setColor(Colors::LIGHT_GRAY);
         $panel->setRenderable(false);
 
+        //Options
+        $heightOption = $heightPanel / $optionShowDisplay;
+        $options = $this->options;
+        $optionId = $this->optionId;
+        $optionText = $this->optionText;
+
+        foreach ($options as $option) {
+
+            $id = $option[$optionId];
+            $text = $option[$optionText];
+
+            $optionText = new Text($this->uid.'_option_'.$id);
+            $optionText->setOrigin($x, $y);
+            $optionText->setFontSize(20);
+            $optionText->setColor($this->valueColor);
+            $optionText->setText($text);
+            $optionText->setRenderable(false);
+            $panel->addChild($optionText);
+            $drawItems[] = $optionText->buildJson();
+
+            $y+= $heightOption;
+
+        }
+
         $drawItems[] = $panel->buildJson();
 
         $this->drawItems = $drawItems;

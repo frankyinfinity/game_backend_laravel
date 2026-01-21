@@ -36,6 +36,13 @@
         let shapePanel = shapes[input_uid + '_panel_select'];
         shapePanel.renderable = active;
 
+        let objectPanel = objects[input_uid + '_panel_select'];
+        objectPanel.children.forEach(function(childUid) {
+            let shapeChild = shapes[childUid];
+            shapeChild.zIndex = active ? 9999 : 0;
+            shapeChild.renderable = active;
+        });
+
     }
     window['__name__']();
 
