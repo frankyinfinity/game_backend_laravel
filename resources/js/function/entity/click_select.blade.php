@@ -31,7 +31,7 @@
         shapeBorder.tint = active ? activeColor : notActiveColor;
 
         let shapeValueText = shapes[window.input_uid + '_box_icon_text'];
-        shapeValueText.text = active ? 'V' : 'A';
+            shapeValueText.text = active ? '^' : 'V';
 
         let shapePanel = shapes[window.input_uid + '_panel_select'];
         shapePanel.renderable = active;
@@ -48,7 +48,9 @@
         shapes[window.input_uid + '_scroll_down'].renderable = active;
         shapes[window.input_uid + '_scroll_down_text'].renderable = active;
 
-        updateVisibility(window.input_uid, objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
+        if (active) {
+            updateVisibility(window.input_uid, objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
+        }
 
     }
     window['__name__']();
