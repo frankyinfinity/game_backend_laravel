@@ -223,8 +223,10 @@ class SelectDraw {
         $panel->setRenderable(false);
 
         //Options
-        $heightOption = $heightPanel / $optionShowDisplay;
         $options = $this->options;
+        
+
+        $heightOption = $heightPanel / $optionShowDisplay;
         $optionId = $this->optionId;
         $optionText = $this->optionText;
 

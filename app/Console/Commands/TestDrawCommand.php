@@ -83,6 +83,8 @@ class TestDrawCommand extends Command
         $select->setOptions($planets);
         $select->setOptionId('id');
         $select->setOptionText('name');
+        $select->setOptionShowDisplay(2);
+
         $select->setOrigin($x, $y);
         $select->setSize(500, 50);
         $select->setBorderThickness(2);
