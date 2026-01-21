@@ -10,6 +10,7 @@ use App\Custom\Draw\Primitive\Text;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
+use App\Custom\Colors;
 
 class SelectDraw {
 
@@ -32,6 +33,12 @@ class SelectDraw {
         $this->borderThickness = 0;
         $this->boxIconColor = 0x000000;
         $this->boxIconTextColor = 0x000000;
+
+        $this->options = [];
+        $this->optionId = '';
+        $this->optionText = '';
+        $this->optionShowDisplay = 5;
+
         $this->drawItems = [];
 
     }
@@ -108,6 +115,26 @@ class SelectDraw {
         return $this->uidValueElement;
     }
 
+    private array $options;
+    public function setOptions(array $options) {
+        $this->options = $options;
+    }
+
+    private string $optionId;
+    public function setOptionId(string $optionId) {
+        $this->optionId = $optionId;
+    }
+
+    private string $optionText;
+    public function setOptionText(string $optionText) {
+        $this->optionText = $optionText;
+    }
+
+    private int $optionShowDisplay;
+    public function setOptionShowDisplay(int $optionShowDisplay) {
+        $this->optionShowDisplay = $optionShowDisplay;
+    }
+
     private $drawItems = [];
     public function getDrawItems() {
         return $this->drawItems;
@@ -182,6 +209,19 @@ class SelectDraw {
         $boxIconText->setText('V');
         $boxIconText->setRenderable(true);
         $drawItems[] = $boxIconText->buildJson();
+
+        //Panel
+        $y+= ($height+5);
+        $optionShowDisplay = $this->optionShowDisplay;
+        $heightPanel = $height * $optionShowDisplay;
+
+        $panel = new Rectangle($this->uid.'_panel_select');
+        $panel->setOrigin($x, $y);
+        $panel->setSize($width, $heightPanel);
+        $panel->setColor(Colors::LIGHT_GRAY);
+        $panel->setRenderable(false);
+
+        $drawItems[] = $panel->buildJson();
 
         $this->drawItems = $drawItems;
 

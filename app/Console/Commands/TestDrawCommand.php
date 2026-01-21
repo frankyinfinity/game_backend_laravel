@@ -80,6 +80,9 @@ class TestDrawCommand extends Command
         $select->setName('birth_planet_id');
         $select->setRequired(true);
         $select->setTitle('Pianeta Natale');
+        $select->setOptions($planets);
+        $select->setOptionId('id');
+        $select->setOptionText('name');
         $select->setOrigin($x, $y);
         $select->setSize(500, 50);
         $select->setBorderThickness(2);
