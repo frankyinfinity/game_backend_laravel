@@ -1,5 +1,24 @@
 <script>
 
+    window['moveShapes_' + window.input_uid] = function(deltaY, optionIds, totalOptions) {
+        for (let idx = 0; idx < totalOptions; idx++) {
+            let id = optionIds[idx];
+            shapes[window.input_uid + '_option_rect_' + id].y += deltaY;
+            shapes[window.input_uid + '_option_border_' + id].y += deltaY;
+            shapes[window.input_uid + '_option_text_' + id].y += deltaY;
+        }
+    };
+
+    window['updateVisibility_' + window.input_uid] = function(currentStart, optionShowDisplay, optionIds, totalOptions) {
+        for (let idx = 0; idx < totalOptions; idx++) {
+            let id = optionIds[idx];
+            let visible = idx >= currentStart && idx < currentStart + optionShowDisplay;
+            shapes[window.input_uid + '_option_rect_' + id].renderable = visible;
+            shapes[window.input_uid + '_option_border_' + id].renderable = visible;
+            shapes[window.input_uid + '_option_text_' + id].renderable = visible;
+        }
+    }
+
     window['__name__'] = function() {
 
         window.input_uid = object['uid'].split('_')[0];
@@ -49,7 +68,7 @@
         shapes[window.input_uid + '_scroll_down_text'].renderable = active;
 
         if (active) {
-            updateVisibility(window.input_uid, objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
+            window['updateVisibility_' + window.input_uid](objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
         }
 
     }
@@ -65,8 +84,8 @@
         if (currentStart > 0) {
             currentStart--;
             objectBody.attributes.currentStart = currentStart;
-            moveShapes(window.input_uid, heightOption, optionIds, totalOptions);
-            updateVisibility(window.input_uid, currentStart, optionShowDisplay, optionIds, totalOptions);
+            window['moveShapes_' + window.input_uid](heightOption, optionIds, totalOptions);
+            window['updateVisibility_' + window.input_uid](currentStart, optionShowDisplay, optionIds, totalOptions);
         }
     };
 
@@ -80,28 +99,9 @@
         if (currentStart + optionShowDisplay < totalOptions) {
             currentStart++;
             objectBody.attributes.currentStart = currentStart;
-            moveShapes(window.input_uid, -heightOption, optionIds, totalOptions);
-            updateVisibility(window.input_uid, currentStart, optionShowDisplay, optionIds, totalOptions);
+            window['moveShapes_' + window.input_uid](-heightOption, optionIds, totalOptions);
+            window['updateVisibility_' + window.input_uid](currentStart, optionShowDisplay, optionIds, totalOptions);
         }
     };
-
-    function moveShapes(uid, deltaY, optionIds, totalOptions) {
-        for (let idx = 0; idx < totalOptions; idx++) {
-            let id = optionIds[idx];
-            shapes[uid + '_option_rect_' + id].y += deltaY;
-            shapes[uid + '_option_border_' + id].y += deltaY;
-            shapes[uid + '_option_text_' + id].y += deltaY;
-        }
-    };
-
-    function updateVisibility(uid, currentStart, optionShowDisplay, optionIds, totalOptions) {
-        for (let idx = 0; idx < totalOptions; idx++) {
-            let id = optionIds[idx];
-            let visible = idx >= currentStart && idx < currentStart + optionShowDisplay;
-            shapes[uid + '_option_rect_' + id].renderable = visible;
-            shapes[uid + '_option_border_' + id].renderable = visible;
-            shapes[uid + '_option_text_' + id].renderable = visible;
-        }
-    }
 
 </script>
