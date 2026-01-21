@@ -31,7 +31,7 @@
         shapeBorder.tint = active ? activeColor : notActiveColor;
 
         let shapeValueText = shapes[input_uid + '_box_icon_text'];
-        shapeValueText.text = active ? 'V' : '∧';
+        shapeValueText.text = active ? 'V' : 'A';
 
         let shapePanel = shapes[input_uid + '_panel_select'];
         shapePanel.renderable = active;
@@ -43,7 +43,68 @@
             shapeChild.renderable = active;
         });
 
+        shapes[input_uid + '_scroll_up'].renderable = active;
+        shapes[input_uid + '_scroll_up_text'].renderable = active;
+        shapes[input_uid + '_scroll_down'].renderable = active;
+        shapes[input_uid + '_scroll_down_text'].renderable = active;
+
+        updateVisibility(input_uid, objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
+
     }
     window['__name__']();
+
+    window['scroll_up_' + input_uid] = function() {
+        let objectBody = objects[input_uid + '_body_select'];
+        let currentStart = objectBody.attributes.currentStart || 0;
+        let optionShowDisplay = objectBody.attributes.optionShowDisplay;
+        let totalOptions = objectBody.attributes.totalOptions;
+        let heightOption = objectBody.attributes.heightOption;
+        let optionIds = objectBody.attributes.optionIds;
+        if (currentStart > 0) {
+            currentStart--;
+            objectBody.attributes.currentStart = currentStart;
+            moveShapes(uid, heightOption, optionIds, totalOptions);
+            updateVisibility(uid, currentStart, optionShowDisplay, optionIds, totalOptions);
+        }
+    };
+
+    window['scroll_down_' + input_uid] = function() {
+        let objectBody = objects[input_uid + '_body_select'];
+        let currentStart = objectBody.attributes.currentStart || 0;
+        let optionShowDisplay = objectBody.attributes.optionShowDisplay;
+        let totalOptions = objectBody.attributes.totalOptions;
+        let heightOption = objectBody.attributes.heightOption;
+        let optionIds = objectBody.attributes.optionIds;
+        if (currentStart + optionShowDisplay < totalOptions) {
+            currentStart++;
+            objectBody.attributes.currentStart = currentStart;
+            moveShapes(uid, -heightOption, optionIds, totalOptions);
+            updateVisibility(uid, currentStart, optionShowDisplay, optionIds, totalOptions);
+        }
+    };
+
+    function moveShapes(uid, deltaY, optionIds, totalOptions) {
+        for (let idx = 0; idx < totalOptions; idx++) {
+            let id = optionIds[idx];
+            let rect = shapes[uid + '_option_rect_' + id];
+            let text = shapes[uid + '_option_text_' + id];
+            let border = shapes[uid + '_option_border_' + id];
+            rect.y += deltaY;
+            text.y += deltaY;
+            if (border && border.points) {
+                border.points.forEach(p => p.y += deltaY);
+            }
+        }
+    }
+
+    function updateVisibility(uid, currentStart, optionShowDisplay, optionIds, totalOptions) {
+        for (let idx = 0; idx < totalOptions; idx++) {
+            let id = optionIds[idx];
+            let visible = idx >= currentStart && idx < currentStart + optionShowDisplay;
+            shapes[uid + '_option_rect_' + id].renderable = visible;
+            shapes[uid + '_option_border_' + id].renderable = visible;
+            shapes[uid + '_option_text_' + id].renderable = visible;
+        }
+    }
 
 </script>

@@ -149,6 +149,15 @@ class SelectDraw {
         $width = $this->width;
         $height = $this->height;
 
+        //Options
+        $options = $this->options;
+        $optionId = $this->optionId;
+        $optionText = $this->optionText;
+
+        $optionShowDisplay = $this->optionShowDisplay;
+        $heightPanel = $height * $optionShowDisplay;
+        $heightOption = $heightPanel / $optionShowDisplay;
+
         //Title
         $title = new Text($this->uid.'_title');
         $title->setFontSize(20);
@@ -170,6 +179,11 @@ class SelectDraw {
         $body->addAttributes('border_not_active_color', $this->borderColor);
         $body->addAttributes('border_active_color', 0x0000FF);
         $body->addAttributes('active', false);
+        $body->addAttributes('currentStart', 0);
+        $body->addAttributes('optionShowDisplay', $this->optionShowDisplay);
+        $body->addAttributes('totalOptions', count($this->options));
+        $body->addAttributes('heightOption', $heightOption);
+        $body->addAttributes('optionIds', array_map(function($option, $index) use ($optionId) { return $option[$optionId] ?? $index; }, $this->options, array_keys($this->options)));
 
         $jsPathClickInput = resource_path('js/function/entity/click_select.blade.php');
         $jsPathClickInput = file_get_contents($jsPathClickInput);
@@ -212,8 +226,6 @@ class SelectDraw {
 
         //Panel
         $y += ($height + 5);
-        $optionShowDisplay = $this->optionShowDisplay;
-        $heightPanel = $height * $optionShowDisplay;
         $colorPanel = Colors::LIGHT_GRAY;
 
         $panel = new Rectangle($this->uid.'_panel_select');
@@ -222,16 +234,8 @@ class SelectDraw {
         $panel->setColor($colorPanel);
         $panel->setRenderable(false);
 
-        //Options
-        $options = $this->options;
-        $options = array_slice($options, 0, $optionShowDisplay);
-
-        $heightOption = $heightPanel / $optionShowDisplay;
-        $optionId = $this->optionId;
-        $optionText = $this->optionText;
-
-        foreach ($options as $option) {
-            $id = $option[$optionId];
+        foreach ($options as $index => $option) {
+            $id = $option[$optionId] ?? $index;
             $text = $option[$optionText];
 
             $optionRect = new Rectangle($this->uid.'_option_rect_'.$id);
@@ -267,6 +271,46 @@ class SelectDraw {
         }
 
         $drawItems[] = $panel->buildJson();
+
+        //Up button
+        $upButton = new Square($this->uid.'_scroll_up');
+        $upButton->setOrigin($x + $width + 5, $y - $heightPanel);
+        $upButton->setSize(20, 20);
+        $upButton->setColor(0xCCCCCC);
+        $upButton->setRenderable(false);
+        $upButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_up_" . $this->uid . "']();");
+        $drawItems[] = $upButton->buildJson();
+
+        //Up text
+        $upText = new Text($this->uid.'_scroll_up_text');
+        $upText->setCenterAnchor(true);
+        $upText->setFontSize(16);
+        $centerUp = $upButton->getCenter();
+        $upText->setOrigin($centerUp['x'], $centerUp['y']);
+        $upText->setColor(0x000000);
+        $upText->setText('^');
+        $upText->setRenderable(false);
+        $drawItems[] = $upText->buildJson();
+
+        //Down button
+        $downButton = new Square($this->uid.'_scroll_down');
+        $downButton->setOrigin($x + $width + 5, $y - $heightPanel + $heightPanel - 20);
+        $downButton->setSize(20, 20);
+        $downButton->setColor(0xCCCCCC);
+        $downButton->setRenderable(false);
+        $downButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_down_" . $this->uid . "']();");
+        $drawItems[] = $downButton->buildJson();
+
+        //Down text
+        $downText = new Text($this->uid.'_scroll_down_text');
+        $downText->setCenterAnchor(true);
+        $downText->setFontSize(16);
+        $centerDown = $downButton->getCenter();
+        $downText->setOrigin($centerDown['x'], $centerDown['y']);
+        $downText->setColor(0x000000);
+        $downText->setText('V');
+        $downText->setRenderable(false);
+        $drawItems[] = $downText->buildJson();
 
         $this->drawItems = $drawItems;
 
