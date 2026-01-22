@@ -1,5 +1,8 @@
 <script>
 
+    // Initialize input_uid FIRST, before defining any functions that use it
+    window.input_uid = object['uid'].split('_')[0];
+
     window['moveShapes_' + window.input_uid] = function(deltaY, optionIds, totalOptions) {
         for (let idx = 0; idx < totalOptions; idx++) {
             let id = optionIds[idx];
@@ -20,8 +23,6 @@
     }
 
     window['__name__'] = function() {
-
-        window.input_uid = object['uid'].split('_')[0];
 
         let objectBody = objects[window.input_uid+'_body_select'];
         let notActiveColor = objectBody.attributes.border_not_active_color;
