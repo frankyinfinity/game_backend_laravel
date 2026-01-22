@@ -152,7 +152,7 @@ class GenerateMapJob implements ShouldQueue
 
                     $entityDraw = new EntityDraw($searchEntity, $square);
 
-                    $entityDrawItems = $entityDraw->getItems();
+                    $entityDrawItems = $entityDraw->getDrawItems();
                     foreach ($entityDrawItems as $entityDrawItem) {
                         //Draw
                         $objectDraw = new ObjectDraw($entityDrawItem, $player->actual_session_id);

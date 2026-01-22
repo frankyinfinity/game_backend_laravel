@@ -16,11 +16,11 @@ class ButtonDraw {
         $this->renderable = true;
     }
 
-    private array $items = [];
-    public function getItems(): array
+    private array $drawItems = [];
+    public function getDrawItems(): array
     {
-        return $this->items;
-    }
+        return $this->drawItems;
+    } 
 
     private $width;
     private $height;
@@ -121,8 +121,8 @@ class ButtonDraw {
         $text->setColor($colorString);
         $text->setRenderable($this->renderable);
 
-        $this->items[] = $rect;
-        $this->items[] = $text;
+        $this->drawItems[] = $rect;
+        $this->drawItems[] = $text;
 
     }
 

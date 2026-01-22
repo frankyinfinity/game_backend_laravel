@@ -18,16 +18,16 @@ class EntityDraw
 
     private Entity $dbEntity;
     private Square $square;
-    private array $items;
-    public function getItems(): array
+    private array $drawItems;
+    public function getDrawItems(): array
     {
-        return $this->items;
+        return $this->drawItems;
     }
 
     public function __construct(Entity $dbEntity, Square $square) {
         $this->dbEntity = $dbEntity;
         $this->square = $square;
-        $this->items = [];
+        $this->drawItems = [];
         $this->build();
     }
     private function getGenomes() {
@@ -202,20 +202,20 @@ class EntityDraw
         //Set Children (Panel)
         $panel->addChild($text1);
         $panel->addChild($text2);
-        foreach ($upButton->getItems() as $item) {$panel->addChild($item);}
-        foreach ($leftButton->getItems() as $item) {$panel->addChild($item);}
-        foreach ($downButton->getItems() as $item) {$panel->addChild($item);}
-        foreach ($rightButton->getItems() as $item) {$panel->addChild($item);}
+        foreach ($upButton->getDrawItems() as $item) {$panel->addChild($item);}
+        foreach ($leftButton->getDrawItems() as $item) {$panel->addChild($item);}
+        foreach ($downButton->getDrawItems() as $item) {$panel->addChild($item);}
+        foreach ($rightButton->getDrawItems() as $item) {$panel->addChild($item);}
 
         //Get JSON
-        $this->items[] = $circle->buildJson();
-        $this->items[] = $panel->buildJson();
-        $this->items[] = $text1->buildJson();
-        $this->items[] = $text2->buildJson();
-        foreach ($upButton->getItems() as $item) {$this->items[] = $item->buildJson();}
-        foreach ($leftButton->getItems() as $item) {$this->items[] = $item->buildJson();}
-        foreach ($downButton->getItems() as $item) {$this->items[] = $item->buildJson();}
-        foreach ($rightButton->getItems() as $item) {$this->items[] = $item->buildJson();}
+        $this->drawItems[] = $circle->buildJson();
+        $this->drawItems[] = $panel->buildJson();
+        $this->drawItems[] = $text1->buildJson();
+        $this->drawItems[] = $text2->buildJson();
+        foreach ($upButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        foreach ($leftButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        foreach ($downButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        foreach ($rightButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
 
     }
 

@@ -73,34 +73,33 @@ class TestDrawCommand extends Command
         $responseBody = json_decode($response->getContent(), true);
         $planets = $responseBody['planets'] ?? [];
 
-        //Select
         $x = 50;
         $y = 50;
 
-        //Select 1
-        $select = new SelectDraw(Str::random(20), $sessionId);
-        $select->setName('birth_planet_id');
-        $select->setRequired(true);
-        $select->setTitle('Pianeta Natale');
-        $select->setOptions($planets);
-        $select->setOptionId('id');
-        $select->setOptionText('name');
-        $select->setOptionShowDisplay(2);
+        //Select Planet
+        $selectPlanet = new SelectDraw(Str::random(20), $sessionId);
+        $selectPlanet->setName('birth_planet_id');
+        $selectPlanet->setRequired(true);
+        $selectPlanet->setTitle('Pianeta Natale');
+        $selectPlanet->setOptions($planets);
+        $selectPlanet->setOptionId('id');
+        $selectPlanet->setOptionText('name');
+        $selectPlanet->setOptionShowDisplay(2);
 
-        $select->setOrigin($x, $y);
-        $select->setSize(500, 50);
-        $select->setBorderThickness(2);
-        $select->setBorderColor(Colors::DARK_GRAY);
-        $select->setTitleColor(Colors::BLACK);
-        $select->setValueColor(Colors::BLACK);
-        $select->setBackgroundColor(Colors::WHITE);
-        $select->setBoxIconColor(Colors::LIGHT_GRAY);
-        $select->setBoxIconTextColor(Colors::BLACK);
-        $select->setOnChange(resource_path('js/function/entity/on_change_planet.blade.php'));
-        $select->build();
+        $selectPlanet->setOrigin($x, $y);
+        $selectPlanet->setSize(500, 50);
+        $selectPlanet->setBorderThickness(2);
+        $selectPlanet->setBorderColor(Colors::DARK_GRAY);
+        $selectPlanet->setTitleColor(Colors::BLACK);
+        $selectPlanet->setValueColor(Colors::BLACK);
+        $selectPlanet->setBackgroundColor(Colors::WHITE);
+        $selectPlanet->setBoxIconColor(Colors::LIGHT_GRAY);
+        $selectPlanet->setBoxIconTextColor(Colors::BLACK);
+        $selectPlanet->setOnChange(resource_path('js/function/entity/on_change_planet.blade.php'));
+        $selectPlanet->build();
 
         //Get all
-        $listItems = $select->getDrawItems();
+        $listItems = $selectPlanet->getDrawItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
