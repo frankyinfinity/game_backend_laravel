@@ -22,6 +22,28 @@
         }
     }
 
+    window['updateOptionColors_' + window.input_uid] = function(selectedOptionId, optionIds, totalOptions) {
+        for (let idx = 0; idx < totalOptions; idx++) {
+            let id = optionIds[idx];
+            let optionText = shapes[window.input_uid + '_option_text_' + id];
+            let optionBorder = shapes[window.input_uid + '_option_border_' + id];
+            
+            if (id === selectedOptionId) {
+                if (optionText) optionText.tint = 0x0000FF; // Blue text
+                if (optionBorder) optionBorder.tint = 0x0000FF; // Blue border
+            } else {
+                if (optionText) optionText.tint = 0x000000; // Black text
+                if (optionBorder) optionBorder.tint = 0x000000; // Black border
+            }
+        }
+    }
+
+
+
+
+
+
+
     window['__name__'] = function() {
 
         let objectBody = objects[window.input_uid+'_body_select'];
@@ -70,7 +92,9 @@
 
         if (active) {
             window['updateVisibility_' + window.input_uid](objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
+            window['updateOptionColors_' + window.input_uid](objectBody.attributes.selectedOptionId, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
         }
+
 
     }
     window['__name__']();

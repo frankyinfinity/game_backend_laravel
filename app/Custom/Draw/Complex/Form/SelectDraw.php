@@ -184,6 +184,8 @@ class SelectDraw {
         $body->addAttributes('totalOptions', count($this->options));
         $body->addAttributes('heightOption', $heightOption);
         $body->addAttributes('optionIds', array_map(function($option, $index) use ($optionId) { return $option[$optionId] ?? $index; }, $this->options, array_keys($this->options)));
+        $body->addAttributes('selectedOptionId', null);
+        $body->addAttributes('selectedOptionText', '');
 
         $jsPathClickInput = resource_path('js/function/entity/click_select.blade.php');
         $jsPathClickInput = file_get_contents($jsPathClickInput);
@@ -224,6 +226,15 @@ class SelectDraw {
         $boxIconText->setRenderable(true);
         $drawItems[] = $boxIconText->buildJson();
 
+        //Value Text (shows selected option)
+        $valueText = new Text($this->uid.'_value_text');
+        $valueText->setOrigin($x + 5, $y + ($height - 20)/2);
+        $valueText->setFontSize(20);
+        $valueText->setColor($this->valueColor);
+        $valueText->setText('');
+        $valueText->setRenderable(true);
+        $drawItems[] = $valueText->buildJson();
+
         //Panel
         $y += ($height + 5);
         $colorPanel = Colors::LIGHT_GRAY;
@@ -243,6 +254,14 @@ class SelectDraw {
             $optionRect->setSize($width, $heightOption);
             $optionRect->setColor($colorPanel);
             $optionRect->setRenderable(false);
+            $optionRect->addAttributes('optionId', $id);
+            $optionRect->addAttributes('optionText', $text);
+            
+            $jsPathClickOption = resource_path('js/function/entity/click_select_option.blade.php');
+            $jsPathClickOption = file_get_contents($jsPathClickOption);
+            $jsPathClickOption = Helper::setCommonJsCode($jsPathClickOption, Str::random(20));
+            $optionRect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickOption);
+            
             $panel->addChild($optionRect);
             $drawItems[] = $optionRect->buildJson();
 
@@ -253,7 +272,7 @@ class SelectDraw {
             $optionBorder->setPoint($x, $y+$heightOption);
             $optionBorder->setPoint($x, $y);
             $optionBorder->setThickness($this->borderThickness);
-            $optionBorder->setColor($this->borderColor);
+            $optionBorder->setColor(0xFFFFFF);
             $optionBorder->setRenderable(false);
             $panel->addChild($optionBorder);
             $drawItems[] = $optionBorder->buildJson();
@@ -261,7 +280,7 @@ class SelectDraw {
             $optionTextObj = new Text($this->uid.'_option_text_'.$id);
             $optionTextObj->setOrigin($x + 5, $y + ($heightOption - 20)/2);
             $optionTextObj->setFontSize(20);
-            $optionTextObj->setColor($this->valueColor);
+            $optionTextObj->setColor(0xFFFFFF);
             $optionTextObj->setText($text);
             $optionTextObj->setRenderable(false);
             $panel->addChild($optionTextObj);
