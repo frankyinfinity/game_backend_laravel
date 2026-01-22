@@ -309,8 +309,8 @@ class SelectDraw {
 
         //Up button
         $upButton = new Rectangle($this->uid.'_scroll_up');
-        $upButton->setOrigin($x + $width - 40, $panelY + 5);
-        $upButton->setSize(40, 40);
+        $upButton->setOrigin($x + $width - 30, $panelY);
+        $upButton->setSize(30, 30);
         $upButton->setColor(0xBBBBBB);
         $upButton->setRenderable(false);
         $upButton->addAttributes('zIndex', 10000);
@@ -320,8 +320,9 @@ class SelectDraw {
         //Up text
         $upText = new Text($this->uid.'_scroll_up_text');
         $upText->setCenterAnchor(true);
-        $upText->setFontSize(26);
-        $upText->setOrigin($x + $width - 20, $panelY + 25);
+        $upText->setFontSize(22);
+        // Center in 30x30: x = +15, y = +15
+        $upText->setOrigin($x + $width - 15, $panelY + 15);
         $upText->setColor(0x333333);
         $upText->setText('^');
         $upText->setRenderable(false);
@@ -330,8 +331,8 @@ class SelectDraw {
 
         //Down button
         $downButton = new Rectangle($this->uid.'_scroll_down');
-        $downButton->setOrigin($x + $width - 40, $panelY + $heightPanel - 45);
-        $downButton->setSize(40, 40);
+        $downButton->setOrigin($x + $width - 30, $panelY + $heightPanel - 30);
+        $downButton->setSize(30, 30);
         $downButton->setColor(0xBBBBBB);
         $downButton->setRenderable(false);
         $downButton->addAttributes('zIndex', 10000);
@@ -341,8 +342,9 @@ class SelectDraw {
         //Down text
         $downText = new Text($this->uid.'_scroll_down_text');
         $downText->setCenterAnchor(true);
-        $downText->setFontSize(26);
-        $downText->setOrigin($x + $width - 20, $panelY + $heightPanel - 25);
+        $downText->setFontSize(22);
+        // Center in 30x30: x = +15, y = +15
+        $downText->setOrigin($x + $width - 15, $panelY + $heightPanel - 15);
         $downText->setColor(0x333333);
         $downText->setText('V');
         $downText->setRenderable(false);
