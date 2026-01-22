@@ -102,12 +102,14 @@
             shapeChild.renderable = active;
         });
 
-        // Manage Top-Level Scroll Buttons
+        // Manage Top-Level Scroll Components
         let scrollIds = [
             window.input_uid + '_scroll_up',
             window.input_uid + '_scroll_up_text',
             window.input_uid + '_scroll_down',
-            window.input_uid + '_scroll_down_text'
+            window.input_uid + '_scroll_down_text',
+            window.input_uid + '_scrollbar_strip',
+            window.input_uid + '_scrollbar_border'
         ];
 
         scrollIds.forEach(function(id) {
@@ -115,7 +117,13 @@
             if (shapeScroll) {
                 shapeScroll.renderable = active;
                 if (active) {
-                    shapeScroll.zIndex = id.includes('_text') ? 10001 : 10000;
+                    if (id.includes('_text')) {
+                        shapeScroll.zIndex = 10001;
+                    } else if (id.includes('_scroll_')) {
+                        shapeScroll.zIndex = 10000;
+                    } else {
+                        shapeScroll.zIndex = 5; // Background and border
+                    }
                 } else {
                     shapeScroll.zIndex = 0;
                 }

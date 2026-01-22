@@ -307,6 +307,28 @@ class SelectDraw {
 
         $drawItems[] = $panel->buildJson();
 
+        //Scrollbar Strip Background
+        $scrollbarStrip = new Rectangle($this->uid.'_scrollbar_strip');
+        $scrollbarStrip->setOrigin($x + $width - 30, $panelY);
+        $scrollbarStrip->setSize(30, $heightPanel);
+        $scrollbarStrip->setColor($colorPanel);
+        $scrollbarStrip->setRenderable(false);
+        $scrollbarStrip->addAttributes('zIndex', 5);
+        $drawItems[] = $scrollbarStrip->buildJson();
+
+        //Scrollbar Strip Border
+        $scrollbarBorder = new MultiLine($this->uid.'_scrollbar_border');
+        $scrollbarBorder->setPoint($x + $width - 30, $panelY);
+        $scrollbarBorder->setPoint($x + $width, $panelY);
+        $scrollbarBorder->setPoint($x + $width, $panelY + $heightPanel);
+        $scrollbarBorder->setPoint($x + $width - 30, $panelY + $heightPanel);
+        $scrollbarBorder->setPoint($x + $width - 30, $panelY);
+        $scrollbarBorder->setThickness(1);
+        $scrollbarBorder->setColor(0x000000); // Black border
+        $scrollbarBorder->setRenderable(false);
+        $scrollbarBorder->addAttributes('zIndex', 6);
+        $drawItems[] = $scrollbarBorder->buildJson();
+
         //Up button
         $upButton = new Rectangle($this->uid.'_scroll_up');
         $upButton->setOrigin($x + $width - 30, $panelY);
