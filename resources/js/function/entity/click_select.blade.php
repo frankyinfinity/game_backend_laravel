@@ -31,20 +31,20 @@
             if (id === selectedOptionId) {
                 if (optionText) {
                     optionText.tint = 0x0000FF; // Blue text
-                    optionText.zIndex = 9999;
+                    optionText.zIndex = 11002;
                 }
                 if (optionBorder) {
                     optionBorder.tint = 0x0000FF; // Blue border
-                    optionBorder.zIndex = 9999;
+                    optionBorder.zIndex = 11002;
                 }
             } else {
                 if (optionText) {
                     optionText.tint = 0x000000; // Black text
-                    optionText.zIndex = 1;
+                    optionText.zIndex = 11001;
                 }
                 if (optionBorder) {
                     optionBorder.tint = 0x000000; // Black border
-                    optionBorder.zIndex = 1;
+                    optionBorder.zIndex = 11001;
                 }
             }
         }
@@ -89,13 +89,18 @@
 
         let shapePanel = shapes[window.input_uid + '_panel_select'];
         shapePanel.renderable = active;
+        if (active) {
+            shapePanel.zIndex = 11000;
+        } else {
+            shapePanel.zIndex = 0;
+        }
 
         let objectPanel = objects[window.input_uid + '_panel_select'];
         objectPanel.children.forEach(function(childUid) {
             let shapeChild = shapes[childUid];
             if (!shapeChild) return;
             if (active) {
-                shapeChild.zIndex = 1;
+                shapeChild.zIndex = 11001;
             } else {
                 shapeChild.zIndex = 0;
             }
@@ -118,11 +123,13 @@
                 shapeScroll.renderable = active;
                 if (active) {
                     if (id.includes('_text')) {
-                        shapeScroll.zIndex = 10001;
+                        shapeScroll.zIndex = 12001;
                     } else if (id.includes('_scroll_')) {
-                        shapeScroll.zIndex = 10000;
+                        shapeScroll.zIndex = 12000;
+                    } else if (id.includes('_scrollbar_strip') || id.includes('_scrollbar_border')) {
+                        shapeScroll.zIndex = 11005;
                     } else {
-                        shapeScroll.zIndex = 5; // Background and border
+                        shapeScroll.zIndex = 11005; 
                     }
                 } else {
                     shapeScroll.zIndex = 0;

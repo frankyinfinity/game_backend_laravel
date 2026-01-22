@@ -301,7 +301,7 @@ class SelectDraw {
             $optionBorder->setThickness($this->borderThickness);
             $optionBorder->setColor(0xFFFFFF);
             $optionBorder->setRenderable(false);
-            $optionBorder->addAttributes('zIndex', 1);
+            $optionBorder->addAttributes('zIndex', 11001);
             $panel->addChild($optionBorder);
             $drawItems[] = $optionBorder->buildJson();
 
@@ -311,7 +311,7 @@ class SelectDraw {
             $optionTextObj->setColor(0xFFFFFF);
             $optionTextObj->setText($text);
             $optionTextObj->setRenderable(false);
-            $optionTextObj->addAttributes('zIndex', 1);
+            $optionTextObj->addAttributes('zIndex', 11001);
             $panel->addChild($optionTextObj);
             $drawItems[] = $optionTextObj->buildJson();
 
@@ -326,7 +326,7 @@ class SelectDraw {
         $scrollbarStrip->setSize(30, $heightPanel);
         $scrollbarStrip->setColor($colorPanel);
         $scrollbarStrip->setRenderable(false);
-        $scrollbarStrip->addAttributes('zIndex', 5);
+        $scrollbarStrip->addAttributes('zIndex', 11005);
         $drawItems[] = $scrollbarStrip->buildJson();
 
         //Scrollbar Strip Border
@@ -339,7 +339,7 @@ class SelectDraw {
         $scrollbarBorder->setThickness(1);
         $scrollbarBorder->setColor(0x000000); // Black border
         $scrollbarBorder->setRenderable(false);
-        $scrollbarBorder->addAttributes('zIndex', 6);
+        $scrollbarBorder->addAttributes('zIndex', 11006);
         $drawItems[] = $scrollbarBorder->buildJson();
 
         //Up button
@@ -348,7 +348,7 @@ class SelectDraw {
         $upButton->setSize(30, 30);
         $upButton->setColor(0xBBBBBB);
         $upButton->setRenderable(false);
-        $upButton->addAttributes('zIndex', 10000);
+        $upButton->addAttributes('zIndex', 12000);
         $upButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_up_" . $this->uid . "']();");
         $drawItems[] = $upButton->buildJson();
 
@@ -361,7 +361,7 @@ class SelectDraw {
         $upText->setColor(0x333333);
         $upText->setText('^');
         $upText->setRenderable(false);
-        $upText->addAttributes('zIndex', 10001);
+        $upText->addAttributes('zIndex', 12001);
         $drawItems[] = $upText->buildJson();
 
         //Down button
@@ -370,7 +370,7 @@ class SelectDraw {
         $downButton->setSize(30, 30);
         $downButton->setColor(0xBBBBBB);
         $downButton->setRenderable(false);
-        $downButton->addAttributes('zIndex', 10000);
+        $downButton->addAttributes('zIndex', 12000);
         $downButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_down_" . $this->uid . "']();");
         $drawItems[] = $downButton->buildJson();
 
@@ -383,7 +383,7 @@ class SelectDraw {
         $downText->setColor(0x333333);
         $downText->setText('V');
         $downText->setRenderable(false);
-        $downText->addAttributes('zIndex', 10001);
+        $downText->addAttributes('zIndex', 12001);
         $drawItems[] = $downText->buildJson();
 
         $this->drawItems = $drawItems;

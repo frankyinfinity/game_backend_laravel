@@ -31,11 +31,11 @@
             let prevOptionBorder = shapes[window.input_uid + '_option_border_' + previousSelectedId];
             if (prevOptionText) {
                 prevOptionText.tint = 0x000000; // Black text
-                prevOptionText.zIndex = 1;
+                prevOptionText.zIndex = 11001;
             }
             if (prevOptionBorder) {
                 prevOptionBorder.tint = 0x000000; // Black border
-                prevOptionBorder.zIndex = 1;
+                prevOptionBorder.zIndex = 11001;
             }
         }
         
@@ -45,11 +45,11 @@
         
         if (currentOptionText) {
             currentOptionText.tint = 0x0000FF; // Blue text
-            currentOptionText.zIndex = 9999;
+            currentOptionText.zIndex = 11002;
         }
         if (currentOptionBorder) {
             currentOptionBorder.tint = 0x0000FF; // Blue border
-            currentOptionBorder.zIndex = 9999;
+            currentOptionBorder.zIndex = 11002;
         }
         
         // Execute custom onChange JS if provided
