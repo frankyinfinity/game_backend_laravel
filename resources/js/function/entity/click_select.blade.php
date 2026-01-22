@@ -29,11 +29,23 @@
             let optionBorder = shapes[window.input_uid + '_option_border_' + id];
             
             if (id === selectedOptionId) {
-                if (optionText) optionText.tint = 0x0000FF; // Blue text
-                if (optionBorder) optionBorder.tint = 0x0000FF; // Blue border
+                if (optionText) {
+                    optionText.tint = 0x0000FF; // Blue text
+                    optionText.zIndex = 9999;
+                }
+                if (optionBorder) {
+                    optionBorder.tint = 0x0000FF; // Blue border
+                    optionBorder.zIndex = 9999;
+                }
             } else {
-                if (optionText) optionText.tint = 0x000000; // Black text
-                if (optionBorder) optionBorder.tint = 0x000000; // Black border
+                if (optionText) {
+                    optionText.tint = 0x000000; // Black text
+                    optionText.zIndex = 1;
+                }
+                if (optionBorder) {
+                    optionBorder.tint = 0x000000; // Black border
+                    optionBorder.zIndex = 1;
+                }
             }
         }
     }
@@ -81,7 +93,7 @@
         let objectPanel = objects[window.input_uid + '_panel_select'];
         objectPanel.children.forEach(function(childUid) {
             let shapeChild = shapes[childUid];
-            shapeChild.zIndex = active ? 9999 : 0;
+            shapeChild.zIndex = active ? 1 : 0;
             shapeChild.renderable = active;
         });
 

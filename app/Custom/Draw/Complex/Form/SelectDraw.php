@@ -274,6 +274,7 @@ class SelectDraw {
             $optionBorder->setThickness($this->borderThickness);
             $optionBorder->setColor(0xFFFFFF);
             $optionBorder->setRenderable(false);
+            $optionBorder->addAttributes('zIndex', 1);
             $panel->addChild($optionBorder);
             $drawItems[] = $optionBorder->buildJson();
 
@@ -283,6 +284,7 @@ class SelectDraw {
             $optionTextObj->setColor(0xFFFFFF);
             $optionTextObj->setText($text);
             $optionTextObj->setRenderable(false);
+            $optionTextObj->addAttributes('zIndex', 1);
             $panel->addChild($optionTextObj);
             $drawItems[] = $optionTextObj->buildJson();
 

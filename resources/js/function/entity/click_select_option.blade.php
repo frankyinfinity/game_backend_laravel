@@ -25,9 +25,11 @@
             let prevOptionBorder = shapes[window.input_uid + '_option_border_' + previousSelectedId];
             if (prevOptionText) {
                 prevOptionText.tint = 0x000000; // Black text
+                prevOptionText.zIndex = 1;
             }
             if (prevOptionBorder) {
                 prevOptionBorder.tint = 0x000000; // Black border
+                prevOptionBorder.zIndex = 1;
             }
         }
         
@@ -37,9 +39,11 @@
         
         if (currentOptionText) {
             currentOptionText.tint = 0x0000FF; // Blue text
+            currentOptionText.zIndex = 9999;
         }
         if (currentOptionBorder) {
             currentOptionBorder.tint = 0x0000FF; // Blue border
+            currentOptionBorder.zIndex = 9999;
         }
 
 
