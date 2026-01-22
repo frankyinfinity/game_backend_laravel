@@ -9,6 +9,7 @@ use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
 use App\Models\Player;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
@@ -76,6 +77,7 @@ class TestDrawCommand extends Command
         $x = 50;
         $y = 50;
 
+        //Select 1
         $select = new SelectDraw(Str::random(20), $sessionId);
         $select->setName('birth_planet_id');
         $select->setRequired(true);
@@ -96,6 +98,31 @@ class TestDrawCommand extends Command
         $select->setBoxIconTextColor(Colors::BLACK);
         $select->build();  
 
+        //Select 2
+        $y += 100;
+
+        $users = User::query()->select('id', 'email')->get()->toArray();
+
+        $select2 = new SelectDraw(Str::random(20), $sessionId);
+        $select2->setName('user_id');
+        $select2->setRequired(true);
+        $select2->setTitle('Utente');
+        $select2->setOptions($users);
+        $select2->setOptionId('id');
+        $select2->setOptionText('email');
+        $select2->setOptionShowDisplay(3);
+
+        $select2->setOrigin($x, $y);
+        $select2->setSize(500, 50);
+        $select2->setBorderThickness(2);
+        $select2->setBorderColor(Colors::DARK_GRAY);
+        $select2->setTitleColor(Colors::BLACK);
+        $select2->setValueColor(Colors::BLACK);
+        $select2->setBackgroundColor(Colors::WHITE);
+        $select2->setBoxIconColor(Colors::LIGHT_GRAY);
+        $select2->setBoxIconTextColor(Colors::BLACK);
+        $select2->build();
+
         //Button
         $y += 100;
 
@@ -111,11 +138,18 @@ class TestDrawCommand extends Command
         //Form
         $form = new ActionForm();
         $form->setSelect($select);
+        $form->setSelect($select2); 
         $form->setUrlRequest('/test/action');
         $form->setButton($submitButton);
 
         //Get all
         $listItems = $select->getDrawItems();
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        $listItems = $select2->getDrawItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();

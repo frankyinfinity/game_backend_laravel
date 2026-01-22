@@ -74,14 +74,22 @@
         let objectPanel = objects[window.input_uid + '_panel_select'];
         objectPanel.children.forEach(function(childUid) {
             let shapeChild = shapes[childUid];
-            shapeChild.zIndex = 0;
-            shapeChild.renderable = false;
+            if (shapeChild) {
+                shapeChild.zIndex = 0;
+                shapeChild.renderable = false;
+            }
         });
         
-        shapes[window.input_uid + '_scroll_up'].renderable = false;
-        shapes[window.input_uid + '_scroll_up_text'].renderable = false;
-        shapes[window.input_uid + '_scroll_down'].renderable = false;
-        shapes[window.input_uid + '_scroll_down_text'].renderable = false;
+        // Hide scroll components (some are top-level)
+        let manualHide = [
+            '_scroll_up', '_scroll_up_text', 
+            '_scroll_down', '_scroll_down_text',
+            '_scrollbar_strip', '_scrollbar_border'
+        ];
+        manualHide.forEach(suffix => {
+            let s = shapes[window.input_uid + suffix];
+            if (s) s.renderable = false;
+        });
         
     }
     window['__name__']();
