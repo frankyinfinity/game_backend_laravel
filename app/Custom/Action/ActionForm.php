@@ -3,6 +3,7 @@
 namespace App\Custom\Action;
 
 use App\Custom\Draw\Complex\Form\InputDraw;
+use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
@@ -10,12 +11,18 @@ use Illuminate\Support\Str;
 class ActionForm {
 
     private array $inputs;
+    private array $selects;
     public function __construct() {
         $this->inputs = [];
+        $this->selects = [];
     }
 
     public function setInput(InputDraw $input) {
         $this->inputs[] = $input;
+    }
+
+    public function setSelect(SelectDraw $select) {
+        $this->selects[] = $select;
     }
 
     private $urlRequest;
@@ -27,9 +34,15 @@ class ActionForm {
 
         $datas = [];
         $inputs = $this->inputs;
+        $selects = $this->selects;
         foreach ($inputs as $input) {
             $name = $input->getName();
             $uid = $input->getUidValueElement();
+            $datas['field_'.$name] = $uid;
+        }
+        foreach ($selects as $select) {
+            $name = $select->getName();
+            $uid = $select->getUidValueElement();
             $datas['field_'.$name] = $uid;
         }
 

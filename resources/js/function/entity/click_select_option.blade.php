@@ -18,6 +18,12 @@
         // Update value text
         let shapeValueText = shapes[window.input_uid + '_value_text'];
         shapeValueText.text = optionText;
+
+        // Update value ID
+        let shapeValueId = shapes[window.input_uid + '_value_id'];
+        if (shapeValueId) {
+            shapeValueId.text = optionId;
+        }
         
         // Reset previous selected option color (if any)
         if (previousSelectedId !== null) {

@@ -96,10 +96,34 @@ class TestDrawCommand extends Command
         $select->setBoxIconTextColor(Colors::BLACK);
         $select->build();  
 
+        //Button
+        $y += 100;
+
+        $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
+        $submitButton->setSize(500, 50);
+        $submitButton->setOrigin($x, $y);
+        $submitButton->setString('Accedi');
+        $submitButton->setColorButton(Colors::BLUE);
+        $submitButton->setColorString(Colors::WHITE);
+        $submitButton->setTextFontSize(22);
+        $submitButton->build();
+
+        //Form
+        $form = new ActionForm();
+        $form->setSelect($select);
+        $form->setUrlRequest('/test/action');
+        $form->setButton($submitButton);
+
         //Get all
         $listItems = $select->getDrawItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        $listItems = $submitButton->getItems(); 
+        foreach($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 

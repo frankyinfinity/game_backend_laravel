@@ -235,6 +235,16 @@ class SelectDraw {
         $valueText->setRenderable(true);
         $drawItems[] = $valueText->buildJson();
 
+        //Value ID (shows selected option ID)
+        $this->uidValueElement = $this->uid.'_value_id';
+        $valueIdText = new Text($this->uidValueElement);
+        $valueIdText->setOrigin(10, 10);
+        $valueIdText->setFontSize(20);
+        $valueIdText->setColor($this->valueColor);
+        $valueIdText->setText('');
+        $valueIdText->setRenderable(false);
+        $drawItems[] = $valueIdText->buildJson();
+
         //Panel
         $y += ($height + 5);
         $colorPanel = Colors::LIGHT_GRAY;
