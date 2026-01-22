@@ -255,13 +255,15 @@ class SelectDraw {
         $panel->setColor($colorPanel);
         $panel->setRenderable(false);
 
+        $panelY = $y;
+
         foreach ($options as $index => $option) {
             $id = $option[$optionId] ?? $index;
             $text = $option[$optionText];
 
             $optionRect = new Rectangle($this->uid.'_option_rect_'.$id);
             $optionRect->setOrigin($x, $y);
-            $optionRect->setSize($width, $heightOption);
+            $optionRect->setSize($width - 30, $heightOption); // Lascia spazio per la scrollbar
             $optionRect->setColor($colorPanel);
             $optionRect->setRenderable(false);
             $optionRect->addAttributes('optionId', $id);
@@ -273,12 +275,14 @@ class SelectDraw {
             $optionRect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsPathClickOption);
             
             $panel->addChild($optionRect);
+            // Non lo aggiungiamo a $drawItems qui se vogliamo che venga gestito dal panel, 
+            // ma il sistema sembra richiedere che tutti gli oggetti siano in $drawItems per essere inviati al client inizialmente
             $drawItems[] = $optionRect->buildJson();
 
             $optionBorder = new MultiLine($this->uid.'_option_border_'.$id);
             $optionBorder->setPoint($x, $y);
-            $optionBorder->setPoint($x+$width, $y);
-            $optionBorder->setPoint($x+$width, $y+$heightOption);
+            $optionBorder->setPoint($x+$width-30, $y); // Ridotto larghezza
+            $optionBorder->setPoint($x+$width-30, $y+$heightOption); // Ridotto larghezza
             $optionBorder->setPoint($x, $y+$heightOption);
             $optionBorder->setPoint($x, $y);
             $optionBorder->setThickness($this->borderThickness);
@@ -304,43 +308,45 @@ class SelectDraw {
         $drawItems[] = $panel->buildJson();
 
         //Up button
-        $upButton = new Square($this->uid.'_scroll_up');
-        $upButton->setOrigin($x + $width + 5, $y - $heightPanel);
-        $upButton->setSize(20, 20);
-        $upButton->setColor(0xCCCCCC);
+        $upButton = new Rectangle($this->uid.'_scroll_up');
+        $upButton->setOrigin($x + $width - 40, $panelY + 5);
+        $upButton->setSize(40, 40);
+        $upButton->setColor(0xBBBBBB);
         $upButton->setRenderable(false);
+        $upButton->addAttributes('zIndex', 10000);
         $upButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_up_" . $this->uid . "']();");
         $drawItems[] = $upButton->buildJson();
 
         //Up text
         $upText = new Text($this->uid.'_scroll_up_text');
         $upText->setCenterAnchor(true);
-        $upText->setFontSize(16);
-        $centerUp = $upButton->getCenter();
-        $upText->setOrigin($centerUp['x'], $centerUp['y']);
-        $upText->setColor(0x000000);
+        $upText->setFontSize(26);
+        $upText->setOrigin($x + $width - 20, $panelY + 25);
+        $upText->setColor(0x333333);
         $upText->setText('^');
         $upText->setRenderable(false);
+        $upText->addAttributes('zIndex', 10001);
         $drawItems[] = $upText->buildJson();
 
         //Down button
-        $downButton = new Square($this->uid.'_scroll_down');
-        $downButton->setOrigin($x + $width + 5, $y - $heightPanel + $heightPanel - 20);
-        $downButton->setSize(20, 20);
-        $downButton->setColor(0xCCCCCC);
+        $downButton = new Rectangle($this->uid.'_scroll_down');
+        $downButton->setOrigin($x + $width - 40, $panelY + $heightPanel - 45);
+        $downButton->setSize(40, 40);
+        $downButton->setColor(0xBBBBBB);
         $downButton->setRenderable(false);
+        $downButton->addAttributes('zIndex', 10000);
         $downButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_down_" . $this->uid . "']();");
         $drawItems[] = $downButton->buildJson();
 
         //Down text
         $downText = new Text($this->uid.'_scroll_down_text');
         $downText->setCenterAnchor(true);
-        $downText->setFontSize(16);
-        $centerDown = $downButton->getCenter();
-        $downText->setOrigin($centerDown['x'], $centerDown['y']);
-        $downText->setColor(0x000000);
+        $downText->setFontSize(26);
+        $downText->setOrigin($x + $width - 20, $panelY + $heightPanel - 25);
+        $downText->setColor(0x333333);
         $downText->setText('V');
         $downText->setRenderable(false);
+        $downText->addAttributes('zIndex', 10001);
         $drawItems[] = $downText->buildJson();
 
         $this->drawItems = $drawItems;

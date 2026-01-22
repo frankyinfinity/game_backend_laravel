@@ -93,15 +93,37 @@
         let objectPanel = objects[window.input_uid + '_panel_select'];
         objectPanel.children.forEach(function(childUid) {
             let shapeChild = shapes[childUid];
-            shapeChild.zIndex = active ? 1 : 0;
+            if (!shapeChild) return;
+            if (active) {
+                shapeChild.zIndex = 1;
+            } else {
+                shapeChild.zIndex = 0;
+            }
             shapeChild.renderable = active;
         });
 
-        shapes[window.input_uid + '_scroll_up'].renderable = active;
-        shapes[window.input_uid + '_scroll_up_text'].renderable = active;
-        shapes[window.input_uid + '_scroll_down'].renderable = active;
-        shapes[window.input_uid + '_scroll_down_text'].renderable = active;
+        // Manage Top-Level Scroll Buttons
+        let scrollIds = [
+            window.input_uid + '_scroll_up',
+            window.input_uid + '_scroll_up_text',
+            window.input_uid + '_scroll_down',
+            window.input_uid + '_scroll_down_text'
+        ];
 
+        scrollIds.forEach(function(id) {
+            let shapeScroll = shapes[id];
+            if (shapeScroll) {
+                shapeScroll.renderable = active;
+                if (active) {
+                    shapeScroll.zIndex = id.includes('_text') ? 10001 : 10000;
+                } else {
+                    shapeScroll.zIndex = 0;
+                }
+            }
+        });
+
+        // Redundant renderable assignments moved inside the loop above
+        
         if (active) {
             window['updateVisibility_' + window.input_uid](objectBody.attributes.currentStart || 0, objectBody.attributes.optionShowDisplay, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
             window['updateOptionColors_' + window.input_uid](objectBody.attributes.selectedOptionId, objectBody.attributes.optionIds, objectBody.attributes.totalOptions);
