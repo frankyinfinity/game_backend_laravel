@@ -38,6 +38,7 @@ class SelectDraw {
         $this->optionId = '';
         $this->optionText = '';
         $this->optionShowDisplay = 5;
+        $this->onChangePath = '';
 
         $this->drawItems = [];
 
@@ -135,6 +136,11 @@ class SelectDraw {
         $this->optionShowDisplay = $optionShowDisplay;
     }
 
+    private string $onChangePath;
+    public function setOnChange(string $path) {
+        $this->onChangePath = $path;
+    }
+
     private $drawItems = [];
     public function getDrawItems() {
         return $this->drawItems;
@@ -186,6 +192,13 @@ class SelectDraw {
         $body->addAttributes('optionIds', array_map(function($option, $index) use ($optionId) { return $option[$optionId] ?? $index; }, $this->options, array_keys($this->options)));
         $body->addAttributes('selectedOptionId', null);
         $body->addAttributes('selectedOptionText', '');
+        
+        $onChangeJs = '';
+        if ($this->onChangePath && file_exists($this->onChangePath)) {
+            $onChangeJs = file_get_contents($this->onChangePath);
+            $onChangeJs = Helper::setCommonJsCode($onChangeJs, Str::random(20));
+        }
+        $body->addAttributes('onChangeJs', $onChangeJs);
 
         $jsPathClickInput = resource_path('js/function/entity/click_select.blade.php');
         $jsPathClickInput = file_get_contents($jsPathClickInput);

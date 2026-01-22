@@ -96,68 +96,13 @@ class TestDrawCommand extends Command
         $select->setBackgroundColor(Colors::WHITE);
         $select->setBoxIconColor(Colors::LIGHT_GRAY);
         $select->setBoxIconTextColor(Colors::BLACK);
-        $select->build();  
-
-        //Select 2
-        $y += 100;
-
-        $users = User::query()->select('id', 'email')->get()->toArray();
-
-        $select2 = new SelectDraw(Str::random(20), $sessionId);
-        $select2->setName('user_id');
-        $select2->setRequired(true);
-        $select2->setTitle('Utente');
-        $select2->setOptions($users);
-        $select2->setOptionId('id');
-        $select2->setOptionText('email');
-        $select2->setOptionShowDisplay(3);
-
-        $select2->setOrigin($x, $y);
-        $select2->setSize(500, 50);
-        $select2->setBorderThickness(2);
-        $select2->setBorderColor(Colors::DARK_GRAY);
-        $select2->setTitleColor(Colors::BLACK);
-        $select2->setValueColor(Colors::BLACK);
-        $select2->setBackgroundColor(Colors::WHITE);
-        $select2->setBoxIconColor(Colors::LIGHT_GRAY);
-        $select2->setBoxIconTextColor(Colors::BLACK);
-        $select2->build();
-
-        //Button
-        $y += 100;
-
-        $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
-        $submitButton->setSize(500, 50);
-        $submitButton->setOrigin($x, $y);
-        $submitButton->setString('Accedi');
-        $submitButton->setColorButton(Colors::BLUE);
-        $submitButton->setColorString(Colors::WHITE);
-        $submitButton->setTextFontSize(22);
-        $submitButton->build();
-
-        //Form
-        $form = new ActionForm();
-        $form->setSelect($select);
-        $form->setSelect($select2); 
-        $form->setUrlRequest('/test/action');
-        $form->setButton($submitButton);
+        $select->setOnChange(resource_path('js/function/entity/on_change_planet.blade.php'));
+        $select->build();
 
         //Get all
         $listItems = $select->getDrawItems();
         foreach($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        $listItems = $select2->getDrawItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        $listItems = $submitButton->getItems(); 
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 

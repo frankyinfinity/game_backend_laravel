@@ -51,13 +51,18 @@
             currentOptionBorder.tint = 0x0000FF; // Blue border
             currentOptionBorder.zIndex = 9999;
         }
-
-
-
-
-
-
-
+        
+        // Execute custom onChange JS if provided
+        if (objectBody.attributes.onChangeJs) {
+            try {
+                let onChangeJs = objectBody.attributes.onChangeJs;
+                let selectedId = optionId;
+                let selectedText = optionText;
+                eval(onChangeJs);
+            } catch (e) {
+                console.error("Error executing onChangeJs for select:", e);
+            }
+        }
         
         // Close the select panel
         objectBody.attributes.active = false;
