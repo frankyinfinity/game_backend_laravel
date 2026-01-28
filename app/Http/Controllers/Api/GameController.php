@@ -380,7 +380,7 @@ class GameController extends Controller
         $loginButton = new ButtonDraw(Str::random(20).'_login_button');
         $loginButton->setSize($widthInput, $heightInput);
         $loginButton->setOrigin($x, $y);
-        $loginButton->setString('Login');
+        $loginButton->setString('Torna al Login');
         $loginButton->setColorButton(Colors::RED);
         $loginButton->setColorString(Colors::WHITE);
         $loginButton->setTextFontSize(22);

@@ -16,12 +16,13 @@
         console.log('Planet changed to: ' + selectedText + ' (ID: ' + selectedId + ')');
         
         if (selectedId) {
-            fetch('/api/regions/' + selectedId, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            status('Caricamento regioni...');
+            $.ajax({
+                url: `${BACK_URL}/api/regions/${selectedId}`,
+                type: 'POST',
+                data: {
+                    player_id: playerId,
+                    session_id: sessionId,
                     x: x,
                     y: y,
                     width_input: width_input,
@@ -33,14 +34,18 @@
                     tile_i_input_uid: tile_i_input_uid,
                     tile_j_input_uid: tile_j_input_uid,
                     planet_select_uid: planet_select_uid
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
+                },
+                success: function (data) {
+                    status('Regioni caricate!');
                     console.log('Regions for planet ' + selectedId + ':', data.regions);
-                })
-                .catch(error => console.error('Error fetching regions:', error));
+                },
+                error: function (error) {
+                    status('Errore caricamento regioni');
+                    console.error('Error fetching regions:', error);
+                }
+            });
         }
     }
     window['__name__']();
 </script>
+

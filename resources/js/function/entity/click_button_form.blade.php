@@ -7,20 +7,35 @@
         let fields = __FIELDS__;
         let datas = getFormData(fields);
 
-        console.log('Datas:', datas);
-
         let url = '__URL__';
-        fetch(url, {
-            method: 'POST',
+        if (url.startsWith('/') && typeof BACK_URL !== 'undefined') {
+            url = BACK_URL + url;
+        }
+
+        let csrfToken = '';
+        let csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta) {
+            csrfToken = csrfMeta.getAttribute('content');
+        }
+
+        status('Invio dati...');
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: JSON.stringify(datas),
+            contentType: 'application/json',
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                'X-CSRF-TOKEN': csrfToken
             },
-            body: JSON.stringify(datas)
-        })
-        .then(response => response.json())
-        .then(data => console.log('Response:', data))
-        .catch(error => console.error('Error:', error));
+            success: function (data) {
+                status('Dati inviati con successo!');
+                console.log('Response:', data);
+            },
+            error: function (error) {
+                status('Errore durante l\'invio');
+                console.error('Error:', error);
+            }
+        });
 
     }
     window['__name__']();

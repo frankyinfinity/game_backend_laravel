@@ -1,7 +1,8 @@
 <script>
 
     // Initialize input_uid from the clicked option
-    window.input_uid = object['uid'].split('_')[0];
+    window.input_uid = object['uid'].substring(0, object['uid'].lastIndexOf('_option_rect_'));
+
 
     window['__name__'] = function() {
 
@@ -17,7 +18,10 @@
         
         // Update value text
         let shapeValueText = shapes[window.input_uid + '_value_text'];
-        shapeValueText.text = optionText;
+        if (shapeValueText) {
+            shapeValueText.text = optionText;
+        }
+
 
         // Update value ID
         let shapeValueId = shapes[window.input_uid + '_value_id'];
@@ -68,13 +72,21 @@
         objectBody.attributes.active = false;
         
         let shapeBorder = shapes[window.input_uid + '_border_select'];
-        shapeBorder.tint = objectBody.attributes.border_not_active_color;
+        if (shapeBorder) {
+            shapeBorder.tint = objectBody.attributes.border_not_active_color;
+        }
         
         let shapeBoxIconText = shapes[window.input_uid + '_box_icon_text'];
-        shapeBoxIconText.text = 'V';
+        if (shapeBoxIconText) {
+            shapeBoxIconText.text = 'V';
+        }
+
         
         let shapePanel = shapes[window.input_uid + '_panel_select'];
-        shapePanel.renderable = false;
+        if (shapePanel) {
+            shapePanel.renderable = false;
+        }
+
         
         let objectPanel = objects[window.input_uid + '_panel_select'];
         objectPanel.children.forEach(function(childUid) {

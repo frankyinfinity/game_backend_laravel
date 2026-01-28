@@ -108,7 +108,7 @@ class AuthController extends Controller
         foreach($gene_ids as $gene_id) {
 
             $min = $requestArray['gene_min_'.$gene_id];
-            $max = $requestArray['gene_max_'.$gene_id];
+            $max = $requestArray['gene_value_'.$gene_id];
             $value = $requestArray['gene_value_'.$gene_id];
 
             $genome = Genome::query()->create([
@@ -134,21 +134,17 @@ class AuthController extends Controller
         $credentials = $request->only('email', 'password');
 
         if (\Illuminate\Support\Facades\Auth::attempt($credentials)) {
+
             $user = \Illuminate\Support\Facades\Auth::user();
             $player = $user->players()->first();
-            
-            $sessionId = null;
-            if ($player) {
-                $sessionId = \App\Helper\Helper::generateSessionIdPlayer($player);
-            }
 
             return response()->json([
                 'success' => true,
                 'is_player' => !is_null($player),
                 'player' => $player,
-                'session_id' => $sessionId,
                 'user' => $user
             ]);
+
         }
 
         return response()->json([

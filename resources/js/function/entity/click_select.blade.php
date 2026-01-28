@@ -1,26 +1,34 @@
 <script>
 
     // Initialize input_uid FIRST, before defining any functions that use it
-    window.input_uid = object['uid'].split('_')[0];
+    window.input_uid = object['uid'].replace('_body_select', '');
 
     window['moveShapes_' + window.input_uid] = function(deltaY, optionIds, totalOptions) {
         for (let idx = 0; idx < totalOptions; idx++) {
             let id = optionIds[idx];
-            shapes[window.input_uid + '_option_rect_' + id].y += deltaY;
-            shapes[window.input_uid + '_option_border_' + id].y += deltaY;
-            shapes[window.input_uid + '_option_text_' + id].y += deltaY;
+            let rect = shapes[window.input_uid + '_option_rect_' + id];
+            let border = shapes[window.input_uid + '_option_border_' + id];
+            let text = shapes[window.input_uid + '_option_text_' + id];
+            if (rect) rect.y += deltaY;
+            if (border) border.y += deltaY;
+            if (text) text.y += deltaY;
         }
     };
+
 
     window['updateVisibility_' + window.input_uid] = function(currentStart, optionShowDisplay, optionIds, totalOptions) {
         for (let idx = 0; idx < totalOptions; idx++) {
             let id = optionIds[idx];
             let visible = idx >= currentStart && idx < currentStart + optionShowDisplay;
-            shapes[window.input_uid + '_option_rect_' + id].renderable = visible;
-            shapes[window.input_uid + '_option_border_' + id].renderable = visible;
-            shapes[window.input_uid + '_option_text_' + id].renderable = visible;
+            let rect = shapes[window.input_uid + '_option_rect_' + id];
+            let border = shapes[window.input_uid + '_option_border_' + id];
+            let text = shapes[window.input_uid + '_option_text_' + id];
+            if (rect) rect.renderable = visible;
+            if (border) border.renderable = visible;
+            if (text) text.renderable = visible;
         }
     }
+
 
     window['updateOptionColors_' + window.input_uid] = function(selectedOptionId, optionIds, totalOptions) {
         for (let idx = 0; idx < totalOptions; idx++) {
@@ -65,11 +73,13 @@
         // Deactivate all other inputs
         for (let key in objects) {
             if (key.endsWith('_body_select') && key !== window.input_uid + '_body_select') {
-                let otherUid = key.split('_')[0];
+                let otherUid = key.replace('_body_select', '');
                 let otherObjectBody = objects[key];
                 otherObjectBody.attributes.active = false;
                 let otherShapeBorder = shapes[otherUid + '_border_select'];
-                otherShapeBorder.tint = otherObjectBody.attributes.border_not_active_color;
+                if (otherShapeBorder) {
+                    otherShapeBorder.tint = otherObjectBody.attributes.border_not_active_color;
+                }
                 // Remove listener
                 if (window['keydown_' + otherUid]) {
                     document.removeEventListener('keydown', window['keydown_' + otherUid]);
@@ -78,11 +88,15 @@
             }
         }
 
+
         objectBody.attributes.active = !objectBody.attributes.active;
         let active = objectBody.attributes.active;
 
         let shapeBorder = shapes[window.input_uid+'_border_select'];
-        shapeBorder.tint = active ? activeColor : notActiveColor;
+        if (shapeBorder) {
+            shapeBorder.tint = active ? activeColor : notActiveColor;
+        }
+
 
         let shapeValueText = shapes[window.input_uid + '_box_icon_text'];
             shapeValueText.text = active ? '^' : 'V';
