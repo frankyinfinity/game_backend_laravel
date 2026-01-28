@@ -12,9 +12,17 @@ class ActionForm {
 
     private array $inputs;
     private array $selects;
+    private array $extraDatas;
+    private $urlRequest;
+    private $submitFunctionPath;
+    private array $submitFunctionParams;
+
     public function __construct() {
         $this->inputs = [];
         $this->selects = [];
+        $this->extraDatas = [];
+        $this->submitFunctionPath = null;
+        $this->submitFunctionParams = [];
     }
 
     public function setInput(InputDraw $input) {
@@ -25,9 +33,17 @@ class ActionForm {
         $this->selects[] = $select;
     }
 
-    private $urlRequest;
+    public function setExtraData($key, $value) {
+        $this->extraDatas[$key] = $value;
+    }
+
     public function setUrlRequest($urlRequest) {
         $this->urlRequest = $urlRequest;
+    }
+
+    public function setSubmitFunction($path, $params = []) {
+        $this->submitFunctionPath = $path;
+        $this->submitFunctionParams = $params;
     }
 
     public function setButton(ButtonDraw $button) {
@@ -46,14 +62,25 @@ class ActionForm {
             $datas['field_'.$name] = $uid;
         }
 
-        $jsPathClick = resource_path('js/function/entity/click_button_form.blade.php');
-        $jsPathClick = file_get_contents($jsPathClick);
-        $jsPathClick = str_replace('__FIELDS__', json_encode($datas), $jsPathClick);
-        $jsPathClick = str_replace('__URL__', $this->urlRequest, $jsPathClick);
+        foreach ($this->extraDatas as $key => $value) {
+            $datas['static_'.$key] = $value;
+        }
 
-        $jsPathClick = Helper::setCommonJsCode($jsPathClick, Str::random(20));
+        $jsPathClick = $this->submitFunctionPath ?? resource_path('js/function/entity/click_button_form.blade.php');
+        $jsCode = file_get_contents($jsPathClick);
+        $jsCode = str_replace('__FIELDS__', json_encode($datas), $jsCode);
+        
+        if ($this->urlRequest) {
+            $jsCode = str_replace('__URL__', $this->urlRequest, $jsCode);
+        }
 
-        $button->setOnClick($jsPathClick);
+        foreach ($this->submitFunctionParams as $key => $value) {
+            $jsCode = str_replace($key, $value, $jsCode);
+        }
+
+        $jsCode = Helper::setCommonJsCode($jsCode, Str::random(20));
+
+        $button->setOnClick($jsCode);
         $button->build();
 
     }

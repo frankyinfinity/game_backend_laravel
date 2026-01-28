@@ -15,6 +15,10 @@ use App\Custom\Colors;
 class SelectDraw {
 
     private string $uid;
+    public function getUid() {
+        return $this->uid;
+    }
+
     private string $sessionId;
     public function __construct($uid, $sessionId) {
 
@@ -39,6 +43,8 @@ class SelectDraw {
         $this->optionText = '';
         $this->optionShowDisplay = 5;
         $this->onChangePath = '';
+        $this->onChangeReplacements = [];
+        $this->uidValueElement = $this->uid.'_value_id';
 
         $this->drawItems = [];
 
@@ -137,8 +143,10 @@ class SelectDraw {
     }
 
     private string $onChangePath;
-    public function setOnChange(string $path) {
+    private array $onChangeReplacements = [];
+    public function setOnChange(string $path, array $replacements = []) {
         $this->onChangePath = $path;
+        $this->onChangeReplacements = $replacements;
     }
 
     private $drawItems = [];
@@ -196,6 +204,9 @@ class SelectDraw {
         $onChangeJs = '';
         if ($this->onChangePath && file_exists($this->onChangePath)) {
             $onChangeJs = file_get_contents($this->onChangePath);
+            foreach ($this->onChangeReplacements as $key => $value) {
+                $onChangeJs = str_replace($key, $value, $onChangeJs);
+            }
             $onChangeJs = Helper::setCommonJsCode($onChangeJs, Str::random(20));
         }
         $body->addAttributes('onChangeJs', $onChangeJs);
@@ -249,7 +260,6 @@ class SelectDraw {
         $drawItems[] = $valueText->buildJson();
 
         //Value ID (shows selected option ID)
-        $this->uidValueElement = $this->uid.'_value_id';
         $valueIdText = new Text($this->uidValueElement);
         $valueIdText->setOrigin(10, 10);
         $valueIdText->setFontSize(20);

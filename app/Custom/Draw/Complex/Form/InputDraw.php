@@ -12,8 +12,15 @@ use App\Helper\Helper;
 use Illuminate\Support\Str;
 
 class InputDraw {
+    
+    const TYPE_TEXT = 'text';
+    const TYPE_NUMBER = 'number';
 
     private string $uid;
+    public function getUid() {
+        return $this->uid;
+    }
+
     private string $sessionId;
     public function __construct($uid, $sessionId) {
 
@@ -32,6 +39,13 @@ class InputDraw {
         $this->borderThickness = 0;
         $this->boxIconColor = 0x000000;
         $this->boxIconTextColor = 0x000000;
+        $this->type = self::TYPE_TEXT;
+        $this->value = '';
+        $this->min = null;
+        $this->max = null;
+
+        $this->uidValueElement = $this->uid.'_value_text';
+
         $this->drawItems = [];
 
     }
@@ -103,6 +117,32 @@ class InputDraw {
         $this->valueColor = $valueColor;
     }
 
+    private string $type;
+    public function setType(string $type) {
+        $this->type = $type;
+    }
+    public function getType() {
+        return $this->type;
+    }
+
+    private $value;
+    public function setValue($value) {
+        $this->value = $value;
+    }
+    public function getValue() {
+        return $this->value;
+    }
+
+    private $min;
+    public function setMin($min) {
+        $this->min = $min;
+    }
+
+    private $max;
+    public function setMax($max) {
+        $this->max = $max;
+    }
+
     private string $uidValueElement;
     public function getUidValueElement() {
         return $this->uidValueElement;
@@ -143,6 +183,10 @@ class InputDraw {
         $body->addAttributes('border_not_active_color', $this->borderColor);
         $body->addAttributes('border_active_color', 0x0000FF);
         $body->addAttributes('active', false);
+        $body->addAttributes('type', $this->type);
+        $body->addAttributes('value', $this->value);
+        $body->addAttributes('min', $this->min);
+        $body->addAttributes('max', $this->max);
 
         $jsPathClickInput = resource_path('js/function/entity/click_input.blade.php');
         $jsPathClickInput = file_get_contents($jsPathClickInput);
@@ -164,18 +208,17 @@ class InputDraw {
         $drawItems[] = $border->buildJson();
 
         //Value
-        $this->uidValueElement = $this->uid.'_value_text';
         $valueText = new Text($this->uidValueElement);
         $valueText->setFontSize(20);
         $valueText->setColor($this->valueColor);
         $valueText->setOrigin($x+12, $y+($height/3.2));
-        $valueText->setText('');
+        $valueText->setText($this->value);
         $valueText->setRenderable(true);
         $drawItems[] = $valueText->buildJson();
 
         //Box Icon
         $boxIcon = new Square($this->uid.'_box_icon');
-        $boxIcon->setOrigin($x+($width-$x), $y);
+        $boxIcon->setOrigin($x + $width - $height, $y);
         $boxIcon->setSize($height, $height);
         $boxIcon->setColor($this->boxIconColor);
         $boxIcon->setRenderable(true);

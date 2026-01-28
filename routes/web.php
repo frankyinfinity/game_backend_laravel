@@ -22,6 +22,7 @@ Route::get('/register-custom', function () {
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
+//Test
 Route::get('/test', [App\Http\Controllers\TestController::class, 'index'])->name('test');
 Route::post('/test/action', [App\Http\Controllers\TestController::class, 'action'])->name('test.action');
 
@@ -59,12 +60,6 @@ Route::group(['middleware' => ['auth']], function (){
     Route::put('/regions/action/update/{id}', [App\Http\Controllers\RegionController::class, 'update'])->name(name: 'regions.update');
     Route::post('/regions/action/delete', action: [App\Http\Controllers\RegionController::class, 'delete'])->name('regions.delete');
     Route::post('/regions/action/tile', action: [App\Http\Controllers\RegionController::class, 'updateTile'])->name('regions.tile');
-
-    //Player
-    Route::resource('players', App\Http\Controllers\PlayerController::class);
-    Route::post('/players/list/table', [App\Http\Controllers\PlayerController::class, 'listDataTable'])->name(name: 'players.datatable');
-    Route::post('/players/generate/map', [App\Http\Controllers\PlayerController::class, 'generateMap'])->name(name: 'players.generate.map');
-    Route::post('/players/get/map', [App\Http\Controllers\PlayerController::class, 'getMap'])->name(name: 'players.get.map');
 
     //Entity
     Route::get('entities/position', [App\Http\Controllers\EntityController::class, 'position']);
