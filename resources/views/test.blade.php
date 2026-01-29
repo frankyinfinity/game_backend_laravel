@@ -289,7 +289,7 @@
                     const p_id = data['player_id'];
 
                     $.ajax({
-                        url: `${BACK_URL}/api/players/get-map`,
+                        url: `${BACK_URL}/api/game/get_draw_item`,
                         type: 'POST',
                         data: {
                             request_id,

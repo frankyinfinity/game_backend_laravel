@@ -67,117 +67,24 @@ class TestDrawCommand extends Command
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        $request = \Illuminate\Http\Request::create('/api/planets', 'GET');
-        $kernel = app()->make(\Illuminate\Contracts\Http\Kernel::class);
-        $response = $kernel->handle($request);
-        $responseBody = json_decode($response->getContent(), true);
-        $planets = $responseBody['planets'] ?? [];
-
         $x = 50;
-        $y = 50;
+        $y = 100;
 
-        //Select Planet
-        $selectPlanet = new SelectDraw(Str::random(20), $sessionId);
-        $selectPlanet->setName('birth_planet_id');
-        $selectPlanet->setRequired(true);
-        $selectPlanet->setTitle('Pianeta Natale');
-        $selectPlanet->setOptions($planets);
-        $selectPlanet->setOptionId('id');
-        $selectPlanet->setOptionText('name');
-        $selectPlanet->setOptionShowDisplay(2);
+        $progressBar = new \App\Custom\Draw\Complex\ProgressBarDraw('test_pb');
+        $progressBar->setName('Vita');
+        $progressBar->setMin(0);
+        $progressBar->setMax(100);
+        $progressBar->setValue(65);
+        $progressBar->setBorderColor(Colors::LIGHT_GRAY);
+        $progressBar->setBarColor(Colors::RED);
+        $progressBar->setOrigin($x, $y);
+        $progressBar->setSize(300, 30);
+        $progressBar->build();
 
-        $selectPlanet->setOrigin($x, $y);
-        $selectPlanet->setSize(500, 50);
-        $selectPlanet->setBorderThickness(2);
-        $selectPlanet->setBorderColor(Colors::DARK_GRAY);
-        $selectPlanet->setTitleColor(Colors::BLACK);
-        $selectPlanet->setValueColor(Colors::BLACK);
-        $selectPlanet->setBackgroundColor(Colors::WHITE);
-        $selectPlanet->setBoxIconColor(Colors::LIGHT_GRAY);
-        $selectPlanet->setBoxIconTextColor(Colors::BLACK);
-        $selectPlanet->setOnChange(resource_path('js/function/entity/on_change_planet.blade.php'));
-        $selectPlanet->build();
-
-        //Get all
-        $listItems = $selectPlanet->getDrawItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
+        foreach ($progressBar->getDrawItems() as $item) {
+            $objectDraw = new ObjectDraw($item, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
-
-        //Input
-        //Input Email
-        /*$x = 50;
-        $y = 50;
-
-        $inputEmail = new InputDraw(Str::random(20), $sessionId);
-        $inputEmail->setName('email');
-        $inputEmail->setRequired(true);
-        $inputEmail->setTitle('Email');
-        $inputEmail->setOrigin($x, $y);
-        $inputEmail->setSize(500, 50);
-        $inputEmail->setBorderThickness(2);
-        $inputEmail->setBorderColor(Colors::DARK_GRAY);
-        $inputEmail->setTitleColor(Colors::BLACK);
-        $inputEmail->setBackgroundColor(Colors::WHITE);
-        $inputEmail->setBoxIconColor(Colors::LIGHT_GRAY);
-        $inputEmail->setBoxIconTextColor(Colors::BLACK);
-        $inputEmail->build();   
-
-        //Input Password
-        $y += 100;
-
-        $inputPassword = new InputDraw(Str::random(20), $sessionId);
-        $inputPassword->setName('password');
-        $inputPassword->setRequired(true);
-        $inputPassword->setTitle('Password');
-        $inputPassword->setOrigin($x, $y);
-        $inputPassword->setSize(500, 50);
-        $inputPassword->setBorderThickness(2);
-        $inputPassword->setBorderColor(Colors::DARK_GRAY);
-        $inputPassword->setTitleColor(Colors::BLACK);
-        $inputPassword->setBackgroundColor(Colors::WHITE);
-        $inputPassword->setBoxIconColor(Colors::LIGHT_GRAY);
-        $inputPassword->setBoxIconTextColor(Colors::BLACK);
-        $inputPassword->build();
-
-        //Button
-        $y += 100;
-
-        $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
-        $submitButton->setSize(500, 50);
-        $submitButton->setOrigin($x, $y);
-        $submitButton->setString('Accedi');
-        $submitButton->setColorButton(Colors::BLUE);
-        $submitButton->setColorString(Colors::WHITE);
-        $submitButton->setTextFontSize(22);
-        $submitButton->build();
-
-        //Form
-        $form = new ActionForm();
-        $form->setInput($inputEmail);
-        $form->setInput($inputPassword);
-        $form->setUrlRequest('/test/action');
-        $form->setButton($submitButton);
-
-        //Get all
-        $listItems = $inputEmail->getDrawItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }    
-        
-        $listItems = $inputPassword->getDrawItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        $listItems = $submitButton->getDrawItems(); 
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }*/
 
         // Flush to cache
         ObjectCache::flush($sessionId);
