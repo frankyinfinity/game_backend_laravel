@@ -65,5 +65,10 @@ Route::group(['middleware' => ['auth']], function (){
     Route::get('entities/position', [App\Http\Controllers\EntityController::class, 'position']);
     Route::post('entities/movement', [App\Http\Controllers\EntityController::class, 'movement'])->name(name: 'entities.movement');
 
+    //Element Types
+    Route::resource('element-types', App\Http\Controllers\ElementTypeController::class);
+    Route::post('/element-types/list/table', [App\Http\Controllers\ElementTypeController::class, 'listDataTable'])->name('element-types.datatable');
+    Route::post('/element-types/delete', [App\Http\Controllers\ElementTypeController::class, 'delete'])->name('element-types.delete');
+
 
 });

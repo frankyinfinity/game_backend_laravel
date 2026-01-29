@@ -347,6 +347,17 @@ return [
             'submenu' => [
             ]
         ],
+        [
+            'text'    => 'Elementi',
+            'icon'    => 'fas fa-cubes',
+            'submenu' => [
+                [
+                    'text' => 'Tipologie Elementi',
+                    'url'  => '/element-types',
+                    'icon' => 'fas fa-cube',
+                ]
+            ]
+        ],
     ],
 
     /*
