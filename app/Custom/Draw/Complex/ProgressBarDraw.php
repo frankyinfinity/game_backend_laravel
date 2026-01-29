@@ -42,6 +42,77 @@ class ProgressBarDraw {
         $this->value = $value;
     }
 
+    public function updateValue($newValue, $sessionId): array {
+        $this->value = $newValue;
+        
+        // Load existing properties from cache
+        $cachedBorder = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_border');
+        $cachedText = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_text');
+        
+        if (!$cachedBorder || !$cachedText) {
+            throw new \Exception("ProgressBar not found in cache. Make sure to call build() first.");
+        }
+        
+        // Extract properties from cached objects
+        $this->x = $cachedBorder['x'];
+        $this->y = $cachedBorder['y'];
+        $this->width = $cachedBorder['width'];
+        $this->height = $cachedBorder['height'];
+        $this->barColor = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar')['color'] ?? $this->barColor;
+        
+        $operations = [];
+        
+        // 1. Update the label text (name + value)
+        // Extract name from cached text (remove the old value part)
+        $cachedTextContent = $cachedText['text'];
+        if (preg_match('/^(.+?)\s*\(\d+\)$/', $cachedTextContent, $matches)) {
+            $this->name = $matches[1];
+        }
+        
+        $operations[] = [
+            'type' => 'update',
+            'uid' => $this->uid . '_text',
+            'attributes' => [
+                'text' => $this->name . " (" . $this->value . ")"
+            ]
+        ];
+        
+        // 2. Clear and redraw the bar (width changes based on value)
+        $operations[] = [
+            'type' => 'clear',
+            'uid' => $this->uid . '_bar'
+        ];
+        
+        // Calculate new bar dimensions
+        // We need min/max - try to extract from range text or use defaults
+        $cachedRange = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_range');
+        if ($cachedRange && preg_match('/\((\d+)\s*\/\s*(\d+)\)/', $cachedRange['text'], $matches)) {
+            $this->min = (int)$matches[1];
+            $this->max = (int)$matches[2];
+        }
+        
+        $range = $this->max - $this->min;
+        $percent = $range > 0 ? ($this->value - $this->min) / $range : 0;
+        $percent = max(0, min(1, $percent));
+        $barWidth = ($this->width - 4) * $percent;
+        $barHeight = $this->height - 4;
+        
+        if ($barWidth > 0) {
+            $bar = new Primitive\Rectangle($this->uid . '_bar');
+            $bar->setSize($barWidth, $barHeight);
+            $bar->setOrigin($this->x + 2, $this->y + 2);
+            $bar->setColor($this->barColor);
+            $bar->setRenderable($this->renderable);
+            
+            $operations[] = [
+                'type' => 'draw',
+                'object' => $bar->buildJson()
+            ];
+        }
+        
+        return $operations;
+    }
+
     public function setBorderColor($color): void {
         $this->borderColor = $color;
     }
