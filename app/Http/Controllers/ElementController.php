@@ -29,6 +29,10 @@ class ElementController extends Controller
             ->addColumn('climates_list', function($row){
                 return $row->climates->pluck('name')->implode(', ');
             })
+            ->addColumn('consumable_badge', function($row){
+                return $row->consumable ? '<span class="badge badge-success">Sì</span>' : '<span class="badge badge-secondary">No</span>';
+            })
+            ->rawColumns(['consumable_badge'])
             ->toJson();
     }
 
@@ -48,7 +52,10 @@ class ElementController extends Controller
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $element = Element::create($request->only('name', 'element_type_id'));
+        $data = $request->only('name', 'element_type_id');
+        $data['consumable'] = $request->has('consumable');
+        
+        $element = Element::create($data);
         
         if ($request->has('climates')) {
             $element->climates()->sync($request->climates);
@@ -84,9 +91,6 @@ class ElementController extends Controller
         return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Element $element)
     {
         $request->validate([
@@ -96,7 +100,10 @@ class ElementController extends Controller
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $element->update($request->only('name', 'element_type_id'));
+        $data = $request->only('name', 'element_type_id');
+        $data['consumable'] = $request->has('consumable');
+
+        $element->update($data);
 
         if ($request->has('climates')) {
             $element->climates()->sync($request->climates);

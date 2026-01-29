@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Element extends Model
 {
-    protected $fillable = ['element_type_id', 'name'];
+    protected $fillable = ['element_type_id', 'name', 'consumable'];
+
+    protected $casts = [
+        'consumable' => 'boolean',
+    ];
 
     public function elementType()
     {

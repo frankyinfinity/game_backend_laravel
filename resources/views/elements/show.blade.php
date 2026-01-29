@@ -22,6 +22,11 @@
                 <dt class="col-sm-3">Tipologia:</dt>
                 <dd class="col-sm-9">{{ $element->elementType->name ?? '-' }}</dd>
 
+                <dt class="col-sm-3">Consumabile:</dt>
+                <dd class="col-sm-9">
+                    {!! $element->consumable ? '<span class="badge badge-success">Sì</span>' : '<span class="badge badge-secondary">No</span>' !!}
+                </dd>
+
                 <dt class="col-sm-3">Climi Validi:</dt>
                 <dd class="col-sm-9">
                     @forelse($element->climates as $climate)

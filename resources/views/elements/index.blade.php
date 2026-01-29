@@ -39,6 +39,7 @@
                             <th>ID</th>
                             <th>Nome</th>
                             <th>Tipologia</th>
+                            <th>Consumabile</th>
                             <th>Climi Validi</th>
                             <th>Azioni</th>
                         </tr>
@@ -85,6 +86,7 @@
                     {data:"id", name:"id"},
                     {data:"name", name:"name"},
                     {data:"element_type_name", name:"element_type_name"},
+                    {data:"consumable_badge", name:"consumable_badge"},
                     {data:"climates_list", name:"climates_list"},
                     {data:"id", name:"id"},
                 ],
