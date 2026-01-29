@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Element;
 use App\Models\ElementType;
 use App\Models\Climate;
+use App\Models\Tile;
+use App\Models\ElementHasTile;
 use Illuminate\Http\Request;
 
 class ElementController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    // ... index, listDataTable, create, store methods remain unchanged ...
+
     public function index()
     {
         return view('elements.index');
@@ -31,9 +32,6 @@ class ElementController extends Controller
             ->toJson();
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         $elementTypes = ElementType::orderBy('name')->get();
@@ -41,9 +39,6 @@ class ElementController extends Controller
         return view('elements.create', compact('elementTypes', 'climates'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -63,9 +58,6 @@ class ElementController extends Controller
             ->with('success', 'Elemento creato con successo.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Element $element)
     {
         return view('elements.show', compact('element'));
@@ -78,7 +70,18 @@ class ElementController extends Controller
     {
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
-        return view('elements.edit', compact('element', 'elementTypes', 'climates'));
+        
+        // Fetch all tiles for diffusion tab
+        $allTiles = Tile::orderBy('name')->get();
+        
+        // Fetch existing diffusion data
+        $existingDiffusion = ElementHasTile::where('element_id', $element->id)->get();
+        $diffusionMap = [];
+        foreach($existingDiffusion as $diff) {
+            $diffusionMap[$diff->climate_id][$diff->tile_id] = $diff->percentage;
+        }
+
+        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap'));
     }
 
     /**
@@ -101,7 +104,38 @@ class ElementController extends Controller
             $element->climates()->detach();
         }
 
-        return redirect()->route('elements.index')
+        // Save Diffusion Data
+        if ($request->has('diffusion')) {
+            foreach ($request->diffusion as $climateId => $tilesData) {
+                foreach ($tilesData as $tileId => $percentage) {
+                    $percentage = (int)$percentage;
+                    
+                    if ($percentage <= 0) {
+                        ElementHasTile::where('element_id', $element->id)
+                            ->where('climate_id', $climateId)
+                            ->where('tile_id', $tileId)
+                            ->delete();
+                    } else {
+                        ElementHasTile::updateOrCreate(
+                            [
+                                'element_id' => $element->id,
+                                'climate_id' => $climateId,
+                                'tile_id' => $tileId
+                            ],
+                            ['percentage' => min(100, $percentage)]
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Clean up orphaned diffusion records (climates no longer associated)
+        $validClimateIds = $element->climates()->pluck('climates.id')->toArray();
+        ElementHasTile::where('element_id', $element->id)
+            ->whereNotIn('climate_id', $validClimateIds)
+            ->delete();
+
+        return redirect()->route('elements.edit', $element)
             ->with('success', 'Elemento aggiornato con successo.');
     }
 
