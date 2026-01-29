@@ -162,6 +162,15 @@ class ElementController extends Controller
             ->whereNotIn('climate_id', $validClimateIds)
             ->delete();
 
+        // Save Image if provided
+        if ($request->has('image_base64') && !empty($request->image_base64)) {
+            $imageData = $request->image_base64;
+            $imageData = str_replace('data:image/png;base64,', '', $imageData);
+            $imageData = str_replace(' ', '+', $imageData);
+            $imageName = $element->id . '.png';
+            \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
+        }
+
         return redirect()->route('elements.edit', $element)
             ->with('success', 'Elemento aggiornato con successo.');
     }
@@ -182,6 +191,22 @@ class ElementController extends Controller
             if($element == null) continue;
             $element->delete();
         }
+        return response()->json(['success' => true]);
+    }
+
+    public function saveGraphics(Request $request, Element $element)
+    {
+        $request->validate([
+            'image' => 'required|string', // base64 image
+        ]);
+
+        $imageData = $request->image;
+        $imageData = str_replace('data:image/png;base64,', '', $imageData);
+        $imageData = str_replace(' ', '+', $imageData);
+        $imageName = $element->id . '.png';
+
+        \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
+
         return response()->json(['success' => true]);
     }
 }

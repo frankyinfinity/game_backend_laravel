@@ -25,6 +25,9 @@
                         <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab" aria-controls="tab-consumption" aria-selected="false">Effetti Consumo</a>
                     </li>
                     @endif
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
+                    </li>
                 </ul>
             </div>
             
@@ -47,6 +50,11 @@
                         @include('elements.tabs.consumption')
                     </div>
                     @endif
+
+                    <!-- TAB GRAPHICS -->
+                    <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
+                        @include('elements.tabs.graphics')
+                    </div>
 
                 </div>
             </div>
