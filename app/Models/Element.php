@@ -21,4 +21,9 @@ class Element extends Model
     {
         return $this->belongsToMany(Climate::class, 'element_has_climates');
     }
+
+    public function genes()
+    {
+        return $this->belongsToMany(Gene::class, 'element_has_genes')->withPivot('effect');
+    }
 }

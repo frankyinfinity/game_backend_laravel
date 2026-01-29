@@ -20,6 +20,11 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-diffusion-link" data-toggle="pill" href="#tab-diffusion" role="tab" aria-controls="tab-diffusion" aria-selected="false">Diffusione</a>
                     </li>
+                    @if($element->consumable)
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab" aria-controls="tab-consumption" aria-selected="false">Effetti Consumo</a>
+                    </li>
+                    @endif
                 </ul>
             </div>
             
@@ -28,148 +33,20 @@
                     
                     <!-- TAB DATI GENERALI -->
                     <div class="tab-pane fade show active" id="tab-general" role="tabpanel" aria-labelledby="tab-general-link">
-                        <div class="form-group">
-                            <label for="name">Nome <span class="text-danger">*</span></label>
-                            <input type="text" 
-                                   class="form-control @error('name') is-invalid @enderror" 
-                                   id="name" 
-                                   name="name" 
-                                   value="{{ old('name', $element->name) }}" 
-                                   required>
-                            @error('name')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-
-                        <div class="form-group">
-                            <div class="custom-control custom-checkbox">
-                                <input type="checkbox" class="custom-control-input" id="consumable" name="consumable" {{ old('consumable', $element->consumable) ? 'checked' : '' }}>
-                                <label class="custom-control-label" for="consumable">Consumabile</label>
-                                <small class="form-text text-muted">Se selezionato, l'elemento può essere consumato.</small>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="element_type_id">Tipologia <span class="text-danger">*</span></label>
-                            <select class="form-control @error('element_type_id') is-invalid @enderror" 
-                                    id="element_type_id" 
-                                    name="element_type_id" 
-                                    required>
-                                <option value="">Seleziona Tipologia</option>
-                                @foreach($elementTypes as $type)
-                                    <option value="{{ $type->id }}" {{ old('element_type_id', $element->element_type_id) == $type->id ? 'selected' : '' }}>
-                                        {{ $type->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('element_type_id')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-
-                        <div class="form-group">
-                            <label for="climates">Climi Validi <span class="text-muted">(Seleziona multipla: Ctrl+Click)</span></label>
-                            <select class="form-control @error('climates') is-invalid @enderror" 
-                                    id="climates" 
-                                    name="climates[]" 
-                                    multiple
-                                    style="min-height: 200px;">
-                                @foreach($climates as $climate)
-                                    <option value="{{ $climate->id }}" 
-                                        {{ (collect(old('climates', $element->climates->pluck('id')))->contains($climate->id)) ? 'selected' : '' }}>
-                                        {{ $climate->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="form-text text-muted">Nota: Se modifichi i climi, salva per aggiornare il tab Diffusione.</small>
-                            @error('climates')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
+                        @include('elements.tabs.general')
                     </div>
 
                     <!-- TAB DIFFUSIONE -->
                     <div class="tab-pane fade" id="tab-diffusion" role="tabpanel" aria-labelledby="tab-diffusion-link">
-                         @if($element->climates->isEmpty())
-                            <div class="alert alert-warning">
-                                <i class="icon fas fa-exclamation-triangle"></i> Nessun clima associato.
-                                Seleziona e salva dei climi nel tab "Dati Generali" per configurare la diffusione.
-                            </div>
-                         @else
-                            <div class="row">
-                                <div class="col-3">
-                                    <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
-                                        @foreach($element->climates as $index => $climate)
-                                            <a class="nav-link {{ $index === 0 ? 'active' : '' }}" 
-                                               id="v-pills-{{ $climate->id }}-tab" 
-                                               data-toggle="pill" 
-                                               href="#v-pills-{{ $climate->id }}" 
-                                               role="tab" 
-                                               aria-controls="v-pills-{{ $climate->id }}" 
-                                               aria-selected="{{ $index === 0 ? 'true' : 'false' }}">
-                                                {{ $climate->name }}
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                </div>
-                                <div class="col-9">
-                                    <div class="tab-content" id="v-pills-tabContent">
-                                        @foreach($element->climates as $index => $climate)
-                                            <div class="tab-pane fade {{ $index === 0 ? 'show active' : '' }}" 
-                                                 id="v-pills-{{ $climate->id }}" 
-                                                 role="tabpanel" 
-                                                 aria-labelledby="v-pills-{{ $climate->id }}-tab">
-                                                 
-                                                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                                                    <table class="table table-bordered table-hover head-fixed">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Tile</th>
-                                                                <th style="width: 150px;">
-                                                                    Diffusione (0-100%)
-                                                                    <i class="fas fa-info-circle text-muted ml-1" title="Questo indica la percentuale in cui un elemento può apparire in quel tile in quel clima" data-toggle="tooltip" style="cursor: help;"></i>
-                                                                </th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @foreach($allTiles as $tile)
-                                                                @php
-                                                                    $val = $diffusionMap[$climate->id][$tile->id] ?? 0;
-                                                                @endphp
-                                                                <tr>
-                                                                    <td class="align-middle">
-                                                                        <div style="display:flex; align-items:center;">
-                                                                            <span style="display:inline-block; width: 24px; height: 24px; background-color: {{ $tile->color }}; margin-right: 10px; border:1px solid #ddd; border-radius: 3px;"></span>
-                                                                            {{ $tile->name }}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>
-                                                                        <input type="number" 
-                                                                               name="diffusion[{{ $climate->id }}][{{ $tile->id }}]" 
-                                                                               value="{{ $val }}" 
-                                                                               min="0" 
-                                                                               max="100" 
-                                                                               class="form-control">
-                                                                    </td>
-                                                                </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                         @endif
+                        @include('elements.tabs.diffusion')
                     </div>
+
+                    <!-- TAB CONSUMPTION -->
+                    @if($element->consumable)
+                    <div class="tab-pane fade" id="tab-consumption" role="tabpanel" aria-labelledby="tab-consumption-link">
+                        @include('elements.tabs.consumption')
+                    </div>
+                    @endif
 
                 </div>
             </div>
@@ -189,7 +66,76 @@
 @section('js')
     <script>
         $(function () {
-            $('[data-toggle="tooltip"]').tooltip()
+            $('[data-toggle="tooltip"]').tooltip();
+
+            // Gene Rows Management
+            let geneIndex = {{ $element->genes->count() }};
+            
+            function updateGeneOptions() {
+                // Raccogli tutti i valori selezionati
+                let selectedValues = [];
+                $('.gene-selector').each(function() {
+                    let val = $(this).val();
+                    if (val) {
+                        selectedValues.push(val);
+                    }
+                });
+
+                // Aggiorna ogni select
+                $('.gene-selector').each(function() {
+                    let currentSelect = $(this);
+                    let currentValue = currentSelect.val();
+                    
+                    currentSelect.find('option').each(function() {
+                        let option = $(this);
+                        let optionValue = option.val();
+                        
+                        // Disabilita se è selezionato altrove (non in questa select)
+                        if (selectedValues.includes(optionValue) && optionValue != currentValue) {
+                            option.prop('disabled', true);
+                        } else {
+                            option.prop('disabled', false);
+                        }
+                    });
+                });
+            }
+
+            // Bind change event
+            $(document).on('change', '.gene-selector', function() {
+                updateGeneOptions();
+            });
+
+            $('#add-gene-row').click(function() {
+                let html = `
+                    <tr class="gene-row">
+                        <td>
+                            <select name="consumption_genes[${geneIndex}][gene_id]" class="form-control gene-selector" required>
+                                <option value="">Seleziona Gene</option>
+                                @foreach($allGenes as $g)
+                                    <option value="{{$g->id}}">{{$g->name}}</option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" name="consumption_genes[${geneIndex}][effect]" class="form-control" required placeholder="Es. 10 o -5">
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm remove-gene-row"><i class="fa fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+                $('#genes_table tbody').append(html);
+                geneIndex++;
+                updateGeneOptions();
+            });
+            
+            $(document).on('click', '.remove-gene-row', function() {
+                $(this).closest('tr').remove();
+                updateGeneOptions();
+            });
+
+            // Initial call
+            updateGeneOptions();
         })
     </script>
 @stop

@@ -8,6 +8,8 @@ use App\Models\ElementType;
 use App\Models\Climate;
 use App\Models\Tile;
 use App\Models\ElementHasTile;
+use App\Models\Gene;
+use App\Models\ElementHasGene;
 use Illuminate\Http\Request;
 
 class ElementController extends Controller
@@ -88,7 +90,10 @@ class ElementController extends Controller
             $diffusionMap[$diff->climate_id][$diff->tile_id] = $diff->percentage;
         }
 
-        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap'));
+        // Fetch Genes
+        $allGenes = Gene::orderBy('name')->get();
+
+        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap', 'allGenes'));
     }
 
     public function update(Request $request, Element $element)
@@ -109,6 +114,21 @@ class ElementController extends Controller
             $element->climates()->sync($request->climates);
         } else {
             $element->climates()->detach();
+        }
+        
+        // Save Consumption Genes Effects
+        if ($element->consumable) {
+            $syncGenes = [];
+            if ($request->has('consumption_genes')) {
+                foreach($request->consumption_genes as $g) {
+                    if(!empty($g['gene_id']) && isset($g['effect'])) {
+                        $syncGenes[$g['gene_id']] = ['effect' => $g['effect']];
+                    }
+                }
+            }
+            $element->genes()->sync($syncGenes);
+        } else {
+            $element->genes()->detach();
         }
 
         // Save Diffusion Data
