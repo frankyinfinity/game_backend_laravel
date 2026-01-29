@@ -70,5 +70,10 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/element-types/list/table', [App\Http\Controllers\ElementTypeController::class, 'listDataTable'])->name('element-types.datatable');
     Route::post('/element-types/delete', [App\Http\Controllers\ElementTypeController::class, 'delete'])->name('element-types.delete');
 
+    //Elements
+    Route::resource('elements', App\Http\Controllers\ElementController::class);
+    Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');
+    Route::post('/elements/delete', [App\Http\Controllers\ElementController::class, 'delete'])->name('elements.delete');
+
 
 });

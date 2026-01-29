@@ -355,6 +355,11 @@ return [
                     'text' => 'Tipologie Elementi',
                     'url'  => '/element-types',
                     'icon' => 'fas fa-cube',
+                ],
+                [
+                    'text' => 'Elementi',
+                    'url'  => '/elements',
+                    'icon' => 'fas fa-atom',
                 ]
             ]
         ],
