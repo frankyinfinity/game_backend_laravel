@@ -37,6 +37,7 @@
                                 </div>
                             </th>
                             <th>ID</th>
+                            <th>Grafica</th>
                             <th>Nome</th>
                             <th>Tipologia</th>
                             <th>Consumabile</th>
@@ -84,6 +85,7 @@
                         class:          "disableEdit",
                     },
                     {data:"id", name:"id"},
+                    {data:"graphics", name:"graphics", searchable: false, orderable: false},
                     {data:"name", name:"name"},
                     {data:"element_type_name", name:"element_type_name"},
                     {data:"consumable_badge", name:"consumable_badge"},
@@ -111,7 +113,7 @@
                         render: function(data, type, row){
                             return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
                         },
-                        targets:   6
+                        targets:   7
                     },
                 ],
             });

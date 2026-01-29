@@ -25,6 +25,13 @@ class ElementController extends Controller
     {
         $query = Element::with(['elementType', 'climates'])->get();
         return datatables($query)
+            ->addColumn('graphics', function($row){
+                $path = 'storage/elements/' . $row->id . '.png';
+                if (file_exists(public_path($path))) {
+                    return '<img src="' . asset($path) . '?v=' . time() . '" style="width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid #ccc;">';
+                }
+                return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
+            })
             ->addColumn('element_type_name', function($row){
                 return $row->elementType ? $row->elementType->name : '-';
             })
@@ -34,7 +41,7 @@ class ElementController extends Controller
             ->addColumn('consumable_badge', function($row){
                 return $row->consumable ? '<span class="badge badge-success">Sì</span>' : '<span class="badge badge-secondary">No</span>';
             })
-            ->rawColumns(['consumable_badge'])
+            ->rawColumns(['consumable_badge', 'graphics'])
             ->toJson();
     }
 
