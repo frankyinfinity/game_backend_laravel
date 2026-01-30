@@ -151,4 +151,54 @@ class Helper
 
     }
 
+    /**
+     * Get all coordinates of tiles with a specific tile ID in a birth region
+     * 
+     * @param int $birthRegionId The ID of the birth region
+     * @param int $tileId The ID of the tile to search for
+     * @return array Array of coordinates ['x' => j, 'y' => i] for each matching tile
+     */
+    public static function getTileCoordinates(int $birthRegionId, int $tileId): array
+    {
+        $birthRegion = BirthRegion::find($birthRegionId);
+        if (!$birthRegion) {
+            return [];
+        }
+
+        $tiles = self::getBirthRegionTiles($birthRegion);
+        $coordinates = [];
+
+        // Search in the tiles collection for matching tile IDs
+        foreach ($tiles as $tile) {
+            if (isset($tile['tile']['id']) && $tile['tile']['id'] == $tileId) {
+                $coordinates[] = [
+                    'i' => $tile['i'],
+                    'j' => $tile['j'],
+                    'x' => $tile['j'] * self::TILE_SIZE,
+                    'y' => $tile['i'] * self::TILE_SIZE,
+                ];
+            }
+        }
+
+        // Also check default tile from birth climate
+        if ($birthRegion->birthClimate && $birthRegion->birthClimate->default_tile_id == $tileId) {
+            // Add coordinates for tiles that are not explicitly set (they use default)
+            for ($i = 0; $i < $birthRegion->height; $i++) {
+                for ($j = 0; $j < $birthRegion->width; $j++) {
+                    $existingTile = $tiles->where('i', $i)->where('j', $j)->first();
+                    if ($existingTile === null) {
+                        $coordinates[] = [
+                            'i' => $i,
+                            'j' => $j,
+                            'x' => $j * self::TILE_SIZE,
+                            'y' => $i * self::TILE_SIZE,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $coordinates;
+    }
+
 }

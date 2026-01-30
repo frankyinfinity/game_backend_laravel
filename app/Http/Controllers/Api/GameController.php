@@ -15,6 +15,9 @@ use App\Models\DrawRequest;
 use App\Models\Player;
 use App\Models\User;
 use App\Models\Gene;
+use App\Models\Tile;
+use App\Models\BirthRegion;
+use App\Models\ElementHasTile;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
@@ -500,7 +503,22 @@ class GameController extends Controller
     public function setElementInMap(Request $request) {
 
         $birth_region_id = $request->birth_region_id;
+        $birthRegion = BirthRegion::find($birth_region_id);
 
+        $tiles = Tile::all();
+        foreach ($tiles as $tile) {
+        
+            $percentage = 0;
+            $elementHasTile = ElementHasTile::query()
+                ->where('tile_id', $tile->tile_id)
+                
+                ->first();
+            if($elementHasTile !== null) {
+                $percentage = $elementHasTile->percentage;
+            }
+
+        }
+        
         return response()->json(['success' => true, 'message' => 'Birh Region ' . $birth_region_id]);
 
     }
