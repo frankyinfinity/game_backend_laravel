@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
@@ -512,15 +513,62 @@ class GameController extends Controller
         
             $percentage = 0;
             $elementHasTile = ElementHasTile::query()
-                ->where('tile_id', $tile->tile_id)
+                ->where('tile_id', $tile->id)
                 ->where('climate_id', $birthClimate->climate_id)
                 ->first();
+            Log::info('tile');
+            Log::info($elementHasTile);
             if($elementHasTile !== null) {
                 $percentage = $elementHasTile->percentage;
             }
 
             if($percentage > 0) {
-                
+                $spawn = Helper::chance($percentage);
+                Log::info($spawn?'1':'0');
+                if($spawn) {
+                    
+                    $coordinates = Helper::getTileCoordinates($birthRegion->id, $tile->id);
+                    $randomIndex = range(0, sizeof($coordinates)-1);
+                    $coordinate = $coordinates[$randomIndex];
+
+                    $element = Element::find($elementHasTile->element_id);
+
+                    $player = Player::query()->where('birth_region_id', $birthRegion->id)->first();
+                    if($player !== null) {
+
+                        $requestId = Str::uuid()->toString();
+                        $sessionId = $player->actual_session_id;
+
+                        // Use the cache system
+                        ObjectCache::buffer($sessionId);
+                        $drawItems = [];
+
+                        //Draw
+                        $imagePath = '/storage/elements/' . $element->id . '.png';
+            
+                        $image = new Image('element_' . $element->id);
+                        $image->setSrc($imagePath);
+                        $image->setOrigin($coordinate['x'], $coordinate['y']);
+                        $image->setSize(64, 64);
+                        
+                        $objectDraw = new ObjectDraw($image->buildJson(), $sessionId);
+                        $drawItems[] = $objectDraw->get();
+
+                        // Flush to cache
+                        ObjectCache::flush($sessionId);
+
+                        // Dispatch event
+                        DrawRequest::query()->create([
+                            'session_id' => $sessionId,
+                            'request_id' => $requestId,
+                            'player_id' => $player->id,
+                            'items' => json_encode($drawItems),
+                        ]);
+                        event(new DrawInterfaceEvent($player, $requestId));
+
+                    }
+
+                }
             }
 
         }

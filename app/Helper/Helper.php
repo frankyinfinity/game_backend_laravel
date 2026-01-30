@@ -201,4 +201,25 @@ class Helper
         return $coordinates;
     }
 
+    /**
+     * Returns true with the given percentage probability
+     * 
+     * @param float $percentage Percentage chance (0-100) of returning true
+     * @return bool True with the given probability, false otherwise
+     */
+    public static function chance(float $percentage): bool
+    {
+        if ($percentage <= 0) {
+            return false;
+        }
+        if ($percentage >= 100) {
+            return true;
+        }
+        
+        // Generate random number between 0 and 100 (with decimal precision)
+        $random = mt_rand(0, 10000) / 100;
+        
+        return $random < $percentage;
+    }
+
 }
