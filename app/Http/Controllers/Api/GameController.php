@@ -499,9 +499,9 @@ class GameController extends Controller
 
     public function setElementInMap(Request $request) {
 
-        
+        $birth_region_id = $request->birth_region_id;
 
-        return response()->json(['success' => true, 'message' => 'Test']);
+        return response()->json(['success' => true, 'message' => 'Birh Region ' . $birth_region_id]);
 
     }
 

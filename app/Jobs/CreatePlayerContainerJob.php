@@ -13,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 use App\Models\Container;
+use App\Models\BirthRegion;
 
 class CreatePlayerContainerJob implements ShouldQueue
 {
@@ -36,6 +37,8 @@ class CreatePlayerContainerJob implements ShouldQueue
         set_time_limit(0);
         
         putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+
+        //Entity
         $docker = Docker::create();
         $imageName = 'entity:latest';
 
@@ -65,7 +68,9 @@ class CreatePlayerContainerJob implements ShouldQueue
             foreach ($entities as $entity) {
                 
                 // Calcola una porta per il WebSocket
-                $maxPort = Container::query()->max('ws_port') ?? 9000;
+                $maxPort = Container::query()
+                    ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                    ->max('ws_port') ?? 9000;
                 $wsPort = $maxPort + 1;
 
                 $containerConfig = new ContainersCreatePostBody();
@@ -124,5 +129,75 @@ class CreatePlayerContainerJob implements ShouldQueue
             \Log::error("Errore nella creazione dei container per il player {$this->player->id}: " . $e->getMessage());
             throw $e;
         }
+
+        //Map
+        $docker = Docker::create();
+        $imageName = 'map:latest';
+
+        try {
+            // Controlla se l'immagine esiste
+            $images = $docker->imageList();
+            $imageExists = collect($images)->contains(fn($img) => 
+                in_array($imageName, $img->getRepoTags() ?? [])
+            );
+            
+            if (!$imageExists) {
+                throw new \Exception("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build");
+            }
+
+            // Recupera il birthRegion
+            $player = Player::query()->find($this->player->id);
+            $birthRegion = BirthRegion::query()
+                ->where('id', $player->birth_region_id)
+                ->first();
+
+            if (!$birthRegion) {
+                throw new \Exception("Nessuna birthRegion trovata per il player {$this->player->id}");
+            }
+
+            // Crea un container
+            $wsPort = null;
+
+            $containerConfig = new ContainersCreatePostBody();
+            $containerConfig->setImage($imageName);
+            $containerConfig->setHostname('map_' . $birthRegion->uid);
+            
+            // Passa i parametri come variabili d'ambiente
+            $appUrl = config('app.url') ?: 'http://localhost';
+            $backendPort = env('BACKEND_PORT', '8085');
+            $parsedUrl = parse_url($appUrl);
+            $backendHost = $parsedUrl['host'] ?? 'localhost';
+            
+            // Rimpiazza localhost con host.docker.internal per accesso da container
+            if ($backendHost === 'localhost' || $backendHost === '127.0.0.1') {
+                $backendHost = 'host.docker.internal';
+            }
+            
+            $backendUrl = $parsedUrl['scheme'] . '://' . $backendHost . ':' . $backendPort;
+            
+            $containerConfig->setEnv([
+                'BACKEND_URL=' . $backendUrl,
+                'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+                'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+                'BIRTH_REGION_ID=' . $birthRegion->id,
+            ]);
+            
+            $container = $docker->containerCreate($containerConfig);
+            $containerId = $container->getId();
+
+            // Salva il container nel database
+            Container::query()->create([
+                'container_id' => $containerId,
+                'name' => 'map_' . $birthRegion->uid,
+                'parent_type' => Container::PARENT_TYPE_MAP,
+                'parent_id' => $birthRegion->id,
+                'ws_port' => $wsPort,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Errore nella creazione dei container per il player {$this->player->id}: " . $e->getMessage());
+            throw $e;
+        }
+
     }
 }

@@ -18,57 +18,73 @@ class BuildDockerImage extends Command
      *
      * @var string
      */
-    protected $description = 'Costruisce l\'immagine Docker entity:latest dal Dockerfile';
+    protected $description = 'Costruisce immagini Docker dal Dockerfile';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $imageName = 'entity:latest';
-        $buildPath = base_path('docker/entity');
 
-        $this->info("Inizio costruzione immagine '$imageName'...");
+        $images = [
+            [
+                'name' => 'entity:latest',
+                'path' => base_path('docker/entity')
+            ],
+            [
+                'name' => 'map:latest',
+                'path' => base_path('docker/map')
+            ],
+        ];
 
-        if (!is_dir($buildPath)) {
-            $this->error("Cartella di build non trovata: $buildPath");
-            return 1;
-        }
+        foreach ($images as $image) {
 
-        if (!file_exists($buildPath . '/Dockerfile')) {
-            $this->error("Dockerfile non trovato in: $buildPath");
-            return 1;
-        }
+            $imageName = $image['name'];
+            $buildPath = $image['path'];
 
-        // Imposta la connessione a Docker su TCP
-        putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+            $this->info("Inizio costruzione immagine '$imageName'...");
 
-        // Usa il comando docker build via shell
-        $command = sprintf(
-            'docker build -t %s "%s"',
-            escapeshellarg($imageName),
-            $buildPath
-        );
-
-        $this->info("Eseguo: $command");
-        $this->line('');
-
-        exec($command, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            $this->error("Errore nella costruzione dell'immagine (exit code: $returnCode)");
-            foreach ($output as $line) {
-                $this->error($line);
+            if (!is_dir($buildPath)) {
+                $this->error("Cartella di build non trovata: $buildPath");
+                return 1;
             }
-            return 1;
-        }
 
-        foreach ($output as $line) {
-            $this->line($line);
-        }
+            if (!file_exists($buildPath . '/Dockerfile')) {
+                $this->error("Dockerfile non trovato in: $buildPath");
+                return 1;
+            }
 
-        $this->line('');
-        $this->info("✅ Immagine '$imageName' costruita con successo!");
+            // Imposta la connessione a Docker su TCP
+            putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+
+            // Usa il comando docker build via shell
+            $command = sprintf(
+                'docker build -t %s "%s"',
+                escapeshellarg($imageName),
+                $buildPath
+            );
+
+            $this->info("Eseguo: $command");
+            $this->line('');
+
+            exec($command, $output, $returnCode);
+
+            if ($returnCode !== 0) {
+                $this->error("Errore nella costruzione dell'immagine (exit code: $returnCode)");
+                foreach ($output as $line) {
+                    $this->error($line);
+                }
+                return 1;
+            }
+
+            foreach ($output as $line) {
+                $this->line($line);
+            }
+
+            $this->line('');
+            $this->info("✅ Immagine '$imageName' costruita con successo!");
+
+        }
 
         return 0;
     }

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Player;
+use App\Models\BirthRegion;
 use Docker\Docker;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,6 +38,7 @@ class StartPlayerContainersJob implements ShouldQueue
 
         try {
 
+            //Entity
             $entityIds = \App\Models\Entity::query()
                 ->whereHas('specie', function($query) {
                     $query->where('player_id', $this->player->id);
@@ -44,15 +46,24 @@ class StartPlayerContainersJob implements ShouldQueue
                 ->pluck('id')
                 ->toArray();
 
-            // Recupera tutti i container associati alle entity del player
-            $containers = Container::query()
-                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
-                ->whereIn('parent_id', $entityIds)
-                ->get();
+            //Map
+            $player = Player::query()->find($this->player->id);
+            $birthRegion = BirthRegion::query()
+                ->where('id', $player->birth_region_id)
+                ->first();
 
-            if ($containers->isEmpty()) {
-                throw new \Exception("Nessun container trovato per il player {$this->player->id}");
-            }
+            // Recupera tutti i container
+            $containers = Container::query()
+                ->where(function ($q) use ($entityIds, $birthRegion) {
+                    $q->where(function ($sq2) use ($entityIds) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                            ->whereIn('parent_id', $entityIds);
+                    })->orWhere(function ($sq2) use ($birthRegion) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_MAP)
+                            ->where('parent_id', $birthRegion->id);
+                    });
+                })
+                ->get();
 
             // Avvia ogni container
             foreach ($containers as $containerRecord) {
