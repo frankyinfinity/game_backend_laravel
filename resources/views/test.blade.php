@@ -208,6 +208,58 @@
             }
         }
 
+        class ImageSprite extends BasicDraw {
+            constructor(object) {
+                super(object);
+                this.shape = null;
+                this.loaded = false;
+            }
+            build() {
+                return new Promise((resolve, reject) => {
+                    const object = this.object;
+                    // Build full URL from relative path
+                    let src = object['src'];
+                    if (src && !src.startsWith('http')) {
+                        src = BACK_URL + src;
+                    }
+                    console.log('Loading image from:', src);
+                    
+                    const texture = PIXI.Texture.from(src);
+                    this.shape = new PIXI.Sprite(texture);
+                    
+                    if (texture.baseTexture.valid) {
+                        this.applyProperties();
+                        this.loaded = true;
+                        resolve();
+                    } else {
+                        texture.baseTexture.on('loaded', () => {
+                            this.applyProperties();
+                            this.loaded = true;
+                            resolve();
+                        });
+                        texture.baseTexture.on('error', (err) => {
+                            console.error('Error loading image:', src, err);
+                            reject(err);
+                        });
+                    }
+                });
+            }
+            applyProperties() {
+                const object = this.object;
+                this.shape.x = object['x'];
+                this.shape.y = object['y'];
+                if (object['width'] !== undefined && object['width'] !== null) {
+                    this.shape.width = object['width'];
+                }
+                if (object['height'] !== undefined && object['height'] !== null) {
+                    this.shape.height = object['height'];
+                }
+                if (object['color'] !== undefined && object['color'] !== null) {
+                    this.shape.tint = object['color'];
+                }
+            }
+        }
+
         function initPixi() {
             app = new PIXI.Application({
                 width: window.innerWidth,
@@ -248,6 +300,12 @@
         function drawText(object) {
             let d = new Text(object);
             d.build();
+            d.render(app);
+        }
+
+        async function drawImage(object) {
+            let d = new ImageSprite(object);
+            await d.build();
             d.render(app);
         }
 
@@ -325,6 +383,7 @@
                             else if (obj.type === 'multi_line') drawMultiLine(obj);
                             else if (obj.type === 'circle') drawCircle(obj);
                             else if (obj.type === 'text') drawText(obj);
+                            else if (obj.type === 'image') await drawImage(obj);
                         } else if (itemType === 'update') {
                             if (item.sleep) await sleep(item.sleep);
                             let shape = shapes[item.uid];

@@ -3,11 +3,13 @@
 namespace App\Console\Commands;
 
 use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
+use App\Models\Element;
 use App\Models\Player;
 use App\Models\User;
 use Illuminate\Console\Command;
@@ -67,10 +69,28 @@ class TestDrawCommand extends Command
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        $x = 50;
-        $y = 100;
+        $x = 10;
+        $y = 10;
 
-        $progressBar = new \App\Custom\Draw\Complex\ProgressBarDraw('test_pb');
+        // Draw the first element's image
+        $element = Element::first();
+        if ($element) {
+            $imagePath = '/storage/elements/' . $element->id . '.png';
+            
+            $image = new Image('element_' . $element->id);
+            $image->setSrc($imagePath);
+            $image->setOrigin($x, $y);
+            $image->setSize(64, 64);
+            
+            $objectDraw = new ObjectDraw($image->buildJson(), $sessionId);
+            $drawItems[] = $objectDraw->get();
+            
+            $this->info('Drawing element: ' . $element->name . ' (ID: ' . $element->id . ')');
+        } else {
+            $this->warn('No elements found in database.');
+        }
+
+        /*$progressBar = new \App\Custom\Draw\Complex\ProgressBarDraw('test_pb');
         $progressBar->setName('Vita');
         $progressBar->setMin(0);
         $progressBar->setMax(100);
@@ -84,7 +104,7 @@ class TestDrawCommand extends Command
         foreach ($progressBar->getDrawItems() as $item) {
             $objectDraw = new ObjectDraw($item, $sessionId);
             $drawItems[] = $objectDraw->get();
-        }
+        }*/
 
         // Flush to cache
         ObjectCache::flush($sessionId);
