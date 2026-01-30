@@ -18,6 +18,7 @@ use App\Models\Gene;
 use App\Models\Tile;
 use App\Models\BirthRegion;
 use App\Models\ElementHasTile;
+use App\Models\BirthClimate;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
@@ -504,6 +505,7 @@ class GameController extends Controller
 
         $birth_region_id = $request->birth_region_id;
         $birthRegion = BirthRegion::find($birth_region_id);
+        $birthClimate = BirthClimate::find($birthRegion->birth_climate_id);
 
         $tiles = Tile::all();
         foreach ($tiles as $tile) {
@@ -511,10 +513,14 @@ class GameController extends Controller
             $percentage = 0;
             $elementHasTile = ElementHasTile::query()
                 ->where('tile_id', $tile->tile_id)
-                
+                ->where('climate_id', $birthClimate->climate_id)
                 ->first();
             if($elementHasTile !== null) {
                 $percentage = $elementHasTile->percentage;
+            }
+
+            if($percentage > 0) {
+                
             }
 
         }

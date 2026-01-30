@@ -44,12 +44,14 @@ class AuthController extends Controller
         $region = Region::find($birth_region_id);
         
         $birthPlanet = BirthPlanet::query()->create([
+            'planet_id' => $planet->id,
             'name' => $planet->name,
             'description' => $planet->description,
         ]);
         foreach($planet->regions as $itemRegion) {
 
             $birthClimate = BirthClimate::query()->create([
+                "climate_id" => $itemRegion->climate->id,
                 "name" => $itemRegion->climate->name,
                 "started" => $itemRegion->climate->started,
                 "min_temperature" => $itemRegion->climate->min_temperature,
@@ -59,6 +61,7 @@ class AuthController extends Controller
 
             $filename = $itemRegion->filename;
             $birthRegion = BirthRegion::query()->create([
+                'region_id' => $itemRegion->id,
                 'birth_planet_id' => $birthPlanet->id,
                 'birth_climate_id' => $birthClimate->id,
                 'name' => $itemRegion->name,
