@@ -8,7 +8,7 @@ Route::get('registration_genes', [App\Http\Controllers\Api\GeneController::class
 Route::post('regions/{planet_id}', [App\Http\Controllers\Api\RegionController::class, 'get']);
 Route::get('map/{region_id}', [App\Http\Controllers\Api\MapController::class, 'get']);
 
-//Game
+//Game (No Auth)
 Route::post('/game/login', [App\Http\Controllers\Api\GameController::class, 'login'])->name('game.login');
 Route::post('/game/register', [App\Http\Controllers\Api\GameController::class, 'register'])->name('game.register');
 Route::post('/game/clear_login', [App\Http\Controllers\Api\GameController::class, 'clearLogin'])->name('game.clear_login');
@@ -16,9 +16,15 @@ Route::post('/game/home', [App\Http\Controllers\Api\GameController::class, 'home
 Route::post('/game/get_draw_item', [App\Http\Controllers\Api\GameController::class, 'getDrawItem'])->name('game.get_draw_item');
 Route::post('/game/close', [App\Http\Controllers\Api\GameController::class, 'close'])->name('game.close');
 
-//Auth
 Route::group(['prefix' => 'auth'], function (){
+
+    //Auth
     Route::post('register', [App\Http\Controllers\Api\AuthController::class, 'register']);
     Route::post('login', [App\Http\Controllers\Api\AuthController::class, 'login']);
     Route::post('logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
+
+    //Game (Auth)
+    Route::post('/game/set_element_in_map', [App\Http\Controllers\Api\GameController::class, 'setElementInMap'])->name('game.set_element_in_map');
+
+
 });

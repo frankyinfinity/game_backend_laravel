@@ -497,4 +497,12 @@ class GameController extends Controller
         return response()->json(['success' => true, 'message' => 'Connection closed successfully']);
     }
 
+    public function setElementInMap(Request $request) {
+
+        
+
+        return response()->json(['success' => true, 'message' => 'Test']);
+
+    }
+
 }
