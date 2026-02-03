@@ -25,6 +25,7 @@ Route::group(['prefix' => 'auth'], function (){
 
     //Game (Auth)
     Route::post('/game/set_element_in_map', [App\Http\Controllers\Api\GameController::class, 'setElementInMap'])->name('game.set_element_in_map');
-    Route::post('/game/entity/consume', [App\Http\Controllers\EntityController::class, 'consume'])->name('game.entity.consume');
+    Route::post('/game/entity/consume', [App\Http\Controllers\Api\GameController::class, 'consume'])->name('game.entity.consume');
+    Route::post('/game/entity/movement', [App\Http\Controllers\Api\GameController::class, 'movement'])->name('game.entity.movement');
 
 });

@@ -275,7 +275,7 @@ function performMovement(params, callback) {
   const options = {
     hostname: new URL(backendUrl).hostname,
     port: new URL(backendUrl).port || 80,
-    path: '/entities/movement',
+    path: '/api/auth/game/entity/movement',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
