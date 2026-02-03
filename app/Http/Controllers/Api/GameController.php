@@ -17,6 +17,7 @@ use App\Models\Player;
 use App\Models\User;
 use App\Models\Gene;
 use App\Models\Tile;
+use App\Models\Element;
 use App\Models\BirthRegion;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
@@ -508,63 +509,55 @@ class GameController extends Controller
         $birthRegion = BirthRegion::find($birth_region_id);
         $birthClimate = BirthClimate::find($birthRegion->birth_climate_id);
 
+        $player = Player::query()->where('birth_region_id', $birthRegion->id)->first();
+        if ($player === null) {
+            return response()->json(['success' => false, 'message' => 'Player non trovato']);
+        }
+
+        $requestId = Str::uuid()->toString();
+        $sessionId = $player->actual_session_id;
+
+        // Buffer once outside the loop to accumulate all items
+        ObjectCache::buffer($sessionId);
+        $drawItems = [];
+
         $tiles = Tile::all();
         foreach ($tiles as $tile) {
-        
+
             $percentage = 0;
             $elementHasTile = ElementHasTile::query()
                 ->where('tile_id', $tile->id)
                 ->where('climate_id', $birthClimate->climate_id)
                 ->first();
-            Log::info('tile');
-            Log::info($elementHasTile);
-            if($elementHasTile !== null) {
+
+            if ($elementHasTile !== null) {
                 $percentage = $elementHasTile->percentage;
             }
 
-            if($percentage > 0) {
+            if ($percentage > 0) {
                 $spawn = Helper::chance($percentage);
-                Log::info($spawn?'1':'0');
-                if($spawn) {
-                    
+                if ($spawn) {
+
                     $coordinates = Helper::getTileCoordinates($birthRegion->id, $tile->id);
-                    $randomIndex = range(0, sizeof($coordinates)-1);
-                    $coordinate = $coordinates[$randomIndex];
+                    if (count($coordinates) > 0) {
 
-                    $element = Element::find($elementHasTile->element_id);
+                        $randomIndex = array_rand($coordinates);
+                        $coordinate = $coordinates[$randomIndex];
 
-                    $player = Player::query()->where('birth_region_id', $birthRegion->id)->first();
-                    if($player !== null) {
+                        $element = Element::find($elementHasTile->element_id);
 
-                        $requestId = Str::uuid()->toString();
-                        $sessionId = $player->actual_session_id;
+                        // UNIQUE UID: adds coordinates to avoid overwriting elements in the frontend
+                        $uid = 'element_' . $element->id . '_' . $coordinate['i'] . '_' . $coordinate['j'];
 
-                        // Use the cache system
-                        ObjectCache::buffer($sessionId);
-                        $drawItems = [];
-
-                        //Draw
                         $imagePath = '/storage/elements/' . $element->id . '.png';
-            
-                        $image = new Image('element_' . $element->id);
+
+                        $image = new Image($uid);
                         $image->setSrc($imagePath);
                         $image->setOrigin($coordinate['x'], $coordinate['y']);
                         $image->setSize(64, 64);
-                        
+
                         $objectDraw = new ObjectDraw($image->buildJson(), $sessionId);
                         $drawItems[] = $objectDraw->get();
-
-                        // Flush to cache
-                        ObjectCache::flush($sessionId);
-
-                        // Dispatch event
-                        DrawRequest::query()->create([
-                            'session_id' => $sessionId,
-                            'request_id' => $requestId,
-                            'player_id' => $player->id,
-                            'items' => json_encode($drawItems),
-                        ]);
-                        event(new DrawInterfaceEvent($player, $requestId));
 
                     }
 
@@ -572,7 +565,20 @@ class GameController extends Controller
             }
 
         }
-        
+
+        // Flush and Send only once after the loop
+        ObjectCache::flush($sessionId);
+
+        if (count($drawItems) > 0) {
+            DrawRequest::query()->create([
+                'session_id' => $sessionId,
+                'request_id' => $requestId,
+                'player_id' => $player->id,
+                'items' => json_encode($drawItems),
+            ]);
+            event(new DrawInterfaceEvent($player, $requestId));
+        }
+
         return response()->json(['success' => true, 'message' => 'Birh Region ' . $birth_region_id]);
 
     }

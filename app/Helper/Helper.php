@@ -38,11 +38,30 @@ class Helper
     {
 
         $tiles = [];
-        if($birthRegion->filename !== null) {
+        if($birthRegion->filename !== null && Storage::disk('birth_regions')->exists($birthRegion->id.'/'.$birthRegion->filename)) {
             $jsonContent = Storage::disk('birth_regions')->get($birthRegion->id.'/'.$birthRegion->filename);
             $tiles = json_decode($jsonContent, true);
         }
-        return collect($tiles);
+
+        $indexedInput = [];
+        foreach ($tiles as $t) {
+            $indexedInput[$t['i']][$t['j']] = $t['tile'];
+        }
+
+        $defaultTile = $birthRegion->birthClimate->default_tile ?? null;
+        $fullTiles = [];
+
+        for ($i = 0; $i < $birthRegion->height; $i++) {
+            for ($j = 0; $j < $birthRegion->width; $j++) {
+                $fullTiles[] = [
+                    'i' => $i,
+                    'j' => $j,
+                    'tile' => $indexedInput[$i][$j] ?? $defaultTile
+                ];
+            }
+        }
+
+        return collect($fullTiles);
 
     }
 
@@ -160,7 +179,7 @@ class Helper
      */
     public static function getTileCoordinates(int $birthRegionId, int $tileId): array
     {
-        $birthRegion = BirthRegion::find($birthRegionId);
+        $birthRegion = BirthRegion::with('birthClimate')->find($birthRegionId);
         if (!$birthRegion) {
             return [];
         }
@@ -177,24 +196,6 @@ class Helper
                     'x' => $tile['j'] * self::TILE_SIZE,
                     'y' => $tile['i'] * self::TILE_SIZE,
                 ];
-            }
-        }
-
-        // Also check default tile from birth climate
-        if ($birthRegion->birthClimate && $birthRegion->birthClimate->default_tile_id == $tileId) {
-            // Add coordinates for tiles that are not explicitly set (they use default)
-            for ($i = 0; $i < $birthRegion->height; $i++) {
-                for ($j = 0; $j < $birthRegion->width; $j++) {
-                    $existingTile = $tiles->where('i', $i)->where('j', $j)->first();
-                    if ($existingTile === null) {
-                        $coordinates[] = [
-                            'i' => $i,
-                            'j' => $j,
-                            'x' => $j * self::TILE_SIZE,
-                            'y' => $i * self::TILE_SIZE,
-                        ];
-                    }
-                }
             }
         }
 
