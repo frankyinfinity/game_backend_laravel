@@ -1,45 +1,47 @@
 <script>
-
     window['__name__'] = function() {
+        let object_uid = object['uid'];
+        let panel_uid = object_uid + '_panel';
+        
+        if (!shapes[panel_uid]) return;
 
-        let entity_uid = object['uid'];
-        let renderable = shapes[entity_uid+'_panel'].renderable;
+        let isVisible = shapes[panel_uid].renderable;
 
-        //Close all
-        const objectPanels = Object.entries(objects).filter(([key, _]) => key.endsWith('_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
-        for (const [key, objectPanel] of Object.entries(objectPanels)) {
-
-            let shapePanel = shapes[key];
-            shapePanel.renderable = false;
-
-            let children = objectPanel['children'];
-            for (const [key, childUid] of Object.entries(children)) {
-                let shape = shapes[childUid];
-                shape.renderable = false;
+        // Chiude tutti gli altri panel Entity
+        const entityPanels = Object.entries(objects).filter(([key, _]) => !key.startsWith('element_') && key.endsWith('_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
+        for (const [key, objectPanel] of Object.entries(entityPanels)) {
+            shapes[key].renderable = false;
+            for (const childUid of objectPanel['children']) {
+                if (shapes[childUid]) shapes[childUid].renderable = false;
             }
-
         }
 
-        //Open Panel
-        let shapePanel = shapes[entity_uid+'_panel'];
-        shapePanel.renderable = !renderable;
-        shapePanel.zIndex = 10000;
+        // Toggle Entity Panel
+        let show = !isVisible;
+        shapes[panel_uid].renderable = show;
+        shapes[panel_uid].zIndex = 10000;
+        AppData.actual_focus_uid_entity = show ? object_uid : null;
 
-        let actual_focus_uid_entity = null;
-        if(shapePanel.renderable) {
-            actual_focus_uid_entity = entity_uid;
-        }
-        AppData.actual_focus_uid_entity = actual_focus_uid_entity;
-
-        //Open Panel (Children)
-        let panelChildren = objects[entity_uid+'_panel']['children'];
-        for (const [key, childUid] of Object.entries(panelChildren)) {
-            let shape = shapes[childUid];
-            shape.renderable = !renderable;
-            shape.zIndex = 10000;
+        // Figli del pannello entità
+        for (const childUid of objects[panel_uid]['children']) {
+            if (shapes[childUid]) {
+                shapes[childUid].renderable = show;
+                shapes[childUid].zIndex = 10001;
+            }
         }
 
+        // Reattività: Se c'è un elemento aperto, aggiorna il suo tasto Consuma
+        if (AppData.actual_focus_uid_element) {
+            let elPanelUid = AppData.actual_focus_uid_element + '_panel';
+            if (objects[elPanelUid]) {
+                for (const childUid of objects[elPanelUid]['children']) {
+                    // Controllo se il figlio fa parte del bottone consuama
+                    if (childUid.includes('_btn_consume')) {
+                        if (shapes[childUid]) shapes[childUid].renderable = show;
+                    }
+                }
+            }
+        }
     }
     window['__name__']();
-
 </script>

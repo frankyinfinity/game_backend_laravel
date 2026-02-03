@@ -61,10 +61,10 @@ class ElementDraw
         $image->setSize(64, 64);
 
         // Interactivity
-        $jsPathClickPanel = resource_path('js/function/common/click_panel.blade.php');
-        $jsContentClickPanel = file_get_contents($jsPathClickPanel);
-        $jsContentClickPanel = Helper::setCommonJsCode($jsContentClickPanel, Str::random(20));
-        $image->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickPanel);
+        $jsPathClickElement = resource_path('js/function/element/click_element.blade.php');
+        $jsContentClickElement = file_get_contents($jsPathClickElement);
+        $jsContentClickElement = Helper::setCommonJsCode($jsContentClickElement, Str::random(20));
+        $image->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickElement);
 
         // Panel
         $panelX = $x + (Helper::TILE_SIZE / 2);
@@ -96,7 +96,6 @@ class ElementDraw
             $jsPathConsume = resource_path('js/function/element/consume.blade.php');
             $jsContentConsume = file_get_contents($jsPathConsume);
             $jsContentConsume = Helper::setCommonJsCode($jsContentConsume, Str::random(20));
-            $jsContentConsume = str_replace('__element_uid__', $uid, $jsContentConsume);
             
             $btn = new ButtonDraw($uid . '_btn_consume');
             $btn->setOrigin($btnX, $btnY);

@@ -87,11 +87,11 @@ class EntityDraw
         $formattedColor = $this->getColor();
         $circle->setColor($formattedColor);
 
-        $jsPathClickPanel = resource_path('js/function/common/click_panel.blade.php');
-        $jsContentClickPanel = file_get_contents($jsPathClickPanel);
-        $jsContentClickPanel = Helper::setCommonJsCode($jsContentClickPanel, Str::random(20));
+        $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
+        $jsContentClickEntity = file_get_contents($jsPathClickEntity);
+        $jsContentClickEntity = Helper::setCommonJsCode($jsContentClickEntity, Str::random(20));
 
-        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickPanel);
+        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickEntity);
         foreach ($dbEntity->getFieldAttributes() as $key => $value) {
             $circle->addAttributes($key, $value);
         }
