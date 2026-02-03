@@ -22,6 +22,7 @@ use App\Models\BirthRegion;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
 use App\Models\ElementHasPosition;
+use App\Custom\Draw\Complex\ElementDraw;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
@@ -557,28 +558,12 @@ class GameController extends Controller
 
                         $element = Element::find($elementHasTile->element_id);
 
-                        // UNIQUE UID: adds coordinates to avoid overwriting elements in the frontend
-                        $uid = 'element_' . $element->id . '_' . $coordinate['i'] . '_' . $coordinate['j'];
-
-                        $imagePath = '/storage/elements/' . $element->id . '.png';
-
-                        $image = new Image($uid);
-                        $image->setSrc($imagePath);
-                        $image->setOrigin($coordinate['x'], $coordinate['y']);
-                        $image->setSize(64, 64);
-
-                        $objectDraw = new ObjectDraw($image->buildJson(), $sessionId);
-                        $drawItems[] = $objectDraw->get();
-
-                        // Save position in Database
-                        ElementHasPosition::query()->create([
-                            'player_id' => $player->id,
-                            'session_id' => $sessionId,
-                            'element_id' => $element->id,
-                            'uid' => $uid,
-                            'tile_i' => $coordinate['i'],
-                            'tile_j' => $coordinate['j'],
-                        ]);
+                        $elementDraw = new ElementDraw($element, $coordinate['i'], $coordinate['j'], $player->id, $sessionId);
+                        $elementDrawItems = $elementDraw->getDrawItems();
+                        foreach ($elementDrawItems as $item) {
+                            $objectDraw = new ObjectDraw($item, $sessionId);
+                            $drawItems[] = $objectDraw->get();
+                        }
 
                     }
 
