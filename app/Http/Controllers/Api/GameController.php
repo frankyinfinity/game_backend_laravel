@@ -537,37 +537,41 @@ class GameController extends Controller
         foreach ($tiles as $tile) {
 
             $percentage = 0;
-            $elementHasTile = ElementHasTile::query()
+            $elementHasTiles = ElementHasTile::query()
                 ->where('tile_id', $tile->id)
                 ->where('climate_id', $birthClimate->climate_id)
-                ->first();
+                ->get();
 
-            if ($elementHasTile !== null) {
-                $percentage = $elementHasTile->percentage;
-            }
+            foreach ($elementHasTiles as $elementHasTile) {
 
-            if ($percentage > 0) {
-                $spawn = Helper::chance($percentage);
-                if ($spawn) {
+                if ($elementHasTile !== null) {
+                    $percentage = $elementHasTile->percentage;
+                }
 
-                    $coordinates = Helper::getTileCoordinates($birthRegion->id, $tile->id);
-                    if (count($coordinates) > 0) {
+                if ($percentage > 0) {
+                    $spawn = Helper::chance($percentage);
+                    if ($spawn) {
 
-                        $randomIndex = array_rand($coordinates);
-                        $coordinate = $coordinates[$randomIndex];
+                        $coordinates = Helper::getTileCoordinates($birthRegion->id, $tile->id);
+                        if (count($coordinates) > 0) {
 
-                        $element = Element::find($elementHasTile->element_id);
+                            $randomIndex = array_rand($coordinates);
+                            $coordinate = $coordinates[$randomIndex];
 
-                        $elementDraw = new ElementDraw($element, $coordinate['i'], $coordinate['j'], $player->id, $sessionId);
-                        $elementDrawItems = $elementDraw->getDrawItems();
-                        foreach ($elementDrawItems as $item) {
-                            $objectDraw = new ObjectDraw($item, $sessionId);
-                            $drawItems[] = $objectDraw->get();
+                            $element = Element::find($elementHasTile->element_id);
+
+                            $elementDraw = new ElementDraw($element, $coordinate['i'], $coordinate['j'], $player->id, $sessionId);
+                            $elementDrawItems = $elementDraw->getDrawItems();
+                            foreach ($elementDrawItems as $item) {
+                                $objectDraw = new ObjectDraw($item, $sessionId);
+                                $drawItems[] = $objectDraw->get();
+                            }
+
                         }
 
                     }
-
                 }
+
             }
 
         }
