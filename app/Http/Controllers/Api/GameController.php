@@ -21,6 +21,7 @@ use App\Models\Element;
 use App\Models\BirthRegion;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
+use App\Models\ElementHasPosition;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Complex\Form\InputDraw;
@@ -496,8 +497,18 @@ class GameController extends Controller
 
         $player = Player::find($player_id);
         if ($player) {
+
+            //Stop Container
             StopPlayerContainersJob::dispatch($player);
             \Log::info("StopPlayerContainersJob dispatched for player {$player_id}");
+
+            //Remove ElementHasPosition
+            $sessionId = $player->actual_session_id;
+            ElementHasPosition::query()
+                ->where('player_id', $player_id)
+                ->where('session_id', $sessionId)
+                ->delete();
+
         }
 
         return response()->json(['success' => true, 'message' => 'Connection closed successfully']);
@@ -558,6 +569,16 @@ class GameController extends Controller
 
                         $objectDraw = new ObjectDraw($image->buildJson(), $sessionId);
                         $drawItems[] = $objectDraw->get();
+
+                        // Save position in Database
+                        ElementHasPosition::query()->create([
+                            'player_id' => $player->id,
+                            'session_id' => $sessionId,
+                            'element_id' => $element->id,
+                            'uid' => $uid,
+                            'tile_i' => $coordinate['i'],
+                            'tile_j' => $coordinate['j'],
+                        ]);
 
                     }
 
