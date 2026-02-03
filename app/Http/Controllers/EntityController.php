@@ -19,6 +19,7 @@ use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectCache;
 use Illuminate\Support\Facades\Log;
 use App\Models\Container;
+use App\Models\Tile;
 use App\Services\WebSocketService;
 
 class EntityController extends Controller
@@ -104,9 +105,6 @@ class EntityController extends Controller
             }
         }
 
-        //Update position
-        $entity->update(['tile_i' => $targetTileI, 'tile_j' => $targetTileJ]);
-
         //Get Path
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
 
@@ -123,6 +121,9 @@ class EntityController extends Controller
 
             $pathNodeI = $path[0];
             $pathNodeJ = $path[1];
+
+            //Update position
+            $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
 
             $tileSize = Helper::TILE_SIZE;
 
