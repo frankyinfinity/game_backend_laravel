@@ -230,4 +230,23 @@ class EntityController extends Controller
 
 
 
+    /**
+     * Gestisce il consumo di un elemento da parte di un'entity
+     */
+    public function consume(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $player_id = $request->player_id;
+        $entityUid = $request->entity_uid;
+        $elementUid = $request->element_uid;
+
+        Log::info("Player {$player_id}: Entity {$entityUid} is consuming Element {$elementUid}");
+
+        // Qui in futuro verrà aggiunta la logica di consumo effettiva (rimozione elemento, effetti sull'entity, ecc.)
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Consumo avviato'
+        ]);
+    }
+
 }
