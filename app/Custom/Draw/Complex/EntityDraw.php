@@ -7,10 +7,13 @@ use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Helper\Helper;
+use App\Custom\Colors;
 use App\Models\Entity;
 use App\Models\Gene;
 use App\Models\Container;
+use App\Models\EntityInformation;
 use Illuminate\Support\Str;
 
 class EntityDraw
@@ -99,7 +102,7 @@ class EntityDraw
 
         $panel = new Rectangle($dbEntity->uid.'_panel');
         $panel->setOrigin($panelX, y: $panelY);
-        $panel->setSize(400, 145);
+        $panel->setSize(400, 345);
         $panel->setColor(0xFFFFFF);
         $panel->setRenderable(false);
 
@@ -127,8 +130,9 @@ class EntityDraw
         $player_id = $this->dbEntity->specie->player_id;
 
         //WS Port
-        $container = Container::where('parent_type', 'Entity')
-            ->where('parent_id', $this->dbEntity->id) // dbEntity is the Entity model instance
+        $container = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+            ->where('parent_id', $this->dbEntity->id)
             ->first();
         $wsPort = $container ? $container->ws_port : null;
 
@@ -199,6 +203,41 @@ class EntityDraw
         $rightButton->setRenderable(false);
         $rightButton->build();
 
+        //Progress Bar
+        $itemBars = [];
+
+        $genomeIds = $dbEntity->genomes->pluck('id')->toArray();
+        $entityInformations = EntityInformation::query()
+            ->whereIn('genome_id', $genomeIds)
+            ->with(['genome'])
+            ->get();
+
+        $panelX = $centerSquare['x'] + ($size / 3) + 10; // Reset X to panel start
+        $panelY += $sizeButton + 60; // Space after buttons
+
+        foreach($entityInformations as $entityInformation) {
+            $genome = $entityInformation->genome;
+            $gene = $genome->gene;
+            if($gene->type === 'dynamic_max') {
+             
+                $progressBar = new ProgressBarDraw($dbEntity->uid.'_progress_bar_'.$gene->key);
+                $progressBar->setName($gene->name);
+                $progressBar->setMin($genome->min);
+                $progressBar->setMax($genome->max);
+                $progressBar->setValue($entityInformation->value);
+                $progressBar->setBorderColor(Colors::LIGHT_GRAY);
+                $progressBar->setBarColor(Colors::RED);
+                $progressBar->setOrigin($panelX, $panelY);
+                $progressBar->setSize(380, 20);
+                $progressBar->setRenderable(false);
+                $progressBar->build();
+
+                $itemBars[] = $progressBar->getDrawItems();
+                $panelY += 60; // Space for the next progress bar (label + bar + range)
+
+            }
+        }
+
         //Set Children (Panel)
         $panel->addChild($text1);
         $panel->addChild($text2);
@@ -206,6 +245,11 @@ class EntityDraw
         foreach ($leftButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($downButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($rightButton->getDrawItems() as $item) {$panel->addChild($item);}
+        foreach ($itemBars as $item) {
+            foreach ($item as $item2) {
+                $panel->addChild($item2);
+            }
+        }
 
         //Get JSON
         $this->drawItems[] = $circle->buildJson();
@@ -216,6 +260,11 @@ class EntityDraw
         foreach ($leftButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($downButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($rightButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        foreach ($itemBars as $item) {
+            foreach ($item as $item2) {
+                $this->drawItems[] = $item2->buildJson();
+            }
+        }
 
     }
 

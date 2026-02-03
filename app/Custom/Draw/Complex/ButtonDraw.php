@@ -77,7 +77,7 @@ class ButtonDraw {
 
     private $renderable;
     public function setRenderable($renderable) {
-        $this->renderable = false;
+        $this->renderable = $renderable;
     }
 
     

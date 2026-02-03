@@ -154,7 +154,7 @@ class ProgressBarDraw {
         $border->setColor($this->borderColor);
         $border->setThickness(2); // Giving it some thickness to look like a border
         $border->setRenderable($this->renderable);
-        $this->drawItems[] = $border->buildJson();
+        $this->drawItems[] = $border;
 
         // 2. The Progress Bar (Filled part)
         // Calculate width based on value, min, max
@@ -171,7 +171,7 @@ class ProgressBarDraw {
             $bar->setOrigin($this->x + 2, $this->y + 2);
             $bar->setColor($this->barColor);
             $bar->setRenderable($this->renderable);
-            $this->drawItems[] = $bar->buildJson();
+            $this->drawItems[] = $bar;
         }
 
         // 3. The Name (Label)
@@ -182,7 +182,7 @@ class ProgressBarDraw {
             $text->setFontSize(14);
             $text->setColor(Colors::BLACK);
             $text->setRenderable($this->renderable);
-            $this->drawItems[] = $text->buildJson();
+            $this->drawItems[] = $text;
         }
 
         // 4. Min / Max (Centered below the bar)
@@ -193,6 +193,6 @@ class ProgressBarDraw {
         $rangeText->setColor(Colors::BLACK);
         $rangeText->setCenterAnchor(true);
         $rangeText->setRenderable($this->renderable);
-        $this->drawItems[] = $rangeText->buildJson();
+        $this->drawItems[] = $rangeText;
     }
 }
