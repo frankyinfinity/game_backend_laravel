@@ -775,17 +775,160 @@ class GameController extends Controller
      */
     public function consume(Request $request): \Illuminate\Http\JsonResponse
     {
-        $player_id = $request->player_id;
         $entityUid = $request->entity_uid;
         $elementUid = $request->element_uid;
 
-        Log::info("Player {$player_id}: Entity {$entityUid} is consuming Element {$elementUid}");
+        Log::info("Starting consume process for Entity: {$entityUid} on Element: {$elementUid}");
 
-        // Qui in futuro verrà aggiunta la logica di consumo effettiva (rimozione elemento, effetti sull'entity, ecc.)
+        $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
+        if (!$entity) return response()->json(['success' => false, 'message' => 'Entity not found']);
+
+        $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
+        if (!$elementPosition) return response()->json(['success' => false, 'message' => 'Element not found']);
+
+        $player = Player::find($entity->specie->player_id);
+        $player_id = $player->id;
+
+        $currentTileI = $entity->tile_i;
+        $currentTileJ = $entity->tile_j;
+        $targetTileI = $elementPosition->tile_i;
+        $targetTileJ = $elementPosition->tile_j;
+
+        //Get Tile Info for Pathfinding
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
+
+        $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
+        $mapSolidTiles[$targetTileI][$targetTileJ] = 'B';
+        $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
+
+        Log::info("Pathfinding for consume found " . count($pathFinding) . " steps.");
+
+        if (count($pathFinding) <= 1 && ($currentTileI != $targetTileI || $currentTileJ != $targetTileJ)) {
+             return response()->json(['success' => false, 'message' => 'Path not found']);
+        }
+
+        $updateCommands = [];
+        $idsToClear = [];
+        $drawCommands = [];
+        ObjectCache::buffer($player->actual_session_id);
+
+        foreach ($pathFinding as $key => $path) {
+
+            $pathNodeI = $path[0];
+            $pathNodeJ = $path[1];
+
+            //Update position
+            $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
+
+            $tileSize = Helper::TILE_SIZE;
+
+            $startSquare = new Square();
+            $startSquare->setOrigin($tileSize*$pathNodeJ, $tileSize*$pathNodeI);
+            $startSquare->setSize($tileSize);
+            $startCenterSquare = $startSquare->getCenter();
+            $xStart = $startCenterSquare['x'];
+            $yStart = $startCenterSquare['y'];
+
+            //Clear movements indicators
+            $circleName = 'circle_' . Str::random(20);
+            $idsToClear[] = $circleName;
+
+            $circle = new Circle($circleName);
+            $circle->setOrigin($xStart, $yStart);
+            $circle->setRadius($tileSize / 6);
+            $circle->setColor('#FF0000'); // Red path for consumption
+
+            //Draw
+            $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
+            $drawCommands[] = $drawObject->get();
+
+            if((sizeof($pathFinding)-1) !== $key) {
+
+                $nextPathNodeI = $pathFinding[$key+1][0];
+                $nextPathNodeJ = $pathFinding[$key+1][1];
+
+                $endSquare = new Square();
+                $endSquare->setSize($tileSize);
+                $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
+                $endCenterSquare = $endSquare->getCenter();
+                $xEnd = $endCenterSquare['x'];
+                $yEnd = $endCenterSquare['y'];
+
+                //Clear indicators
+                $multilineName = 'multiline_' . Str::random(20);
+                $idsToClear[] = $multilineName;
+
+                $linePath = new MultiLine($multilineName);
+                $linePath->setPoint($xStart, $yStart);
+                $linePath->setPoint($xEnd, $yEnd);
+                $linePath->setColor('#FF0000'); // Red path for consumption
+                $linePath->setThickness(2);
+
+                //Draw
+                $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
+                $drawCommands[] = $drawObject->get();
+
+                //Update Entity
+                $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
+                $updateObject->setAttributes('x', $xEnd);
+                $updateObject->setAttributes('y', $yEnd);
+                $updateObject->setAttributes('zIndex', 100);
+
+                foreach ($updateObject->get() as $data) $updateCommands[] = $data;
+
+                //Update Text
+                $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
+                $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
+                foreach ($updateObject->get() as $data) $updateCommands[] = $data;
+
+                //Update Panel
+                $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
+                $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
+                $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                $updateObject->setAttributes('zIndex', 100);
+                foreach ($updateObject->get() as $data) $updateCommands[] = $data;
+            }
+        }
+
+        // --- END OF MOVEMENT ---
+        
+        // Clear Element from UI
+        // We clear the main UID, the panel, and other potential components
+        $idsToClear[] = $elementUid;
+        $idsToClear[] = $elementUid . '_panel';
+        $idsToClear[] = $elementUid . '_text_name';
+        $idsToClear[] = $elementUid . '_btn_consume';
+        $idsToClear[] = $elementUid . '_btn_consume_rect';
+        $idsToClear[] = $elementUid . '_btn_consume_text';
+        
+        // Actual removal from DB
+        $elementPosition->delete();
+
+        foreach ($updateCommands as $update) $drawCommands[] = $update;
+        foreach ($idsToClear as $idToClear) {
+            $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
+            $drawCommands[] = $clearObject->get();
+            ObjectCache::forget($player->actual_session_id, $idToClear);
+        }
+        
+        ObjectCache::flush($player->actual_session_id);
+
+        $request_id = Str::random(20);
+        DrawRequest::query()->create([
+            'session_id' => $player->actual_session_id,
+            'request_id' => $request_id,
+            'player_id' => $player_id,
+            'items' => json_encode($drawCommands),
+        ]);
+        event(new DrawInterfaceEvent($player, $request_id));
+
+        Log::info("Consume process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Cleared IDs: " . implode(', ', $idsToClear));
 
         return response()->json([
             'success' => true,
-            'message' => 'Consumo avviato'
+            'message' => 'Consumo completato'
         ]);
     }
 
