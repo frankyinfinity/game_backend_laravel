@@ -8,6 +8,8 @@ use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Colors;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
 
@@ -83,9 +85,43 @@ class ElementDraw
 
         $panel->addChild($text);
 
+        // Consumable Button Setup
+        $btnItems = [];
+        if ($this->element->consumable) {
+            $panel->setSize(200, 120); // Increase height
+            
+            $btnX = $panelX + 10;
+            $btnY = $panelY + 50;
+            
+            $jsPathConsume = resource_path('js/function/element/consume.blade.php');
+            $jsContentConsume = file_get_contents($jsPathConsume);
+            $jsContentConsume = Helper::setCommonJsCode($jsContentConsume, Str::random(20));
+            $jsContentConsume = str_replace('__element_uid__', $uid, $jsContentConsume);
+            
+            $btn = new ButtonDraw($uid . '_btn_consume');
+            $btn->setOrigin($btnX, $btnY);
+            $btn->setSize(180, 50);
+            $btn->setString('Consuma');
+            $btn->setColorButton(Colors::BLUE);
+            $btn->setColorString(Colors::WHITE);
+            $btn->setRenderable(false);
+            $btn->setOnClick($jsContentConsume);
+            $btn->build();
+            
+            foreach ($btn->getDrawItems() as $item) {
+                $panel->addChild($item);
+                $btnItems[] = $item;
+            }
+        }
+
+        // Final Draw Items Assembly (Parent before Children)
         $this->drawItems[] = $image->buildJson();
         $this->drawItems[] = $panel->buildJson();
         $this->drawItems[] = $text->buildJson();
+        
+        foreach ($btnItems as $item) {
+            $this->drawItems[] = $item->buildJson();
+        }
 
         // Save position in Database
         ElementHasPosition::query()->create([
