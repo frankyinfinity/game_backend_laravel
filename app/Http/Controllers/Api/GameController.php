@@ -24,7 +24,11 @@ use App\Models\BirthClimate;
 use App\Models\ElementHasPosition;
 use App\Models\Entity;
 use App\Models\Container;
+use App\Models\Genome;
+use App\Models\EntityInformation;
+use App\Models\ElementHasGene;
 use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Draw\Complex\ElementDraw;
@@ -904,7 +908,64 @@ class GameController extends Controller
         $idsToClear[] = $elementUid . '_btn_consume_text';
         
         // Actual removal from DB
+        $elementId = $elementPosition->element_id;
         $elementPosition->delete();
+
+        // --- APPLY GENE EFFECTS ---
+        $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
+        foreach ($elementEffects as $effect) {
+            $gene = Gene::find($effect->gene_id);
+            if (!$gene) continue;
+
+            // Find genome of the entity for this gene
+            $genome = Genome::query()
+                ->where('entity_id', $entity->id)
+                ->where('gene_id', $gene->id)
+                ->first();
+
+            if ($genome) {
+                $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+                if ($entityInfo) {
+                    $oldValue = $entityInfo->value;
+                    $newValue = $oldValue + $effect->effect;
+                    
+                    // Clamp value
+                    $newValue = max($genome->min, min($genome->max, $newValue));
+                    
+                    if ($newValue !== $oldValue) {
+                        $entityInfo->update(['value' => $newValue]);
+
+                        // Update Progress Bar in UI if it's dynamic
+                        if ($gene->type === Gene::DYNAMIC_MAX) {
+                            $pbUid = $entityUid . '_progress_bar_' . $gene->key;
+                            try {
+                                $pbDraw = new ProgressBarDraw($pbUid);
+                                $pbOps = $pbDraw->updateValue($newValue, $player->actual_session_id);
+                                foreach ($pbOps as $op) {
+                                    if ($op['type'] === 'update') {
+                                        $updateObj = new ObjectUpdate($op['uid'], $player->actual_session_id);
+                                        foreach ($op['attributes'] as $attr => $val) {
+                                            $updateObj->setAttributes($attr, $val);
+                                        }
+                                        foreach ($updateObj->get() as $data) $drawCommands[] = $data;
+                                    } elseif ($op['type'] === 'draw') {
+                                        $drawObj = new ObjectDraw($op['object'], $player->actual_session_id);
+                                        $drawCommands[] = $drawObj->get();
+                                    } elseif ($op['type'] === 'clear') {
+                                        $clearObj = new ObjectClear($op['uid'], $player->actual_session_id);
+                                        $drawCommands[] = $clearObj->get();
+                                        ObjectCache::forget($player->actual_session_id, $op['uid']);
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                Log::warning("Could not update progress bar {$pbUid}: " . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // --------------------------
 
         foreach ($updateCommands as $update) $drawCommands[] = $update;
         foreach ($idsToClear as $idToClear) {
