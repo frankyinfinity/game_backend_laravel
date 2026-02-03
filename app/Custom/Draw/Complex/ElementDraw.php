@@ -58,7 +58,7 @@ class ElementDraw
         $image = new Image($uid);
         $image->setSrc($imagePath);
         $image->setOrigin($x, $y);
-        $image->setSize(64, 64);
+        $image->setSize(32, 32);
 
         // Interactivity
         $jsPathClickElement = resource_path('js/function/element/click_element.blade.php');
