@@ -5,7 +5,11 @@ namespace App\Custom\Draw\Complex;
 use App\Models\Element;
 use App\Models\ElementHasPosition;
 use App\Custom\Draw\Primitive\Image;
+use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Primitive\BasicDraw;
 use App\Helper\Helper;
+use Illuminate\Support\Str;
 
 class ElementDraw
 {
@@ -54,7 +58,34 @@ class ElementDraw
         $image->setOrigin($x, $y);
         $image->setSize(64, 64);
 
+        // Interactivity
+        $jsPathClickPanel = resource_path('js/function/common/click_panel.blade.php');
+        $jsContentClickPanel = file_get_contents($jsPathClickPanel);
+        $jsContentClickPanel = Helper::setCommonJsCode($jsContentClickPanel, Str::random(20));
+        $image->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickPanel);
+
+        // Panel
+        $panelX = $x + (Helper::TILE_SIZE / 2);
+        $panelY = $y + (Helper::TILE_SIZE / 2);
+
+        $panel = new Rectangle($uid . '_panel');
+        $panel->setOrigin($panelX, $panelY);
+        $panel->setSize(200, 50);
+        $panel->setColor(0xFFFFFF);
+        $panel->setRenderable(false);
+
+        // Text (Name)
+        $text = new Text($uid . '_text_name');
+        $text->setOrigin($panelX + 10, $panelY + 10);
+        $text->setText($this->element->name);
+        $text->setFontSize(20);
+        $text->setRenderable(false);
+
+        $panel->addChild($text);
+
         $this->drawItems[] = $image->buildJson();
+        $this->drawItems[] = $panel->buildJson();
+        $this->drawItems[] = $text->buildJson();
 
         // Save position in Database
         ElementHasPosition::query()->create([
