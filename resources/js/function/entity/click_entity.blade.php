@@ -10,9 +10,11 @@
         // Chiude tutti gli altri panel Entity
         const entityPanels = Object.entries(objects).filter(([key, _]) => !key.startsWith('element_') && key.endsWith('_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
         for (const [key, objectPanel] of Object.entries(entityPanels)) {
-            shapes[key].renderable = false;
-            for (const childUid of objectPanel['children']) {
-                if (shapes[childUid]) shapes[childUid].renderable = false;
+            if (shapes[key]) shapes[key].renderable = false;
+            if (objectPanel['children']) {
+                for (const childUid of objectPanel['children']) {
+                    if (shapes[childUid]) shapes[childUid].renderable = false;
+                }
             }
         }
 
