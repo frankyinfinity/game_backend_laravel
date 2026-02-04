@@ -77,13 +77,7 @@ class ProgressBarDraw {
             ]
         ];
         
-        // 2. Clear and redraw the bar (width changes based on value)
-        $operations[] = [
-            'type' => 'clear',
-            'uid' => $this->uid . '_bar'
-        ];
-        
-        // Calculate new bar dimensions
+        // 2. Calculate new bar dimensions
         // We need min/max - try to extract from range text or use defaults
         $cachedRange = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_range');
         if ($cachedRange && preg_match('/\((\d+)\s*\/\s*(\d+)\)/', $cachedRange['text'], $matches)) {
@@ -97,17 +91,43 @@ class ProgressBarDraw {
         $barWidth = ($this->width - 4) * $percent;
         $barHeight = $this->height - 4;
         
+        // Update the existing bar's width instead of clearing and redrawing
+        // This preserves the bar's position as a child of the entity's panel
         if ($barWidth > 0) {
-            $bar = new Primitive\Rectangle($this->uid . '_bar');
-            $bar->setSize($barWidth, $barHeight);
-            $bar->setOrigin($this->x + 2, $this->y + 2);
-            $bar->setColor($this->barColor);
-            $bar->setRenderable($this->renderable);
-            
             $operations[] = [
-                'type' => 'draw',
-                'object' => $bar->buildJson()
+                'type' => 'update',
+                'uid' => $this->uid . '_bar',
+                'attributes' => [
+                    'width' => $barWidth,
+                    'height' => $barHeight,
+                    'renderable' => true
+                ]
             ];
+            
+            // Update the cache with the new bar attributes
+            $cachedBar = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar');
+            if ($cachedBar) {
+                $cachedBar['width'] = $barWidth;
+                $cachedBar['height'] = $barHeight;
+                $cachedBar['renderable'] = true;
+                \App\Custom\Manipulation\ObjectCache::put($sessionId, $cachedBar);
+            }
+        } else {
+            // If bar width is 0, hide it
+            $operations[] = [
+                'type' => 'update',
+                'uid' => $this->uid . '_bar',
+                'attributes' => [
+                    'renderable' => false
+                ]
+            ];
+            
+            // Update the cache with the new bar attributes
+            $cachedBar = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar');
+            if ($cachedBar) {
+                $cachedBar['renderable'] = false;
+                \App\Custom\Manipulation\ObjectCache::put($sessionId, $cachedBar);
+            }
         }
         
         return $operations;
