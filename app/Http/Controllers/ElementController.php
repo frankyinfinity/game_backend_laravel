@@ -26,9 +26,10 @@ class ElementController extends Controller
         $query = Element::with(['elementType', 'climates'])->get();
         return datatables($query)
             ->addColumn('graphics', function($row){
-                $path = 'storage/elements/' . $row->id . '.png';
-                if (file_exists(public_path($path))) {
-                    return '<img src="' . asset($path) . '?v=' . time() . '" style="width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid #ccc;">';
+                $imagePath = $row->id . '.png';
+                if (\Storage::disk('elements')->exists($imagePath)) {
+                    $url = \Storage::disk('elements')->url($imagePath);
+                    return '<img src="' . $url . '?v=' . time() . '" style="width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid #ccc;">';
                 }
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
@@ -175,6 +176,9 @@ class ElementController extends Controller
             $imageData = str_replace('data:image/png;base64,', '', $imageData);
             $imageData = str_replace(' ', '+', $imageData);
             $imageName = $element->id . '.png';
+            \Storage::disk('uploads')->put('elements/' . $imageName, base64_decode($imageData));
+            
+            // Also copy to public disk for web access
             \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
         }
 
@@ -212,6 +216,9 @@ class ElementController extends Controller
         $imageData = str_replace(' ', '+', $imageData);
         $imageName = $element->id . '.png';
 
+        \Storage::disk('uploads')->put('elements/' . $imageName, base64_decode($imageData));
+        
+        // Also copy to public disk for web access
         \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
 
         return response()->json(['success' => true]);
