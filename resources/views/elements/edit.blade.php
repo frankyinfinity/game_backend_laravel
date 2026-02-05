@@ -25,6 +25,11 @@
                         <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab" aria-controls="tab-consumption" aria-selected="false">Effetti Consumo</a>
                     </li>
                     @endif
+                    @if($element->isInteractive())
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-information-link" data-toggle="pill" href="#tab-information" role="tab" aria-controls="tab-information" aria-selected="false">Informazione</a>
+                    </li>
+                    @endif
                     <li class="nav-item">
                         <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
                     </li>
@@ -48,6 +53,13 @@
                     @if($element->isConsumable())
                     <div class="tab-pane fade" id="tab-consumption" role="tabpanel" aria-labelledby="tab-consumption-link">
                         @include('elements.tabs.consumption')
+                    </div>
+                    @endif
+
+                    <!-- TAB INFORMAZIONE -->
+                    @if($element->isInteractive())
+                    <div class="tab-pane fade" id="tab-information" role="tabpanel" aria-labelledby="tab-information-link">
+                        @include('elements.tabs.information')
                     </div>
                     @endif
 
