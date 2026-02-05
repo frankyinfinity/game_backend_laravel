@@ -13,8 +13,10 @@ return new class extends Migration
     {
         Schema::create('element_has_position_information', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('element_has_position_id')->constrained();
-            $table->foreignId('gene_id')->constrained();
+            $table->unsignedBigInteger('element_has_position_id');
+            $table->foreign('element_has_position_id')->references('id')->on('element_has_positions');
+            $table->unsignedBigInteger('gene_id');
+            $table->foreign('gene_id')->references('id')->on('genes');
             $table->integer('min')->default(0);
             $table->integer('max')->default(0);
             $table->integer('value')->default(0);
