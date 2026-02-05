@@ -99,8 +99,9 @@ class ElementDraw
         $panel->addChild($text);
 
         // Progress Bars for Genes (only for interactive elements)
+        $geneProgressBarItems = [];
         if ($this->element->isInteractive()) {
-            $this->addGeneProgressBars($panel, $panelX, $panelY, $elementHasPosition);
+            $geneProgressBarItems = $this->addGeneProgressBars($panel, $panelX, $panelY, $elementHasPosition);
         }
 
         // Consumable Button (encapsulated in function)
@@ -117,34 +118,23 @@ class ElementDraw
         foreach ($btnItems as $item) {
             $this->drawItems[] = $item->buildJson();
         }
+        
+        // Add gene progress bar items to draw items
+        foreach ($geneProgressBarItems as $item) {
+            $this->drawItems[] = $item->buildJson();
+        }
 
     }
     
     /**
-     * Create ElementHasPositionInformation records for each gene
-     */
-    private function createGeneInformationRecords($uid): void
-    {
-        $elementHasPosition = ElementHasPosition::query()
-            ->where('uid', $uid)
-            ->first();
-            
-        if ($elementHasPosition) {
-            foreach ($this->element->genes as $gene) {
-                ElementHasPositionInformation::query()->create([
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'gene_id' => $gene->id,
-                    'value' => 0, // Initial value
-                ]);
-            }
-        }
-    }
-    
-    /**
      * Add progress bars for genes to the panel
+     * 
+     * @return array Array of progress bar draw items
      */
-    private function addGeneProgressBars(Rectangle $panel, $panelX, $panelY, $elementHasPosition): void
+    private function addGeneProgressBars(Rectangle $panel, $panelX, $panelY, $elementHasPosition): array
     {
+        $geneProgressBarItems = [];
+        
         $elementHasPositionInformations = ElementHasPositionInformation::query()
             ->where('element_has_position_id', $elementHasPosition->id)
             ->with(['gene', 'elementHasPosition'])
@@ -153,9 +143,9 @@ class ElementDraw
         
         if ($informationCount > 0) {
             // Increase panel height to accommodate progress bars
-            $panel->setSize(200, 50 + ($informationCount * 30));
+            $panel->setSize(200, 50 + ($informationCount * 60));
             
-            $progressBarY = $panelY + 30; // Start below the name text
+            $progressBarY = $panelY + 60; // Start below the name text
             
             foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
 
@@ -166,9 +156,11 @@ class ElementDraw
                 
                 $progressBar = new ProgressBarDraw($progressBarUid);
                 $progressBar->setName($gene->name);
-                $progressBar->setValue($elementHasPositionInformation->value); // Initial value
+                $progressBar->setValue($elementHasPositionInformation->value); 
                 $progressBar->setMin($elementHasPositionInformation->min);
                 $progressBar->setMax($elementHasPositionInformation->max);
+                $progressBar->setBorderColor(Colors::LIGHT_GRAY);
+                $progressBar->setBarColor(Colors::RED);
                 $progressBar->setSize(180, 20);
                 $progressBar->setOrigin($panelX + 10, $progressBarY);
                 $progressBar->setRenderable(false);
@@ -176,11 +168,14 @@ class ElementDraw
                 $progressBar->build();
                 foreach ($progressBar->getDrawItems() as $item) {
                     $panel->addChild($item);
+                    $geneProgressBarItems[] = $item;
                 }
                 
                 $progressBarY += 30; // Space between progress bars
             }
         }
+        
+        return $geneProgressBarItems;
     }
     
     /**
