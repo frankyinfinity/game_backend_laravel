@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 class Element extends Model
 {
     const CONSUMABLE = 0;
+    const INTERACTIVE = 1;
     const CHARACTERISTIC_TYPES = [
         self::CONSUMABLE => 'Consumabile',
-        1 => 'Altro'
+        self::INTERACTIVE => 'Interattivo'
     ];
 
     protected $fillable = ['element_type_id', 'name', 'characteristic'];
@@ -51,5 +52,15 @@ class Element extends Model
     public function isConsumable()
     {
         return $this->characteristic === self::CONSUMABLE;
+    }
+
+    /**
+     * Check if the element is interactive
+     *
+     * @return bool
+     */
+    public function isInteractive()
+    {
+        return $this->characteristic === self::INTERACTIVE;
     }
 }
