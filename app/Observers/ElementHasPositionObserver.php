@@ -3,8 +3,9 @@
 namespace App\Observers;
 
 use App\Models\ElementHasPosition;
-use App\Models\ElementHasInformation;
 use App\Models\ElementHasPositionInformation;
+use App\Models\ElementHasGene;
+use App\Models\ElementInformation;
 
 class ElementHasPositionObserver
 {
@@ -16,7 +17,7 @@ class ElementHasPositionObserver
         if($elementHasPosition->element->isInteractive()) {
             
             $element = $elementHasPosition->element;
-            $elementHasInformations = ElementHasInformation::query()
+            $elementHasInformations = ElementInformation::query()
                 ->where('element_id', $element->id)
                 ->get();
 
