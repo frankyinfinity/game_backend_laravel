@@ -99,9 +99,21 @@ class ElementController extends Controller
         }
 
         // Fetch Genes
-        $allGenes = Gene::orderBy('name')->get();
+        $allGenes = Gene::query()->where('type', 'dynamic_max')->orderBy('name')->get();
+        
+        // Prepare gene data for JavaScript
+        $geneData = $allGenes->map(function($gene) {
+            return [
+                'id' => $gene->id,
+                'name' => $gene->name,
+                'min' => $gene->min,
+                'max' => $gene->max,
+                'max_from' => $gene->max_from,
+                'max_to' => $gene->max_to
+            ];
+        });
 
-        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap', 'allGenes'));
+        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap', 'allGenes', 'geneData'));
     }
 
     public function update(Request $request, Element $element)
@@ -137,6 +149,35 @@ class ElementController extends Controller
             $element->genes()->sync($syncGenes);
         } else {
             $element->genes()->detach();
+        }
+
+        // Save Information Genes
+        if ($element->isInteractive()) {
+            $informations = [];
+            if ($request->has('information_genes')) {
+                foreach($request->information_genes as $g) {
+                    if(!empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['value'])) {
+                        $informations[] = [
+                            'gene_id' => $g['gene_id'],
+                            'min_value' => $g['min_value'],
+                            'max_value' => $g['value'], // Set max_value to current value
+                            'max_from' => $g['max_from'],
+                            'max_to' => $g['max_to'],
+                            'value' => $g['value']
+                        ];
+                    }
+                }
+            }
+            
+            // Delete existing information
+            $element->informations()->delete();
+            
+            // Save new information
+            foreach($informations as $info) {
+                $element->informations()->create($info);
+            }
+        } else {
+            $element->informations()->delete();
         }
 
         // Save Diffusion Data

@@ -27,7 +27,7 @@
                     @endif
                     @if($element->isInteractive())
                     <li class="nav-item">
-                        <a class="nav-link" id="tab-information-link" data-toggle="pill" href="#tab-information" role="tab" aria-controls="tab-information" aria-selected="false">Informazione</a>
+                        <a class="nav-link" id="tab-information-link" data-toggle="pill" href="#tab-information" role="tab" aria-controls="tab-information" aria-selected="false">Informazioni</a>
                     </li>
                     @endif
                     <li class="nav-item">
@@ -156,6 +156,117 @@
 
             // Initial call
             updateGeneOptions();
+            
+            // Information Rows Management
+            let informationIndex = {{ $element->informations->count() }};
+            
+            function updateInformationOptions() {
+                let selectedValues = [];
+                $('.information-selector').each(function() {
+                    let val = $(this).val();
+                    if (val) {
+                        selectedValues.push(val);
+                    }
+                });
+                
+                $('.information-selector').each(function() {
+                    let currentSelect = $(this);
+                    let currentValue = currentSelect.val();
+                    
+                    currentSelect.find('option').each(function() {
+                        let option = $(this);
+                        let optionValue = option.val();
+                        
+                        if (selectedValues.includes(optionValue) && optionValue != currentValue) {
+                            option.prop('disabled', true);
+                        } else {
+                            option.prop('disabled', false);
+                        }
+                    });
+                });
+            }
+            
+            $(document).on('change', '.information-selector', function() {
+                updateInformationOptions();
+                
+                // Get the selected gene id
+                const geneId = $(this).val();
+                if (!geneId) {
+                    return;
+                }
+                
+                // Find the corresponding gene data
+                const gene = geneMap[geneId];
+                if (!gene) {
+                    return;
+                }
+                
+                // Update the min, max_from, and max_to fields
+                const row = $(this).closest('tr');
+                const minInput = row.find('input[name$="[min_value]"]');
+                const maxFromInput = row.find('input[name$="[max_from]"]');
+                const maxToInput = row.find('input[name$="[max_to]"]');
+                const valueInput = row.find('input[name$="[value]"]');
+                
+                // Set values
+                minInput.val(gene.min || 0);
+                if (gene.max !== null) {
+                    maxFromInput.val(gene.max);
+                    maxToInput.val(gene.max);
+                } else {
+                    maxFromInput.val(gene.max_from || 0);
+                    maxToInput.val(gene.max_to || 0);
+                }
+                
+                // Set value field constraints
+                valueInput.attr('min', gene.max_from || 0);
+                valueInput.attr('max', gene.max_to || 999999);
+                
+                // Set default value if empty
+                if (!valueInput.val() || valueInput.val() === '') {
+                    valueInput.val(gene.max_from || 0);
+                }
+            });
+            
+            $('#add-information-row').click(function() {
+                let html = `
+                    <tr class="information-row">
+                        <td>
+                            <select name="information_genes[${informationIndex}][gene_id]" class="form-control information-selector" required>
+                                <option value="">Seleziona Gene</option>
+                                @foreach($allGenes as $g)
+                                    <option value="{{$g->id}}">{{$g->name}}</option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" name="information_genes[${informationIndex}][min_value]" class="form-control" required placeholder="Valore Minimo" readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
+                        </td>
+                        <td>
+                            <input type="number" name="information_genes[${informationIndex}][max_from]" class="form-control" required placeholder="Valore Massimo Da" readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
+                        </td>
+                        <td>
+                            <input type="number" name="information_genes[${informationIndex}][max_to]" class="form-control" required placeholder="Valore Massimo A" readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
+                        </td>
+                        <td>
+                            <input type="number" name="information_genes[${informationIndex}][value]" class="form-control" required placeholder="Valore Attuale">
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm remove-information-row"><i class="fa fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+                $('#information_table tbody').append(html);
+                informationIndex++;
+                updateInformationOptions();
+            });
+            
+            $(document).on('click', '.remove-information-row', function() {
+                $(this).closest('tr').remove();
+                updateInformationOptions();
+            });
+            
+            updateInformationOptions();
         })
     </script>
 @stop

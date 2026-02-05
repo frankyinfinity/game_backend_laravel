@@ -44,6 +44,11 @@ class Element extends Model
         return $this->belongsToMany(Gene::class, 'element_has_genes')->withPivot('effect');
     }
 
+    public function informations()
+    {
+        return $this->hasMany(ElementInformation::class);
+    }
+
     /**
      * Check if the element is consumable
      *
