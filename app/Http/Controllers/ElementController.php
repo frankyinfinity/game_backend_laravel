@@ -39,10 +39,10 @@ class ElementController extends Controller
             ->addColumn('climates_list', function($row){
                 return $row->climates->pluck('name')->implode(', ');
             })
-            ->addColumn('consumable_badge', function($row){
-                return $row->consumable ? '<span class="badge badge-success">Sì</span>' : '<span class="badge badge-secondary">No</span>';
+            ->addColumn('characteristic', function($row){
+                return $row->getCharacteristicLabel();
             })
-            ->rawColumns(['consumable_badge', 'graphics'])
+            ->rawColumns(['graphics'])
             ->toJson();
     }
 
@@ -58,12 +58,12 @@ class ElementController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'element_type_id' => 'required|exists:element_types,id',
+            'characteristic' => 'required|integer',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $data = $request->only('name', 'element_type_id');
-        $data['consumable'] = $request->has('consumable');
+        $data = $request->only('name', 'element_type_id', 'characteristic');
         
         $element = Element::create($data);
         
@@ -109,12 +109,12 @@ class ElementController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'element_type_id' => 'required|exists:element_types,id',
+            'characteristic' => 'required|integer',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $data = $request->only('name', 'element_type_id');
-        $data['consumable'] = $request->has('consumable');
+        $data = $request->only('name', 'element_type_id', 'characteristic');
 
         $element->update($data);
 
@@ -125,7 +125,7 @@ class ElementController extends Controller
         }
         
         // Save Consumption Genes Effects
-        if ($element->consumable) {
+        if ($element->isConsumable()) {
             $syncGenes = [];
             if ($request->has('consumption_genes')) {
                 foreach($request->consumption_genes as $g) {

@@ -30,11 +30,24 @@
                 </div>
                 
                 <div class="form-group">
-                    <div class="custom-control custom-checkbox">
-                        <input type="checkbox" class="custom-control-input" id="consumable" name="consumable" {{ old('consumable') ? 'checked' : '' }}>
-                        <label class="custom-control-label" for="consumable">Consumabile</label>
-                        <small class="form-text text-muted">Se selezionato, l'elemento può essere consumato.</small>
-                    </div>
+                    <div class="form-group">
+                    <label for="characteristic">Caratteristica <span class="text-danger">*</span></label>
+                    <select class="form-control @error('characteristic') is-invalid @enderror" 
+                            id="characteristic" 
+                            name="characteristic" 
+                            required>
+                        @foreach(\App\Models\Element::CHARACTERISTIC_TYPES as $value => $label)
+                            <option value="{{ $value }}" {{ old('characteristic') == $value ? 'selected' : '' }}>
+                                {{ $label }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('characteristic')
+                        <span class="invalid-feedback" role="alert">
+                            <strong>{{ $message }}</strong>
+                        </span>
+                    @enderror
+                </div>
                 </div>
 
                 <div class="form-group">

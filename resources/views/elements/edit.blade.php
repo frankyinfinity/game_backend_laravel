@@ -20,7 +20,7 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-diffusion-link" data-toggle="pill" href="#tab-diffusion" role="tab" aria-controls="tab-diffusion" aria-selected="false">Diffusione</a>
                     </li>
-                    @if($element->consumable)
+                    @if($element->isConsumable())
                     <li class="nav-item">
                         <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab" aria-controls="tab-consumption" aria-selected="false">Effetti Consumo</a>
                     </li>
@@ -45,7 +45,7 @@
                     </div>
 
                     <!-- TAB CONSUMPTION -->
-                    @if($element->consumable)
+                    @if($element->isConsumable())
                     <div class="tab-pane fade" id="tab-consumption" role="tabpanel" aria-labelledby="tab-consumption-link">
                         @include('elements.tabs.consumption')
                     </div>

@@ -40,7 +40,7 @@
                             <th>Grafica</th>
                             <th>Nome</th>
                             <th>Tipologia</th>
-                            <th>Consumabile</th>
+                            <th>Caratteristica</th>
                             <th>Climi Validi</th>
                             <th>Azioni</th>
                         </tr>
@@ -88,7 +88,7 @@
                     {data:"graphics", name:"graphics", searchable: false, orderable: false},
                     {data:"name", name:"name"},
                     {data:"element_type_name", name:"element_type_name"},
-                    {data:"consumable_badge", name:"consumable_badge"},
+                    {data:"characteristic", name:"characteristic"},
                     {data:"climates_list", name:"climates_list"},
                     {data:"id", name:"id"},
                 ],

@@ -87,7 +87,7 @@ class ElementDraw
 
         // Consumable Button Setup
         $btnItems = [];
-        if ($this->element->consumable) {
+        if ($this->element->isConsumable()) {
             $panel->setSize(200, 120); // Increase height
             
             $btnX = $panelX + 10;
