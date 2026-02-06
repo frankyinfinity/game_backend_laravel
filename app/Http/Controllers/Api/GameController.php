@@ -1206,11 +1206,39 @@ class GameController extends Controller
                 $idsToClear[] = $elementUid . '_btn_consume_rect';
                 $idsToClear[] = $elementUid . '_btn_consume_text';
 
+                // Clear all gene progress bars for this element
+                $elementHasPositionInformations = ElementHasPositionInformation::query()
+                    ->where('element_has_position_id', $elementPosition->id)
+                    ->with(['gene'])
+                    ->get();
+
+                foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
+                    $gene = $elementHasPositionInformation->gene;
+                    $progressBarUid = 'gene_progress_' . $gene->key . '_element_' . $elementUid;
+                    
+                    // Clear all progress bar components
+                    $idsToClear[] = $progressBarUid . '_border';
+                    $idsToClear[] = $progressBarUid . '_bar';
+                    $idsToClear[] = $progressBarUid . '_text';
+                    $idsToClear[] = $progressBarUid . '_range';
+                }
+
                 // Delete from DB
                 $elementPosition->delete();
             }
         } else {
             Log::info("Damage NOT applied - elementLifeInfo: " . ($elementLifeInfo ? 'yes' : 'no') . ", damage: {$damage}");
+        }
+
+        // === CLEAR ELEMENT FROM UI AND DB BEFORE SECOND PATH ===
+        if ($elementDied) {
+            foreach ($idsToClear as $idToClear) {
+                $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
+                $drawCommands[] = $clearObject->get();
+                ObjectCache::forget($player->actual_session_id, $idToClear);
+            }
+            // Clear the idsToClear array since we've already processed them
+            $idsToClear = [];
         }
 
         // === RETURN TO ORIGINAL POSITION ===
