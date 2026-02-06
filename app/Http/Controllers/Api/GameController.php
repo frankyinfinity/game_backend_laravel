@@ -22,6 +22,7 @@ use App\Models\BirthRegion;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
 use App\Models\ElementHasPosition;
+use App\Models\ElementHasPositionInformation;
 use App\Models\Entity;
 use App\Models\Container;
 use App\Models\Genome;
@@ -994,9 +995,358 @@ class GameController extends Controller
     }
 
     public function attack(Request $request) {
+        $entityUid = $request->entity_uid;
+        $elementUid = $request->element_uid;
 
-        return response()->json(['success' => true]);
+        Log::info("Starting attack process for Entity: {$entityUid} on Element: {$elementUid}");
 
+        $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
+        if (!$entity) return response()->json(['success' => false, 'message' => 'Entity not found']);
+
+        $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
+        if (!$elementPosition) return response()->json(['success' => false, 'message' => 'Element not found']);
+
+        $player = Player::find($entity->specie->player_id);
+        $player_id = $player->id;
+
+        // Store original position
+        $originalTileI = $entity->tile_i;
+        $originalTileJ = $entity->tile_j;
+
+        $currentTileI = $entity->tile_i;
+        $currentTileJ = $entity->tile_j;
+        $targetTileI = $elementPosition->tile_i;
+        $targetTileJ = $elementPosition->tile_j;
+
+        // Get Tile Info for Pathfinding
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
+
+        $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
+        $mapSolidTiles[$targetTileI][$targetTileJ] = 'B';
+        $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
+
+        if ($pathFinding === null) {
+            Log::error("Pathfinding failed - no path found");
+            return response()->json(['success' => false, 'message' => 'Path not found']);
+        }
+
+        Log::info("Pathfinding for attack found " . count($pathFinding) . " steps.");
+
+        if (count($pathFinding) <= 1 && ($currentTileI != $targetTileI || $currentTileJ != $targetTileJ)) {
+            return response()->json(['success' => false, 'message' => 'Path not found']);
+        }
+
+        $updateCommands = [];
+        $idsToClear = [];
+        $drawCommands = [];
+        ObjectCache::buffer($player->actual_session_id);
+
+        $firstPathIds = []; // Track first path IDs to clear before return
+        $secondPathIds = []; // Track second path IDs to clear at the end
+        $updateCommands = []; // Not used anymore, kept for compatibility
+
+        // === PHASE 1: DRAW FIRST PATH INDICATORS ===
+        foreach ($pathFinding as $key => $path) {
+            $pathNodeI = $path[0];
+            $pathNodeJ = $path[1];
+
+            $tileSize = Helper::TILE_SIZE;
+
+            $startSquare = new Square();
+            $startSquare->setOrigin($tileSize*$pathNodeJ, $tileSize*$pathNodeI);
+            $startSquare->setSize($tileSize);
+            $startCenterSquare = $startSquare->getCenter();
+            $xStart = $startCenterSquare['x'];
+            $yStart = $startCenterSquare['y'];
+
+            // Draw circle
+            $circleName = 'circle_' . Str::random(20);
+            $firstPathIds[] = $circleName;
+
+            $circle = new Circle($circleName);
+            $circle->setOrigin($xStart, $yStart);
+            $circle->setRadius($tileSize / 6);
+            $circle->setColor('#FF0000'); // Red path for attack
+
+            $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
+            $drawCommands[] = $drawObject->get();
+
+            if((sizeof($pathFinding)-1) !== $key) {
+                $nextPathNodeI = $pathFinding[$key+1][0];
+                $nextPathNodeJ = $pathFinding[$key+1][1];
+
+                $endSquare = new Square();
+                $endSquare->setSize($tileSize);
+                $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
+                $endCenterSquare = $endSquare->getCenter();
+                $xEnd = $endCenterSquare['x'];
+                $yEnd = $endCenterSquare['y'];
+
+                // Draw path line
+                $multilineName = 'multiline_' . Str::random(20);
+                $firstPathIds[] = $multilineName;
+
+                $linePath = new MultiLine($multilineName);
+                $linePath->setPoint($xStart, $yStart);
+                $linePath->setPoint($xEnd, $yEnd);
+                $linePath->setColor('#FF0000'); // Red path for attack
+                $linePath->setThickness(2);
+
+                $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
+                $drawCommands[] = $drawObject->get();
+            }
+        }
+
+        // === PHASE 2: MAKE MOVEMENTS FOR FIRST PATH ===
+        foreach ($pathFinding as $key => $path) {
+            $pathNodeI = $path[0];
+            $pathNodeJ = $path[1];
+
+            $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
+
+            $tileSize = Helper::TILE_SIZE;
+
+            if((sizeof($pathFinding)-1) !== $key) {
+                $nextPathNodeI = $pathFinding[$key+1][0];
+                $nextPathNodeJ = $pathFinding[$key+1][1];
+
+                $endSquare = new Square();
+                $endSquare->setSize($tileSize);
+                $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
+                $endCenterSquare = $endSquare->getCenter();
+                $xEnd = $endCenterSquare['x'];
+                $yEnd = $endCenterSquare['y'];
+
+                // Update Entity
+                $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
+                $updateObject->setAttributes('x', $xEnd);
+                $updateObject->setAttributes('y', $yEnd);
+                $updateObject->setAttributes('zIndex', 100);
+                foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+
+                // Update Text
+                $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
+                $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
+                foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+
+                // Update Panel
+                $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
+                $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
+                $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                $updateObject->setAttributes('zIndex', 100);
+                foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+            }
+        }
+
+        // === PHASE 3: CLEAR FIRST PATH ===
+        foreach ($firstPathIds as $idToClear) {
+            $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
+            $drawCommands[] = $clearObject->get();
+            ObjectCache::forget($player->actual_session_id, $idToClear);
+        }
+
+        // === APPLY DAMAGE TO ELEMENT ===
+        // Get entity attack from gene
+        $attackGenome = Genome::query()
+            ->where('entity_id', $entity->id)
+            ->whereHas('gene', function($q) {
+                $q->where('key', Gene::KEY_ATTACK);
+            })
+            ->with(['gene'])
+            ->first();
+
+        $damage = 0;
+        if ($attackGenome) {
+            $attackInfo = EntityInformation::query()->where('genome_id', $attackGenome->id)->first();
+            if ($attackInfo) {
+                $damage = (int)$attackInfo->value;
+            }
+        }
+
+        Log::info("Entity {$entityUid} attack damage: {$damage}");
+
+        // Get element health
+        $elementLifeInfo = ElementHasPositionInformation::query()
+            ->where('element_has_position_id', $elementPosition->id)
+            ->whereHas('gene', function($q) {
+                $q->where('key', Gene::KEY_LIFEPOINT);
+            })
+            ->with(['gene', 'elementHasPosition'])
+            ->first();
+
+        Log::info("Element {$elementUid} lifepoint info: " . ($elementLifeInfo ? "found, value={$elementLifeInfo->value}" : "NOT FOUND"));
+
+        $elementDied = false;
+        if ($elementLifeInfo && $damage > 0) {
+            $newHealth = $elementLifeInfo->value - $damage;
+            $elementLifeInfo->update(['value' => $newHealth]);
+
+            Log::info("Element {$elementUid} health: {$elementLifeInfo->value} -> {$newHealth}");
+
+            // Update element's lifepoint progress bar in UI
+            $progressBarUid = 'gene_progress_' . $elementLifeInfo->gene->key . '_element_' . $elementLifeInfo->elementHasPosition->uid;
+            $progressBar = new ProgressBarDraw($progressBarUid);
+            $progressBarUpdate = $progressBar->updateValue($newHealth, $player->actual_session_id);
+            foreach ($progressBarUpdate as $data) $drawCommands[] = $data;
+
+            if ($newHealth <= 0) {
+                $elementDied = true;
+                Log::info("Element {$elementUid} died!");
+
+                // Clear element from UI
+                $idsToClear[] = $elementUid;
+                $idsToClear[] = $elementUid . '_panel';
+                $idsToClear[] = $elementUid . '_text_name';
+                $idsToClear[] = $elementUid . '_btn_attack';
+                $idsToClear[] = $elementUid . '_btn_attack_rect';
+                $idsToClear[] = $elementUid . '_btn_attack_text';
+                $idsToClear[] = $elementUid . '_btn_consume';
+                $idsToClear[] = $elementUid . '_btn_consume_rect';
+                $idsToClear[] = $elementUid . '_btn_consume_text';
+
+                // Delete from DB
+                $elementPosition->delete();
+            }
+        } else {
+            Log::info("Damage NOT applied - elementLifeInfo: " . ($elementLifeInfo ? 'yes' : 'no') . ", damage: {$damage}");
+        }
+
+        // === RETURN TO ORIGINAL POSITION ===
+        if ($originalTileI != $targetTileI || $originalTileJ != $targetTileJ) {
+            // Calculate path back
+            $mapSolidTiles[$targetTileI][$targetTileJ] = 'A';
+            $mapSolidTiles[$originalTileI][$originalTileJ] = 'B';
+            $pathBack = Helper::calculatePathFinding($mapSolidTiles);
+
+            // === PHASE 4: DRAW SECOND PATH INDICATORS ===
+            foreach ($pathBack as $key => $path) {
+                $pathNodeI = $path[0];
+                $pathNodeJ = $path[1];
+
+                $tileSize = Helper::TILE_SIZE;
+
+                $startSquare = new Square();
+                $startSquare->setOrigin($tileSize*$pathNodeJ, $tileSize*$pathNodeI);
+                $startSquare->setSize($tileSize);
+                $startCenterSquare = $startSquare->getCenter();
+                $xStart = $startCenterSquare['x'];
+                $yStart = $startCenterSquare['y'];
+
+                // Draw circle for return path (same style as first path)
+                $circleName = 'circle_' . Str::random(20);
+                $secondPathIds[] = $circleName;
+
+                $circle = new Circle($circleName);
+                $circle->setOrigin($xStart, $yStart);
+                $circle->setRadius($tileSize / 6);
+                $circle->setColor('#FF0000'); // Red path for return (same as attack)
+
+                $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
+                $drawCommands[] = $drawObject->get();
+
+                if((sizeof($pathBack)-1) !== $key) {
+                    $nextPathNodeI = $pathBack[$key+1][0];
+                    $nextPathNodeJ = $pathBack[$key+1][1];
+
+                    $endSquare = new Square();
+                    $endSquare->setSize($tileSize);
+                    $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
+                    $endCenterSquare = $endSquare->getCenter();
+                    $xEnd = $endCenterSquare['x'];
+                    $yEnd = $endCenterSquare['y'];
+
+                    // Draw path line
+                    $multilineName = 'multiline_' . Str::random(20);
+                    $secondPathIds[] = $multilineName;
+
+                    $linePath = new MultiLine($multilineName);
+                    $linePath->setPoint($xStart, $yStart);
+                    $linePath->setPoint($xEnd, $yEnd);
+                    $linePath->setColor('#FF0000'); // Red path for return (same as attack)
+                    $linePath->setThickness(2);
+
+                    $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
+                    $drawCommands[] = $drawObject->get();
+                }
+            }
+
+            // === PHASE 5: MAKE MOVEMENTS FOR SECOND PATH ===
+            foreach ($pathBack as $key => $path) {
+                $pathNodeI = $path[0];
+                $pathNodeJ = $path[1];
+
+                $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
+
+                $tileSize = Helper::TILE_SIZE;
+
+                if((sizeof($pathBack)-1) !== $key) {
+                    $nextPathNodeI = $pathBack[$key+1][0];
+                    $nextPathNodeJ = $pathBack[$key+1][1];
+
+                    $endSquare = new Square();
+                    $endSquare->setSize($tileSize);
+                    $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
+                    $endCenterSquare = $endSquare->getCenter();
+                    $xEnd = $endCenterSquare['x'];
+                    $yEnd = $endCenterSquare['y'];
+
+                    // Update Entity
+                    $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
+                    $updateObject->setAttributes('x', $xEnd);
+                    $updateObject->setAttributes('y', $yEnd);
+                    $updateObject->setAttributes('zIndex', 100);
+                    foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+
+                    // Update Text
+                    $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
+                    $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
+                    foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+
+                    // Update Panel
+                    $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
+                    $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
+                    $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                    $updateObject->setAttributes('zIndex', 100);
+                    foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                }
+            }
+
+            // === PHASE 6: CLEAR SECOND PATH ===
+            foreach ($secondPathIds as $idToClear) {
+                $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
+                $drawCommands[] = $clearObject->get();
+                ObjectCache::forget($player->actual_session_id, $idToClear);
+            }
+        }
+
+        // Clear element-related IDs (if element died)
+        foreach ($idsToClear as $idToClear) {
+            $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
+            $drawCommands[] = $clearObject->get();
+            ObjectCache::forget($player->actual_session_id, $idToClear);
+        }
+
+        ObjectCache::flush($player->actual_session_id);
+
+        $request_id = Str::random(20);
+        DrawRequest::query()->create([
+            'session_id' => $player->actual_session_id,
+            'request_id' => $request_id,
+            'player_id' => $player_id,
+            'items' => json_encode($drawCommands),
+        ]);
+        event(new DrawInterfaceEvent($player, $request_id));
+
+        Log::info("Attack process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Element died: " . ($elementDied ? 'YES' : 'NO'));
+
+        return response()->json([
+            'success' => true,
+            'message' => $elementDied ? 'Attacco completato - nemico sconfitto!' : 'Attacco completato!',
+            'element_died' => $elementDied
+        ]);
     }
 
 }
+
