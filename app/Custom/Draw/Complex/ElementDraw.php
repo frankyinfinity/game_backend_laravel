@@ -100,14 +100,29 @@ class ElementDraw
 
         // Progress Bars for Genes (only for interactive elements)
         $geneProgressBarItems = [];
+        $geneProgressBarCount = 0;
         if ($this->element->isInteractive()) {
             $geneProgressBarItems = $this->addGeneProgressBars($panel, $panelX, $panelY, $elementHasPosition);
+            $geneProgressBarCount = count($geneProgressBarItems) / 3; // Each progress bar has ~3 draw items
         }
 
+        // Attack Button position (after gene progress bars)
+        $attackBtnY = $panelY + 60 + ($geneProgressBarCount * 30) + 20;
+        
         // Consumable Button (encapsulated in function)
         $btnItems = [];
         if ($this->element->isConsumable()) {
             $btnItems = $this->addConsumableButton($panel, $panelX, $panelY, $uid);
+        }
+        
+        // Attack Button (for interactive elements, below progress bars)
+        $attackBtnItems = [];
+        if ($this->element->isInteractive()) {
+            $attackBtnItems = $this->addAttackButton($panel, $panelX, $attackBtnY, $uid);
+            // Mark button as only visible when both entity and element panels are open
+            foreach ($attackBtnItems as $item) {
+                $item->addAttributes('requires_entity_focus', true);
+            }
         }
 
         // Final Draw Items Assembly (Parent before Children)
@@ -116,6 +131,10 @@ class ElementDraw
         $this->drawItems[] = $text->buildJson();
         
         foreach ($btnItems as $item) {
+            $this->drawItems[] = $item->buildJson();
+        }
+        
+        foreach ($attackBtnItems as $item) {
             $this->drawItems[] = $item->buildJson();
         }
         
@@ -202,6 +221,42 @@ class ElementDraw
         $btn->setColorString(Colors::WHITE);
         $btn->setRenderable(false);
         $btn->setOnClick($jsContentConsume);
+        $btn->build();
+        
+        $btnItems = [];
+        foreach ($btn->getDrawItems() as $item) {
+            $panel->addChild($item);
+            $btnItems[] = $item;
+        }
+        
+        return $btnItems;
+    }
+    
+    /**
+     * Add attack button to the panel (for interactive elements)
+     * 
+     * @return array Array of draw items from the button
+     */
+    private function addAttackButton(Rectangle $panel, $panelX, $attackBtnY, $uid): array
+    {
+        // Increase panel height for button
+        $panel->setSize(200, 200);
+        
+        $btnX = $panelX + 10;
+        $btnY = $attackBtnY;
+        
+        $jsPathAttack = resource_path('js/function/element/attack.blade.php');
+        $jsContentAttack = file_get_contents($jsPathAttack);
+        $jsContentAttack = Helper::setCommonJsCode($jsContentAttack, Str::random(20));
+        
+        $btn = new ButtonDraw($uid . '_btn_attack');
+        $btn->setOrigin($btnX, $btnY);
+        $btn->setSize(180, 50);
+        $btn->setString('Attacco');
+        $btn->setColorButton(Colors::RED);
+        $btn->setColorString(Colors::WHITE);
+        $btn->setRenderable(false);
+        $btn->setOnClick($jsContentAttack);
         $btn->build();
         
         $btnItems = [];

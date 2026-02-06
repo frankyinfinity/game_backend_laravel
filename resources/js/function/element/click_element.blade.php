@@ -32,6 +32,11 @@
                     let canConsume = (show && AppData.actual_focus_uid_entity !== null && AppData.actual_focus_uid_entity !== undefined);
                     shapes[childUid].renderable = canConsume;
                     shapes[childUid].zIndex = 10002;
+                } else if (childUid.includes('_btn_attack')) {
+                    // Visibile solo se un Entity Panel è aperto
+                    let canAttack = (show && AppData.actual_focus_uid_entity !== null && AppData.actual_focus_uid_entity !== undefined);
+                    shapes[childUid].renderable = canAttack;
+                    shapes[childUid].zIndex = 10002;
                 } else {
                     shapes[childUid].renderable = show;
                     shapes[childUid].zIndex = 10001;

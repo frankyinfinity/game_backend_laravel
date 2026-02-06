@@ -41,6 +41,10 @@
                     if (childUid.includes('_btn_consume')) {
                         if (shapes[childUid]) shapes[childUid].renderable = show;
                     }
+                    // Controllo se il figlio fa parte del bottone attacco
+                    if (childUid.includes('_btn_attack')) {
+                        if (shapes[childUid]) shapes[childUid].renderable = show;
+                    }
                 }
             }
         }
