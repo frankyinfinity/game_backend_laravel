@@ -993,4 +993,10 @@ class GameController extends Controller
         ]);
     }
 
+    public function attack(Request $request) {
+
+        return response()->json(['success' => true]);
+
+    }
+
 }
