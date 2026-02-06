@@ -162,16 +162,17 @@ class InputDraw {
         $width = $this->width;
         $height = $this->height;
 
-        //Title
-        $title = new Text($this->uid.'_title');
-        $title->setFontSize(20);
-        $title->setColor($this->titleColor);
-        $title->setOrigin($x, $y);
-        $title->setText($this->title.($this->required?'*':''));
-        $title->setRenderable(true);
-        $drawItems[] = $title->buildJson();
-
-        $y += 25;
+        //Title (optional)
+        if (!empty($this->title)) {
+            $title = new Text($this->uid.'_title');
+            $title->setFontSize(20);
+            $title->setColor($this->titleColor);
+            $title->setOrigin($x, $y);
+            $title->setText($this->title.($this->required?'*':''));
+            $title->setRenderable(true);
+            $drawItems[] = $title->buildJson();
+            $y += 25;
+        }
 
         //Body
         $body = new Rectangle($this->uid.'_body_input');

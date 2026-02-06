@@ -43,5 +43,14 @@ class GeneSeeder extends Seeder
             "max_from" => 90,
             "max_to" => 100,
         ]);
+        Gene::query()->updateOrCreate(['key' => Gene::KEY_ATTACK], [
+            "type" => Gene::DYNAMIC_MAX,
+            "name" => "Attacco",
+            "show_on_registration" => true,
+            "min" => 1,
+            "max" => null,
+            "max_from" => 45,
+            "max_to" => 50,
+        ]);
     }
 }

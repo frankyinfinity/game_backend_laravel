@@ -91,6 +91,7 @@ class RegionController extends Controller
         $table = new TableDraw(Str::random(20));
         $table->setOrigin($x, $y);
         $table->setWidth(1380);
+        $table->setRowHeight(50);
 
         $head1 = new TableHeadDraw(Str::random(20));
         $head1->setText('Nome Gene');
@@ -115,8 +116,6 @@ class RegionController extends Controller
         $tableInputs = [];
         foreach ($genes as $gene) {
 
-            Log::info($gene);
-
             $row = [];
             
             // Col 1: Nome Gene
@@ -140,7 +139,7 @@ class RegionController extends Controller
 
             // Col 4
             $cell4 = new TableCellDraw(Str::random(20));
-            $cell4->setSize(150, 80);
+            $cell4->setSize(150, 50);
             $inputGene = new InputDraw(Str::random(20), $sessionId);
             $inputGene->setName('gene_value_' . $gene['id']);
             $inputGene->setTitle('');
@@ -148,6 +147,7 @@ class RegionController extends Controller
             $inputGene->setBorderThickness(1);
             $inputGene->setBorderColor(Colors::DARK_GRAY);
             $inputGene->setBackgroundColor(Colors::WHITE);
+            $inputGene->setSize(130, 68);
             $inputGene->setValue($gene['max'] !== null ? $gene['min'] : $gene['max_from']);
             if($gene['max'] !== null) {
                 $inputGene->setMin($gene['min']);
@@ -160,9 +160,9 @@ class RegionController extends Controller
             $row[] = $cell4;
 
             // Set consistent height for all cells in row
-            $cell1->setSize(250, 80);
-            $cell2->setSize(100, 80);
-            $cell3->setSize(250, 80);
+            $cell1->setSize(250, 50);
+            $cell2->setSize(100, 50);
+            $cell3->setSize(250, 50);
 
             $table->addRow($row);
             

@@ -16,6 +16,7 @@ class Gene extends Model
     const KEY_GREEN_TEXTURE = 'green_texture';
     const KEY_BLUE_TEXTURE = 'blue_texture';
     const KEY_LIFEPOINT = 'lifepoint';
+    const KEY_ATTACK = 'attack';
 
     public function genomes(){
         return $this->hasMany(Genome::class);

@@ -25,7 +25,7 @@ class TableCellDraw {
         $this->uid = $uid;
         $this->content = null;
         $this->width = 100;
-        $this->height = 40;
+        $this->height = 30;
         $this->backgroundColor = Colors::WHITE;
         $this->borderColor = Colors::BLACK;
         $this->borderThickness = 1;
@@ -123,12 +123,12 @@ class TableCellDraw {
         }
         // Form Element
         if ($this->formElement !== null) {
-            $this->formElement->setOrigin($x + 5, $y + 5);
-            // Height needs to be adjusted because InputDraw adds a title and padding
-            // In InputDraw.php: $y += 25; for the body.
-            // So if height of cell is 50, and title takes 25, body height might be too small if we use ($height - 10).
-            // But let's let the user decide the height of the cell.
-            $this->formElement->setSize($this->width - 10, $this->height - 40);
+            $elementWidth = $this->width - 10;
+            $elementHeight = $this->height - 6;
+            $elementX = $x + 5;
+            $elementY = $y + 3;
+            $this->formElement->setOrigin($elementX, $elementY);
+            $this->formElement->setSize($elementWidth, $elementHeight);
             $this->formElement->build();
             foreach ($this->formElement->getDrawItems() as $item) {
                 $drawItems[] = $item;

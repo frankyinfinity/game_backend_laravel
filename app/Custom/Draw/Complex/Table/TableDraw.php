@@ -12,6 +12,7 @@ class TableDraw {
     private int $x = 0;
     private int $y = 0;
     private int $width = 0;
+    private int $rowHeight = 40;
     private array $heads = [];
     private array $rows = [];
     private array $drawItems = [];
@@ -28,6 +29,10 @@ class TableDraw {
 
     public function setWidth(int $width) {
         $this->width = $width;
+    }
+
+    public function setRowHeight(int $height) {
+        $this->rowHeight = $height;
     }
 
     public function addHead(TableHeadDraw $head) {
@@ -102,7 +107,7 @@ class TableDraw {
 
                 $currentX += $cell->getWidth();
             }
-            $currentY += $maxRowHeight;
+            $currentY += max($maxRowHeight, $this->rowHeight);
         }
         $this->bottomY = $currentY;
     }
