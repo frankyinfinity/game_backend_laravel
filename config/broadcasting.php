@@ -11,11 +11,11 @@ return [
     | framework when an event needs to be broadcast. You may set this to
     | any of the connections defined in the "connections" array below.
     |
-    | Supported: "reverb", "pusher", "ably", "redis", "log", "null"
+    | Supported: "reverb", "pusher", "ably", "redis", "log", "null", "socketio"
     |
     */
 
-    'default' => env('BROADCAST_CONNECTION', 'pusher'),
+    'default' => env('BROADCAST_CONNECTION', 'socketio'),
 
     /*
     |--------------------------------------------------------------------------
@@ -70,6 +70,17 @@ return [
             'curl_options' => [
                 CURLOPT_SSL_VERIFYPEER => false, // Disabilita la verifica del peer
                 CURLOPT_SSL_VERIFYHOST => false, // Disabilita la verifica dell'host
+            ],
+        ],
+
+        'socketio' => [
+            'driver' => 'socketio',
+            'url' => env('SOCKETIO_URL', 'http://localhost:3001'),
+            'key' => env('SOCKETIO_KEY', 'socketio-key'),
+            'options' => [
+                'host' => env('SOCKETIO_HOST', 'localhost'),
+                'port' => env('SOCKETIO_PORT', 3001),
+                'scheme' => env('SOCKETIO_SCHEME', 'http'),
             ],
         ],
 

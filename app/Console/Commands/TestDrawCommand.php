@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\Image;
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
@@ -69,42 +70,19 @@ class TestDrawCommand extends Command
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        $x = 10;
-        $y = 10;
+        $x = 100;
+        $y = 100;
 
-        // Draw the first element's image
-        $element = Element::first();
-        if ($element) {
-            $imagePath = '/storage/elements/' . $element->id . '.png';
-            
-            $image = new Image('element_' . $element->id);
-            $image->setSrc($imagePath);
-            $image->setOrigin($x, $y);
-            $image->setSize(64, 64);
-            
-            $objectDraw = new ObjectDraw($image->buildJson(), $sessionId);
-            $drawItems[] = $objectDraw->get();
-            
-            $this->info('Drawing element: ' . $element->name . ' (ID: ' . $element->id . ')');
-        } else {
-            $this->warn('No elements found in database.');
-        }
+        // Draw a simple red square
+        $square = new Square('test_square');
+        $square->setOrigin($x, $y);
+        $square->setSize(100);
+        $square->setColor(Colors::RED);
 
-        /*$progressBar = new \App\Custom\Draw\Complex\ProgressBarDraw('test_pb');
-        $progressBar->setName('Vita');
-        $progressBar->setMin(0);
-        $progressBar->setMax(100);
-        $progressBar->setValue(65);
-        $progressBar->setBorderColor(Colors::LIGHT_GRAY);
-        $progressBar->setBarColor(Colors::RED);
-        $progressBar->setOrigin($x, $y);
-        $progressBar->setSize(300, 30);
-        $progressBar->build();
+        $objectDraw = new ObjectDraw($square->buildJson(), $sessionId);
+        $drawItems[] = $objectDraw->get();
 
-        foreach ($progressBar->getDrawItems() as $item) {
-            $objectDraw = new ObjectDraw($item, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }*/
+        $this->info('Drawing a simple red square at position (' . $x . ', ' . $y . ') with size 100');
 
         // Flush to cache
         ObjectCache::flush($sessionId);

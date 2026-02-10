@@ -1,14 +1,8 @@
-import Echo from 'laravel-echo';
+// Socket.io Client - Replaces Pusher/Reverb
+import './socketio-client';
 
-import Pusher from 'pusher-js';
-window.Pusher = Pusher;
+// Echo is now available globally from socketio-client.js
+// It provides a compatible interface with Laravel Echo
 
-window.Echo = new Echo({
-    broadcaster: 'reverb',
-    key: import.meta.env.VITE_REVERB_APP_KEY,
-    wsHost: import.meta.env.VITE_REVERB_HOST,
-    wsPort: import.meta.env.VITE_REVERB_PORT ?? 80,
-    wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
-    forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
-    enabledTransports: ['ws', 'wss'],
-});
+console.log('Socket.io client loaded');
+

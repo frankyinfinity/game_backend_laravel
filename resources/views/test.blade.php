@@ -27,13 +27,12 @@
 @stop
 
 @section('js')
-    <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
         const BACK_URL = '{{ url('/') }}';
         const config = {
-            PUSHER_KEY: '{{ config('broadcasting.connections.pusher.key') }}',
-            PUSHER_CLUSTER: '{{ config('broadcasting.connections.pusher.options.cluster') }}'
+            SOCKETIO_URL: '{{ config('broadcasting.connections.socketio.url') }}'
         };
         const testPlayerId = 1; // Use existing player ID
         const sessionId = 'test_session_fixed';
@@ -311,30 +310,54 @@
 
         $(document).ready(function() {
             initPixi();
-            status('PixiJS Avviato - Connessione a Pusher...');
+            status('PixiJS Avviato - Connessione a Socket.io...');
 
-            const pusher = new Pusher(config.PUSHER_KEY, {
-                cluster: config.PUSHER_CLUSTER,
-                forceTLS: true
+            const socket = io(config.SOCKETIO_URL, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: Infinity
             });
 
             const channelName = 'player_' + testPlayerId + '_channel';
-            let channel = pusher.subscribe(channelName);
 
-            channel.bind('pusher:subscription_succeeded', function() {
-                status('Connesso a Pusher - In attesa di eventi di disegno...');
-                console.log('Test player channel subscribed:', channelName);
+            socket.on('connect', function() {
+                status('Connesso a Socket.io - Sottoscrizione canale...');
+                console.log('Socket.io connected:', socket.id);
+
+                // Subscribe to channel
+                socket.emit('subscribe', {
+                    channel: channelName,
+                    auth: {
+                        token: localStorage.getItem('auth_token') || null
+                    }
+                });
             });
 
-            // Keep connection open
-            setInterval(() => {
-                if (pusher.connection.state !== 'connected') {
-                    console.log('Pusher not connected, reconnecting...');
-                    pusher.connect();
+            socket.on('subscription_succeeded', function(data) {
+                if (data.channel === channelName) {
+                    status('Connesso a Socket.io - In attesa di eventi di disegno...');
+                    console.log('Test player channel subscribed:', channelName);
                 }
-            }, 10000); // Check every 10 seconds
+            });
 
-            channel.bind('draw_interface', function(data) {
+            socket.on('subscription_error', function(data) {
+                status('Errore sottoscrizione canale: ' + data.error);
+                console.error('Subscription error:', data);
+            });
+
+            socket.on('disconnect', function(reason) {
+                status('Disconnesso da Socket.io: ' + reason);
+                console.log('Socket.io disconnected:', reason);
+            });
+
+            socket.on('connect_error', function(error) {
+                status('Errore connessione Socket.io: ' + error.message);
+                console.error('Socket.io connection error:', error);
+            });
+
+            // Listen for draw_interface events
+            socket.on('draw_interface', function(data) {
                 console.log('Draw interface event received:', data);
                 status('Evento di disegno ricevuto...');
 

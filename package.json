@@ -3,12 +3,13 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "socketio": "node socketio-server.js",
+        "dev:all": "concurrently \"npm run dev\" \"npm run socketio\""
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",
         "autoprefixer": "^10.4.20",
-        "axios": "^1.7.4",
         "bootstrap": "^5.2.3",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^1.0",
@@ -18,7 +19,10 @@
         "vite": "^6.0"
     },
     "dependencies": {
+        "axios": "^1.13.5",
         "laravel-echo": "^2.2.7",
-        "pusher-js": "^8.4.0"
+        "pusher-js": "^8.4.0",
+        "socket.io": "^4.8.3",
+        "socket.io-client": "^4.8.3"
     }
 }

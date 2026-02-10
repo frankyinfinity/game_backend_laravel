@@ -2,12 +2,51 @@
 
 namespace App\Services;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+
 class WebSocketService
 {
     /**
-     * Invia un messaggio via WebSocket e ritorna la risposta
+     * Invia un messaggio via Socket.io e ritorna la risposta
      */
     public static function send($url, $payload)
+    {
+        $client = new Client(['timeout' => 10]);
+
+        try {
+            $response = $client->post($url, [
+                'json' => $payload,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ],
+            ]);
+
+            $body = $response->getBody()->getContents();
+            $data = json_decode($body, true);
+
+            return [
+                'success' => true,
+                'response' => $data ?? $body
+            ];
+        } catch (RequestException $e) {
+            $errorMessage = $e->getMessage();
+            if ($e->hasResponse()) {
+                $errorMessage = $e->getResponse()->getBody()->getContents();
+            }
+
+            return [
+                'success' => false,
+                'error' => $errorMessage
+            ];
+        }
+    }
+
+    /**
+     * Invia un messaggio via WebSocket (legacy raw WebSocket support)
+     */
+    public static function sendRawWebSocket($url, $payload)
     {
         // Parse dell'URL
         $urlParts = parse_url($url);
@@ -79,6 +118,46 @@ class WebSocketService
             'success' => false,
             'error' => 'Nessuna risposta ricevuta'
         ];
+    }
+
+    /**
+     * Broadcast un evento a un canale Socket.io
+     */
+    public static function broadcast($channel, $event, $payload = [])
+    {
+        $socketIoUrl = config('broadcasting.connections.socketio.url');
+        $url = rtrim($socketIoUrl, '/') . '/broadcast';
+
+        $client = new Client(['timeout' => 5]);
+
+        try {
+            $response = $client->post($url, [
+                'json' => [
+                    'channel' => $channel,
+                    'event' => $event,
+                    'payload' => $payload,
+                ],
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ],
+            ]);
+
+            return [
+                'success' => true,
+                'response' => json_decode($response->getBody()->getContents(), true)
+            ];
+        } catch (RequestException $e) {
+            $errorMessage = $e->getMessage();
+            if ($e->hasResponse()) {
+                $errorMessage = $e->getResponse()->getBody()->getContents();
+            }
+
+            return [
+                'success' => false,
+                'error' => $errorMessage
+            ];
+        }
     }
 
     /**
