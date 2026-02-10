@@ -39,6 +39,7 @@ use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Colors;
 use App\Custom\Draw\Complex\Table\TableDraw;
 use App\Custom\Draw\Complex\Table\TableHeadDraw;
@@ -64,11 +65,25 @@ class GameController extends Controller
         ObjectCache::buffer($sessionId);
         $drawItems = [];
 
-        // Clear all existing elements before drawing
-        $existingObjects = ObjectCache::all($sessionId);
-        foreach ($existingObjects as $uid => $object) {
-            $objectClear = new ObjectClear($uid, $sessionId);
-            $drawItems[] = $objectClear->get();
+        if($request->has('old_session_id')) {
+
+            $oldSessionId = $request->old_session_id;
+
+            // Clear all existing elements before drawing
+            $existingObjects = ObjectCache::all($oldSessionId);
+            foreach ($existingObjects as $uid => $object) {
+                $objectClear = new ObjectClear($uid, $oldSessionId);
+                $drawItems[] = $objectClear->get();
+            }
+            ObjectCache::clear($oldSessionId);
+
+        } else {
+            // Clear all existing elements before drawing
+            $existingObjects = ObjectCache::all($sessionId);
+            foreach ($existingObjects as $uid => $object) {
+                $objectClear = new ObjectClear($uid, $sessionId);
+                $drawItems[] = $objectClear->get();
+            }
         }
         ObjectCache::clear($sessionId);
 

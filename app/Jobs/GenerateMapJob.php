@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Custom\Draw\Complex\EntityDraw;
+use App\Custom\Draw\Complex\AppbarDraw;
+use App\Custom\Draw\Complex\Appbar\HomeAppbarDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
@@ -46,7 +48,7 @@ class GenerateMapJob implements ShouldQueue
         $drawItems = [];
         $startPixelX = 0;
         $pixelX = $startPixelX;
-        $pixelY = 0;
+        $pixelY = 80; // Start below appbar (80px height)
         $tileSize = Helper::TILE_SIZE;
 
         $player = Player::find($player_id);
@@ -77,6 +79,13 @@ class GenerateMapJob implements ShouldQueue
         $portsJson = json_encode($ports);
 
         ObjectCache::buffer($player->actual_session_id);
+
+        // Draw Appbar
+        $appbar = new HomeAppbarDraw($player_id, $player->actual_session_id);
+        foreach ($appbar->getDrawItems() as $item) {
+            $objectDraw = new ObjectDraw($item, $player->actual_session_id);
+            $drawItems[] = $objectDraw->get();
+        }
 
         for ($i = 0; $i < $birthRegion->height; $i++) {
             for ($j = 0; $j < $birthRegion->width; $j++) {
