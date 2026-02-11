@@ -862,8 +862,11 @@ class GameController extends Controller
 
             $tileSize = Helper::TILE_SIZE;
 
+            $originX = ($tileSize*$pathNodeJ) + Helper::MAP_START_X;
+            $originY = ($tileSize*$pathNodeI) + Helper::MAP_START_Y;
+
             $startSquare = new Square();
-            $startSquare->setOrigin($tileSize*$pathNodeJ, $tileSize*$pathNodeI);
+            $startSquare->setOrigin($originX, $originY);
             $startSquare->setSize($tileSize);
             $startCenterSquare = $startSquare->getCenter();
             $xStart = $startCenterSquare['x'];
@@ -887,9 +890,12 @@ class GameController extends Controller
                 $nextPathNodeI = $pathFinding[$key+1][0];
                 $nextPathNodeJ = $pathFinding[$key+1][1];
 
+                $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
+                $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
+
                 $endSquare = new Square();
                 $endSquare->setSize($tileSize);
-                $endSquare->setOrigin($tileSize*$nextPathNodeJ, $tileSize*$nextPathNodeI);
+                $endSquare->setOrigin($originX, $originY);
                 $endCenterSquare = $endSquare->getCenter();
                 $xEnd = $endCenterSquare['x'];
                 $yEnd = $endCenterSquare['y'];
