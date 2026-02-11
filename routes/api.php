@@ -15,6 +15,7 @@ Route::post('/game/clear_login', [App\Http\Controllers\Api\GameController::class
 Route::post('/game/home', [App\Http\Controllers\Api\GameController::class, 'home'])->name('game.home');
 Route::post('/game/get_draw_item', [App\Http\Controllers\Api\GameController::class, 'getDrawItem'])->name('game.get_draw_item');
 Route::post('/game/close', [App\Http\Controllers\Api\GameController::class, 'close'])->name('game.close');
+Route::post('/game/clear', [App\Http\Controllers\Api\GameController::class, 'clear'])->name('game.clear');
 
 Route::group(['prefix' => 'auth'], function (){
 

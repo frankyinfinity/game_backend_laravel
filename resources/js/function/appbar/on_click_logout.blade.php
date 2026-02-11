@@ -10,29 +10,59 @@
             type: 'POST',
             data: { player_id: playerId, session_id: sessionId },
             success: function (result) {
-                status('Sessione chiusa. Ritorno al login...');
+                status('Sessione chiusa. Pulizia schermo in corso...');
                 
-                // Switch to player_1
-                let oldSessionId = sessionId;
-                setPlayerId('1');
-                sessionId = 'init_session_id';
-                if (window.switchPlayerChannel) {
-                    window.switchPlayerChannel(playerId);
-                }
-                
-                // Second call: redraw the login
+                // Second call: clear the screen before switching to player_1
                 $.ajax({
-                    url: `${BACK_URL}/api/game/login`,
+                    url: `${BACK_URL}/api/game/clear`,
                     type: 'POST',
-                    data: { 
-                        player_id: playerId,
-                        old_session_id: oldSessionId
-                     },
+                    data: { player_id: playerId, session_id: sessionId },
                     success: function () {
-                        status('Logout effettuato!');
+                        
+                        // Clear all local objects after screen clear
+                        if (typeof shapes !== 'undefined') {
+                            Object.keys(shapes).forEach(uid => {
+                                let shape = shapes[uid];
+                                if (shape) {
+                                    if (typeof shape.clear === 'function') shape.clear();
+                                    if (app && app.stage) app.stage.removeChild(shape);
+                                    delete shapes[uid];
+                                    delete objects[uid];
+                                }
+                            });
+                            shapes = {};
+                            objects = {};
+                        }
+                        
+                        status('Schermo pulito. Ritorno al login...');
+                        
+                        // Switch to player_1
+                        let oldSessionId = sessionId;
+                        setPlayerId('1');
+                        sessionId = 'init_session_id';
+                        if (window.switchPlayerChannel) {
+                            window.switchPlayerChannel(playerId);
+                        }
+                        
+                        // Third call: redraw the login
+                        $.ajax({
+                            url: `${BACK_URL}/api/game/login`,
+                            type: 'POST',
+                            data: { 
+                                player_id: playerId,
+                                old_session_id: oldSessionId
+                             },
+                            success: function () {
+                                status('Logout effettuato!');
+                            },
+                            error: function (err) {
+                                status('Errore logout');
+                                console.error(err);
+                            }
+                        });
                     },
                     error: function (err) {
-                        status('Errore logout');
+                        status('Errore pulizia schermo');
                         console.error(err);
                     }
                 });

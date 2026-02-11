@@ -65,25 +65,11 @@ class GameController extends Controller
         ObjectCache::buffer($sessionId);
         $drawItems = [];
 
-        if($request->has('old_session_id')) {
-
-            $oldSessionId = $request->old_session_id;
-
-            // Clear all existing elements before drawing
-            $existingObjects = ObjectCache::all($oldSessionId);
-            foreach ($existingObjects as $uid => $object) {
-                $objectClear = new ObjectClear($uid, $oldSessionId);
-                $drawItems[] = $objectClear->get();
-            }
-            ObjectCache::clear($oldSessionId);
-
-        } else {
-            // Clear all existing elements before drawing
-            $existingObjects = ObjectCache::all($sessionId);
-            foreach ($existingObjects as $uid => $object) {
-                $objectClear = new ObjectClear($uid, $sessionId);
-                $drawItems[] = $objectClear->get();
-            }
+        // Clear all existing elements before drawing
+        $existingObjects = ObjectCache::all($sessionId);
+        foreach ($existingObjects as $uid => $object) {
+            $objectClear = new ObjectClear($uid, $sessionId);
+            $drawItems[] = $objectClear->get();
         }
         ObjectCache::clear($sessionId);
 
@@ -538,6 +524,32 @@ class GameController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => 'Connection closed successfully']);
+    }
+
+    public function clear(Request $request)
+    {
+        $playerId = $request->input('player_id');
+        $sessionId = $request->input('session_id');
+        
+        Log::info("Clearing screen for player", [
+            'player_id' => $playerId,
+            'session_id' => $sessionId,
+            'timestamp' => now()
+        ]);
+
+        // Use the cache system
+        ObjectCache::buffer($sessionId);
+        $drawItems = [];
+
+        // Clear all existing elements
+        $existingObjects = ObjectCache::all($sessionId);
+        foreach ($existingObjects as $uid => $object) {
+            $objectClear = new ObjectClear($uid, $sessionId);
+            $drawItems[] = $objectClear->get();
+        }
+        ObjectCache::clear($sessionId);
+
+        return response()->json(['success' => true, 'items' => $drawItems]);
     }
 
     public function setElementInMap(Request $request) {
