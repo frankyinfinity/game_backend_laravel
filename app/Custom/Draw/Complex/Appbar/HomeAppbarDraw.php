@@ -6,6 +6,8 @@ use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Colors;
+use App\Helper\Helper;
+use Illuminate\Support\Str;
 
 class HomeAppbarDraw extends AppbarDraw
 {
@@ -66,8 +68,9 @@ class HomeAppbarDraw extends AppbarDraw
         // Set onClick function
         $jsPathOnClickLogout = resource_path('js/function/appbar/on_click_logout.blade.php');
         $jsContentOnClickLogout = file_get_contents($jsPathOnClickLogout);
+        $jsContentOnClickLogout = Helper::setCommonJsCode($jsContentOnClickLogout, Str::random(20));
+
         $logoutButton->setOnClick($jsContentOnClickLogout);
-        
         $logoutButton->build();
         
         // Add button elements using addRightElement()

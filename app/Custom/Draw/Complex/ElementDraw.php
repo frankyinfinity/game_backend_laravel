@@ -65,8 +65,8 @@ class ElementDraw
             'tile_j' => $this->tileJ,
         ]);
         
-        $x = $this->tileJ * Helper::TILE_SIZE;
-        $y = $this->tileI * Helper::TILE_SIZE;
+        $x = ($this->tileJ * Helper::TILE_SIZE) + Helper::MAP_START_X;
+        $y = ($this->tileI * Helper::TILE_SIZE) + Helper::MAP_START_Y;
 
         $image = new Image($uid);
         $image->setSrc($imagePath);

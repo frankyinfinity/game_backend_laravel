@@ -46,9 +46,9 @@ class GenerateMapJob implements ShouldQueue
         $player_id = $jobPayload['player_id'];
 
         $drawItems = [];
-        $startPixelX = 0;
+        $startPixelX = Helper::MAP_START_X;
         $pixelX = $startPixelX;
-        $pixelY = 80; // Start below appbar (80px height)
+        $pixelY = Helper::MAP_START_Y; // Start below appbar (80px height)
         $tileSize = Helper::TILE_SIZE;
 
         $player = Player::find($player_id);

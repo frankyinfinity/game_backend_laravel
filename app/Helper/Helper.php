@@ -20,6 +20,9 @@ class Helper
     public const DEFAULT_FONT_SIZE = 16;
     public const DEFAULT_FONT_FAMILY = 'Consolas';
 
+    public const MAP_START_X = 0;
+    public const MAP_START_Y = 80;
+
     const DRAW_REQUEST_TYPE_DRAW = 'draw';
     const DRAW_REQUEST_TYPE_UPDATE = 'update';
     const DRAW_REQUEST_TYPE_CLEAR = 'clear';
@@ -175,6 +178,8 @@ class Helper
      * 
      * @param int $birthRegionId The ID of the birth region
      * @param int $tileId The ID of the tile to search for
+     * @param int $startX The starting X position of the map (default 0)
+     * @param int $startY The starting Y position of the map (default 0)
      * @return array Array of coordinates ['x' => j, 'y' => i] for each matching tile
      */
     public static function getTileCoordinates(int $birthRegionId, int $tileId): array
@@ -193,8 +198,6 @@ class Helper
                 $coordinates[] = [
                     'i' => $tile['i'],
                     'j' => $tile['j'],
-                    'x' => $tile['j'] * self::TILE_SIZE,
-                    'y' => $tile['i'] * self::TILE_SIZE,
                 ];
             }
         }
