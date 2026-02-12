@@ -28,6 +28,9 @@ use App\Models\Container;
 use App\Models\Genome;
 use App\Models\EntityInformation;
 use App\Models\ElementHasGene;
+use App\Models\Score;
+use App\Models\ElementHasScore;
+use App\Models\PlayerHasScore;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -1264,6 +1267,32 @@ class GameController extends Controller
 
                 // Delete from DB
                 $elementPosition->delete();
+
+                // === AWARD SCORES FOR KILLING ELEMENT ===
+                $element = $elementPosition->element;
+                $elementRewards = $element->scores;
+                
+                foreach ($elementRewards as $score) {
+                    $amount = $score->pivot->amount;
+                    
+                    // Find or create player's score record
+                    $playerHasScore = PlayerHasScore::query()
+                        ->where('player_id', $player->id)
+                        ->where('score_id', $score->id)
+                        ->first();
+                    
+                    if ($playerHasScore) {
+                        $playerHasScore->increment('value', $amount);
+                    } else {
+                        PlayerHasScore::create([
+                            'player_id' => $player->id,
+                            'score_id' => $score->id,
+                            'value' => $amount
+                        ]);
+                    }
+                    
+                    Log::info("Awarded {$amount} {$score->name} to player {$player->id} for killing {$element->name}");
+                }
             }
         } else {
             Log::info("Damage NOT applied - elementLifeInfo: " . ($elementLifeInfo ? 'yes' : 'no') . ", damage: {$damage}");

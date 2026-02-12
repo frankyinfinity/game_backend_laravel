@@ -17,6 +17,8 @@ class ElementHasPositionObserver
         if($elementHasPosition->element->isInteractive()) {
             
             $element = $elementHasPosition->element;
+
+            //Information
             $elementHasInformations = ElementInformation::query()
                 ->where('element_id', $element->id)
                 ->get();

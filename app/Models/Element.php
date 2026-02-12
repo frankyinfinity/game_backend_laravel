@@ -49,6 +49,11 @@ class Element extends Model
         return $this->hasMany(ElementInformation::class);
     }
 
+    public function scores()
+    {
+        return $this->belongsToMany(Score::class, 'element_has_scores')->withPivot('amount');
+    }
+
     /**
      * Check if the element is consumable
      *

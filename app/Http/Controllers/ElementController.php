@@ -9,6 +9,7 @@ use App\Models\Climate;
 use App\Models\Tile;
 use App\Models\ElementHasTile;
 use App\Models\Gene;
+use App\Models\Score;
 use App\Models\ElementHasGene;
 use Illuminate\Http\Request;
 
@@ -101,6 +102,9 @@ class ElementController extends Controller
         // Fetch Genes
         $allGenes = Gene::query()->where('type', 'dynamic_max')->orderBy('name')->get();
         
+        // Fetch Scores for reward tab
+        $allScores = Score::orderBy('name')->get();
+        
         // Prepare gene data for JavaScript
         $geneData = $allGenes->map(function($gene) {
             return [
@@ -113,7 +117,7 @@ class ElementController extends Controller
             ];
         });
 
-        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap', 'allGenes', 'geneData'));
+        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap', 'allGenes', 'geneData', 'allScores'));
     }
 
     public function update(Request $request, Element $element)
@@ -178,6 +182,21 @@ class ElementController extends Controller
             }
         } else {
             $element->informations()->delete();
+        }
+
+        // Save Reward Scores
+        if ($element->isInteractive()) {
+            $scores = [];
+            if ($request->has('reward_scores')) {
+                foreach($request->reward_scores as $s) {
+                    if(!empty($s['score_id']) && isset($s['amount'])) {
+                        $scores[$s['score_id']] = ['amount' => $s['amount']];
+                    }
+                }
+            }
+            $element->scores()->sync($scores);
+        } else {
+            $element->scores()->delete();
         }
 
         // Save Diffusion Data

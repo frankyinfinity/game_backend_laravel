@@ -29,6 +29,9 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-information-link" data-toggle="pill" href="#tab-information" role="tab" aria-controls="tab-information" aria-selected="false">Informazioni</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-reward-link" data-toggle="pill" href="#tab-reward" role="tab" aria-controls="tab-reward" aria-selected="false">Ricompensa</a>
+                    </li>
                     @endif
                     <li class="nav-item">
                         <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
@@ -60,6 +63,11 @@
                     @if($element->isInteractive())
                     <div class="tab-pane fade" id="tab-information" role="tabpanel" aria-labelledby="tab-information-link">
                         @include('elements.tabs.information')
+                    </div>
+
+                    <!-- TAB RICOMPENSA -->
+                    <div class="tab-pane fade" id="tab-reward" role="tabpanel" aria-labelledby="tab-reward-link">
+                        @include('elements.tabs.reward')
                     </div>
                     @endif
 
@@ -267,6 +275,66 @@
             });
             
             updateInformationOptions();
+            
+            // Reward Rows Management
+            let rewardIndex = {{ $element->scores->count() }};
+            
+            function updateRewardOptions() {
+                let selectedValues = [];
+                $('.reward-selector').each(function() {
+                    let val = $(this).val();
+                    if (val) {
+                        selectedValues.push(val);
+                    }
+                });
+                
+                $('.reward-selector').each(function() {
+                    let currentSelect = $(this);
+                    let currentValue = currentSelect.val();
+                    
+                    currentSelect.find('option').each(function() {
+                        let option = $(this);
+                        let optionValue = option.val();
+                        
+                        if (selectedValues.includes(optionValue) && optionValue != currentValue) {
+                            option.prop('disabled', true);
+                        } else {
+                            option.prop('disabled', false);
+                        }
+                    });
+                });
+            }
+            
+            $('#add-reward-row').click(function() {
+                let html = `
+                    <tr class="reward-row">
+                        <td>
+                            <select name="reward_scores[${rewardIndex}][score_id]" class="form-control reward-selector" required>
+                                <option value="">Seleziona Punteggio</option>
+                                @foreach($allScores as $s)
+                                    <option value="{{ $s->id }}">{{ $s->name }}</option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" name="reward_scores[${rewardIndex}][amount]" class="form-control" required placeholder="Quantità" value="1">
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm remove-reward-row"><i class="fa fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+                $('#reward_table tbody').append(html);
+                rewardIndex++;
+                updateRewardOptions();
+            });
+            
+            $(document).on('click', '.remove-reward-row', function() {
+                $(this).closest('tr').remove();
+                updateRewardOptions();
+            });
+            
+            updateRewardOptions();
         })
     </script>
 @stop
