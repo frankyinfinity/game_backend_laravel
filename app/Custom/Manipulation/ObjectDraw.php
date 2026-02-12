@@ -21,16 +21,25 @@ class ObjectDraw
 
     private function write(): void
     {
-        ObjectCache::put($this->sessionId, $this->object);
+        // Check if object is already an array or has buildJson() method
+        if (is_array($this->object)) {
+            // Already converted to array
+            ObjectCache::put($this->sessionId, $this->object);
+        } else {
+            // Convert object to array using buildJson()
+            $objectArray = $this->object->buildJson();
+            ObjectCache::put($this->sessionId, $objectArray);
+        }
     }
 
 
     public function get(): array
     {
         $this->write();
+        // Return the object as-is (array or object) for the frontend
         return [
             'type' => Helper::DRAW_REQUEST_TYPE_DRAW,
-            'object' => $this->object,
+            'object' => is_array($this->object) ? $this->object : $this->object->buildJson(),
         ];
     }
 

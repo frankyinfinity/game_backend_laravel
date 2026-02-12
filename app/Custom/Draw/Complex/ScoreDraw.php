@@ -6,6 +6,7 @@ use App\Custom\Draw\Primitive;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Text;
+use App\Custom\Manipulation\ObjectCache;
 use App\Helper\Helper;
 
 class ScoreDraw {
@@ -153,4 +154,28 @@ class ScoreDraw {
         $this->drawItems[] = $text;
     }
 
+    public function updateValue($newValue, $sessionId): array
+    {
+        $this->scoreValue = $newValue;
+        
+        // Load existing properties from cache
+        $cachedText = ObjectCache::find($sessionId, $this->uid . '_text');
+        
+        if (!$cachedText) {
+            throw new \Exception("Score text not found in cache. Make sure to call build() first.");
+        }
+        
+        $operations = [];
+        
+        // Update the text with new score value
+        $operations[] = [
+            'type' => 'update',
+            'uid' => $this->uid . '_text',
+            'attributes' => [
+                'text' => (string)$this->scoreValue
+            ]
+        ];
+        
+        return $operations;
+    }
 }

@@ -2,15 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Draw\Complex\ProgressBarDraw;
+use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Manipulation\ObjectCache;
-use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Manipulation\ObjectClear;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
 use App\Models\Player;
-use App\Custom\Colors;
+use App\Models\Score;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
@@ -21,14 +20,14 @@ class TestUpdateDrawCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'test-update:draw {value=80}';
+    protected $signature = 'test-update:score {value} {--scoreId=}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Update the progress bar value';
+    protected $description = 'Update the score value';
 
     /**
      * Execute the console command.
@@ -37,6 +36,7 @@ class TestUpdateDrawCommand extends Command
     {
         $requestId = Str::uuid()->toString();
         $sessionId = 'test_session_fixed';
+        $scoreId = $this->option('scoreId') ?: 1;
         $newValue = $this->argument('value');
 
         // Use player ID 1 for test
@@ -52,11 +52,18 @@ class TestUpdateDrawCommand extends Command
 
         $drawItems = [];
 
-        // Update the progress bar value - only need to instantiate with UID
-        $progressBar = new ProgressBarDraw('test_pb');
+        // Get the score UID from the database
+        $score = Score::find($scoreId);
+        if (!$score) {
+            $this->error("Score with ID {$scoreId} not found.");
+            return;
+        }
+
+        // Update the score value using the score ID
+        $scoreDraw = new ScoreDraw('score_' . $scoreId);
         
         // Use the updateValue method - it will load all properties from cache
-        $operations = $progressBar->updateValue($newValue, $sessionId);
+        $operations = $scoreDraw->updateValue($newValue, $sessionId);
 
         foreach ($operations as $operation) {
             $type = $operation['type'];
@@ -71,8 +78,7 @@ class TestUpdateDrawCommand extends Command
                 $objectClear = new ObjectClear($operation['uid'], $sessionId);
                 $drawItems[] = $objectClear->get();
             } elseif ($type === 'draw') {
-                $objectDraw = new ObjectDraw($operation['object'], $sessionId);
-                $drawItems[] = $objectDraw->get();
+                $drawItems[] = $operation['object'];
             }
         }
 
@@ -88,6 +94,6 @@ class TestUpdateDrawCommand extends Command
         ]);
         event(new DrawInterfaceEvent($player, $requestId));
 
-        $this->info("Progress bar updated to value: {$newValue}. Check the /test page.");
+        $this->info("Score {$scoreId} updated to value: {$newValue}. Check the /test page.");
     }
 }
