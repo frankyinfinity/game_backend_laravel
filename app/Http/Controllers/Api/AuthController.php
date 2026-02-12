@@ -17,6 +17,8 @@ use App\Models\Region;
 use App\Models\BirthPlanet;
 use App\Models\BirthRegion;
 use App\Models\BirthClimate;
+use App\Models\Score;
+use App\Models\PlayerHasScore;
 use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
@@ -91,6 +93,15 @@ class AuthController extends Controller
             'birth_planet_id' => $birthPlanet->id,
             'birth_region_id' => $searchBirthRegion->id
         ]);
+
+        //Score
+        $scores = Score::all();
+        foreach ($scores as $score) {
+            PlayerHasScore::query()->create([
+                'player_id' => $player->id,
+                'score_id' => $score->id
+            ]);
+        }
  
         $specie = Specie::query()->create([
             'player_id' => $player->id,
