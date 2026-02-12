@@ -4,9 +4,11 @@ namespace App\Custom\Draw\Complex\Appbar;
 
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Colors;
 use App\Helper\Helper;
+use App\Models\PlayerHasScore;
 use Illuminate\Support\Str;
 
 class HomeAppbarDraw extends AppbarDraw
@@ -83,6 +85,76 @@ class HomeAppbarDraw extends AppbarDraw
             foreach ($drawItems as $item) {
                 $this->addRightElement($item);
             }
+        }
+    }
+
+    /**
+     * Add elements to the center section of the appbar
+     * Shows three ScoreDraw elements for the player's scores
+     */
+    protected function addCenterSection(): void
+    {
+        \Log::info('HomeAppbarDraw::addCenterSection() called for player: ' . ($this->player ? $this->player->id : 'null'));
+        
+        if (!$this->player) {
+            return;
+        }
+        
+        // Get player's scores from PlayerHasScore
+        $playerScores = PlayerHasScore::query()
+            ->where('player_id', $this->player->id)
+            ->with('score')
+            ->get();
+        
+        \Log::info('Found ' . $playerScores->count() . ' scores for player');
+        
+        if ($playerScores->isEmpty()) {
+            return;
+        }
+        
+        // Center section dimensions
+        $startX = 400; // LEFT_SECTION_WIDTH
+        $centerY = 15; // Vertically centered in appbar (height 80)
+        $scoreWidth = 120;
+        $scoreHeight = 50;
+        $spacing = 130;
+        
+        $index = 0;
+        foreach ($playerScores as $playerScore) {
+            
+            $score = $playerScore->score;
+            if (!$score) {
+                continue;
+            }
+            
+            $x = $startX + ($index * $spacing);
+            
+            $scoreDraw = new ScoreDraw($this->getUid() . '_score_' . $score->id);
+            $scoreDraw->setOrigin($x, $centerY);
+            $scoreDraw->setSize($scoreWidth, $scoreHeight);
+            $scoreDraw->setBackgroundColor('#4169E1');
+            $scoreDraw->setBorderColor('#5B7FE8');
+            $scoreDraw->setBorderRadius(10);
+            
+            // Get image path for this score
+            $imagePath = '/storage/scores/' . $score->id . '.png';
+            $scoreDraw->setScoreImage($imagePath);
+            
+            // Use the value from player_score table if available, else 0
+            $scoreValue = $playerScore->value ?? 0;
+            $scoreDraw->setScoreValue((string) $scoreValue);
+            
+            // White text
+            $scoreDraw->setTextColor('#FFFFFF');
+            $scoreDraw->setTextFontSize(16);
+            $scoreDraw->build();
+            
+            // Add all draw items to center section
+            foreach ($scoreDraw->getDrawItems() as $drawItem) {
+                $this->addCenterElement($drawItem);
+            }
+            
+            $index++;
         }
     }
 }

@@ -227,13 +227,15 @@
                 
                 if (object['color'] !== null && object['color'] !== undefined) {
                     let colorValue = object['color'];
-                    // Handle string colors like '#FFFFFF'
-                    if (typeof colorValue === 'string' && colorValue.startsWith('#')) {
-                        style.fill = colorValue;
+                    
+                    // Handle string colors - use directly if already formatted
+                    if (typeof colorValue === 'string') {
+                        // Remove any leading # if present, then add it properly
+                        let cleanColor = colorValue.replace(/^#+/, '');
+                        style.fill = '#' + cleanColor;
                     } else if (typeof colorValue === 'number') {
+                        // Convert numeric hex to #RRGGBB format
                         style.fill = '#' + colorValue.toString(16).padStart(6, '0');
-                    } else {
-                        style.fill = '#' + colorValue;
                     }
                 }
                 
