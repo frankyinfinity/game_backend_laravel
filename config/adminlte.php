@@ -363,6 +363,17 @@ return [
                 ]
             ]
         ],
+        [
+            'text'    => 'Obiettivi',
+            'icon'    => 'fas fa-trophy',
+            'submenu' => [
+                [
+                    'text' => 'Punteggi',
+                    'url'  => '/scores',
+                    'icon' => 'fas fa-list',
+                ]
+            ]
+        ],
     ],
 
     /*

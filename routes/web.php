@@ -75,5 +75,11 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/elements/delete', [App\Http\Controllers\ElementController::class, 'delete'])->name('elements.delete');
     Route::post('/elements/{element}/save-graphics', [App\Http\Controllers\ElementController::class, 'saveGraphics'])->name('elements.save-graphics');
 
+    //Scores
+    Route::resource('scores', App\Http\Controllers\ScoreController::class);
+    Route::post('/scores/list/table', [App\Http\Controllers\ScoreController::class, 'listDataTable'])->name('scores.datatable');
+    Route::post('/scores/delete', [App\Http\Controllers\ScoreController::class, 'destroy'])->name('scores.delete');
+    Route::post('/scores/{score}/save-graphics', [App\Http\Controllers\ScoreController::class, 'saveGraphics'])->name('scores.save-graphics');
+
 
 });
