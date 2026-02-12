@@ -457,15 +457,6 @@ class GameController extends Controller
         // Flush to cache
         ObjectCache::flush($sessionId);
 
-        // Dispatch event
-        DrawRequest::query()->create([
-            'session_id' => $sessionId,
-            'request_id' => $requestId,
-            'player_id' => $playerId,
-            'items' => json_encode($drawItems),
-        ]);
-        event(new DrawInterfaceEvent($player, $requestId));
-
         $newPlayer = Player::find($request->new_player_id);
         $newSessionId = Helper::generateSessionIdPlayer($newPlayer);
 

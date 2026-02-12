@@ -26,6 +26,21 @@
                         },
                         success: function (result) { 
                             
+                            // Clear all local objects after screen clear
+                            if (typeof shapes !== 'undefined') {
+                                Object.keys(shapes).forEach(uid => {
+                                    let shape = shapes[uid];
+                                    if (shape) {
+                                        if (typeof shape.clear === 'function') shape.clear();
+                                        if (app && app.stage) app.stage.removeChild(shape);
+                                        delete shapes[uid];
+                                        delete objects[uid];
+                                    }
+                                });
+                                shapes = {};
+                                objects = {};
+                            }
+
                             let newSessionId = result.session_id;
                             
                             // Aggiorna variabili globali
