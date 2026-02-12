@@ -136,15 +136,44 @@
         class Rectangle extends BasicDraw {
             constructor(object) {
                 super(object);
-                this.shape = new PIXI.Sprite(PIXI.Texture.WHITE);
+                this.shape = new PIXI.Graphics();
             }
             build() {
                 const object = this.object;
-                this.shape.width = object['width'];
-                this.shape.height = object['height'];
+                
+                // Check if we need rounded corners
+                const borderRadius = object['borderRadius'] || 0;
+                const borderColor = object['borderColor'];
+                
+                if (borderRadius > 0 && borderColor) {
+                    // Draw rounded rectangle with border
+                    this.shape.beginFill(borderColor);
+                    this.shape.drawRoundedRect(0, 0, object['width'], object['height'], borderRadius);
+                    this.shape.endFill();
+                    
+                    // Draw inner fill if color is different
+                    if (object['color'] && object['color'] !== borderColor) {
+                        const padding = 2;
+                        this.shape.beginFill(object['color']);
+                        this.shape.drawRoundedRect(
+                            padding, 
+                            padding, 
+                            object['width'] - (padding * 2), 
+                            object['height'] - (padding * 2), 
+                            Math.max(0, borderRadius - padding)
+                        );
+                        this.shape.endFill();
+                    }
+                } else {
+                    // Regular rectangle
+                    this.shape.beginFill(0xFFFFFF);
+                    this.shape.drawRect(0, 0, object['width'], object['height']);
+                    this.shape.endFill();
+                }
+                
                 this.shape.x = object['x'];
                 this.shape.y = object['y'];
-                this.shape.tint = object['color'];
+                this.shape.tint = object['color'] || 0xFFFFFF;
             }
         }
 
@@ -192,14 +221,32 @@
             }
             build() {
                 const object = this.object;
+                
+                // Build style first
+                const style = new PIXI.TextStyle();
+                
+                if (object['color'] !== null && object['color'] !== undefined) {
+                    let colorValue = object['color'];
+                    // Handle string colors like '#FFFFFF'
+                    if (typeof colorValue === 'string' && colorValue.startsWith('#')) {
+                        style.fill = colorValue;
+                    } else if (typeof colorValue === 'number') {
+                        style.fill = '#' + colorValue.toString(16).padStart(6, '0');
+                    } else {
+                        style.fill = '#' + colorValue;
+                    }
+                }
+                
+                if (object['fontFamily']) {
+                    style.fontFamily = object['fontFamily'];
+                }
+                if (object['fontSize']) {
+                    style.fontSize = object['fontSize'];
+                }
+                
+                this.shape.style = style;
                 this.shape.x = object['x'];
                 this.shape.y = object['y'];
-                if (object['color'] !== null) {
-                    const hexValue = object['color'];
-                    this.shape.style.fill = '#' + hexValue.toString(16).padStart(6, '0');
-                }
-                this.shape.style.fontFamily = object['fontFamily'];
-                this.shape.style.fontSize = object['fontSize'];
                 this.shape.text = object['text'];
                 if (object['centerAnchor']) {
                     this.shape.pivot.set(this.shape.width / 2, this.shape.height / 2);

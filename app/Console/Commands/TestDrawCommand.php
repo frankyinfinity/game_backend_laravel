@@ -12,6 +12,7 @@ use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
 use App\Models\Element;
 use App\Models\Player;
+use App\Models\Score;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -19,6 +20,7 @@ use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Colors;
 use Illuminate\Support\Facades\Log;
 use function GuzzleHttp\json_encode;
@@ -70,22 +72,73 @@ class TestDrawCommand extends Command
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        $x = 100;
-        $y = 100;
+        // Fetch all scores from database
+        $scores = Score::all();
+        
+        // Debug: log all score IDs
+        $this->info('Score IDs in database: ' . $scores->pluck('id')->implode(', '));
+        
+        if ($scores->isEmpty()) {
+            $this->warn('No scores found in database.');
+        } else {
+            $this->info('Found ' . $scores->count() . ' scores to draw.');
+        }
 
-        // Draw a simple red square
-        $square = new Square('test_square');
-        $square->setOrigin($x, $y);
-        $square->setSize(100);
-        $square->setColor(Colors::RED);
+        // Configuration for ScoreDraw
+        $scoreWidth = 120;
+        $scoreHeight = 50;
+        $startX = 20;
+        $startY = 20;
+        $spacingX = 130;
+        $spacingY = 60;
 
-        $objectDraw = new ObjectDraw($square->buildJson(), $sessionId);
-        $drawItems[] = $objectDraw->get();
+        $column = 0;
+        $row = 0;
 
-        $this->info('Drawing a simple red square at position (' . $x . ', ' . $y . ') with size 100');
+        // Draw all scores
+        foreach ($scores as $index => $score) {
+            // Calculate position
+            $x = $startX + ($column * $spacingX);
+            $y = $startY + ($row * $spacingY);
+
+            // Move to next row after 4 columns
+            if ($column >= 4) {
+                $column = 0;
+                $row++;
+            }
+            $column++;
+
+            $scoreDraw = new ScoreDraw('score_' . $score->id);
+            $scoreDraw->setOrigin($x, $y);
+            $scoreDraw->setSize($scoreWidth, $scoreHeight);
+            $scoreDraw->setBackgroundColor('#4169E1');
+            $scoreDraw->setBorderColor('#5B7FE8');
+            $scoreDraw->setBorderRadius(10);
+            
+            // Get image path
+            $imagePath = '/storage/scores/' . $score->id . '.png';
+            $scoreDraw->setScoreImage($imagePath);
+            
+            // Use score name as value (or you can use a value field)
+            $scoreDraw->setScoreValue('0');
+            
+            // White text
+            $scoreDraw->setTextColor('#FFFFFF');
+            $scoreDraw->setTextFontSize(18);
+            $scoreDraw->build();
+
+            foreach ($scoreDraw->getDrawItems() as $drawItem) {
+                $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                $drawItems[] = $objectDraw->get();
+            }
+
+            $this->info("Drawing score: {$score->name} at ({$x}, {$y})");
+        }
 
         // Flush to cache
         ObjectCache::flush($sessionId);
+        
+        $this->info('Total draw items: ' . count($drawItems));
 
         // Dispatch event
         DrawRequest::query()->create([

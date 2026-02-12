@@ -7,6 +7,8 @@ class Rectangle extends BasicDraw
 
     private $width;
     private $height;
+    private $borderRadius;
+    private $borderColor;
 
     public function __construct($uid = null)
     {
@@ -22,11 +24,23 @@ class Rectangle extends BasicDraw
        $this->height = $height;
    }
 
+   public function setBorderRadius($radius): void
+   {
+       $this->borderRadius = $radius;
+   }
+
+   public function setBorderColor($color): void
+   {
+       $this->borderColor = $color;
+   }
+
     public function buildJson(): array
     {
         return $this->commonJson([
             'width' => $this->width,
-            'height' => $this->height
+            'height' => $this->height,
+            'borderRadius' => $this->borderRadius ?? 0,
+            'borderColor' => $this->borderColor ?? null,
         ]);
     }
 
