@@ -6,6 +6,8 @@ use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionInformation;
 use App\Models\ElementHasGene;
 use App\Models\ElementInformation;
+use App\Models\ElementHasScore;
+use App\Models\ElementHasPositionScore;
 
 class ElementHasPositionObserver
 {
@@ -33,6 +35,19 @@ class ElementHasPositionObserver
                 ]);
             }
 
+            //Score
+            $elementHasScores = ElementHasScore::query()
+                ->where('element_id', $element->id)
+                ->get();
+
+            foreach ($elementHasScores as $elementHasScore) {
+                ElementHasPositionScore::query()->create([
+                    'element_has_position_id' => $elementHasPosition->id,
+                    'score_id' => $elementHasScore->score_id,
+                    'amount' => $elementHasScore->amount,
+                ]);
+            }
+
         }
     }
 
@@ -41,8 +56,7 @@ class ElementHasPositionObserver
      */
     public function deleting(ElementHasPosition $elementHasPosition): void
     {
-       ElementHasPositionInformation::query()
-            ->where('element_has_position_id', $elementHasPosition->id)
-            ->delete();
+       ElementHasPositionInformation::query()->where('element_has_position_id', $elementHasPosition->id)->delete();
+       ElementHasPositionScore::query()->where('element_has_position_id', $elementHasPosition->id)->delete();
     }
 }
