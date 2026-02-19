@@ -22,6 +22,7 @@ use App\Models\BirthRegion;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
 use App\Models\ElementHasPosition;
+use App\Models\ElementHasPositionScore;
 use App\Models\ElementHasPositionInformation;
 use App\Models\Entity;
 use App\Models\Container;
@@ -52,6 +53,7 @@ use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
 use App\Jobs\StopPlayerContainersJob;
+use App\Custom\Draw\Complex\ScoreDraw;
 
 class GameController extends Controller
 {
@@ -1266,14 +1268,18 @@ class GameController extends Controller
                 }
 
                 // Delete from DB
-                $elementPosition->delete();
-
-                // === AWARD SCORES FOR KILLING ELEMENT ===
-                $element = $elementPosition->element;
-                $elementRewards = $element->scores;
+                // === AWARD SCORES FOR KILLING ELEMENT (from ElementHasPositionScore) ===
+                $elementHasPositionScores = ElementHasPositionScore::query()
+                    ->where('element_has_position_id', $elementPosition->id)
+                    ->with(['score'])
+                    ->get();
                 
-                foreach ($elementRewards as $score) {
-                    $amount = $score->pivot->amount;
+                // Delete from DB after getting scores
+                $elementPosition->delete();
+                
+                foreach ($elementHasPositionScores as $elementHasPositionScore) {
+                    $score = $elementHasPositionScore->score;
+                    $amount = $elementHasPositionScore->amount;
                     
                     // Find or create player's score record
                     $playerHasScore = PlayerHasScore::query()
@@ -1283,15 +1289,24 @@ class GameController extends Controller
                     
                     if ($playerHasScore) {
                         $playerHasScore->increment('value', $amount);
+                        $newValue = $playerHasScore->value;
                     } else {
-                        PlayerHasScore::create([
+                        $playerHasScore = PlayerHasScore::create([
                             'player_id' => $player->id,
                             'score_id' => $score->id,
                             'value' => $amount
                         ]);
+                        $newValue = $amount;
                     }
                     
-                    Log::info("Awarded {$amount} {$score->name} to player {$player->id} for killing {$element->name}");
+                    Log::info("Awarded {$amount} {$score->name} to player {$player->id} for killing element at position");
+                    
+                    // Update ScoreDraw in UI
+                    $scoreDrawUid = 'player_' . $player->id . '_score_' . $score->id;
+                    $scoreDraw = new ScoreDraw($scoreDrawUid);
+                    $scoreDrawUpdate = $scoreDraw->updateValue($newValue, $player->actual_session_id);
+                    foreach ($scoreDrawUpdate as $data) $drawCommands[] = $data;
+                    
                 }
             }
         } else {

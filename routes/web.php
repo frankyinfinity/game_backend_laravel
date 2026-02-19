@@ -81,5 +81,40 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/scores/delete', [App\Http\Controllers\ScoreController::class, 'destroy'])->name('scores.delete');
     Route::post('/scores/{score}/save-graphics', [App\Http\Controllers\ScoreController::class, 'saveGraphics'])->name('scores.save-graphics');
 
+    //Ages
+    Route::resource('ages', App\Http\Controllers\AgeController::class);
+    Route::post('/ages/list/table', [App\Http\Controllers\AgeController::class, 'listDataTable'])->name('ages.datatable');
+    Route::post('/ages/delete', [App\Http\Controllers\AgeController::class, 'delete'])->name('ages.delete');
+    Route::get('/ages/{age}/move-up', [App\Http\Controllers\AgeController::class, 'moveUp'])->name('ages.move-up');
+    Route::get('/ages/{age}/move-down', [App\Http\Controllers\AgeController::class, 'moveDown'])->name('ages.move-down');
+
+     //Phases
+     Route::resource('ages.phases', App\Http\Controllers\PhaseController::class);
+     Route::post('/ages/{age}/phases/list/table', [App\Http\Controllers\PhaseController::class, 'listDataTable'])->name('ages.phases.datatable');
+     Route::post('/ages/{age}/phases/delete', [App\Http\Controllers\PhaseController::class, 'delete'])->name('ages.phases.delete');
+     Route::get('/ages/{age}/phases/{phase}/move-up', [App\Http\Controllers\PhaseController::class, 'moveUp'])->name('ages.phases.move-up');
+     Route::get('/ages/{age}/phases/{phase}/move-down', [App\Http\Controllers\PhaseController::class, 'moveDown'])->name('ages.phases.move-down');
+
+      //Phase Columns
+      Route::post('/ages/{age}/phases/{phase}/columns', [App\Http\Controllers\PhaseColumnController::class, 'store'])->name('ages.phases.columns.store');
+      Route::delete('/ages/{age}/phases/{phase}/columns/{phaseColumn}', [App\Http\Controllers\PhaseColumnController::class, 'destroy'])->name('ages.phases.columns.destroy');
+
+        //Targets (Obiettivi)
+        Route::get('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}', [App\Http\Controllers\TargetController::class, 'show'])->name('ages.phases.columns.targets.show');
+        Route::post('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets', [App\Http\Controllers\TargetController::class, 'store'])->name('ages.phases.columns.targets.store');
+        Route::put('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}', [App\Http\Controllers\TargetController::class, 'update'])->name('ages.phases.columns.targets.update');
+        Route::delete('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}', [App\Http\Controllers\TargetController::class, 'destroy'])->name('ages.phases.columns.targets.destroy');
+        Route::get('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-has-scores', [App\Http\Controllers\TargetHasScoreController::class, 'index'])->name('ages.phases.columns.targets.target-has-scores.index');
+        Route::post('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-has-scores', [App\Http\Controllers\TargetHasScoreController::class, 'store'])->name('ages.phases.columns.targets.target-has-scores.store');
+        Route::put('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-has-scores/{targetHasScore}', [App\Http\Controllers\TargetHasScoreController::class, 'update'])->name('ages.phases.columns.targets.target-has-scores.update');
+        Route::delete('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-has-scores/{targetHasScore}', [App\Http\Controllers\TargetHasScoreController::class, 'destroy'])->name('ages.phases.columns.targets.target-has-scores.destroy');
+
+        //Target Links (Collegamenti tra obiettivi)
+        Route::get('/ages/{age}/phases/{phase}/target-links', [App\Http\Controllers\TargetLinkController::class, 'phaseIndex'])->name('ages.phases.target-links.index');
+        Route::get('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-links', [App\Http\Controllers\TargetLinkController::class, 'index'])->name('ages.phases.columns.targets.target-links.index');
+        Route::post('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-links', [App\Http\Controllers\TargetLinkController::class, 'store'])->name('ages.phases.columns.targets.target-links.store');
+        Route::get('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-links/{targetLink}', [App\Http\Controllers\TargetLinkController::class, 'show'])->name('ages.phases.columns.targets.target-links.show');
+        Route::delete('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-links/{targetLink}', [App\Http\Controllers\TargetLinkController::class, 'destroy'])->name('ages.phases.columns.targets.target-links.destroy');
+
 
 });

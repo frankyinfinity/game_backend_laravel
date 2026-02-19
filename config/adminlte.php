@@ -371,6 +371,11 @@ return [
                     'text' => 'Punteggi',
                     'url'  => '/scores',
                     'icon' => 'fas fa-list',
+                ],
+                [
+                    'text' => 'Ere',
+                    'url'  => '/ages',
+                    'icon' => 'fas fa-clock',
                 ]
             ]
         ],

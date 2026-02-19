@@ -10,6 +10,12 @@ class ScoreController extends Controller
 {
     public function index()
     {
+        // Se la richiesta è AJAX, restituisci i dati in JSON
+        if (request()->ajax()) {
+            $scores = Score::all();
+            return response()->json($scores);
+        }
+        
         return view('scores.index');
     }
 

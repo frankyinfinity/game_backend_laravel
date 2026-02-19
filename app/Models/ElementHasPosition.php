@@ -24,4 +24,9 @@ class ElementHasPosition extends Model
     {
         return $this->belongsTo(Element::class);
     }
+
+    public function elementHasPositionScores()
+    {
+        return $this->hasMany(ElementHasPositionScore::class);
+    }
 }

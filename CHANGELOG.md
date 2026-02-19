@@ -1,6 +1,6 @@
 # backend
 # php artisan serve --host=0.0.0.0 --port=8085
-# npm run socketio o node socketio-server.js
+# node socketio-server.js
 # php artisan queue:listen
 
 # frontend

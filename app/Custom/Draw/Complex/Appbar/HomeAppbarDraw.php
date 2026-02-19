@@ -129,7 +129,7 @@ class HomeAppbarDraw extends AppbarDraw
             
             $x = $startX + ($index * $spacing);
             
-            $scoreDraw = new ScoreDraw($this->getUid() . '_score_' . $score->id);
+            $scoreDraw = new ScoreDraw('player_'.$playerScore->player_id.'_score_' . $playerScore->score_id);
             $scoreDraw->setOrigin($x, $centerY);
             $scoreDraw->setSize($scoreWidth, $scoreHeight);
             $scoreDraw->setBackgroundColor('#4169E1');
