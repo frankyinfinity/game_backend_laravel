@@ -10,5 +10,6 @@ class Container extends Model
 
     const PARENT_TYPE_ENTITY = 'Entity';
     const PARENT_TYPE_MAP = 'Map';
+    const PARENT_TYPE_OBJECTIVE = 'Objective';
 
 }

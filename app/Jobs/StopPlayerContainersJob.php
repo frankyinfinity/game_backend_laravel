@@ -54,13 +54,16 @@ class StopPlayerContainersJob implements ShouldQueue
 
             // Recupera tutti i container associati alle entity del player
             $containers = Container::query()
-                ->where(function ($q) use ($entityIds, $birthRegion) {
+                ->where(function ($q) use ($entityIds, $birthRegion, $player) {
                     $q->where(function ($sq2) use ($entityIds) {
                         $sq2->where('parent_type', Container::PARENT_TYPE_ENTITY)
                             ->whereIn('parent_id', $entityIds);
                     })->orWhere(function ($sq2) use ($birthRegion) {
                         $sq2->where('parent_type', Container::PARENT_TYPE_MAP)
                             ->where('parent_id', $birthRegion->id);
+                    })->orWhere(function ($sq2) use ($player) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)
+                            ->where('parent_id', $player->id);
                     });
                 })
                 ->get();

@@ -1505,4 +1505,15 @@ class GameController extends Controller
         ]);
     }
 
+    public function checkObjective(Request $request) {
+
+        $playerId = $request->player_id;
+        Log::info('Check objective player: ' . $playerId);
+
+        return response()->json([
+            'success' => true,
+        ]);
+
+    }
+
 }

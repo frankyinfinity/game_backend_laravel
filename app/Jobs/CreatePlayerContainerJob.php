@@ -199,5 +199,66 @@ class CreatePlayerContainerJob implements ShouldQueue
             throw $e;
         }
 
+        //Objective
+        $docker = Docker::create();
+        $imageName = 'objective:latest';
+
+        try {
+            // Controlla se l'immagine esiste
+            $images = $docker->imageList();
+            $imageExists = collect($images)->contains(fn($img) => 
+                in_array($imageName, $img->getRepoTags() ?? [])
+            );
+            
+            if (!$imageExists) {
+                throw new \Exception("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build");
+            }
+
+            $playerId = $this->player->id;
+
+            // Crea un container
+            $wsPort = null;
+
+            $containerConfig = new ContainersCreatePostBody();
+            $containerConfig->setImage($imageName);
+            $containerConfig->setHostname('objective_' . $playerId);
+            
+            // Passa i parametri come variabili d'ambiente
+            $appUrl = config('app.url') ?: 'http://localhost';
+            $backendPort = env('BACKEND_PORT', '8085');
+            $parsedUrl = parse_url($appUrl);
+            $backendHost = $parsedUrl['host'] ?? 'localhost';
+            
+            // Rimpiazza localhost con host.docker.internal per accesso da container
+            if ($backendHost === 'localhost' || $backendHost === '127.0.0.1') {
+                $backendHost = 'host.docker.internal';
+            }
+            
+            $backendUrl = $parsedUrl['scheme'] . '://' . $backendHost . ':' . $backendPort;
+            
+            $containerConfig->setEnv([
+                'BACKEND_URL=' . $backendUrl,
+                'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+                'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+                'PLAYER_ID=' . $playerId,
+            ]);
+            
+            $container = $docker->containerCreate($containerConfig);
+            $containerId = $container->getId();
+
+            // Salva il container nel database
+            Container::query()->create([
+                'container_id' => $containerId,
+                'name' => 'objective_' . $playerId,
+                'parent_type' => Container::PARENT_TYPE_OBJECTIVE,
+                'parent_id' => $playerId,
+                'ws_port' => $wsPort,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Errore nella creazione dei container per il player {$this->player->id}: " . $e->getMessage());
+            throw $e;
+        }
+
     }
 }
