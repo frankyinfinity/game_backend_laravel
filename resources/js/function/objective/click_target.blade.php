@@ -32,11 +32,38 @@
         // Get target title and description from attributes
         let target_title = object['attributes']['target_title'] || 'Obiettivo';
         let target_description = object['attributes']['target_description'] || 'Nessuna descrizione disponibile';
+        let target_state = object['attributes']['target_state'] || 'locked';
+
+        const hasAnyInProgressTarget = function() {
+            if (typeof objects === 'undefined') return false;
+            return Object.keys(objects).some(function(uid) {
+                if (!uid.endsWith('_container')) return false;
+                const attrs = (objects[uid] && objects[uid]['attributes']) ? objects[uid]['attributes'] : null;
+                return attrs && attrs['target_state'] === 'in_progress';
+            });
+        };
+
+        if (typeof AppData !== 'undefined') {
+            AppData.objective_has_active_in_progress = hasAnyInProgressTarget();
+        }
+        const getStateLabel = function(state) {
+            if (state === 'locked') return 'Bloccato';
+            if (state === 'unlocked') return 'Sbloccato';
+            if (state === 'in_progress') return 'In corso';
+            if (state === 'completed') return 'Completato';
+            return state || '';
+        };
 
         // Manage panel children and update text
         for (const childUid of objects[panel_uid]['children']) {
             if (shapes[childUid]) {
-                shapes[childUid].renderable = show;
+                const isStartButton = childUid.endsWith('_panel_start_btn') || childUid.endsWith('_panel_start_btn_text');
+                if (isStartButton) {
+                    const hasActiveInProgress = (typeof AppData !== 'undefined') && !!AppData.objective_has_active_in_progress;
+                    shapes[childUid].renderable = show && target_state === 'unlocked' && !hasActiveInProgress;
+                } else {
+                    shapes[childUid].renderable = show;
+                }
                 shapes[childUid].zIndex = 10001;
                 
                 // Update text for title and description
@@ -44,6 +71,8 @@
                     shapes[childUid].text = target_title;
                 } else if (childUid.endsWith('_panel_description')) {
                     shapes[childUid].text = target_description;
+                } else if (childUid.endsWith('_panel_state_value')) {
+                    shapes[childUid].text = getStateLabel(target_state);
                 }
             }
         }

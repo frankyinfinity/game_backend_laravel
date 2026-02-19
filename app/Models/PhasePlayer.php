@@ -14,13 +14,11 @@ class PhasePlayer extends Model
     // State constants
     const STATE_LOCKED = 'locked';
     const STATE_UNLOCKED = 'unlocked';
-    const STATE_IN_PROGRESS = 'in_progress';
     const STATE_COMPLETED = 'completed';
 
     const STATES = [
         self::STATE_LOCKED,
         self::STATE_UNLOCKED,
-        self::STATE_IN_PROGRESS,
         self::STATE_COMPLETED,
     ];
 
@@ -51,14 +49,6 @@ class PhasePlayer extends Model
     }
 
     /**
-     * Check if the phase is in progress
-     */
-    public function isInProgress(): bool
-    {
-        return $this->state === self::STATE_IN_PROGRESS;
-    }
-
-    /**
      * Check if the phase is completed
      */
     public function isCompleted(): bool
@@ -81,15 +71,6 @@ class PhasePlayer extends Model
     public function setUnlocked(): void
     {
         $this->state = self::STATE_UNLOCKED;
-        $this->save();
-    }
-
-    /**
-     * Set the phase as in progress
-     */
-    public function setInProgress(): void
-    {
-        $this->state = self::STATE_IN_PROGRESS;
         $this->save();
     }
 

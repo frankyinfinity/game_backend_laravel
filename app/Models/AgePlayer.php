@@ -14,13 +14,11 @@ class AgePlayer extends Model
     // State constants
     const STATE_LOCKED = 'locked';
     const STATE_UNLOCKED = 'unlocked';
-    const STATE_IN_PROGRESS = 'in_progress';
     const STATE_COMPLETED = 'completed';
 
     const STATES = [
         self::STATE_LOCKED,
         self::STATE_UNLOCKED,
-        self::STATE_IN_PROGRESS,
         self::STATE_COMPLETED,
     ];
 
@@ -49,14 +47,6 @@ class AgePlayer extends Model
     }
 
     /**
-     * Check if the age is in progress
-     */
-    public function isInProgress(): bool
-    {
-        return $this->state === self::STATE_IN_PROGRESS;
-    }
-
-    /**
      * Check if the age is completed
      */
     public function isCompleted(): bool
@@ -79,15 +69,6 @@ class AgePlayer extends Model
     public function setUnlocked(): void
     {
         $this->state = self::STATE_UNLOCKED;
-        $this->save();
-    }
-
-    /**
-     * Set the age as in progress
-     */
-    public function setInProgress(): void
-    {
-        $this->state = self::STATE_IN_PROGRESS;
         $this->save();
     }
 

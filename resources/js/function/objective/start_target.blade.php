@@ -29,6 +29,83 @@
             return;
         }
 
+        const panelUid = targetUid + '_panel';
+        const startBtnUid = panelUid + '_start_btn';
+        const startBtnTextUid = startBtnUid + '_text';
+
+        const setStartButtonVisible = function(visible) {
+            if (shapes[startBtnUid]) {
+                shapes[startBtnUid].renderable = !!visible;
+            }
+            if (shapes[startBtnTextUid]) {
+                shapes[startBtnTextUid].renderable = !!visible;
+            }
+        };
+        const setAllStartButtonsVisible = function(visible) {
+            if (typeof shapes === 'undefined') return;
+            Object.keys(shapes).forEach(function(uid) {
+                if (uid.endsWith('_panel_start_btn') || uid.endsWith('_panel_start_btn_text')) {
+                    shapes[uid].renderable = !!visible;
+                }
+            });
+        };
+        const hasAnyInProgressTarget = function() {
+            if (typeof objects === 'undefined') return false;
+            return Object.keys(objects).some(function(uid) {
+                if (!uid.endsWith('_container')) return false;
+                const attrs = (objects[uid] && objects[uid]['attributes']) ? objects[uid]['attributes'] : null;
+                return attrs && attrs['target_state'] === 'in_progress';
+            });
+        };
+        const syncStartButtonsWithState = function() {
+            const hasActive = hasAnyInProgressTarget();
+            if (typeof AppData !== 'undefined') {
+                AppData.objective_has_active_in_progress = hasActive;
+            }
+            if (hasActive) {
+                setAllStartButtonsVisible(false);
+            }
+        };
+        const getStateLabel = function(state) {
+            if (state === 'locked') return 'Bloccato';
+            if (state === 'unlocked') return 'Sbloccato';
+            if (state === 'in_progress') return 'In corso';
+            if (state === 'completed') return 'Completato';
+            return state || '';
+        };
+        const stateValueUid = targetUid + '_panel_state_value';
+
+        const inProgressBg = 0x0a2a4a;
+        const inProgressText = '#5dade2';
+        const unlockedBg = 0x1a3a1a;
+        const unlockedText = '#7ed66f';
+        const titleUid = targetUid.replace('_container', '_title');
+
+        // Hide immediately and mark as not unlocked, so the button does not reappear on panel reopen.
+        setStartButtonVisible(false);
+        if (objects[targetUid] && objects[targetUid]['attributes']) {
+            objects[targetUid]['attributes']['target_state'] = 'in_progress';
+        }
+        if (typeof AppData !== 'undefined') {
+            AppData.objective_has_active_in_progress = true;
+        }
+        setAllStartButtonsVisible(false);
+        if (objects[targetUid]) {
+            objects[targetUid]['color'] = inProgressBg;
+        }
+        if (shapes[targetUid]) {
+            shapes[targetUid].tint = inProgressBg;
+        }
+        if (objects[titleUid]) {
+            objects[titleUid]['color'] = inProgressText;
+        }
+        if (shapes[titleUid] && shapes[titleUid].style) {
+            shapes[titleUid].style.fill = inProgressText;
+        }
+        if (shapes[stateValueUid]) {
+            shapes[stateValueUid].text = getStateLabel('in_progress');
+        }
+
         $.ajax({
             url: `${BACK_URL}/api/auth/game/objective/start`,
             type: 'POST',
@@ -39,46 +116,56 @@
             success: function(result) {
                 if (!result.success) {
                     console.warn('Start objective failed', result);
+                    if (objects[targetUid] && objects[targetUid]['attributes']) {
+                        objects[targetUid]['attributes']['target_state'] = 'unlocked';
+                    }
+                    if (objects[targetUid]) {
+                        objects[targetUid]['color'] = unlockedBg;
+                    }
+                    if (shapes[targetUid]) {
+                        shapes[targetUid].tint = unlockedBg;
+                    }
+                    if (objects[titleUid]) {
+                        objects[titleUid]['color'] = unlockedText;
+                    }
+                    if (shapes[titleUid] && shapes[titleUid].style) {
+                        shapes[titleUid].style.fill = unlockedText;
+                    }
+                    if (shapes[stateValueUid]) {
+                        shapes[stateValueUid].text = getStateLabel('unlocked');
+                    }
+                    syncStartButtonsWithState();
+                    if (!hasAnyInProgressTarget()) {
+                        setStartButtonVisible(true);
+                    }
                     return;
                 }
-
-                if (objects[targetUid]['attributes']) {
-                    objects[targetUid]['attributes']['target_state'] = 'in_progress';
-                }
-
-                const inProgressBg = 0x0a2a4a;
-                const inProgressText = '#5dade2';
-
-                if (objects[targetUid]) {
-                    objects[targetUid]['color'] = inProgressBg;
-                }
-
-                if (shapes[targetUid]) {
-                    shapes[targetUid].tint = inProgressBg;
-                }
-
-                const titleUid = targetUid.replace('_container', '_title');
-                if (objects[titleUid]) {
-                    objects[titleUid]['color'] = inProgressText;
-                }
-                if (shapes[titleUid]) {
-                    if (shapes[titleUid].style) {
-                        shapes[titleUid].style.fill = inProgressText;
-                    }
-                }
-
-                const panelUid = targetUid + '_panel';
-                const startBtnUid = panelUid + '_start_btn';
-                const startBtnTextUid = startBtnUid + '_text';
-                if (shapes[startBtnUid]) {
-                    shapes[startBtnUid].renderable = false;
-                }
-                if (shapes[startBtnTextUid]) {
-                    shapes[startBtnTextUid].renderable = false;
-                }
+                syncStartButtonsWithState();
             },
             error: function(err) {
                 console.error('Start objective API error', err);
+                if (objects[targetUid] && objects[targetUid]['attributes']) {
+                    objects[targetUid]['attributes']['target_state'] = 'unlocked';
+                }
+                if (objects[targetUid]) {
+                    objects[targetUid]['color'] = unlockedBg;
+                }
+                if (shapes[targetUid]) {
+                    shapes[targetUid].tint = unlockedBg;
+                }
+                if (objects[titleUid]) {
+                    objects[titleUid]['color'] = unlockedText;
+                }
+                if (shapes[titleUid] && shapes[titleUid].style) {
+                    shapes[titleUid].style.fill = unlockedText;
+                }
+                if (shapes[stateValueUid]) {
+                    shapes[stateValueUid].text = getStateLabel('unlocked');
+                }
+                syncStartButtonsWithState();
+                if (!hasAnyInProgressTarget()) {
+                    setStartButtonVisible(true);
+                }
             }
         });
     }

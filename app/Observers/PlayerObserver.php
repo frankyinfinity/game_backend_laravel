@@ -16,6 +16,8 @@ use App\Models\TargetHasScore;
 use App\Models\TargetHasScorePlayer;
 use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class PlayerObserver
 {
@@ -112,6 +114,23 @@ class PlayerObserver
                 'state' => $isFirstPhaseTarget ? TargetPlayer::STATE_UNLOCKED : TargetPlayer::STATE_LOCKED,
             ]);
             $targetMap[$target->id] = $targetPlayer->id;
+
+            // Clone reward script from template target disk to player target disk
+            $sourceFilename = $target->id . '.php';
+            $destinationFilename = $targetPlayer->id . '.php';
+            try {
+                if (Storage::disk('rewards')->exists($sourceFilename)) {
+                    $rewardContent = Storage::disk('rewards')->get($sourceFilename);
+                    Storage::disk('rewards_player')->put($destinationFilename, $rewardContent);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Unable to clone target reward file for player target', [
+                    'player_id' => $player->id,
+                    'target_id' => $target->id,
+                    'target_player_id' => $targetPlayer->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // Clone TargetHasScores

@@ -47,9 +47,9 @@ class TargetPlayerDraw
             'text' => '#5dade2',
         ],
         TargetPlayer::STATE_COMPLETED => [
-            'background' => '#0a2a4a',
-            'border' => '#1a5276',
-            'text' => '#5dade2',
+            'background' => '#f1c40f',
+            'border' => '#b7950b',
+            'text' => '#1f2d3d',
         ],
     ];
     
@@ -139,9 +139,28 @@ class TargetPlayerDraw
         $description->setRenderable(false);
         $panel->addChild($description);
 
+        // Current state label/value
+        $stateLabel = new Text($this->uid . '_container_panel_state_label');
+        $stateLabel->setOrigin($panelX + 20, $panelY + 115);
+        $stateLabel->setText('Stato:');
+        $stateLabel->setFontFamily($this->textFontFamily);
+        $stateLabel->setFontSize(16);
+        $stateLabel->setColor('#000000');
+        $stateLabel->setRenderable(false);
+        $panel->addChild($stateLabel);
+
+        $stateValue = new Text($this->uid . '_container_panel_state_value');
+        $stateValue->setOrigin($panelX + 90, $panelY + 115);
+        $stateValue->setText($this->getStateLabel($this->targetPlayer->state));
+        $stateValue->setFontFamily($this->textFontFamily);
+        $stateValue->setFontSize(16);
+        $stateValue->setColor('#333333');
+        $stateValue->setRenderable(false);
+        $panel->addChild($stateValue);
+
         // Cost section label
         $costLabel = new Text($this->uid . '_container_panel_cost_label');
-        $costLabel->setOrigin($panelX + 20, $panelY + 115);
+        $costLabel->setOrigin($panelX + 20, $panelY + 145);
         $costLabel->setText('Costo:');
         $costLabel->setFontFamily($this->textFontFamily);
         $costLabel->setFontSize(16);
@@ -150,7 +169,7 @@ class TargetPlayerDraw
         $panel->addChild($costLabel);
 
         // Cost rows (ScoreDraw style) from target_has_score_player
-        $costStartY = $panelY + 135;
+        $costStartY = $panelY + 165;
         foreach ($costRows as $index => $costRow) {
             if (!$costRow->score) {
                 continue;
@@ -208,6 +227,8 @@ class TargetPlayerDraw
         $this->drawItems[] = $panel;
         $this->drawItems[] = $title;
         $this->drawItems[] = $description;
+        $this->drawItems[] = $stateLabel;
+        $this->drawItems[] = $stateValue;
         $this->drawItems[] = $costLabel;
     }
     
@@ -360,5 +381,16 @@ class TargetPlayerDraw
             return $text;
         }
         return substr($text, 0, $maxLength - 1) . '.';
+    }
+
+    private function getStateLabel(string $state): string
+    {
+        return match ($state) {
+            TargetPlayer::STATE_LOCKED => 'Bloccato',
+            TargetPlayer::STATE_UNLOCKED => 'Sbloccato',
+            TargetPlayer::STATE_IN_PROGRESS => 'In corso',
+            TargetPlayer::STATE_COMPLETED => 'Completato',
+            default => $state,
+        };
     }
 }

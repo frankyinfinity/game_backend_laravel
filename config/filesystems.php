@@ -84,6 +84,14 @@ return [
             'throw' => false,
         ],
 
+        'rewards_player' => [
+            'driver' => 'local',
+            'root' => storage_path('app/uploads/rewards_player'),
+            'url' => env('APP_URL').'/storage/rewards_player',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

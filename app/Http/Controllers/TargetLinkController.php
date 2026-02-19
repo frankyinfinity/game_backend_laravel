@@ -39,14 +39,65 @@ class TargetLinkController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, Age $age, Phase $phase)
     {
         $request->validate([
             'from_target_id' => 'required|exists:targets,id',
             'to_target_id' => 'required|exists:targets,id|different:from_target_id',
         ]);
 
-        $link = TargetLink::create($request->all());
+        $fromTarget = Target::query()->with('phaseColumn')->find($request->from_target_id);
+        $toTarget = Target::query()->with('phaseColumn')->find($request->to_target_id);
+
+        if (!$fromTarget || !$toTarget || !$fromTarget->phaseColumn || !$toTarget->phaseColumn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Target non validi per il collegamento.',
+            ], 422);
+        }
+
+        if (
+            (int) $fromTarget->phaseColumn->phase_id !== (int) $phase->id
+            || (int) $toTarget->phaseColumn->phase_id !== (int) $phase->id
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'I target devono appartenere alla stessa fase.',
+            ], 422);
+        }
+
+        $phaseColumnIds = PhaseColumn::query()
+            ->where('phase_id', $phase->id)
+            ->orderBy('id')
+            ->pluck('id')
+            ->values();
+
+        $fromColumnIndex = $phaseColumnIds->search((int) $fromTarget->phase_column_id);
+        $toColumnIndex = $phaseColumnIds->search((int) $toTarget->phase_column_id);
+
+        if ($fromColumnIndex === false || $toColumnIndex === false || $toColumnIndex <= $fromColumnIndex) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Il collegamento deve puntare a una fascia successiva.',
+            ], 422);
+        }
+
+        $existing = TargetLink::query()
+            ->where('from_target_id', $fromTarget->id)
+            ->where('to_target_id', $toTarget->id)
+            ->exists();
+
+        if ($existing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Questo collegamento esiste già.',
+            ], 422);
+        }
+
+        $link = TargetLink::create([
+            'from_target_id' => $fromTarget->id,
+            'to_target_id' => $toTarget->id,
+        ]);
 
         return response()->json(['success' => true, 'message' => 'Collegamento creato con successo.', 'link' => $link]);
     }

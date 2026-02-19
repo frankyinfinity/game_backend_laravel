@@ -48,19 +48,12 @@ class PhasePlayerDraw
             'text' => '#333333',
             'accent' => '#a0a0a0',
         ],
-        PhasePlayer::STATE_IN_PROGRESS => [
-            'background' => '#d0d0d0',
-            'header' => '#c0c0c0',
-            'border' => '#808080',
-            'text' => '#000000',
-            'accent' => '#a0a0a0',
-        ],
         PhasePlayer::STATE_COMPLETED => [
-            'background' => '#d0d0d0',
-            'header' => '#c0c0c0',
-            'border' => '#808080',
-            'text' => '#000000',
-            'accent' => '#a0a0a0',
+            'background' => '#9dad9f',
+            'header' => '#8f9f91',
+            'border' => '#6f7f72',
+            'text' => '#1f2d23',
+            'accent' => '#7f8f82',
         ],
     ];
     

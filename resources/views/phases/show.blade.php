@@ -406,6 +406,7 @@
                 $('.link-anchor').each(function() {
                     var anchorColumnIndex = $(this).data('column-index');
                     var anchorTargetId = $(this).data('target-id');
+                    var isLeftAnchor = $(this).hasClass('left-anchor');
                     
                     // Reset stile
                     $(this).css({
@@ -414,8 +415,8 @@
                         'transition': 'all 0.2s ease'
                     });
                     
-                    // Evidenzia solo le ancore della colonna successiva
-                    if (anchorColumnIndex === fromColumnIndex + 1 && anchorTargetId) {
+                    // Evidenzia solo ancore sinistre in una qualsiasi fascia successiva
+                    if (isLeftAnchor && anchorColumnIndex > fromColumnIndex && anchorTargetId) {
                         $(this).css({
                             'background-color': '#28a745',
                             'transform': 'scale(1.3)',
@@ -908,7 +909,7 @@
                     'box-shadow': '0 0 10px rgba(220, 53, 69, 0.8)'
                 });
                 
-                // Evidenzia le ancore valide (colonna successiva)
+                // Evidenzia le ancore valide (fasce successive)
                 highlightValidAnchors(columnIndex);
                 
                 // Crea la linea temporanea
@@ -938,6 +939,7 @@
                 $('.link-anchor').each(function() {
                     if (!$(this).data('target-id')) return;
                     if (!$(this).hasClass('left-anchor')) return;
+                    if ($(this).data('column-index') <= selectedFromColumnIndex) return;
                     
                     var anchorCoords = getRelativeCoordinates($(this));
                     var distance = Math.sqrt(Math.pow(endX - anchorCoords.x, 2) + Math.pow(endY - anchorCoords.y, 2));
@@ -949,7 +951,7 @@
                 
                 // Aggiorna lo stile dell'ancora sotto il mouse
                 $('.link-anchor').each(function() {
-                    if ($(this).hasClass('left-anchor') && $(this).data('column-index') === selectedFromColumnIndex + 1) {
+                    if ($(this).hasClass('left-anchor') && $(this).data('column-index') > selectedFromColumnIndex) {
                         if ($(this).is(hoveredAnchor)) {
                             $(this).css({
                                 'background-color': '#ffc107',
@@ -982,7 +984,7 @@
                 endX = e.clientX - containerRect.left;
                 endY = e.clientY - containerRect.top;
                 
-                // Trova l'ancora di arrivo (deve essere left-anchor nella colonna successiva)
+                // Trova l'ancora di arrivo (deve essere left-anchor in una fascia successiva)
                 var targetAnchor = null;
                 $('.left-anchor').each(function() {
                     if (!$(this).data('target-id')) return;
@@ -992,8 +994,8 @@
                     
                     if (distance < 20) {
                         var toColumnIndex = $(this).data('column-index');
-                        // Verifica che sia nella colonna successiva
-                        if (toColumnIndex === selectedFromColumnIndex + 1) {
+                        // Verifica che sia in una fascia successiva
+                        if (toColumnIndex > selectedFromColumnIndex) {
                             targetAnchor = $(this);
                         }
                     }
