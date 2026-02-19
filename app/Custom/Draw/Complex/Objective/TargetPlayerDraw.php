@@ -11,6 +11,7 @@ use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Complex\ScoreDraw;
 use App\Models\TargetPlayer;
 use App\Helper\Helper;
+use Illuminate\Support\Str;
 
 /**
  * TargetPlayerDraw - Draws a single target/objective node
@@ -41,9 +42,9 @@ class TargetPlayerDraw
             'text' => '#7ed66f',
         ],
         TargetPlayer::STATE_IN_PROGRESS => [
-            'background' => '#3a2a0a',
-            'border' => '#b8860b',
-            'text' => '#ffd700',
+            'background' => '#0a2a4a',
+            'border' => '#1a5276',
+            'text' => '#5dade2',
         ],
         TargetPlayer::STATE_COMPLETED => [
             'background' => '#0a2a4a',
@@ -173,6 +174,34 @@ class TargetPlayerDraw
                 $this->drawItems[] = $scoreItem;
             }
         }
+
+        if ($this->targetPlayer->state === TargetPlayer::STATE_UNLOCKED) {
+            $jsPathStartTarget = resource_path('js/function/objective/start_target.blade.php');
+            $jsContentStartTarget = file_get_contents($jsPathStartTarget);
+            $jsContentStartTarget = Helper::setCommonJsCode($jsContentStartTarget, Str::random(20));
+
+            $startButton = new Rectangle($this->uid . '_container_panel_start_btn');
+            $startButton->setOrigin($panelX + $panelWidth - 56, $panelY + 12);
+            $startButton->setSize(34, 34);
+            $startButton->setColor('#1E90FF');
+            $startButton->setBorderColor('#0B63CE');
+            $startButton->setBorderRadius(17);
+            $startButton->setRenderable(false);
+            $startButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentStartTarget);
+            $panel->addChild($startButton);
+            $this->drawItems[] = $startButton;
+
+            $startIcon = new Text($this->uid . '_container_panel_start_btn_text');
+            $startIcon->setOrigin($panelX + $panelWidth - 39, $panelY + 29);
+            $startIcon->setCenterAnchor(true);
+            $startIcon->setText('>');
+            $startIcon->setFontFamily($this->textFontFamily);
+            $startIcon->setFontSize(22);
+            $startIcon->setColor('#FFFFFF');
+            $startIcon->setRenderable(false);
+            $panel->addChild($startIcon);
+            $this->drawItems[] = $startIcon;
+        }
         
         // Add panel and child text objects to draw items.
         // Children must also be sent as standalone draw objects so the frontend can resolve child UIDs.
@@ -291,6 +320,8 @@ class TargetPlayerDraw
         // Store target data in attributes for the click handler
         $container->addAttributes('target_title', $this->targetPlayer->title ?? 'Obiettivo');
         $container->addAttributes('target_description', $this->targetPlayer->description ?? 'Nessuna descrizione disponibile');
+        $container->addAttributes('target_player_id', $this->targetPlayer->id);
+        $container->addAttributes('target_state', $state);
         
         // Add click handler only if set and target is not locked
         if ($this->onClickFunction !== null && $state !== TargetPlayer::STATE_LOCKED) {

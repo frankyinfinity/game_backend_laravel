@@ -25,6 +25,9 @@
         shapes[panel_uid].renderable = show;
         shapes[panel_uid].zIndex = 10000;
         AppData.actual_focus_uid_target = show ? target_uid : null;
+        AppData.actual_focus_target_player_id = show
+            ? ((object['attributes'] && object['attributes']['target_player_id']) ? object['attributes']['target_player_id'] : null)
+            : null;
 
         // Get target title and description from attributes
         let target_title = object['attributes']['target_title'] || 'Obiettivo';

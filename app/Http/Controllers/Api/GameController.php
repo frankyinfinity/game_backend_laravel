@@ -32,6 +32,7 @@ use App\Models\ElementHasGene;
 use App\Models\Score;
 use App\Models\ElementHasScore;
 use App\Models\PlayerHasScore;
+use App\Models\TargetPlayer;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -1029,6 +1030,42 @@ class GameController extends Controller
         ]);
     }
 
+    public function startObjective(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $playerId = (int) $request->player_id;
+        $targetPlayerId = (int) $request->target_player_id;
+
+        $targetPlayer = TargetPlayer::query()
+            ->where('id', $targetPlayerId)
+            ->where('player_id', $playerId)
+            ->first();
+
+        if (!$targetPlayer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Obiettivo non trovato',
+            ], 404);
+        }
+
+        if ($targetPlayer->state !== TargetPlayer::STATE_UNLOCKED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Obiettivo non in stato unlocked',
+            ], 422);
+        }
+
+        $targetPlayer->update([
+            'state' => TargetPlayer::STATE_IN_PROGRESS,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Obiettivo avviato',
+            'target_player_id' => $targetPlayer->id,
+            'state' => $targetPlayer->state,
+        ]);
+    }
+
     public function attack(Request $request) {
         $entityUid = $request->entity_uid;
         $elementUid = $request->element_uid;
@@ -1469,4 +1506,3 @@ class GameController extends Controller
     }
 
 }
-

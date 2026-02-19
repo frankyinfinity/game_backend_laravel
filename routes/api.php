@@ -29,5 +29,6 @@ Route::group(['prefix' => 'auth'], function (){
     Route::post('/game/entity/movement', [App\Http\Controllers\Api\GameController::class, 'movement'])->name('game.entity.movement');
     Route::post('/game/entity/consume', [App\Http\Controllers\Api\GameController::class, 'consume'])->name('game.entity.consume');
     Route::post('/game/entity/attack', [App\Http\Controllers\Api\GameController::class, 'attack'])->name('game.entity.attack');
+    Route::post('/game/objective/start', [App\Http\Controllers\Api\GameController::class, 'startObjective'])->name('game.objective.start');
 
 });
