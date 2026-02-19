@@ -9,6 +9,7 @@ use App\Models\Player;
 use App\Models\AgePlayer;
 use App\Models\TargetLinkPlayer;
 use App\Helper\Helper;
+use Illuminate\Support\Collection;
 
 /**
  * ObjectiveTreeDraw - Main class to draw the entire objective tree for a player
@@ -36,12 +37,17 @@ class ObjectiveTreeDraw
     private bool $renderable = true;
     private string $textFontFamily;
     private int $calculatedWidth = 0;
+    private Collection $ages;
+    private Collection $links;
     
     public function __construct(string $uid, Player $player)
     {
         $this->uid = $uid;
         $this->player = $player;
         $this->textFontFamily = Helper::DEFAULT_FONT_FAMILY;
+        $this->ages = collect();
+        $this->links = collect();
+        $this->preloadObjectiveData();
     }
     
     public function setOrigin(int $x, int $y): void
@@ -91,7 +97,7 @@ class ObjectiveTreeDraw
      */
     private function calculateDimensions(): void
     {
-        $ages = $this->player->agePlayers()->orderBy('order')->get();
+        $ages = $this->ages;
         
         // Find max phase height (number of slots) across all phases
         $maxPhaseHeight = 3;
@@ -135,7 +141,7 @@ class ObjectiveTreeDraw
     
     private function buildAges(): void
     {
-        $ages = $this->player->agePlayers()->orderBy('order')->get();
+        $ages = $this->ages;
         
         $currentX = $this->x + $this->padding;
         $currentY = $this->y + $this->padding;
@@ -161,8 +167,7 @@ class ObjectiveTreeDraw
     
     private function buildLinks(): void
     {
-        // Get all target links for this player
-        $links = TargetLinkPlayer::where('player_id', $this->player->id)->get();
+        $links = $this->links;
         
         foreach ($links as $link) {
             $linkDraw = new TargetLinkPlayerDraw(
@@ -182,7 +187,7 @@ class ObjectiveTreeDraw
      */
     public function getStatistics(): array
     {
-        $ages = $this->player->agePlayers()->orderBy('order')->get();
+        $ages = $this->ages;
         
         $stats = [
             'total_ages' => $ages->count(),
@@ -215,8 +220,27 @@ class ObjectiveTreeDraw
             }
         }
         
-        $stats['total_links'] = TargetLinkPlayer::where('player_id', $this->player->id)->count();
+        $stats['total_links'] = $this->links->count();
         
         return $stats;
+    }
+
+    /**
+     * Preload full objective tree to avoid N+1 queries during draw.
+     */
+    private function preloadObjectiveData(): void
+    {
+        $this->player->loadMissing([
+            'agePlayers.phasePlayers.phaseColumnPlayers.targetPlayers.targetHasScorePlayers.score',
+        ]);
+
+        $this->ages = $this->player->agePlayers
+            ->sortBy('order')
+            ->values();
+
+        $this->links = TargetLinkPlayer::query()
+            ->where('player_id', $this->player->id)
+            ->with(['fromTargetPlayer', 'toTargetPlayer'])
+            ->get();
     }
 }

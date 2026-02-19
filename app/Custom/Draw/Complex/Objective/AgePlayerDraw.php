@@ -218,7 +218,9 @@ private int $columnSpacing = 20;
      */
     private function calculatePhasesDimensions(): void
     {
-        $phases = $this->agePlayer->phasePlayers()->orderBy('order')->get();
+        $phases = $this->agePlayer->phasePlayers
+            ->sortBy('order')
+            ->values();
         
         // Calculate total width as sum of all phase widths
         $totalPhasesWidth = 0;
@@ -251,7 +253,9 @@ private int $columnSpacing = 20;
     
     private function buildPhases(): void
     {
-        $phases = $this->agePlayer->phasePlayers()->orderBy('order')->get();
+        $phases = $this->agePlayer->phasePlayers
+            ->sortBy('order')
+            ->values();
         
         $phaseX = $this->x + $this->padding;
         $phaseY = $this->y + $this->headerHeight + $this->padding;

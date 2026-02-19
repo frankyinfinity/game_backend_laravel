@@ -29,6 +29,18 @@
             return;
         }
 
+        let resolvedDrawPlayerId = resolvedPlayerId;
+        if (typeof testPlayerId !== 'undefined') {
+            resolvedDrawPlayerId = testPlayerId;
+        }
+
+        let resolvedSessionId = null;
+        if (typeof sessionId !== 'undefined') {
+            resolvedSessionId = sessionId;
+        } else if (typeof AppData !== 'undefined' && typeof AppData.session_id !== 'undefined') {
+            resolvedSessionId = AppData.session_id;
+        }
+
         const panelUid = targetUid + '_panel';
         const startBtnUid = panelUid + '_start_btn';
         const startBtnTextUid = startBtnUid + '_text';
@@ -111,7 +123,9 @@
             type: 'POST',
             data: {
                 player_id: resolvedPlayerId,
-                target_player_id: targetPlayerId
+                target_player_id: targetPlayerId,
+                draw_player_id: resolvedDrawPlayerId,
+                session_id: resolvedSessionId
             },
             success: function(result) {
                 if (!result.success) {

@@ -101,7 +101,9 @@ class TargetPlayerDraw
     public function buildPanel(): void
     {
         $panelWidth = 400;
-        $costRows = $this->targetPlayer->targetHasScorePlayers()->with('score')->get();
+        $costRows = $this->targetPlayer->relationLoaded('targetHasScorePlayers')
+            ? $this->targetPlayer->targetHasScorePlayers
+            : $this->targetPlayer->targetHasScorePlayers()->with('score')->get();
         $costRowHeight = 46;
         $panelHeight = 300 + ($costRows->count() * ($costRowHeight + 8));
         // Position panel relative to the target, offset to the right

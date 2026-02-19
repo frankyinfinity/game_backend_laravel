@@ -35,6 +35,7 @@ use App\Models\PlayerHasScore;
 use App\Models\TargetPlayer;
 use App\Models\TargetLinkPlayer;
 use App\Models\PhasePlayer;
+use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
@@ -1075,11 +1076,57 @@ class GameController extends Controller
             'state' => TargetPlayer::STATE_IN_PROGRESS,
         ]);
 
+        $player = Player::find($playerId);
+        $objectiveRequestId = null;
+        if ($player) {
+            $sessionId = (string) $request->input('session_id', $player->actual_session_id ?: 'test_session_fixed');
+            $drawPlayerId = (int) $request->input('draw_player_id', $playerId);
+            $drawPlayer = Player::find($drawPlayerId) ?? $player;
+            $objectiveTreeUidPrefix = 'objective_tree_' . $playerId;
+            $objectiveDrawCommands = [];
+
+            if (!empty($sessionId)) {
+                ObjectCache::buffer($sessionId);
+
+                $existingObjects = ObjectCache::all($sessionId);
+                foreach ($existingObjects as $uid => $object) {
+                    if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                        $objectClear = new ObjectClear($uid, $sessionId);
+                        $objectiveDrawCommands[] = $objectClear->get();
+                        ObjectCache::forget($sessionId, $uid);
+                    }
+                }
+
+                $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                $objectiveTree->setOrigin(20, 20);
+                $objectiveTree->build();
+
+                foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                    $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                    $objectiveDrawCommands[] = $objectDraw->get();
+                }
+
+                ObjectCache::flush($sessionId);
+
+                if (!empty($objectiveDrawCommands)) {
+                    $objectiveRequestId = Str::random(20);
+                    DrawRequest::query()->create([
+                        'session_id' => $sessionId,
+                        'request_id' => $objectiveRequestId,
+                        'player_id' => $drawPlayerId,
+                        'items' => json_encode($objectiveDrawCommands),
+                    ]);
+                    event(new DrawInterfaceEvent($drawPlayer, $objectiveRequestId));
+                }
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Obiettivo avviato',
             'target_player_id' => $targetPlayer->id,
             'state' => $targetPlayer->state,
+            'objective_redraw_request_id' => $objectiveRequestId,
         ]);
     }
 
@@ -1597,41 +1644,36 @@ class GameController extends Controller
             &$objectiveTreeChanged
         ) {
             $unlockFirstTargetForPhase = function (int $phasePlayerId) use ($playerId, &$unlockedTargetIds, &$objectiveTreeChanged) {
-                $phaseTargets = TargetPlayer::query()
+                $firstPhaseColumnPlayer = PhaseColumnPlayer::query()
                     ->where('player_id', $playerId)
-                    ->whereHas('phaseColumnPlayer', function ($q) use ($phasePlayerId) {
-                        $q->where('phase_player_id', $phasePlayerId);
-                    })
+                    ->where('phase_player_id', $phasePlayerId)
+                    ->orderBy('phase_column_id')
+                    ->orderBy('id')
+                    ->first();
+
+                if (!$firstPhaseColumnPlayer) {
+                    return;
+                }
+
+                $firstColumnTargets = TargetPlayer::query()
+                    ->where('player_id', $playerId)
+                    ->where('phase_column_player_id', $firstPhaseColumnPlayer->id)
                     ->orderBy('slot')
                     ->orderBy('id')
                     ->get();
 
-                if ($phaseTargets->isEmpty()) {
+                if ($firstColumnTargets->isEmpty()) {
                     return;
                 }
 
-                $hasActiveTarget = $phaseTargets->contains(function ($target) {
-                    return in_array($target->state, [
-                        TargetPlayer::STATE_UNLOCKED,
-                        TargetPlayer::STATE_IN_PROGRESS,
-                        TargetPlayer::STATE_COMPLETED,
-                    ], true);
-                });
-
-                if ($hasActiveTarget) {
-                    return;
-                }
-
-                $firstLockedTarget = $phaseTargets->first(function ($target) {
-                    return $target->state === TargetPlayer::STATE_LOCKED;
-                });
-
-                if ($firstLockedTarget) {
-                    $firstLockedTarget->update([
-                        'state' => TargetPlayer::STATE_UNLOCKED,
-                    ]);
-                    $unlockedTargetIds[] = $firstLockedTarget->id;
-                    $objectiveTreeChanged = true;
+                foreach ($firstColumnTargets as $target) {
+                    if ($target->state === TargetPlayer::STATE_LOCKED) {
+                        $target->update([
+                            'state' => TargetPlayer::STATE_UNLOCKED,
+                        ]);
+                        $unlockedTargetIds[] = $target->id;
+                        $objectiveTreeChanged = true;
+                    }
                 }
             };
 
@@ -1948,7 +1990,8 @@ class GameController extends Controller
                     'player_id' => '1',
                     'items' => json_encode($objectiveDrawCommands),
                 ]);
-                event(new DrawInterfaceEvent($player, $objectiveRequestId));
+                $drawPlayer = Player::find('1');
+                event(new DrawInterfaceEvent($drawPlayer, $objectiveRequestId));
             }
         }
 

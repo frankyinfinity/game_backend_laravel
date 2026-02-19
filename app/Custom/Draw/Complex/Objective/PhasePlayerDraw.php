@@ -62,6 +62,7 @@ class PhasePlayerDraw
     private int $textFontSize = 13;
     private int $calculatedWidth = 0;
     private int $calculatedHeight = 0;
+    private static ?string $cachedClickTargetTemplate = null;
     
     public function __construct(string $uid, PhasePlayer $phasePlayer)
     {
@@ -250,8 +251,11 @@ class PhasePlayerDraw
         $columnX = $this->x + $this->padding;
         
         // Load the click handler JS file
-        $jsPathClickTarget = resource_path('js/function/objective/click_target.blade.php');
-        $jsContentClickTarget = file_get_contents($jsPathClickTarget);
+        if (self::$cachedClickTargetTemplate === null) {
+            $jsPathClickTarget = resource_path('js/function/objective/click_target.blade.php');
+            self::$cachedClickTargetTemplate = file_get_contents($jsPathClickTarget);
+        }
+        $jsContentClickTarget = self::$cachedClickTargetTemplate;
         $jsContentClickTarget = Helper::setCommonJsCode($jsContentClickTarget, Str::random(20));
         
         foreach ($phaseColumns as $phaseColumnPlayer) {
