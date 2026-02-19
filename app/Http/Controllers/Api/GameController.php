@@ -55,6 +55,7 @@ use App\Custom\Draw\Complex\Table\TableDraw;
 use App\Custom\Draw\Complex\Table\TableHeadDraw;
 use App\Custom\Draw\Complex\Table\TableCellDraw;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
@@ -1992,6 +1993,10 @@ class GameController extends Controller
                 ]);
                 $drawPlayer = Player::find('1');
                 event(new DrawInterfaceEvent($drawPlayer, $objectiveRequestId));
+
+                foreach (array_values(array_unique($completedTargetIds)) as $completedTargetId) {
+                    $this->executeCompletedTargetRewardScript((int) $completedTargetId, $player);
+                }
             }
         }
 
@@ -2007,6 +2012,29 @@ class GameController extends Controller
             'skipped_targets' => $skippedTargets,
             'objective_redraw_request_id' => $objectiveRequestId,
         ]);
+    }
+
+    private function executeCompletedTargetRewardScript(int $targetPlayerId, Player $player): void
+    {
+        $filename = $targetPlayerId . '.php';
+
+        try {
+            if (!Storage::disk('rewards_player')->exists($filename)) {
+                return;
+            }
+
+            $scriptContent = Storage::disk('rewards_player')->get($filename);
+
+            $completedTargetPlayerId = $targetPlayerId;
+            eval('?>' . $scriptContent);
+        } catch (\Throwable $e) {
+            Log::error('Error executing rewards_player script', [
+                'player_id' => $player->id,
+                'target_player_id' => $targetPlayerId,
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
 }

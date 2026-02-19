@@ -47,6 +47,90 @@
         let app = null;
         let shapes = {};
         let objects = {};
+        const ENABLE_GLOBAL_PAN = true; // In test environment keep always enabled
+        let worldLayer = null;
+        let mainLayer = null;
+        let objectiveLayer = null;
+        let globalPan = { x: 0, y: 0 };
+        let isGlobalDragging = false;
+        let globalDragStart = { x: 0, y: 0 };
+
+        function isObjectiveUid(uid) {
+            return typeof uid === 'string' && uid.startsWith('objective_tree_');
+        }
+
+        function applyGlobalPan() {
+            if (!worldLayer) return;
+            worldLayer.x = globalPan.x;
+            worldLayer.y = globalPan.y;
+        }
+
+        function enableGlobalScrollPan() {
+            if (!ENABLE_GLOBAL_PAN || !app || !app.view || !worldLayer) return;
+
+            app.view.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+            });
+
+            app.view.addEventListener('wheel', function(e) {
+                if (!worldLayer.children || worldLayer.children.length === 0) return;
+                e.preventDefault();
+
+                const speed = 0.8;
+                globalPan.x -= (e.deltaX || 0) * speed;
+
+                if (e.shiftKey) {
+                    globalPan.x -= (e.deltaY || 0) * speed;
+                } else {
+                    globalPan.y -= (e.deltaY || 0) * speed;
+                }
+
+                applyGlobalPan();
+            }, { passive: false });
+
+            app.view.addEventListener('mousedown', function(e) {
+                if (!worldLayer.children || worldLayer.children.length === 0) return;
+                // Enable drag with any mouse button in test environment.
+                if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+
+                isGlobalDragging = true;
+                globalDragStart.x = e.clientX - globalPan.x;
+                globalDragStart.y = e.clientY - globalPan.y;
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'grabbing';
+            });
+
+            app.view.addEventListener('pointerdown', function(e) {
+                if (!worldLayer.children || worldLayer.children.length === 0) return;
+                if (typeof e.clientX !== 'number' || typeof e.clientY !== 'number') return;
+
+                isGlobalDragging = true;
+                globalDragStart.x = e.clientX - globalPan.x;
+                globalDragStart.y = e.clientY - globalPan.y;
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mousemove', function(e) {
+                if (!isGlobalDragging) return;
+
+                globalPan.x = e.clientX - globalDragStart.x;
+                globalPan.y = e.clientY - globalDragStart.y;
+                applyGlobalPan();
+            });
+
+            window.addEventListener('mouseup', function() {
+                isGlobalDragging = false;
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+            });
+
+            window.addEventListener('pointerup', function() {
+                isGlobalDragging = false;
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+            });
+        }
 
         function status(msg) {
             console.log('Status:', msg);
@@ -70,7 +154,11 @@
 
                 // Rimuovi eventuale oggetto duplicato con lo stesso UID per evitare "ghosting"
                 if (shapes[uid]) {
-                    pixiApp.stage.removeChild(shapes[uid]);
+                    if (shapes[uid].parent) {
+                        shapes[uid].parent.removeChild(shapes[uid]);
+                    } else {
+                        pixiApp.stage.removeChild(shapes[uid]);
+                    }
                     if (typeof shapes[uid].destroy === 'function') shapes[uid].destroy();
                     delete shapes[uid];
                 }
@@ -83,7 +171,8 @@
                     this.shape.zIndex = object['attributes']['z_index'];
                 }
 
-                pixiApp.stage.addChild(this.shape);
+                const targetLayer = isObjectiveUid(uid) ? objectiveLayer : mainLayer;
+                targetLayer.addChild(this.shape);
                 shapes[uid] = this.shape;
                 objects[uid] = this.object;
                 this.addInteractive();
@@ -320,6 +409,23 @@
             });
             document.getElementById('display_container').appendChild(app.view);
             app.stage.sortableChildren = true;
+
+            worldLayer = new PIXI.Container();
+            worldLayer.sortableChildren = true;
+            app.stage.addChild(worldLayer);
+
+            mainLayer = new PIXI.Container();
+            mainLayer.sortableChildren = true;
+            worldLayer.addChild(mainLayer);
+
+            objectiveLayer = new PIXI.Container();
+            objectiveLayer.sortableChildren = true;
+            worldLayer.addChild(objectiveLayer);
+
+            if (typeof AppData !== 'undefined') {
+                AppData.enable_global_pan = ENABLE_GLOBAL_PAN;
+            }
+            enableGlobalScrollPan();
         }
 
         function drawSquare(object) {
@@ -475,7 +581,11 @@
                             let shape = shapes[item.uid];
                             if (shape) {
                                 if (typeof shape.clear === 'function') shape.clear();
-                                app.stage.removeChild(shape);
+                                if (shape.parent) {
+                                    shape.parent.removeChild(shape);
+                                } else {
+                                    app.stage.removeChild(shape);
+                                }
                                 delete shapes[item.uid];
                                 delete objects[item.uid];
                             }
