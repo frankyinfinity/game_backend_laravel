@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Custom\Draw\Complex\ModalDraw;
+use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
+use App\Helper\Helper;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
@@ -98,10 +100,31 @@ class TestDrawCommand extends Command
         // ------------------------------------------------------------
 
         // Modal test
-        $modal = new ModalDraw('test_modal_draw');
+        $modalUid = 'test_modal_draw';
+
+        $jsOpenModal = file_get_contents(resource_path('js/function/modal/click_open_modal.blade.php'));
+        $jsOpenModal = str_replace('__MODAL_UID__', $modalUid, $jsOpenModal);
+        $jsOpenModal = Helper::setCommonJsCode($jsOpenModal, Str::random(20));
+
+        $objectivesButton = new ButtonDraw('test_open_objectives_button');
+        $objectivesButton->setOrigin(24, 24);
+        $objectivesButton->setSize(180, 46);
+        $objectivesButton->setString('Obiettivi');
+        $objectivesButton->setColorButton(0x1E90FF);
+        $objectivesButton->setColorString(0xFFFFFF);
+        $objectivesButton->setOnClick($jsOpenModal);
+        $objectivesButton->build();
+
+        foreach ($objectivesButton->getDrawItems() as $drawItem) {
+            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        $modal = new ModalDraw($modalUid);
         $modal->setScreenSize(1280, 720);
         $modal->setSize(760, 560);
         $modal->setTitle('Test ModalDraw');
+        $modal->setRenderable(false);
 
         $columns = 6;
         $rows = 6;
