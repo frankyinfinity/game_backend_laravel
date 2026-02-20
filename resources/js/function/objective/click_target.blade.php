@@ -13,9 +13,15 @@
         const targetPanels = Object.entries(objects).filter(([key, _]) => key.endsWith('_container_panel')).reduce((obj, [key, value]) => {obj[key] = value;return obj;}, {});
         for (const [key, objectPanel] of Object.entries(targetPanels)) {
             if (shapes[key]) shapes[key].renderable = false;
+            if (objects[key] && objects[key]['attributes']) {
+                objects[key]['attributes']['renderable'] = false;
+            }
             if (objectPanel['children']) {
                 for (const childUid of objectPanel['children']) {
                     if (shapes[childUid]) shapes[childUid].renderable = false;
+                    if (objects[childUid] && objects[childUid]['attributes']) {
+                        objects[childUid]['attributes']['renderable'] = false;
+                    }
                 }
             }
         }
@@ -27,6 +33,9 @@
 
         shapes[panel_uid].renderable = show;
         shapes[panel_uid].zIndex = panelZIndex;
+        if (objects[panel_uid] && objects[panel_uid]['attributes']) {
+            objects[panel_uid]['attributes']['renderable'] = show;
+        }
         AppData.actual_focus_uid_target = show ? target_uid : null;
         AppData.actual_focus_target_player_id = show
             ? ((object['attributes'] && object['attributes']['target_player_id']) ? object['attributes']['target_player_id'] : null)
@@ -59,15 +68,20 @@
 
         // Manage panel children and update text
         for (const childUid of objects[panel_uid]['children']) {
-            if (shapes[childUid]) {
-                const isStartButton = childUid.endsWith('_panel_start_btn') || childUid.endsWith('_panel_start_btn_text');
-                if (isStartButton) {
-                    const hasActiveInProgress = (typeof AppData !== 'undefined') && !!AppData.objective_has_active_in_progress;
-                    shapes[childUid].renderable = show && target_state === 'unlocked' && !hasActiveInProgress;
-                } else {
-                    shapes[childUid].renderable = show;
-                }
-                shapes[childUid].zIndex = panelChildZIndex;
+                if (shapes[childUid]) {
+                    const isStartButton = childUid.endsWith('_panel_start_btn') || childUid.endsWith('_panel_start_btn_text');
+                    let childRenderable = false;
+                    if (isStartButton) {
+                        const hasActiveInProgress = (typeof AppData !== 'undefined') && !!AppData.objective_has_active_in_progress;
+                        childRenderable = show && target_state === 'unlocked' && !hasActiveInProgress;
+                    } else {
+                        childRenderable = show;
+                    }
+                    shapes[childUid].renderable = childRenderable;
+                    if (objects[childUid] && objects[childUid]['attributes']) {
+                        objects[childUid]['attributes']['renderable'] = childRenderable;
+                    }
+                    shapes[childUid].zIndex = panelChildZIndex;
                 
                 // Update text for title and description
                 if (childUid.endsWith('_panel_title')) {

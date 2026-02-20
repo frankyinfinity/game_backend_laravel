@@ -1081,7 +1081,7 @@ class GameController extends Controller
         $player = Player::find($playerId);
         $objectiveRequestId = null;
         if ($player) {
-            $sessionId = (string) $request->input('session_id', $player->actual_session_id ?: 'test_session_fixed');
+            $sessionId = (string) $request->input('session_id', $player->actual_session_id ?: 'init_session_id');
             $drawPlayerId = (int) $request->input('draw_player_id', $playerId);
             $drawPlayer = Player::find($drawPlayerId) ?? $player;
             $objectiveTreeUidPrefix = 'objective_tree_' . $playerId;
@@ -1169,6 +1169,55 @@ class GameController extends Controller
             'state' => $targetPlayer->state,
             'objective_redraw_request_id' => $objectiveRequestId,
         ]);
+    }
+
+    public function setObjectiveModalVisibility(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $playerId = (int) $request->input('player_id');
+        $player = Player::find($playerId);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player non trovato'], 404);
+        }
+
+        $sessionId = (string) $request->input('session_id', $player->actual_session_id ?: 'init_session_id');
+        $modalUid = (string) $request->input('modal_uid', 'objective_modal_' . $playerId);
+        $renderable = filter_var($request->input('renderable', true), FILTER_VALIDATE_BOOL);
+
+        ObjectCache::buffer($sessionId);
+        $existingObjects = ObjectCache::all($sessionId);
+
+        $viewportUid = $modalUid . '_content_viewport';
+        $childUids = [];
+        if (isset($existingObjects[$viewportUid]) && isset($existingObjects[$viewportUid]['attributes']['scroll_child_uids']) && is_array($existingObjects[$viewportUid]['attributes']['scroll_child_uids'])) {
+            $childUids = $existingObjects[$viewportUid]['attributes']['scroll_child_uids'];
+        }
+
+        foreach ($existingObjects as $uid => $object) {
+            if (!is_string($uid) || !Str::startsWith($uid, $modalUid . '_')) {
+                continue;
+            }
+            if (!isset($object['attributes']) || !is_array($object['attributes'])) {
+                $object['attributes'] = [];
+            }
+            $object['attributes']['renderable'] = $renderable;
+            ObjectCache::put($sessionId, $object);
+        }
+
+        foreach ($childUids as $childUid) {
+            if (!isset($existingObjects[$childUid])) {
+                continue;
+            }
+            $object = $existingObjects[$childUid];
+            if (!isset($object['attributes']) || !is_array($object['attributes'])) {
+                $object['attributes'] = [];
+            }
+            $object['attributes']['renderable'] = $renderable;
+            ObjectCache::put($sessionId, $object);
+        }
+
+        ObjectCache::flush($sessionId);
+
+        return response()->json(['success' => true]);
     }
 
     public function attack(Request $request) {
@@ -1997,7 +2046,9 @@ class GameController extends Controller
 
         $objectiveDrawCommands = [];
         $objectiveRequestId = null;
-        $sessionId = 'test_session_fixed';
+        $sessionId = (string) $request->input('session_id', $player->actual_session_id ?: 'init_session_id');
+        $drawPlayerId = (int) $request->input('draw_player_id', $playerId);
+        $drawPlayer = Player::find($drawPlayerId) ?? $player;
         $objectiveTreeUidPrefix = 'objective_tree_' . $playerId;
 
         if (!empty($sessionId) && $objectiveTreeChanged) {
@@ -2060,6 +2111,13 @@ class GameController extends Controller
                 }
             }
 
+            if (!empty($updatedScores)) {
+                $objectiveDrawCommands = array_merge(
+                    $objectiveDrawCommands,
+                    $this->buildScoreDrawUpdateCommands($playerId, $updatedScores, $sessionId)
+                );
+            }
+
             ObjectCache::flush($sessionId);
 
             if (!empty($objectiveDrawCommands)) {
@@ -2067,10 +2125,9 @@ class GameController extends Controller
                 DrawRequest::query()->create([
                     'session_id' => $sessionId,
                     'request_id' => $objectiveRequestId,
-                    'player_id' => '1',
+                    'player_id' => $drawPlayerId,
                     'items' => json_encode($objectiveDrawCommands),
                 ]);
-                $drawPlayer = Player::find('1');
                 event(new DrawInterfaceEvent($drawPlayer, $objectiveRequestId));
 
                 foreach (array_values(array_unique($completedTargetIds)) as $completedTargetId) {
@@ -2223,6 +2280,32 @@ class GameController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Build update commands for appbar score widgets after objective completion.
+     */
+    private function buildScoreDrawUpdateCommands(int $playerId, array $updatedScores, string $sessionId): array
+    {
+        $commands = [];
+        foreach ($updatedScores as $scoreId => $newValue) {
+            $scoreDrawUid = 'player_' . $playerId . '_score_' . (int) $scoreId;
+            try {
+                $scoreDraw = new ScoreDraw($scoreDrawUid);
+                $updates = $scoreDraw->updateValue((string) $newValue, $sessionId);
+                foreach ($updates as $update) {
+                    $commands[] = $update;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('ScoreDraw update skipped after objective refresh', [
+                    'player_id' => $playerId,
+                    'score_id' => (int) $scoreId,
+                    'session_id' => $sessionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+        return $commands;
     }
 
 }

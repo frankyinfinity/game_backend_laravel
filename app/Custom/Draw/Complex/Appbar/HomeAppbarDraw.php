@@ -4,6 +4,8 @@ namespace App\Custom\Draw\Complex\Appbar;
 
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\ModalDraw;
+use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Colors;
@@ -108,53 +110,105 @@ class HomeAppbarDraw extends AppbarDraw
         
         \Log::info('Found ' . $playerScores->count() . ' scores for player');
         
-        if ($playerScores->isEmpty()) {
+        if (!$playerScores->isEmpty()) {
+            // Center section dimensions
+            $startX = 400; // LEFT_SECTION_WIDTH
+            $centerY = 15; // Vertically centered in appbar (height 80)
+            $scoreWidth = 120;
+            $scoreHeight = 50;
+            $spacing = 130;
+            
+            $index = 0;
+            foreach ($playerScores as $playerScore) {
+                
+                $score = $playerScore->score;
+                if (!$score) {
+                    continue;
+                }
+                
+                $x = $startX + ($index * $spacing);
+                
+                $scoreDraw = new ScoreDraw('player_'.$playerScore->player_id.'_score_' . $playerScore->score_id);
+                $scoreDraw->setOrigin($x, $centerY);
+                $scoreDraw->setSize($scoreWidth, $scoreHeight);
+                $scoreDraw->setBackgroundColor('#4169E1');
+                $scoreDraw->setBorderColor('#5B7FE8');
+                $scoreDraw->setBorderRadius(10);
+                
+                // Get image path for this score
+                $imagePath = '/storage/scores/' . $score->id . '.png';
+                $scoreDraw->setScoreImage($imagePath);
+                
+                // Use the value from player_score table if available, else 0
+                $scoreValue = $playerScore->value ?? 0;
+                $scoreDraw->setScoreValue((string) $scoreValue);
+                
+                // White text
+                $scoreDraw->setTextColor('#FFFFFF');
+                $scoreDraw->setTextFontSize(16);
+                $scoreDraw->build();
+                
+                // Add all draw items to center section
+                foreach ($scoreDraw->getDrawItems() as $drawItem) {
+                    $this->addCenterElement($drawItem);
+                }
+                
+                $index++;
+            }
+        }
+
+        // Objectives button in center section, positioned left of Logout.
+        $objectivesButton = new ButtonDraw($this->getUid() . '_objectives_button');
+        $objectivesButton->setOrigin(1290, 25);
+        $objectivesButton->setSize(100, 30);
+        $objectivesButton->setString('Obiettivi');
+        $objectivesButton->setColorButton(Colors::BLUE);
+        $objectivesButton->setColorString(Colors::WHITE);
+        $objectivesButton->setTextFontSize(14);
+
+        $modalUid = 'objective_modal_' . $this->player->id;
+        $jsPathOnClickObjectives = resource_path('js/function/modal/click_open_modal.blade.php');
+        $jsContentOnClickObjectives = file_get_contents($jsPathOnClickObjectives);
+        $jsContentOnClickObjectives = str_replace('__MODAL_UID__', $modalUid, $jsContentOnClickObjectives);
+        $jsContentOnClickObjectives = Helper::setCommonJsCode($jsContentOnClickObjectives, Str::random(20));
+        $objectivesButton->setOnClick($jsContentOnClickObjectives);
+        $objectivesButton->build();
+
+        foreach ($objectivesButton->getDrawItems() as $drawItem) {
+            $this->addCenterElement($drawItem);
+        }
+
+        $this->addObjectiveModal($modalUid);
+    }
+
+    private function addObjectiveModal(string $modalUid): void
+    {
+        if (!$this->player) {
             return;
         }
-        
-        // Center section dimensions
-        $startX = 400; // LEFT_SECTION_WIDTH
-        $centerY = 15; // Vertically centered in appbar (height 80)
-        $scoreWidth = 120;
-        $scoreHeight = 50;
-        $spacing = 130;
-        
-        $index = 0;
-        foreach ($playerScores as $playerScore) {
-            
-            $score = $playerScore->score;
-            if (!$score) {
-                continue;
-            }
-            
-            $x = $startX + ($index * $spacing);
-            
-            $scoreDraw = new ScoreDraw('player_'.$playerScore->player_id.'_score_' . $playerScore->score_id);
-            $scoreDraw->setOrigin($x, $centerY);
-            $scoreDraw->setSize($scoreWidth, $scoreHeight);
-            $scoreDraw->setBackgroundColor('#4169E1');
-            $scoreDraw->setBorderColor('#5B7FE8');
-            $scoreDraw->setBorderRadius(10);
-            
-            // Get image path for this score
-            $imagePath = '/storage/scores/' . $score->id . '.png';
-            $scoreDraw->setScoreImage($imagePath);
-            
-            // Use the value from player_score table if available, else 0
-            $scoreValue = $playerScore->value ?? 0;
-            $scoreDraw->setScoreValue((string) $scoreValue);
-            
-            // White text
-            $scoreDraw->setTextColor('#FFFFFF');
-            $scoreDraw->setTextFontSize(16);
-            $scoreDraw->build();
-            
-            // Add all draw items to center section
-            foreach ($scoreDraw->getDrawItems() as $drawItem) {
-                $this->addCenterElement($drawItem);
-            }
-            
-            $index++;
+
+        $objectiveTreeUidPrefix = 'objective_tree_' . $this->player->id;
+        $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $this->player->fresh());
+        $objectiveTree->setOrigin(0, 0);
+        $objectiveTree->build();
+
+        $modal = new ModalDraw($modalUid);
+        $modal->setOrigin(20, 90);
+        $modal->setSize(1120, 680);
+        $modal->setTitle('Obiettivi');
+        $modal->setRenderable(false);
+
+        foreach ($objectiveTree->getDrawItems() as $drawItem) {
+            $json = $drawItem->buildJson();
+            $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
+            $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+            $modal->addContentItem($drawItem, $offsetX, $offsetY);
+        }
+
+        $modal->build();
+
+        foreach ($modal->getDrawItems() as $drawItem) {
+            $this->addCenterElement($drawItem);
         }
     }
 }

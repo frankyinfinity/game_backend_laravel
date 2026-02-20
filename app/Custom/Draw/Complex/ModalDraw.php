@@ -221,7 +221,9 @@ class ModalDraw
                 $draw->translatePoints($absoluteX - $beforeX, $absoluteY - $beforeY);
             }
 
-            $draw->setRenderable($this->renderable);
+            // Preserve each child's intended visibility (e.g. hidden target panels),
+            // while still allowing modal-level hide/show.
+            $draw->setRenderable($this->renderable && $originalRenderable);
             $draw->addAttributes('z_index', 20020 + $index);
 
             $preview = $draw->buildJson();

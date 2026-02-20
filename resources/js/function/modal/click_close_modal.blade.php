@@ -35,6 +35,37 @@ window['__name__'] = function() {
 
     window['__modal_scroll_drag_' + modalUid] = null;
     window.__disableGlobalPan = false;
+
+    if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
+        let resolvedPlayerId = null;
+        if (typeof playerId !== 'undefined') {
+            resolvedPlayerId = playerId;
+        } else if (typeof window !== 'undefined' && typeof window.playerId !== 'undefined') {
+            resolvedPlayerId = window.playerId;
+        } else if (typeof AppData !== 'undefined' && typeof AppData.player_id !== 'undefined') {
+            resolvedPlayerId = AppData.player_id;
+        }
+
+        let resolvedSessionId = null;
+        if (typeof sessionId !== 'undefined') {
+            resolvedSessionId = sessionId;
+        } else if (typeof AppData !== 'undefined' && typeof AppData.session_id !== 'undefined') {
+            resolvedSessionId = AppData.session_id;
+        }
+
+        if (resolvedPlayerId) {
+            $.ajax({
+                url: `${BACK_URL}/api/auth/game/objective/modal_visibility`,
+                type: 'POST',
+                data: {
+                    player_id: resolvedPlayerId,
+                    session_id: resolvedSessionId,
+                    modal_uid: modalUid,
+                    renderable: false
+                }
+            });
+        }
+    }
 };
 
 window['__name__']();

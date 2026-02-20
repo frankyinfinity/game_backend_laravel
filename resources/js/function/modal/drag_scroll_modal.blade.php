@@ -267,12 +267,18 @@ window['__name__'] = function() {
     window[upHandlerName] = function() {
         window.removeEventListener('pointermove', window[moveHandlerName]);
         window.removeEventListener('pointerup', window[upHandlerName]);
+        window.removeEventListener('pointercancel', window[upHandlerName]);
+        window.removeEventListener('mouseup', window[upHandlerName]);
+        window.removeEventListener('blur', window[upHandlerName]);
         window['__modal_scroll_drag_' + modalUid] = null;
         window.__disableGlobalPan = false;
     };
 
     window.addEventListener('pointermove', window[moveHandlerName]);
     window.addEventListener('pointerup', window[upHandlerName]);
+    window.addEventListener('pointercancel', window[upHandlerName]);
+    window.addEventListener('mouseup', window[upHandlerName]);
+    window.addEventListener('blur', window[upHandlerName]);
 };
 
 window['__name__']();
