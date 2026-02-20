@@ -47,10 +47,11 @@
         let app = null;
         let shapes = {};
         let objects = {};
-        const ENABLE_GLOBAL_PAN = true; // In test environment keep always enabled
+        const ENABLE_GLOBAL_PAN = false;
         let worldLayer = null;
         let mainLayer = null;
         let objectiveLayer = null;
+        let modalViewportMasks = {};
         let globalPan = { x: 0, y: 0 };
         let isGlobalDragging = false;
         let globalDragStart = { x: 0, y: 0 };
@@ -89,6 +90,7 @@
             }, { passive: false });
 
             app.view.addEventListener('mousedown', function(e) {
+                if (window.__disableGlobalPan) return;
                 if (!worldLayer.children || worldLayer.children.length === 0) return;
                 // Enable drag with any mouse button in test environment.
                 if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
@@ -101,6 +103,7 @@
             });
 
             app.view.addEventListener('pointerdown', function(e) {
+                if (window.__disableGlobalPan) return;
                 if (!worldLayer.children || worldLayer.children.length === 0) return;
                 if (typeof e.clientX !== 'number' || typeof e.clientY !== 'number') return;
 
@@ -112,6 +115,7 @@
             });
 
             window.addEventListener('mousemove', function(e) {
+                if (window.__disableGlobalPan) return;
                 if (!isGlobalDragging) return;
 
                 globalPan.x = e.clientX - globalDragStart.x;
@@ -139,6 +143,53 @@
 
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function ensureModalViewportMask(viewportUid) {
+            const viewportObject = objects[viewportUid];
+            const viewportShape = shapes[viewportUid];
+            if (!viewportObject || !viewportShape || !viewportObject.attributes) return;
+
+            const attrs = viewportObject.attributes;
+            const childUids = Array.isArray(attrs.scroll_child_uids) ? attrs.scroll_child_uids : [];
+            if (childUids.length === 0) return;
+
+            const width = viewportObject.width || 0;
+            const height = viewportObject.height || 0;
+            const x = viewportObject.x || 0;
+            const y = viewportObject.y || 0;
+            if (width <= 0 || height <= 0) return;
+
+            let mask = modalViewportMasks[viewportUid];
+            if (!mask) {
+                mask = new PIXI.Graphics();
+                mask.renderable = false;
+                modalViewportMasks[viewportUid] = mask;
+                const parentLayer = viewportShape.parent || mainLayer;
+                parentLayer.addChild(mask);
+            }
+
+            mask.clear();
+            mask.beginFill(0xFFFFFF);
+            mask.drawRect(0, 0, width, height);
+            mask.endFill();
+            mask.x = x;
+            mask.y = y;
+
+            childUids.forEach((childUid) => {
+                if (shapes[childUid]) {
+                    shapes[childUid].mask = mask;
+                }
+            });
+        }
+
+        function refreshAllModalViewportMasks() {
+            Object.keys(objects).forEach((uid) => {
+                const obj = objects[uid];
+                if (obj && obj.attributes && Array.isArray(obj.attributes.scroll_child_uids)) {
+                    ensureModalViewportMask(uid);
+                }
+            });
         }
 
         class BasicDraw {
@@ -194,12 +245,12 @@
                         .replace(/<\/script>/g, '')
                         .replace(/window\.location\.hostname/g, `'${hostname}'`);
 
-                    targetShape.on(event, () => {
+                    targetShape.on(event, (evt) => {
                         console.log(`Interaction: ${event} on ${object.uid}`);
                         try {
-                            (function(object, shape, shapes, objects, AppData) {
+                            (function(object, shape, shapes, objects, AppData, event) {
                                 eval(processedScript);
-                            })(object, targetShape, shapes, objects, AppData);
+                            })(object, targetShape, shapes, objects, AppData, evt);
                         } catch (e) {
                             console.error('Error executing interaction script:', e);
                         }
@@ -579,6 +630,16 @@
                             }
                         } else if (itemType === 'clear') {
                             let shape = shapes[item.uid];
+                            if (modalViewportMasks[item.uid]) {
+                                const mask = modalViewportMasks[item.uid];
+                                if (mask.parent) {
+                                    mask.parent.removeChild(mask);
+                                }
+                                if (typeof mask.destroy === 'function') {
+                                    mask.destroy();
+                                }
+                                delete modalViewportMasks[item.uid];
+                            }
                             if (shape) {
                                 if (typeof shape.clear === 'function') shape.clear();
                                 if (shape.parent) {
@@ -591,6 +652,7 @@
                             }
                         }
                     }
+                    refreshAllModalViewportMasks();
                     app.stage.sortChildren();
                     status('Disegno completato');
                 }

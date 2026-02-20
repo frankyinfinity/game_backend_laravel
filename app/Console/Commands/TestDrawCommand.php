@@ -2,28 +2,17 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Draw\Primitive\Circle;
-use App\Custom\Draw\Primitive\Image;
-use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Complex\ModalDraw;
+use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Draw\Primitive\Text;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
-use App\Models\Element;
 use App\Models\Player;
-use App\Models\Score;
-use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
-use App\Custom\Draw\Complex\Form\InputDraw;
-use App\Custom\Draw\Complex\Form\SelectDraw;
-use App\Custom\Action\ActionForm;
-use App\Custom\Draw\Complex\ButtonDraw;
-use App\Custom\Draw\Complex\ScoreDraw;
-use App\Custom\Colors;
-use Illuminate\Support\Facades\Log;
-use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use function GuzzleHttp\json_encode;
 
 class TestDrawCommand extends Command
@@ -33,14 +22,14 @@ class TestDrawCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'test:draw {objective_player_id=54 : The ID of the player to draw objectives for}';
+    protected $signature = 'test:draw';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send test draw events to the test page - draws the objective tree for a player';
+    protected $description = 'Send test draw events to the test page - modal draw test';
 
     /**
      * Execute the console command.
@@ -54,13 +43,11 @@ class TestDrawCommand extends Command
         $eventPlayerId = 1;
         $eventPlayer = Player::find($eventPlayerId);
         
-        // Player ID for objectives queries (from argument, default 54)
-        $objectivePlayerId = $this->argument('objective_player_id');
-        $objectivePlayer = Player::find($objectivePlayerId);
-        if (!$objectivePlayer) {
-            $this->error("Player with ID {$objectivePlayerId} not found. Please ensure a player with that ID exists.");
-            return;
-        }
+        // ============================================================
+        // OBIETTIVI DISABILITATI SU RICHIESTA:
+        // la parte relativa all'ObjectiveTree e' stata commentata/sostituita
+        // da un test dedicato alla modal.
+        // ============================================================
 
         // Use the cache system
         ObjectCache::buffer($sessionId);
@@ -77,28 +64,74 @@ class TestDrawCommand extends Command
         // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        $this->info("Drawing objective tree for player ID: {$objectivePlayerId}");
-        $this->info('Player name: ' . $objectivePlayer->name);
+        // ------------------------------------------------------------
+        // BLOCCO OBIETTIVI ORIGINALE (COMMENTATO)
+        // ------------------------------------------------------------
+        // $objectivePlayerId = $this->argument('objective_player_id');
+        // $objectivePlayer = Player::find($objectivePlayerId);
+        // if (!$objectivePlayer) {
+        //     $this->error("Player with ID {$objectivePlayerId} not found. Please ensure a player with that ID exists.");
+        //     return;
+        // }
+        //
+        // $this->info("Drawing objective tree for player ID: {$objectivePlayerId}");
+        // $this->info('Player name: ' . $objectivePlayer->name);
+        //
+        // $objectiveTree = new ObjectiveTreeDraw('objective_tree_' . $objectivePlayerId, $objectivePlayer);
+        // $objectiveTree->setOrigin(20, 20);
+        // $objectiveTree->build();
+        //
+        // $stats = $objectiveTree->getStatistics();
+        // $this->info('--- Objective Tree Statistics ---');
+        // $this->info("Total Ages: {$stats['total_ages']}");
+        // $this->info("Total Phases: {$stats['total_phases']}");
+        // $this->info("Total Targets: {$stats['total_targets']}");
+        // $this->info("Total Links: {$stats['total_links']}");
+        // $this->info('States:');
+        // foreach ($stats['states'] as $state => $count) {
+        //     $this->info("  - {$state}: {$count}");
+        // }
+        // foreach ($objectiveTree->getDrawItems() as $drawItem) {
+        //     $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+        //     $drawItems[] = $objectDraw->get();
+        // }
+        // ------------------------------------------------------------
 
-        // Draw the objective tree using the objective player
-        $objectiveTree = new ObjectiveTreeDraw('objective_tree_' . $objectivePlayerId, $objectivePlayer);
-        $objectiveTree->setOrigin(20, 20);
-        $objectiveTree->build();
+        // Modal test
+        $modal = new ModalDraw('test_modal_draw');
+        $modal->setScreenSize(1280, 720);
+        $modal->setSize(760, 560);
+        $modal->setTitle('Test ModalDraw');
 
-        // Get statistics
-        $stats = $objectiveTree->getStatistics();
-        $this->info('--- Objective Tree Statistics ---');
-        $this->info("Total Ages: {$stats['total_ages']}");
-        $this->info("Total Phases: {$stats['total_phases']}");
-        $this->info("Total Targets: {$stats['total_targets']}");
-        $this->info("Total Links: {$stats['total_links']}");
-        $this->info('States:');
-        foreach ($stats['states'] as $state => $count) {
-            $this->info("  - {$state}: {$count}");
+        $columns = 6;
+        $rows = 6;
+        $cellWidth = 220;
+        $cellHeight = 120;
+        $gapX = 14;
+        $gapY = 14;
+
+        for ($row = 0; $row < $rows; $row++) {
+            for ($col = 0; $col < $columns; $col++) {
+                $index = ($row * $columns) + $col;
+                $offsetX = $col * ($cellWidth + $gapX);
+                $offsetY = $row * ($cellHeight + $gapY);
+
+                $itemRect = new Rectangle('test_modal_item_rect_' . $index);
+                $itemRect->setSize($cellWidth, $cellHeight);
+                $itemRect->setColor(($index % 2) === 0 ? 0xE6E6E6 : 0xDADADA);
+                $modal->addContentItem($itemRect, $offsetX, $offsetY);
+
+                $itemText = new Text('test_modal_item_text_' . $index);
+                $itemText->setText('Cell [' . $row . ',' . $col . ']');
+                $itemText->setFontSize(18);
+                $itemText->setColor(0x111111);
+                $modal->addContentItem($itemText, $offsetX + 14, $offsetY + 12);
+            }
         }
 
-        // Add all draw items from the objective tree
-        foreach ($objectiveTree->getDrawItems() as $drawItem) {
+        $modal->build();
+
+        foreach ($modal->getDrawItems() as $drawItem) {
             $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
