@@ -22,8 +22,11 @@
 
         // Toggle Target Panel
         let show = !isVisible;
+        const panelZIndex = 50000;
+        const panelChildZIndex = 50001;
+
         shapes[panel_uid].renderable = show;
-        shapes[panel_uid].zIndex = 10000;
+        shapes[panel_uid].zIndex = panelZIndex;
         AppData.actual_focus_uid_target = show ? target_uid : null;
         AppData.actual_focus_target_player_id = show
             ? ((object['attributes'] && object['attributes']['target_player_id']) ? object['attributes']['target_player_id'] : null)
@@ -64,7 +67,7 @@
                 } else {
                     shapes[childUid].renderable = show;
                 }
-                shapes[childUid].zIndex = 10001;
+                shapes[childUid].zIndex = panelChildZIndex;
                 
                 // Update text for title and description
                 if (childUid.endsWith('_panel_title')) {
@@ -75,6 +78,14 @@
                     shapes[childUid].text = getStateLabel(target_state);
                 }
             }
+        }
+
+        // Ensure zIndex changes are applied immediately in both normal and test renderers.
+        if (shapes[panel_uid] && shapes[panel_uid].parent && typeof shapes[panel_uid].parent.sortChildren === 'function') {
+            shapes[panel_uid].parent.sortChildren();
+        }
+        if (typeof app !== 'undefined' && app && app.stage && typeof app.stage.sortChildren === 'function') {
+            app.stage.sortChildren();
         }
     }
     window['__name__']();

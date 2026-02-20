@@ -54,6 +54,7 @@ window['__name__'] = function() {
 
     const currentBaseX = {};
     const currentBaseY = {};
+    const currentBasePoints = {};
     let currentContentLeft = null;
     let currentContentRight = null;
     let currentContentTop = null;
@@ -83,8 +84,15 @@ window['__name__'] = function() {
         let bottom = currentBaseY[uid];
 
         if (isMultiLine) {
-            const xs = basePointsMap[uid].map(function(p) { return Number(p.x) || 0; });
-            const ys = basePointsMap[uid].map(function(p) { return Number(p.y) || 0; });
+            const sourcePoints = (obj && Array.isArray(obj.points) && obj.points.length > 0)
+                ? obj.points
+                : basePointsMap[uid];
+            currentBasePoints[uid] = sourcePoints.map(function(p) {
+                return { x: Number(p.x) || 0, y: Number(p.y) || 0 };
+            });
+
+            const xs = currentBasePoints[uid].map(function(p) { return p.x; });
+            const ys = currentBasePoints[uid].map(function(p) { return p.y; });
             left = Math.min.apply(null, xs);
             right = Math.max.apply(null, xs);
             top = Math.min.apply(null, ys);
@@ -113,6 +121,7 @@ window['__name__'] = function() {
         basePositionsY: currentBaseY,
         itemWidths: attrs.scroll_item_widths || {},
         itemHeights: attrs.scroll_item_heights || {},
+        basePoints: currentBasePoints,
         viewportLeft: attrs.scroll_viewport_left,
         viewportRight: attrs.scroll_viewport_right,
         viewportTop: attrs.scroll_viewport_top,
@@ -152,6 +161,8 @@ window['__name__'] = function() {
             const baseY = state.basePositionsY[uid];
             const obj = objects[uid];
             const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
+            const isPanelItem = typeof uid === 'string' && uid.indexOf('_container_panel') !== -1;
+            const intendedVisible = !!(obj && obj.attributes && obj.attributes.renderable);
             if (typeof baseX !== 'number' || typeof baseY !== 'number') {
                 return;
             }
@@ -165,7 +176,10 @@ window['__name__'] = function() {
             let bottom = newY;
 
             if (isMultiLine) {
-                const translatedPoints = basePointsMap[uid].map(function(p) {
+                const basePoints = Array.isArray(state.basePoints[uid]) && state.basePoints[uid].length > 0
+                    ? state.basePoints[uid]
+                    : basePointsMap[uid];
+                const translatedPoints = basePoints.map(function(p) {
                     return {
                         x: (Number(p.x) || 0) + appliedDeltaX,
                         y: (Number(p.y) || 0) + appliedDeltaY
@@ -221,13 +235,11 @@ window['__name__'] = function() {
             const isVisible = intersectsX && intersectsY;
 
             if (shapes[uid]) {
-                shapes[uid].renderable = isVisible;
+                shapes[uid].renderable = isPanelItem ? (intendedVisible && isVisible) : isVisible;
             }
 
-            if (obj) {
-                if (obj.attributes) {
-                    obj.attributes.renderable = isVisible;
-                }
+            if (obj && obj.attributes && !isPanelItem) {
+                obj.attributes.renderable = isVisible;
             }
         });
     }

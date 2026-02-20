@@ -35,7 +35,7 @@
             SOCKETIO_URL: '{{ config('broadcasting.connections.socketio.url') }}'
         };
         const testPlayerId = 1; // Use existing player ID
-        window.playerId = 60;
+        window.playerId = 61;
         const sessionId = 'test_session_fixed';
         const hostname = new URL(BACK_URL).hostname;
 
