@@ -37,6 +37,7 @@ use App\Models\TargetLinkPlayer;
 use App\Models\PhasePlayer;
 use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
+use App\Models\PlayerValue;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -644,6 +645,10 @@ class GameController extends Controller
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
 
         $player_id = $entity->specie->player_id;
+        PlayerValue::query()->updateOrCreate(
+            ['player_id' => $player_id],
+            ['movement' => true]
+        );
 
         $currentTileI = $entity->tile_i;
         $currentTileJ = $entity->tile_j;
@@ -812,6 +817,25 @@ class GameController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function resetPlayerValues(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $playerId = (int) $request->input('player_id');
+        if ($playerId <= 0) {
+            return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
+        }
+
+        PlayerValue::query()->updateOrCreate(
+            ['player_id' => $playerId],
+            [
+                'movement' => false,
+                'consume' => false,
+                'attack' => false,
+            ]
+        );
+
+        return response()->json(['success' => true]);
+    }
+
     /**
      * Gestisce il consumo di un elemento da parte di un'entity
      */
@@ -830,6 +854,10 @@ class GameController extends Controller
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
+        PlayerValue::query()->updateOrCreate(
+            ['player_id' => $player_id],
+            ['consume' => true]
+        );
 
         $currentTileI = $entity->tile_i;
         $currentTileJ = $entity->tile_j;
@@ -1197,6 +1225,10 @@ class GameController extends Controller
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
+        PlayerValue::query()->updateOrCreate(
+            ['player_id' => $player_id],
+            ['attack' => true]
+        );
 
         // Store original position
         $originalTileI = $entity->tile_i;
@@ -1640,6 +1672,22 @@ class GameController extends Controller
                 'success' => false,
                 'message' => 'Player non trovato',
             ], 404);
+        }
+
+        $playerValue = PlayerValue::query()->firstOrCreate(
+            ['player_id' => $playerId],
+            [
+                'movement' => false,
+                'consume' => false,
+                'attack' => false,
+            ]
+        );
+
+        if ($playerValue->movement || $playerValue->consume || $playerValue->attack) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Azione player in corso',
+            ]);
         }
 
         $inProgressTargets = TargetPlayer::query()

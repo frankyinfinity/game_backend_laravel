@@ -81,4 +81,9 @@ class Player extends Model
         return $this->hasMany(TargetLinkPlayer::class);
     }
 
+    public function playerValue()
+    {
+        return $this->hasOne(PlayerValue::class);
+    }
+
 }

@@ -29,6 +29,7 @@ Route::group(['prefix' => 'auth'], function (){
     Route::post('/game/entity/movement', [App\Http\Controllers\Api\GameController::class, 'movement'])->name('game.entity.movement');
     Route::post('/game/entity/consume', [App\Http\Controllers\Api\GameController::class, 'consume'])->name('game.entity.consume');
     Route::post('/game/entity/attack', [App\Http\Controllers\Api\GameController::class, 'attack'])->name('game.entity.attack');
+    Route::post('/game/player_values/reset', [App\Http\Controllers\Api\GameController::class, 'resetPlayerValues'])->name('game.player_values.reset');
     Route::post('/game/objective/modal_visibility', [App\Http\Controllers\Api\GameController::class, 'setObjectiveModalVisibility'])->name('game.objective.modal_visibility');
     Route::post('/game/objective/start', [App\Http\Controllers\Api\GameController::class, 'startObjective'])->name('game.objective.start');
     Route::post('/game/objective/check', [App\Http\Controllers\Api\GameController::class, 'checkObjective'])->name('game.objective.check');

@@ -16,6 +16,7 @@ use App\Models\TargetHasScore;
 use App\Models\TargetHasScorePlayer;
 use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
+use App\Models\PlayerValue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -26,6 +27,15 @@ class PlayerObserver
      */
     public function created(Player $player): void
     {
+        PlayerValue::firstOrCreate(
+            ['player_id' => $player->id],
+            [
+                'movement' => false,
+                'consume' => false,
+                'attack' => false,
+            ]
+        );
+
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
         
