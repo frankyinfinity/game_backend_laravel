@@ -4,8 +4,7 @@ namespace App\Console\Commands;
 
 use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
-use App\Custom\Draw\Primitive\Rectangle;
-use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Helper\Helper;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
@@ -123,32 +122,21 @@ class TestDrawCommand extends Command
         $modal = new ModalDraw($modalUid);
         $modal->setScreenSize(1280, 720);
         $modal->setSize(760, 560);
-        $modal->setTitle('Test ModalDraw');
+        $modal->setTitle('Obiettivi');
         $modal->setRenderable(false);
 
-        $columns = 6;
-        $rows = 6;
-        $cellWidth = 220;
-        $cellHeight = 120;
-        $gapX = 14;
-        $gapY = 14;
+        $objectivePlayerId = 60;
+        $objectivePlayer = Player::find($objectivePlayerId);
+        if ($objectivePlayer) {
+            $objectiveTree = new ObjectiveTreeDraw('objective_tree_' . $objectivePlayerId, $objectivePlayer);
+            $objectiveTree->setOrigin(0, 0);
+            $objectiveTree->build();
 
-        for ($row = 0; $row < $rows; $row++) {
-            for ($col = 0; $col < $columns; $col++) {
-                $index = ($row * $columns) + $col;
-                $offsetX = $col * ($cellWidth + $gapX);
-                $offsetY = $row * ($cellHeight + $gapY);
-
-                $itemRect = new Rectangle('test_modal_item_rect_' . $index);
-                $itemRect->setSize($cellWidth, $cellHeight);
-                $itemRect->setColor(($index % 2) === 0 ? 0xE6E6E6 : 0xDADADA);
-                $modal->addContentItem($itemRect, $offsetX, $offsetY);
-
-                $itemText = new Text('test_modal_item_text_' . $index);
-                $itemText->setText('Cell [' . $row . ',' . $col . ']');
-                $itemText->setFontSize(18);
-                $itemText->setColor(0x111111);
-                $modal->addContentItem($itemText, $offsetX + 14, $offsetY + 12);
+            foreach ($objectiveTree->getDrawItems() as $objectiveItem) {
+                $json = $objectiveItem->buildJson();
+                $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
+                $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+                $modal->addContentItem($objectiveItem, $offsetX, $offsetY);
             }
         }
 

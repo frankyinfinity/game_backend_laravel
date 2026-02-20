@@ -10,6 +10,7 @@ window['__name__'] = function() {
 
     const attrs = viewportObject.attributes;
     const childUids = Array.isArray(attrs.scroll_child_uids) ? attrs.scroll_child_uids : [];
+    const basePointsMap = (attrs.scroll_base_points && typeof attrs.scroll_base_points === 'object') ? attrs.scroll_base_points : {};
     if (childUids.length === 0) {
         return;
     }
@@ -36,6 +37,9 @@ window['__name__'] = function() {
     let currentContentTop = null;
     let currentContentBottom = null;
     childUids.forEach(function(uid) {
+        const obj = objects[uid];
+        const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
+
         if (objects[uid] && typeof objects[uid].x === 'number' && typeof objects[uid].y === 'number') {
             currentBaseX[uid] = objects[uid].x;
             currentBaseY[uid] = objects[uid].y;
@@ -48,12 +52,26 @@ window['__name__'] = function() {
                 : 0;
         }
 
-        const itemW = (attrs.scroll_item_widths && typeof attrs.scroll_item_widths[uid] === 'number') ? attrs.scroll_item_widths[uid] : 1;
-        const itemH = (attrs.scroll_item_heights && typeof attrs.scroll_item_heights[uid] === 'number') ? attrs.scroll_item_heights[uid] : 1;
-        const left = currentBaseX[uid];
-        const right = currentBaseX[uid] + itemW;
-        const top = currentBaseY[uid];
-        const bottom = currentBaseY[uid] + itemH;
+        let left = currentBaseX[uid];
+        let right = currentBaseX[uid];
+        let top = currentBaseY[uid];
+        let bottom = currentBaseY[uid];
+
+        if (isMultiLine) {
+            const xs = basePointsMap[uid].map(function(p) { return Number(p.x) || 0; });
+            const ys = basePointsMap[uid].map(function(p) { return Number(p.y) || 0; });
+            left = Math.min.apply(null, xs);
+            right = Math.max.apply(null, xs);
+            top = Math.min.apply(null, ys);
+            bottom = Math.max.apply(null, ys);
+            currentBaseX[uid] = left;
+            currentBaseY[uid] = top;
+        } else {
+            const itemW = (attrs.scroll_item_widths && typeof attrs.scroll_item_widths[uid] === 'number') ? attrs.scroll_item_widths[uid] : 1;
+            const itemH = (attrs.scroll_item_heights && typeof attrs.scroll_item_heights[uid] === 'number') ? attrs.scroll_item_heights[uid] : 1;
+            right = currentBaseX[uid] + itemW;
+            bottom = currentBaseY[uid] + itemH;
+        }
 
         currentContentLeft = currentContentLeft === null ? left : Math.min(currentContentLeft, left);
         currentContentRight = currentContentRight === null ? right : Math.max(currentContentRight, right);
@@ -105,6 +123,8 @@ window['__name__'] = function() {
         childUids.forEach(function(uid) {
             const baseX = state.basePositionsX[uid];
             const baseY = state.basePositionsY[uid];
+            const obj = objects[uid];
+            const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
             if (typeof baseX !== 'number' || typeof baseY !== 'number') {
                 return;
             }
@@ -112,28 +132,75 @@ window['__name__'] = function() {
             const newX = baseX + appliedDeltaX;
             const newY = baseY + appliedDeltaY;
 
-            const fallbackWidth = (typeof state.itemWidths[uid] === 'number') ? state.itemWidths[uid] : 1;
-            const fallbackHeight = (typeof state.itemHeights[uid] === 'number') ? state.itemHeights[uid] : 1;
-            const shapeWidth = (shapes[uid] && typeof shapes[uid].width === 'number' && shapes[uid].width > 0) ? shapes[uid].width : fallbackWidth;
-            const shapeHeight = (shapes[uid] && typeof shapes[uid].height === 'number' && shapes[uid].height > 0) ? shapes[uid].height : fallbackHeight;
+            let left = newX;
+            let right = newX;
+            let top = newY;
+            let bottom = newY;
 
-            const right = newX + shapeWidth;
-            const bottom = newY + shapeHeight;
-            const intersectsX = right > state.viewportLeft && newX < state.viewportRight;
-            const intersectsY = bottom > state.viewportTop && newY < state.viewportBottom;
+            if (isMultiLine) {
+                const translatedPoints = basePointsMap[uid].map(function(p) {
+                    return {
+                        x: (Number(p.x) || 0) + appliedDeltaX,
+                        y: (Number(p.y) || 0) + appliedDeltaY
+                    };
+                });
+
+                const xs = translatedPoints.map(function(p) { return p.x; });
+                const ys = translatedPoints.map(function(p) { return p.y; });
+                left = Math.min.apply(null, xs);
+                right = Math.max.apply(null, xs);
+                top = Math.min.apply(null, ys);
+                bottom = Math.max.apply(null, ys);
+
+                if (shapes[uid] && typeof shapes[uid].clear === 'function') {
+                    const lineThickness = (obj && typeof obj.thickness === 'number') ? obj.thickness : 1;
+                    const lineColor = (obj && obj.color !== undefined && obj.color !== null) ? obj.color : 0x000000;
+                    shapes[uid].clear();
+                    shapes[uid].lineStyle(lineThickness, 0xFFFFFF);
+                    shapes[uid].tint = lineColor;
+                    if (translatedPoints.length > 0) {
+                        shapes[uid].moveTo(translatedPoints[0].x, translatedPoints[0].y);
+                        for (let i = 1; i < translatedPoints.length; i++) {
+                            shapes[uid].lineTo(translatedPoints[i].x, translatedPoints[i].y);
+                        }
+                    }
+                }
+
+                if (obj) {
+                    obj.points = translatedPoints;
+                    obj.x = left;
+                    obj.y = top;
+                }
+            } else {
+                const fallbackWidth = (typeof state.itemWidths[uid] === 'number') ? state.itemWidths[uid] : 1;
+                const fallbackHeight = (typeof state.itemHeights[uid] === 'number') ? state.itemHeights[uid] : 1;
+                const shapeWidth = (shapes[uid] && typeof shapes[uid].width === 'number' && shapes[uid].width > 0) ? shapes[uid].width : fallbackWidth;
+                const shapeHeight = (shapes[uid] && typeof shapes[uid].height === 'number' && shapes[uid].height > 0) ? shapes[uid].height : fallbackHeight;
+                right = newX + shapeWidth;
+                bottom = newY + shapeHeight;
+
+                if (shapes[uid]) {
+                    shapes[uid].x = newX;
+                    shapes[uid].y = newY;
+                }
+
+                if (obj) {
+                    obj.x = newX;
+                    obj.y = newY;
+                }
+            }
+
+            const intersectsX = right > state.viewportLeft && left < state.viewportRight;
+            const intersectsY = bottom > state.viewportTop && top < state.viewportBottom;
             const isVisible = intersectsX && intersectsY;
 
             if (shapes[uid]) {
-                shapes[uid].x = newX;
-                shapes[uid].y = newY;
                 shapes[uid].renderable = isVisible;
             }
 
-            if (objects[uid]) {
-                objects[uid].x = newX;
-                objects[uid].y = newY;
-                if (objects[uid].attributes) {
-                    objects[uid].attributes.renderable = isVisible;
+            if (obj) {
+                if (obj.attributes) {
+                    obj.attributes.renderable = isVisible;
                 }
             }
         });

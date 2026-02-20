@@ -24,6 +24,18 @@ class MultiLine extends BasicDraw
         $this->points[] = ['x' => $x, 'y' => $y];
     }
 
+    public function translatePoints(int $deltaX, int $deltaY): void
+    {
+        if ($deltaX === 0 && $deltaY === 0) {
+            return;
+        }
+
+        foreach ($this->points as $index => $point) {
+            $this->points[$index]['x'] = $point['x'] + $deltaX;
+            $this->points[$index]['y'] = $point['y'] + $deltaY;
+        }
+    }
+
     public function buildJson(): array
     {
         return $this->commonJson([

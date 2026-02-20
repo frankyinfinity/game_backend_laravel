@@ -50,15 +50,10 @@
         const ENABLE_GLOBAL_PAN = false;
         let worldLayer = null;
         let mainLayer = null;
-        let objectiveLayer = null;
         let modalViewportMasks = {};
         let globalPan = { x: 0, y: 0 };
         let isGlobalDragging = false;
         let globalDragStart = { x: 0, y: 0 };
-
-        function isObjectiveUid(uid) {
-            return typeof uid === 'string' && uid.startsWith('objective_tree_');
-        }
 
         function applyGlobalPan() {
             if (!worldLayer) return;
@@ -163,7 +158,9 @@
             let mask = modalViewportMasks[viewportUid];
             if (!mask) {
                 mask = new PIXI.Graphics();
-                mask.renderable = false;
+                // Keep mask renderable for reliable clipping in Pixi, but invisible.
+                mask.renderable = true;
+                mask.alpha = 0;
                 modalViewportMasks[viewportUid] = mask;
                 const parentLayer = viewportShape.parent || mainLayer;
                 parentLayer.addChild(mask);
@@ -191,6 +188,9 @@
                 }
             });
         }
+
+        // Expose for modal open/close scripts injected from backend.
+        window.refreshAllModalViewportMasks = refreshAllModalViewportMasks;
 
         class BasicDraw {
             constructor(object) {
@@ -222,8 +222,9 @@
                     this.shape.zIndex = object['attributes']['z_index'];
                 }
 
-                const targetLayer = isObjectiveUid(uid) ? objectiveLayer : mainLayer;
-                targetLayer.addChild(this.shape);
+                // Test page: render everything in one layer so modal viewport masks
+                // are always applied consistently.
+                mainLayer.addChild(this.shape);
                 shapes[uid] = this.shape;
                 objects[uid] = this.object;
                 this.addInteractive();
@@ -468,10 +469,6 @@
             mainLayer = new PIXI.Container();
             mainLayer.sortableChildren = true;
             worldLayer.addChild(mainLayer);
-
-            objectiveLayer = new PIXI.Container();
-            objectiveLayer.sortableChildren = true;
-            worldLayer.addChild(objectiveLayer);
 
             if (typeof AppData !== 'undefined') {
                 AppData.enable_global_pan = ENABLE_GLOBAL_PAN;

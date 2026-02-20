@@ -4,6 +4,7 @@ namespace App\Custom\Draw\Complex;
 
 use App\Custom\Colors;
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
@@ -198,6 +199,8 @@ class ModalDraw
         $basePositionsY = [];
         $itemWidths = [];
         $itemHeights = [];
+        $basePoints = [];
+        $initialRenderables = [];
         $contentLeft = null;
         $contentRight = null;
         $contentTop = null;
@@ -206,9 +209,18 @@ class ModalDraw
         foreach ($this->contentItems as $index => $item) {
             /** @var BasicDraw $draw */
             $draw = $item['draw'];
+            $before = $draw->buildJson();
+            $originalRenderable = (bool) (($before['attributes']['renderable'] ?? true));
             $absoluteX = $contentX + $item['offset_x'];
             $absoluteY = $contentY + $item['offset_y'];
             $draw->setOrigin($absoluteX, $absoluteY);
+
+            if ($draw instanceof MultiLine) {
+                $beforeX = (isset($before['x']) && is_numeric($before['x'])) ? (int) $before['x'] : 0;
+                $beforeY = (isset($before['y']) && is_numeric($before['y'])) ? (int) $before['y'] : 0;
+                $draw->translatePoints($absoluteX - $beforeX, $absoluteY - $beforeY);
+            }
+
             $draw->setRenderable($this->renderable);
             $draw->addAttributes('z_index', 20020 + $index);
 
@@ -216,16 +228,33 @@ class ModalDraw
             $width = $this->estimateItemWidth($preview);
             $height = $this->estimateItemHeight($preview);
 
-            $contentLeft = $contentLeft === null ? $absoluteX : min($contentLeft, $absoluteX);
-            $contentRight = $contentRight === null ? ($absoluteX + $width) : max($contentRight, ($absoluteX + $width));
-            $contentTop = $contentTop === null ? $absoluteY : min($contentTop, $absoluteY);
-            $contentBottom = $contentBottom === null ? ($absoluteY + $height) : max($contentBottom, ($absoluteY + $height));
+            $itemLeft = $absoluteX;
+            $itemRight = $absoluteX + $width;
+            $itemTop = $absoluteY;
+            $itemBottom = $absoluteY + $height;
+
+            if (isset($preview['points']) && is_array($preview['points']) && count($preview['points']) > 0) {
+                $xs = array_map(static fn($p) => (int) ($p['x'] ?? 0), $preview['points']);
+                $ys = array_map(static fn($p) => (int) ($p['y'] ?? 0), $preview['points']);
+                $itemLeft = min($xs);
+                $itemRight = max($xs);
+                $itemTop = min($ys);
+                $itemBottom = max($ys);
+                $basePoints[$draw->getUid()] = $preview['points'];
+            }
+
+            $contentLeft = $contentLeft === null ? $itemLeft : min($contentLeft, $itemLeft);
+            $contentRight = $contentRight === null ? $itemRight : max($contentRight, $itemRight);
+            $contentTop = $contentTop === null ? $itemTop : min($contentTop, $itemTop);
+            $contentBottom = $contentBottom === null ? $itemBottom : max($contentBottom, $itemBottom);
 
             $childUids[] = $draw->getUid();
             $basePositionsX[$draw->getUid()] = $absoluteX;
             $basePositionsY[$draw->getUid()] = $absoluteY;
             $itemWidths[$draw->getUid()] = $width;
             $itemHeights[$draw->getUid()] = $height;
+            // Preserve the draw's intended visibility before modal-level hiding.
+            $initialRenderables[$draw->getUid()] = $originalRenderable;
             $contentViewport->addChild($draw);
             $this->drawItems[] = $draw;
         }
@@ -235,6 +264,8 @@ class ModalDraw
         $contentViewport->addAttributes('scroll_base_positions_y', $basePositionsY);
         $contentViewport->addAttributes('scroll_item_widths', $itemWidths);
         $contentViewport->addAttributes('scroll_item_heights', $itemHeights);
+        $contentViewport->addAttributes('scroll_base_points', $basePoints);
+        $contentViewport->addAttributes('scroll_initial_renderables', $initialRenderables);
         $contentViewport->addAttributes('scroll_viewport_left', $contentX);
         $contentViewport->addAttributes('scroll_viewport_right', $contentX + $contentWidth);
         $contentViewport->addAttributes('scroll_viewport_top', $contentY);
@@ -254,6 +285,10 @@ class ModalDraw
 
     private function estimateItemHeight(array $draw): int
     {
+        if (isset($draw['points']) && is_array($draw['points']) && count($draw['points']) > 0) {
+            $ys = array_map(static fn($p) => (int) ($p['y'] ?? 0), $draw['points']);
+            return max(1, max($ys) - min($ys));
+        }
         if (isset($draw['height']) && is_numeric($draw['height'])) {
             return (int) $draw['height'];
         }
@@ -272,6 +307,10 @@ class ModalDraw
 
     private function estimateItemWidth(array $draw): int
     {
+        if (isset($draw['points']) && is_array($draw['points']) && count($draw['points']) > 0) {
+            $xs = array_map(static fn($p) => (int) ($p['x'] ?? 0), $draw['points']);
+            return max(1, max($xs) - min($xs));
+        }
         if (isset($draw['width']) && is_numeric($draw['width'])) {
             return (int) $draw['width'];
         }
