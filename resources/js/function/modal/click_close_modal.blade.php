@@ -2,6 +2,12 @@
 
 window['__name__'] = function() {
     const modalUid = '__MODAL_UID__';
+    if (typeof AppData !== 'undefined') {
+        if (!AppData.open_modals || typeof AppData.open_modals !== 'object') {
+            AppData.open_modals = {};
+        }
+        AppData.open_modals[modalUid] = false;
+    }
     const idsToHide = [
         modalUid + '_body',
         modalUid + '_header',

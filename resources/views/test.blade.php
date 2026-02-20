@@ -213,6 +213,65 @@
         // Expose for modal open/close scripts injected from backend.
         window.refreshAllModalViewportMasks = refreshAllModalViewportMasks;
 
+        function applyModalOpenState(modalUid) {
+            const viewportUid = modalUid + '_content_viewport';
+            const idsToAlwaysShow = [
+                modalUid + '_body',
+                modalUid + '_header',
+                modalUid + '_title',
+                modalUid + '_close_button',
+                modalUid + '_close_text',
+                viewportUid,
+            ];
+
+            idsToAlwaysShow.forEach((uid) => {
+                if (shapes[uid]) shapes[uid].renderable = true;
+                if (objects[uid] && objects[uid].attributes) {
+                    objects[uid].attributes.renderable = true;
+                }
+            });
+
+            const viewportObject = objects[viewportUid];
+            if (viewportObject && viewportObject.attributes && Array.isArray(viewportObject.attributes.scroll_child_uids)) {
+                const initialRenderables = (viewportObject.attributes.scroll_initial_renderables && typeof viewportObject.attributes.scroll_initial_renderables === 'object')
+                    ? viewportObject.attributes.scroll_initial_renderables
+                    : {};
+                const childUids = viewportObject.attributes.scroll_child_uids;
+
+                const isPanelUid = (uid) => typeof uid === 'string' && uid.indexOf('_container_panel') !== -1;
+                const hasVisibleBaseContent = childUids.some((uid) => {
+                    if (isPanelUid(uid)) return false;
+                    return initialRenderables[uid] === undefined ? true : !!initialRenderables[uid];
+                });
+
+                childUids.forEach((uid) => {
+                    let shouldShow = initialRenderables[uid] === undefined ? true : !!initialRenderables[uid];
+                    // Fallback for objective redraw: if server rebuilt modal content while closed,
+                    // all initial renderables may be false. When modal is open, keep base tree
+                    // content visible and keep panel elements hidden until explicit click.
+                    if (!hasVisibleBaseContent) {
+                        shouldShow = !isPanelUid(uid);
+                    }
+                    if (shapes[uid]) shapes[uid].renderable = shouldShow;
+                    if (objects[uid] && objects[uid].attributes) {
+                        objects[uid].attributes.renderable = shouldShow;
+                    }
+                });
+            }
+        }
+
+        function reapplyOpenModalsState() {
+            const openModals = (window.AppData && window.AppData.open_modals) ? window.AppData.open_modals : {};
+            Object.keys(openModals).forEach((modalUid) => {
+                if (openModals[modalUid]) {
+                    applyModalOpenState(modalUid);
+                }
+            });
+            refreshAllModalViewportMasks();
+        }
+
+        window.reapplyOpenModalsState = reapplyOpenModalsState;
+
         class BasicDraw {
             constructor(object) {
                 this.object = object;
@@ -672,6 +731,7 @@
                         }
                     }
                     refreshAllModalViewportMasks();
+                    reapplyOpenModalsState();
                     app.stage.sortChildren();
                     status('Disegno completato');
                 }

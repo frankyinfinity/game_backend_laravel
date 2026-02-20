@@ -2,6 +2,12 @@
 
 window['__name__'] = function() {
     const modalUid = '__MODAL_UID__';
+    if (typeof AppData !== 'undefined') {
+        if (!AppData.open_modals || typeof AppData.open_modals !== 'object') {
+            AppData.open_modals = {};
+        }
+        AppData.open_modals[modalUid] = true;
+    }
     const viewportUid = modalUid + '_content_viewport';
     const idsToAlwaysShow = [
         modalUid + '_body',
@@ -40,6 +46,9 @@ window['__name__'] = function() {
 
     if (typeof window.refreshAllModalViewportMasks === 'function') {
         window.refreshAllModalViewportMasks();
+    }
+    if (typeof window.reapplyOpenModalsState === 'function') {
+        window.reapplyOpenModalsState();
     }
 
     window.__disableGlobalPan = true;

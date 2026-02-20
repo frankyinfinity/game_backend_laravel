@@ -48,6 +48,7 @@ use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Custom\Colors;
@@ -1090,21 +1091,60 @@ class GameController extends Controller
                 ObjectCache::buffer($sessionId);
 
                 $existingObjects = ObjectCache::all($sessionId);
-                foreach ($existingObjects as $uid => $object) {
-                    if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                $objectiveRenderable = $this->resolveObjectiveRenderableFromCache($existingObjects, $objectiveTreeUidPrefix);
+                $modalContext = $this->resolveObjectiveModalContext($existingObjects, $objectiveTreeUidPrefix);
+
+                if ($modalContext !== null) {
+                    foreach ($modalContext['uids_to_clear'] as $uid) {
+                        if (!isset($existingObjects[$uid])) {
+                            continue;
+                        }
                         $objectClear = new ObjectClear($uid, $sessionId);
                         $objectiveDrawCommands[] = $objectClear->get();
                         ObjectCache::forget($sessionId, $uid);
                     }
-                }
 
-                $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
-                $objectiveTree->setOrigin(20, 20);
-                $objectiveTree->build();
+                    $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                    $objectiveTree->setOrigin(0, 0);
+                    $objectiveTree->build();
 
-                foreach ($objectiveTree->getDrawItems() as $drawItem) {
-                    $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-                    $objectiveDrawCommands[] = $objectDraw->get();
+                    $modal = new ModalDraw($modalContext['modal_uid']);
+                    $modal->setOrigin($modalContext['x'], $modalContext['y']);
+                    $modal->setSize($modalContext['width'], $modalContext['height']);
+                    $modal->setTitle($modalContext['title']);
+                    $modal->setRenderable($modalContext['renderable']);
+
+                    foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                        $json = $drawItem->buildJson();
+                        $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
+                        $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+                        $modal->addContentItem($drawItem, $offsetX, $offsetY);
+                    }
+
+                    $modal->build();
+
+                    foreach ($modal->getDrawItems() as $drawItem) {
+                        $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                        $objectiveDrawCommands[] = $objectDraw->get();
+                    }
+                } else {
+                    foreach ($existingObjects as $uid => $object) {
+                        if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                            $objectClear = new ObjectClear($uid, $sessionId);
+                            $objectiveDrawCommands[] = $objectClear->get();
+                            ObjectCache::forget($sessionId, $uid);
+                        }
+                    }
+
+                    $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                    $objectiveTree->setOrigin(20, 20);
+                    $objectiveTree->setRenderable($objectiveRenderable);
+                    $objectiveTree->build();
+
+                    foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                        $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                        $objectiveDrawCommands[] = $objectDraw->get();
+                    }
                 }
 
                 ObjectCache::flush($sessionId);
@@ -1964,21 +2004,60 @@ class GameController extends Controller
             ObjectCache::buffer($sessionId);
 
             $existingObjects = ObjectCache::all($sessionId);
-            foreach ($existingObjects as $uid => $object) {
-                if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+            $objectiveRenderable = $this->resolveObjectiveRenderableFromCache($existingObjects, $objectiveTreeUidPrefix);
+            $modalContext = $this->resolveObjectiveModalContext($existingObjects, $objectiveTreeUidPrefix);
+
+            if ($modalContext !== null) {
+                foreach ($modalContext['uids_to_clear'] as $uid) {
+                    if (!isset($existingObjects[$uid])) {
+                        continue;
+                    }
                     $objectClear = new ObjectClear($uid, $sessionId);
                     $objectiveDrawCommands[] = $objectClear->get();
                     ObjectCache::forget($sessionId, $uid);
                 }
-            }
 
-            $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
-            $objectiveTree->setOrigin(20, 20);
-            $objectiveTree->build();
+                $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                $objectiveTree->setOrigin(0, 0);
+                $objectiveTree->build();
 
-            foreach ($objectiveTree->getDrawItems() as $drawItem) {
-                $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-                $objectiveDrawCommands[] = $objectDraw->get();
+                $modal = new ModalDraw($modalContext['modal_uid']);
+                $modal->setOrigin($modalContext['x'], $modalContext['y']);
+                $modal->setSize($modalContext['width'], $modalContext['height']);
+                $modal->setTitle($modalContext['title']);
+                $modal->setRenderable($modalContext['renderable']);
+
+                foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                    $json = $drawItem->buildJson();
+                    $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
+                    $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+                    $modal->addContentItem($drawItem, $offsetX, $offsetY);
+                }
+
+                $modal->build();
+
+                foreach ($modal->getDrawItems() as $drawItem) {
+                    $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                    $objectiveDrawCommands[] = $objectDraw->get();
+                }
+            } else {
+                foreach ($existingObjects as $uid => $object) {
+                    if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                        $objectClear = new ObjectClear($uid, $sessionId);
+                        $objectiveDrawCommands[] = $objectClear->get();
+                        ObjectCache::forget($sessionId, $uid);
+                    }
+                }
+
+                $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                $objectiveTree->setOrigin(20, 20);
+                $objectiveTree->setRenderable($objectiveRenderable);
+                $objectiveTree->build();
+
+                foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                    $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                    $objectiveDrawCommands[] = $objectDraw->get();
+                }
             }
 
             ObjectCache::flush($sessionId);
@@ -2035,6 +2114,115 @@ class GameController extends Controller
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Keep objective redraw aligned with current modal visibility.
+     * If objectives are rendered inside a modal viewport, use viewport renderable.
+     */
+    private function resolveObjectiveRenderableFromCache(array $existingObjects, string $objectiveTreeUidPrefix): bool
+    {
+        foreach ($existingObjects as $object) {
+            $attributes = $object['attributes'] ?? null;
+            if (!is_array($attributes)) {
+                continue;
+            }
+
+            $scrollChildUids = $attributes['scroll_child_uids'] ?? null;
+            if (!is_array($scrollChildUids) || empty($scrollChildUids)) {
+                continue;
+            }
+
+            foreach ($scrollChildUids as $childUid) {
+                if (is_string($childUid) && Str::startsWith($childUid, $objectiveTreeUidPrefix)) {
+                    return (bool) ($attributes['renderable'] ?? true);
+                }
+            }
+        }
+
+        foreach ($existingObjects as $uid => $object) {
+            if (is_string($uid) && Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                return (bool) (($object['attributes']['renderable'] ?? true));
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Detect if the objective tree is rendered inside a modal viewport and
+     * return enough info to rebuild the whole modal on objective refresh.
+     */
+    private function resolveObjectiveModalContext(array $existingObjects, string $objectiveTreeUidPrefix): ?array
+    {
+        foreach ($existingObjects as $uid => $object) {
+            $attributes = $object['attributes'] ?? null;
+            if (!is_array($attributes)) {
+                continue;
+            }
+
+            $scrollChildUids = $attributes['scroll_child_uids'] ?? null;
+            if (!is_array($scrollChildUids) || empty($scrollChildUids)) {
+                continue;
+            }
+
+            $containsObjective = false;
+            foreach ($scrollChildUids as $childUid) {
+                if (is_string($childUid) && Str::startsWith($childUid, $objectiveTreeUidPrefix)) {
+                    $containsObjective = true;
+                    break;
+                }
+            }
+            if (!$containsObjective) {
+                continue;
+            }
+
+            $modalUid = $attributes['modal_uid'] ?? null;
+            if (!is_string($modalUid) || $modalUid === '') {
+                if (is_string($uid) && Str::endsWith($uid, '_content_viewport')) {
+                    $modalUid = substr($uid, 0, -strlen('_content_viewport'));
+                } else {
+                    continue;
+                }
+            }
+
+            $bodyUid = $modalUid . '_body';
+            $titleUid = $modalUid . '_title';
+            $body = $existingObjects[$bodyUid] ?? null;
+            $title = $existingObjects[$titleUid] ?? null;
+
+            $x = isset($body['x']) ? (int) $body['x'] : 0;
+            $y = isset($body['y']) ? (int) $body['y'] : 0;
+            $width = isset($body['width']) ? (int) $body['width'] : 760;
+            $height = isset($body['height']) ? (int) $body['height'] : 560;
+            $renderable = (bool) (($body['attributes']['renderable'] ?? ($attributes['renderable'] ?? true)));
+            $titleText = is_array($title) && isset($title['text']) ? (string) $title['text'] : 'Obiettivi';
+
+            $uidsToClear = [];
+            foreach ($existingObjects as $existingUid => $_) {
+                if (is_string($existingUid) && Str::startsWith($existingUid, $modalUid . '_')) {
+                    $uidsToClear[] = $existingUid;
+                }
+            }
+            foreach ($scrollChildUids as $childUid) {
+                if (is_string($childUid)) {
+                    $uidsToClear[] = $childUid;
+                }
+            }
+
+            return [
+                'modal_uid' => $modalUid,
+                'x' => $x,
+                'y' => $y,
+                'width' => $width,
+                'height' => $height,
+                'title' => $titleText,
+                'renderable' => $renderable,
+                'uids_to_clear' => array_values(array_unique($uidsToClear)),
+            ];
+        }
+
+        return null;
     }
 
 }
