@@ -243,10 +243,15 @@ class ModalDraw
                 $basePoints[$draw->getUid()] = $preview['points'];
             }
 
-            $contentLeft = $contentLeft === null ? $itemLeft : min($contentLeft, $itemLeft);
-            $contentRight = $contentRight === null ? $itemRight : max($contentRight, $itemRight);
-            $contentTop = $contentTop === null ? $itemTop : min($contentTop, $itemTop);
-            $contentBottom = $contentBottom === null ? $itemBottom : max($contentBottom, $itemBottom);
+            // Compute scroll bounds from items intended to be visible at modal open.
+            // Hidden per-target panels are still tracked/moved, but must not inflate
+            // the initial viewport content area.
+            if ($originalRenderable) {
+                $contentLeft = $contentLeft === null ? $itemLeft : min($contentLeft, $itemLeft);
+                $contentRight = $contentRight === null ? $itemRight : max($contentRight, $itemRight);
+                $contentTop = $contentTop === null ? $itemTop : min($contentTop, $itemTop);
+                $contentBottom = $contentBottom === null ? $itemBottom : max($contentBottom, $itemBottom);
+            }
 
             $childUids[] = $draw->getUid();
             $basePositionsX[$draw->getUid()] = $absoluteX;

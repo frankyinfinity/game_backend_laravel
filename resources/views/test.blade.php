@@ -140,6 +140,27 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        function toPixiColor(value, fallback = 0xFFFFFF) {
+            if (value === null || value === undefined) return fallback;
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (trimmed.startsWith('#')) {
+                    const parsed = parseInt(trimmed.slice(1), 16);
+                    return Number.isFinite(parsed) ? parsed : fallback;
+                }
+                if (/^0x[0-9a-f]+$/i.test(trimmed)) {
+                    const parsed = parseInt(trimmed, 16);
+                    return Number.isFinite(parsed) ? parsed : fallback;
+                }
+                if (/^[0-9a-f]{6}$/i.test(trimmed)) {
+                    const parsed = parseInt(trimmed, 16);
+                    return Number.isFinite(parsed) ? parsed : fallback;
+                }
+            }
+            return fallback;
+        }
+
         function ensureModalViewportMask(viewportUid) {
             const viewportObject = objects[viewportUid];
             const viewportShape = shapes[viewportUid];
@@ -282,21 +303,24 @@
             }
             build() {
                 const object = this.object;
+                const fillColor = toPixiColor(object['color'], 0xFFFFFF);
+                const borderColor = object['borderColor'] !== null && object['borderColor'] !== undefined
+                    ? toPixiColor(object['borderColor'], fillColor)
+                    : null;
                 
                 // Check if we need rounded corners
                 const borderRadius = object['borderRadius'] || 0;
-                const borderColor = object['borderColor'];
                 
-                if (borderRadius > 0 && borderColor) {
+                if (borderRadius > 0 && borderColor !== null) {
                     // Draw rounded rectangle with border
                     this.shape.beginFill(borderColor);
                     this.shape.drawRoundedRect(0, 0, object['width'], object['height'], borderRadius);
                     this.shape.endFill();
                     
                     // Draw inner fill if color is different
-                    if (object['color'] && object['color'] !== borderColor) {
+                    if (fillColor !== borderColor) {
                         const padding = 2;
-                        this.shape.beginFill(object['color']);
+                        this.shape.beginFill(fillColor);
                         this.shape.drawRoundedRect(
                             padding, 
                             padding, 
@@ -308,14 +332,13 @@
                     }
                 } else {
                     // Regular rectangle
-                    this.shape.beginFill(0xFFFFFF);
+                    this.shape.beginFill(fillColor);
                     this.shape.drawRect(0, 0, object['width'], object['height']);
                     this.shape.endFill();
                 }
                 
                 this.shape.x = object['x'];
                 this.shape.y = object['y'];
-                this.shape.tint = object['color'] || 0xFFFFFF;
             }
         }
 
@@ -326,11 +349,10 @@
             }
             build() {
                 const object = this.object;
-                const lineColor = object['color'];
+                const lineColor = toPixiColor(object['color'], 0x666666);
                 const lineThickness = object['thickness'] || 1;
                 const points = object['points'];
-                this.shape.lineStyle(lineThickness, 0xFFFFFF);
-                this.shape.tint = lineColor;
+                this.shape.lineStyle(lineThickness, lineColor);
                 if (points && points.length > 0) {
                     this.shape.moveTo(points[0].x, points[0].y);
                     for (let i = 1; i < points.length; i++) {
@@ -347,10 +369,10 @@
             }
             build() {
                 const object = this.object;
-                this.shape.beginFill(0xFFFFFF);
+                const fillColor = toPixiColor(object['color'], 0xFFFFFF);
+                this.shape.beginFill(fillColor);
                 this.shape.drawCircle(0, 0, object['radius']);
                 this.shape.endFill();
-                this.shape.tint = object['color'];
                 this.shape.x = object['x'];
                 this.shape.y = object['y'];
             }

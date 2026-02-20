@@ -11,8 +11,30 @@ window['__name__'] = function() {
     const attrs = viewportObject.attributes;
     const childUids = Array.isArray(attrs.scroll_child_uids) ? attrs.scroll_child_uids : [];
     const basePointsMap = (attrs.scroll_base_points && typeof attrs.scroll_base_points === 'object') ? attrs.scroll_base_points : {};
+    const initialRenderables = (attrs.scroll_initial_renderables && typeof attrs.scroll_initial_renderables === 'object') ? attrs.scroll_initial_renderables : {};
     if (childUids.length === 0) {
         return;
+    }
+
+    function toPixiColor(value, fallback) {
+        if (value === null || value === undefined) return fallback;
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (trimmed.startsWith('#')) {
+                const parsed = parseInt(trimmed.slice(1), 16);
+                return Number.isFinite(parsed) ? parsed : fallback;
+            }
+            if (/^0x[0-9a-f]+$/i.test(trimmed)) {
+                const parsed = parseInt(trimmed, 16);
+                return Number.isFinite(parsed) ? parsed : fallback;
+            }
+            if (/^[0-9a-f]{6}$/i.test(trimmed)) {
+                const parsed = parseInt(trimmed, 16);
+                return Number.isFinite(parsed) ? parsed : fallback;
+            }
+        }
+        return fallback;
     }
 
     function getPointerPosition(e) {
@@ -39,6 +61,9 @@ window['__name__'] = function() {
     childUids.forEach(function(uid) {
         const obj = objects[uid];
         const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
+        const initiallyVisible = initialRenderables[uid] === undefined ? true : !!initialRenderables[uid];
+        const currentlyVisible = !!(obj && obj.attributes && obj.attributes.renderable);
+        const includeInBounds = initiallyVisible || currentlyVisible;
 
         if (objects[uid] && typeof objects[uid].x === 'number' && typeof objects[uid].y === 'number') {
             currentBaseX[uid] = objects[uid].x;
@@ -73,10 +98,12 @@ window['__name__'] = function() {
             bottom = currentBaseY[uid] + itemH;
         }
 
-        currentContentLeft = currentContentLeft === null ? left : Math.min(currentContentLeft, left);
-        currentContentRight = currentContentRight === null ? right : Math.max(currentContentRight, right);
-        currentContentTop = currentContentTop === null ? top : Math.min(currentContentTop, top);
-        currentContentBottom = currentContentBottom === null ? bottom : Math.max(currentContentBottom, bottom);
+        if (includeInBounds) {
+            currentContentLeft = currentContentLeft === null ? left : Math.min(currentContentLeft, left);
+            currentContentRight = currentContentRight === null ? right : Math.max(currentContentRight, right);
+            currentContentTop = currentContentTop === null ? top : Math.min(currentContentTop, top);
+            currentContentBottom = currentContentBottom === null ? bottom : Math.max(currentContentBottom, bottom);
+        }
     });
 
     const state = {
@@ -154,10 +181,9 @@ window['__name__'] = function() {
 
                 if (shapes[uid] && typeof shapes[uid].clear === 'function') {
                     const lineThickness = (obj && typeof obj.thickness === 'number') ? obj.thickness : 1;
-                    const lineColor = (obj && obj.color !== undefined && obj.color !== null) ? obj.color : 0x000000;
+                    const lineColor = toPixiColor((obj && obj.color !== undefined && obj.color !== null) ? obj.color : null, 0x000000);
                     shapes[uid].clear();
-                    shapes[uid].lineStyle(lineThickness, 0xFFFFFF);
-                    shapes[uid].tint = lineColor;
+                    shapes[uid].lineStyle(lineThickness, lineColor);
                     if (translatedPoints.length > 0) {
                         shapes[uid].moveTo(translatedPoints[0].x, translatedPoints[0].y);
                         for (let i = 1; i < translatedPoints.length; i++) {

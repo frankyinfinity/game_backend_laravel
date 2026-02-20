@@ -134,6 +134,12 @@ class TestDrawCommand extends Command
 
             foreach ($objectiveTree->getDrawItems() as $objectiveItem) {
                 $json = $objectiveItem->buildJson();
+                $isInitiallyRenderable = (bool) (($json['attributes']['renderable'] ?? true));
+                if (!$isInitiallyRenderable) {
+                    // Skip hidden nested panel items in test modal: they are not needed
+                    // to render the tree and can break viewport/bounds behavior.
+                    continue;
+                }
                 $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
                 $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
                 $modal->addContentItem($objectiveItem, $offsetX, $offsetY);
