@@ -49,17 +49,35 @@
             if (shapes[startBtnUid]) {
                 shapes[startBtnUid].renderable = !!visible;
             }
+            if (objects[startBtnUid] && objects[startBtnUid]['attributes']) {
+                objects[startBtnUid]['attributes']['renderable'] = !!visible;
+            }
             if (shapes[startBtnTextUid]) {
                 shapes[startBtnTextUid].renderable = !!visible;
             }
+            if (objects[startBtnTextUid] && objects[startBtnTextUid]['attributes']) {
+                objects[startBtnTextUid]['attributes']['renderable'] = !!visible;
+            }
         };
         const setAllStartButtonsVisible = function(visible) {
-            if (typeof shapes === 'undefined') return;
-            Object.keys(shapes).forEach(function(uid) {
-                if (uid.endsWith('_panel_start_btn') || uid.endsWith('_panel_start_btn_text')) {
-                    shapes[uid].renderable = !!visible;
-                }
-            });
+            const renderable = !!visible;
+            if (typeof shapes !== 'undefined') {
+                Object.keys(shapes).forEach(function(uid) {
+                    if (uid.endsWith('_panel_start_btn') || uid.endsWith('_panel_start_btn_text')) {
+                        shapes[uid].renderable = renderable;
+                    }
+                });
+            }
+            if (typeof objects !== 'undefined') {
+                Object.keys(objects).forEach(function(uid) {
+                    if (uid.endsWith('_panel_start_btn') || uid.endsWith('_panel_start_btn_text')) {
+                        if (!objects[uid]['attributes']) {
+                            objects[uid]['attributes'] = {};
+                        }
+                        objects[uid]['attributes']['renderable'] = renderable;
+                    }
+                });
+            }
         };
         const hasAnyInProgressTarget = function() {
             if (typeof objects === 'undefined') return false;
@@ -118,15 +136,19 @@
             shapes[stateValueUid].text = getStateLabel('in_progress');
         }
 
+        const requestData = {
+            player_id: resolvedPlayerId,
+            target_player_id: targetPlayerId,
+            draw_player_id: resolvedDrawPlayerId
+        };
+        if (resolvedSessionId) {
+            requestData.session_id = resolvedSessionId;
+        }
+
         $.ajax({
             url: `${BACK_URL}/api/auth/game/objective/start`,
             type: 'POST',
-            data: {
-                player_id: resolvedPlayerId,
-                target_player_id: targetPlayerId,
-                draw_player_id: resolvedDrawPlayerId,
-                session_id: resolvedSessionId
-            },
+            data: requestData,
             success: function(result) {
                 if (!result.success) {
                     console.warn('Start objective failed', result);

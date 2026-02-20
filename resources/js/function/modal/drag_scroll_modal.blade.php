@@ -62,9 +62,12 @@ window['__name__'] = function() {
     childUids.forEach(function(uid) {
         const obj = objects[uid];
         const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
+        const isPanelItem = typeof uid === 'string' && uid.indexOf('_container_panel') !== -1;
         const initiallyVisible = initialRenderables[uid] === undefined ? true : !!initialRenderables[uid];
         const currentlyVisible = !!(obj && obj.attributes && obj.attributes.renderable);
-        const includeInBounds = initiallyVisible || currentlyVisible;
+        // Keep non-panel content always in bounds computation, otherwise
+        // after some state transitions the viewport can "lose" all items.
+        const includeInBounds = !isPanelItem || initiallyVisible || currentlyVisible;
 
         if (objects[uid] && typeof objects[uid].x === 'number' && typeof objects[uid].y === 'number') {
             currentBaseX[uid] = objects[uid].x;

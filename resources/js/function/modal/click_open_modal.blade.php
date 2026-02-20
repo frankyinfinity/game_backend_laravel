@@ -192,15 +192,18 @@ window['__name__'] = function() {
         }
 
         if (resolvedPlayerId) {
+            const requestData = {
+                player_id: resolvedPlayerId,
+                modal_uid: modalUid,
+                renderable: true
+            };
+            if (resolvedSessionId) {
+                requestData.session_id = resolvedSessionId;
+            }
             $.ajax({
                 url: `${BACK_URL}/api/auth/game/objective/modal_visibility`,
                 type: 'POST',
-                data: {
-                    player_id: resolvedPlayerId,
-                    session_id: resolvedSessionId,
-                    modal_uid: modalUid,
-                    renderable: true
-                }
+                data: requestData
             });
         }
     }
