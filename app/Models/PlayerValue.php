@@ -6,11 +6,118 @@ use Illuminate\Database\Eloquent\Model;
 
 class PlayerValue extends Model
 {
+    public const TYPE_BOOLEAN = 'boolean';
+    public const TYPE_INTEGER = 'integer';
+    public const TYPE_FLOAT = 'float';
+    public const TYPE_STRING = 'string';
+    public const TYPE_JSON = 'json';
+
+    public const KEY_MOVEMENT = 'movement';
+    public const KEY_CONSUME = 'consume';
+    public const KEY_ATTACK = 'attack';
+
+    public const ALL_KEYS = [
+        self::KEY_MOVEMENT,
+        self::KEY_CONSUME,
+        self::KEY_ATTACK,
+    ];
+
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
     public function player()
     {
         return $this->belongsTo(Player::class);
     }
-}
 
+    public static function ensureDefaultsForPlayer(int $playerId): void
+    {
+        foreach (self::ALL_KEYS as $key) {
+            self::query()->updateOrCreate(
+                ['player_id' => $playerId, 'key' => $key],
+                [
+                    'data_type' => self::TYPE_BOOLEAN,
+                    'value' => '0',
+                ]
+            );
+        }
+    }
+
+    public static function setFlag(int $playerId, string $key, bool $value): void
+    {
+        if (!in_array($key, self::ALL_KEYS, true)) {
+            return;
+        }
+
+        self::query()->updateOrCreate(
+            ['player_id' => $playerId, 'key' => $key],
+            [
+                'data_type' => self::TYPE_BOOLEAN,
+                'value' => $value ? '1' : '0',
+            ]
+        );
+    }
+
+    public static function setValue(int $playerId, string $key, mixed $value, string $dataType = self::TYPE_STRING): void
+    {
+        self::query()->updateOrCreate(
+            ['player_id' => $playerId, 'key' => $key],
+            [
+                'data_type' => $dataType,
+                'value' => self::encodeValue($value, $dataType),
+            ]
+        );
+    }
+
+    public static function resetAll(int $playerId): void
+    {
+        self::ensureDefaultsForPlayer($playerId);
+
+        self::query()
+            ->where('player_id', $playerId)
+            ->whereIn('key', self::ALL_KEYS)
+            ->update([
+                'data_type' => self::TYPE_BOOLEAN,
+                'value' => '0',
+            ]);
+    }
+
+    public static function hasAnyActive(int $playerId): bool
+    {
+        self::ensureDefaultsForPlayer($playerId);
+
+        $values = self::query()
+            ->where('player_id', $playerId)
+            ->whereIn('key', self::ALL_KEYS)
+            ->get(['data_type', 'value']);
+
+        foreach ($values as $row) {
+            if ((bool) self::decodeValue($row->value, (string) $row->data_type)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function encodeValue(mixed $value, string $dataType): ?string
+    {
+        return match ($dataType) {
+            self::TYPE_BOOLEAN => $value ? '1' : '0',
+            self::TYPE_INTEGER => (string) ((int) $value),
+            self::TYPE_FLOAT => (string) ((float) $value),
+            self::TYPE_JSON => json_encode($value),
+            default => $value === null ? null : (string) $value,
+        };
+    }
+
+    public static function decodeValue(?string $value, string $dataType): mixed
+    {
+        return match ($dataType) {
+            self::TYPE_BOOLEAN => in_array(strtolower((string) $value), ['1', 'true', 'yes', 'on'], true),
+            self::TYPE_INTEGER => (int) $value,
+            self::TYPE_FLOAT => (float) $value,
+            self::TYPE_JSON => $value === null ? null : json_decode($value, true),
+            default => $value,
+        };
+    }
+}

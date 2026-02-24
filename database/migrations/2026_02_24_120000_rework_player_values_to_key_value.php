@@ -13,11 +13,13 @@ return new class extends Migration
     {
         Schema::create('player_values', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('player_id')->unique()->constrained('players')->cascadeOnDelete();
-            $table->boolean('movement')->default(false);
-            $table->boolean('consume')->default(false);
-            $table->boolean('attack')->default(false);
+            $table->foreignId('player_id')->constrained('players')->cascadeOnDelete();
+            $table->string('key', 100);
+            $table->string('data_type', 20)->default('string');
+            $table->text('value')->nullable();
             $table->timestamps();
+
+            $table->unique(['player_id', 'key'], 'player_values_player_id_key_unique');
         });
     }
 
@@ -29,4 +31,3 @@ return new class extends Migration
         Schema::dropIfExists('player_values');
     }
 };
-

@@ -83,7 +83,12 @@ class Player extends Model
 
     public function playerValue()
     {
-        return $this->hasOne(PlayerValue::class);
+        return $this->hasMany(PlayerValue::class);
+    }
+
+    public function playerValues()
+    {
+        return $this->hasMany(PlayerValue::class);
     }
 
 }

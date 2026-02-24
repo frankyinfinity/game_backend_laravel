@@ -646,10 +646,7 @@ class GameController extends Controller
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
 
         $player_id = $entity->specie->player_id;
-        PlayerValue::query()->updateOrCreate(
-            ['player_id' => $player_id],
-            ['movement' => true]
-        );
+        PlayerValue::setFlag($player_id, PlayerValue::KEY_MOVEMENT, true);
 
         $currentTileI = $entity->tile_i;
         $currentTileJ = $entity->tile_j;
@@ -825,14 +822,7 @@ class GameController extends Controller
             return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
         }
 
-        PlayerValue::query()->updateOrCreate(
-            ['player_id' => $playerId],
-            [
-                'movement' => false,
-                'consume' => false,
-                'attack' => false,
-            ]
-        );
+        PlayerValue::resetAll($playerId);
 
         return response()->json(['success' => true]);
     }
@@ -855,10 +845,7 @@ class GameController extends Controller
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
-        PlayerValue::query()->updateOrCreate(
-            ['player_id' => $player_id],
-            ['consume' => true]
-        );
+        PlayerValue::setFlag($player_id, PlayerValue::KEY_CONSUME, true);
 
         $currentTileI = $entity->tile_i;
         $currentTileJ = $entity->tile_j;
@@ -1263,10 +1250,7 @@ class GameController extends Controller
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
-        PlayerValue::query()->updateOrCreate(
-            ['player_id' => $player_id],
-            ['attack' => true]
-        );
+        PlayerValue::setFlag($player_id, PlayerValue::KEY_ATTACK, true);
 
         // Store original position
         $originalTileI = $entity->tile_i;

@@ -59,16 +59,7 @@ class CheckObjectiveJob implements ShouldQueue
             return;
         }
 
-        $playerValue = PlayerValue::query()->firstOrCreate(
-            ['player_id' => $playerId],
-            [
-                'movement' => false,
-                'consume' => false,
-                'attack' => false,
-            ]
-        );
-
-        if ($playerValue->movement || $playerValue->consume || $playerValue->attack) {
+        if (PlayerValue::hasAnyActive($playerId)) {
             return;
         }
 

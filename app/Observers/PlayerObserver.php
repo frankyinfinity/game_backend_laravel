@@ -27,14 +27,7 @@ class PlayerObserver
      */
     public function created(Player $player): void
     {
-        PlayerValue::firstOrCreate(
-            ['player_id' => $player->id],
-            [
-                'movement' => false,
-                'consume' => false,
-                'attack' => false,
-            ]
-        );
+        PlayerValue::ensureDefaultsForPlayer($player->id);
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
