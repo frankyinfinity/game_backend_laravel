@@ -28,6 +28,8 @@ class PlayerObserver
     public function created(Player $player): void
     {
         PlayerValue::ensureDefaultsForPlayer($player->id);
+        PlayerValue::setValue($player->id, PlayerValue::KEY_DIVISION_COST, 50, PlayerValue::TYPE_INTEGER);
+        PlayerValue::setValue($player->id, PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY, 40, PlayerValue::TYPE_INTEGER);
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);

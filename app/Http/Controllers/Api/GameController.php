@@ -58,12 +58,18 @@ use App\Custom\Draw\Complex\Table\TableHeadDraw;
 use App\Custom\Draw\Complex\Table\TableCellDraw;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
 use App\Jobs\StopPlayerContainersJob;
 use App\Jobs\CheckObjectiveJob;
 use App\Custom\Draw\Complex\ScoreDraw;
+use App\Custom\Draw\Complex\EntityDraw;
+use Docker\Docker;
+use Docker\API\Model\ContainersCreatePostBody;
+use Docker\API\Model\HostConfig;
+use Docker\API\Model\PortBinding;
 
 class GameController extends Controller
 {
@@ -1702,14 +1708,391 @@ class GameController extends Controller
     }
 
     public function division(Request $request) {
+        $entityUid = (string) $request->input('entity_uid');
+        if ($entityUid === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'entity_uid obbligatorio',
+            ], 422);
+        }
 
-        $entity_uid = $request->entity_uid;
-        Log::info('Division: ' . $entity_uid);
+        $entity = Entity::query()
+            ->where('uid', $entityUid)
+            ->where('state', Entity::STATE_LIFE)
+            ->with(['specie'])
+            ->first();
 
-        return response()->json([
-            'success' => true
+        if (!$entity || !$entity->specie) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity non trovata',
+            ], 404);
+        }
+
+        $player = Player::query()->find($entity->specie->player_id);
+        if (!$player || !$player->birthRegion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Player o regione non trovati',
+            ], 404);
+        }
+
+        $divisionCost = PlayerValue::getIntegerValue(
+            $player->id,
+            PlayerValue::KEY_DIVISION_COST
+        );
+        $generatedEntityLifepoint = PlayerValue::getIntegerValue(
+            $player->id,
+            PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY
+        );
+
+        $lifepointGenome = Genome::query()
+            ->where('entity_id', $entity->id)
+            ->whereHas('gene', function ($q) {
+                $q->where('key', Gene::KEY_LIFEPOINT);
+            })
+            ->with(['gene'])
+            ->first();
+
+        if (!$lifepointGenome) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gene lifepoint non trovato',
+            ], 422);
+        }
+
+        $lifepointInfo = EntityInformation::query()->where('genome_id', $lifepointGenome->id)->first();
+        if (!$lifepointInfo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Valore lifepoint non trovato',
+            ], 422);
+        }
+
+        $currentLife = (int) $lifepointInfo->value;
+        if ($currentLife < $divisionCost) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Punti vita insufficienti per divisione (minimo ' . $divisionCost . ')',
+            ], 422);
+        }
+
+        $spawnCell = $this->findFreeAdjacentCell($entity, $player);
+        if ($spawnCell === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nessuna cella adiacente libera disponibile',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1) Togli i punti vita richiesti all'entity target
+            $updatedTargetLife = max(0, $currentLife - $divisionCost);
+            $lifepointInfo->update([
+                'value' => $updatedTargetLife,
+            ]);
+
+            // 2) Crea nuova entity in una cella adiacente con lifepoint configurato
+            $newEntity = Entity::query()->create([
+                'specie_id' => $entity->specie_id,
+                'uid' => uniqid('', true),
+                'tile_i' => $spawnCell['i'],
+                'tile_j' => $spawnCell['j'],
+                'state' => Entity::STATE_LIFE,
+            ]);
+
+            $sourceGenomes = Genome::query()
+                ->where('entity_id', $entity->id)
+                ->with(['gene'])
+                ->get();
+
+            foreach ($sourceGenomes as $sourceGenome) {
+                $newGenome = Genome::query()->create([
+                    'entity_id' => $newEntity->id,
+                    'gene_id' => $sourceGenome->gene_id,
+                    'min' => $sourceGenome->min,
+                    'max' => $sourceGenome->max,
+                ]);
+
+                $sourceInfo = EntityInformation::query()->where('genome_id', $sourceGenome->id)->first();
+                $newValue = $sourceInfo ? (int) $sourceInfo->value : (int) $sourceGenome->min;
+
+                if ($sourceGenome->gene && $sourceGenome->gene->key === Gene::KEY_LIFEPOINT) {
+                    $newValue = $generatedEntityLifepoint;
+                }
+                $newValue = max((int) $sourceGenome->min, min((int) $sourceGenome->max, $newValue));
+
+                EntityInformation::query()->create([
+                    'genome_id' => $newGenome->id,
+                    'value' => $newValue,
+                ]);
+            }
+
+            // 3) Crea e avvia container per la nuova entity
+            $container = $this->createAndStartEntityContainer($newEntity, $player);
+
+            DB::commit();
+
+            Log::info('Division completed', [
+                'source_entity_uid' => $entityUid,
+                'new_entity_uid' => $newEntity->uid,
+                'new_entity_tile_i' => $newEntity->tile_i,
+                'new_entity_tile_j' => $newEntity->tile_j,
+                'container_id' => $container->container_id ?? null,
+                'container_ws_port' => $container->ws_port ?? null,
+            ]);
+
+            // Aggiorna progressbar lifepoint dell'entity target in UI
+            $this->dispatchEntityLifepointProgressBarUpdate($request, $player, $entityUid, $updatedTargetLife);
+            // Disegna subito la nuova entity spawnata
+            $this->dispatchNewEntitySpawnDraw($request, $player, $newEntity);
+
+            return response()->json([
+                'success' => true,
+                'new_entity_uid' => $newEntity->uid,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Division failed', [
+                'entity_uid' => $entityUid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore durante la divisione',
+            ], 500);
+        }
+
+    }
+
+    private function findFreeAdjacentCell(Entity $entity, Player $player): ?array
+    {
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $solidMap = Helper::getMapSolidTiles($tiles, $birthRegion);
+
+        $directions = [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1],
+        ];
+
+        $candidates = [];
+        foreach ($directions as [$di, $dj]) {
+            $i = (int) $entity->tile_i + $di;
+            $j = (int) $entity->tile_j + $dj;
+
+            if ($i < 0 || $j < 0 || $i >= (int) $birthRegion->height || $j >= (int) $birthRegion->width) {
+                continue;
+            }
+
+            if (($solidMap[$i][$j] ?? 'X') !== '0') {
+                continue;
+            }
+
+            $occupied = Entity::query()
+                ->where('state', Entity::STATE_LIFE)
+                ->where('tile_i', $i)
+                ->where('tile_j', $j)
+                ->exists();
+            if ($occupied) {
+                continue;
+            }
+
+            $candidates[] = ['i' => $i, 'j' => $j];
+        }
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        shuffle($candidates);
+        return $candidates[0];
+    }
+
+    private function createAndStartEntityContainer(Entity $entity, Player $player): Container
+    {
+        putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+        $docker = Docker::create();
+        $imageName = 'entity:latest';
+
+        $images = $docker->imageList();
+        $imageExists = collect($images)->contains(fn($img) =>
+            in_array($imageName, $img->getRepoTags() ?? [])
+        );
+        if (!$imageExists) {
+            throw new \RuntimeException("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build");
+        }
+
+        $maxPort = Container::query()->whereNotNull('ws_port')->max('ws_port') ?? 9000;
+        $wsPort = $maxPort + 1;
+
+        $containerConfig = new ContainersCreatePostBody();
+        $containerConfig->setImage($imageName);
+        $containerConfig->setHostname('entity_' . $entity->uid);
+
+        $appUrl = config('app.url') ?: 'http://localhost';
+        $backendPort = env('BACKEND_PORT', '8085');
+        $parsedUrl = parse_url($appUrl);
+        $backendHost = $parsedUrl['host'] ?? 'localhost';
+        if ($backendHost === 'localhost' || $backendHost === '127.0.0.1') {
+            $backendHost = 'host.docker.internal';
+        }
+        $backendUrl = ($parsedUrl['scheme'] ?? 'http') . '://' . $backendHost . ':' . $backendPort;
+
+        $containerConfig->setEnv([
+            'ENTITY_UID=' . $entity->uid,
+            'ENTITY_TILE_I=' . $entity->tile_i,
+            'ENTITY_TILE_J=' . $entity->tile_j,
+            'ENTITY_PLAYER_ID=' . $player->id,
+            'BACKEND_URL=' . $backendUrl,
+            'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+            'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+            'WS_PORT=8080',
         ]);
 
+        $portBinding = new PortBinding();
+        $portBinding->setHostPort((string) $wsPort);
+
+        $hostConfig = new HostConfig();
+        $hostConfig->setPortBindings([
+            '8080/tcp' => [$portBinding],
+        ]);
+        $containerConfig->setHostConfig($hostConfig);
+
+        $container = $docker->containerCreate($containerConfig);
+        $containerId = $container->getId();
+        $docker->containerStart($containerId);
+
+        return Container::query()->create([
+            'container_id' => $containerId,
+            'name' => 'entity_' . $entity->uid,
+            'parent_type' => Container::PARENT_TYPE_ENTITY,
+            'parent_id' => $entity->id,
+            'ws_port' => $wsPort,
+        ]);
+    }
+
+    private function dispatchEntityLifepointProgressBarUpdate(Request $request, Player $player, string $entityUid, int $newValue): void
+    {
+        $sessionId = $this->resolveSessionId($request, $player);
+        if ($sessionId === '') {
+            return;
+        }
+
+        try {
+            ObjectCache::buffer($sessionId);
+
+            $drawCommands = [];
+            $progressBarUid = $entityUid . '_progress_bar_' . Gene::KEY_LIFEPOINT;
+            $progressBar = new ProgressBarDraw($progressBarUid);
+            $operations = $progressBar->updateValue($newValue, $sessionId);
+
+            foreach ($operations as $operation) {
+                if (($operation['type'] ?? null) === 'update') {
+                    $updateObject = new ObjectUpdate($operation['uid'], $sessionId);
+                    foreach (($operation['attributes'] ?? []) as $attribute => $value) {
+                        $updateObject->setAttributes($attribute, $value);
+                    }
+                    foreach ($updateObject->get() as $data) {
+                        $drawCommands[] = $data;
+                    }
+                    continue;
+                }
+
+                if (($operation['type'] ?? null) === 'draw') {
+                    $drawObject = new ObjectDraw($operation['object'], $sessionId);
+                    $drawCommands[] = $drawObject->get();
+                    continue;
+                }
+
+                if (($operation['type'] ?? null) === 'clear') {
+                    $clearObject = new ObjectClear($operation['uid'], $sessionId);
+                    $drawCommands[] = $clearObject->get();
+                    ObjectCache::forget($sessionId, $operation['uid']);
+                }
+            }
+
+            ObjectCache::flush($sessionId);
+
+            if (!empty($drawCommands)) {
+                $requestId = Str::random(20);
+                DrawRequest::query()->create([
+                    'session_id' => $sessionId,
+                    'request_id' => $requestId,
+                    'player_id' => $player->id,
+                    'items' => json_encode($drawCommands),
+                ]);
+                event(new DrawInterfaceEvent($player, $requestId));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Unable to update entity lifepoint progressbar after division', [
+                'entity_uid' => $entityUid,
+                'player_id' => $player->id,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function dispatchNewEntitySpawnDraw(Request $request, Player $player, Entity $newEntity): void
+    {
+        $sessionId = $this->resolveSessionId($request, $player);
+        if ($sessionId === '') {
+            return;
+        }
+
+        try {
+            ObjectCache::buffer($sessionId);
+
+            $newEntity = Entity::query()
+                ->where('id', $newEntity->id)
+                ->with(['specie', 'genomes.gene', 'genomes.entityInformations'])
+                ->first();
+
+            if (!$newEntity) {
+                ObjectCache::flush($sessionId);
+                return;
+            }
+
+            $tileSize = Helper::TILE_SIZE;
+            $originX = ($tileSize * (int) $newEntity->tile_j) + Helper::MAP_START_X;
+            $originY = ($tileSize * (int) $newEntity->tile_i) + Helper::MAP_START_Y;
+
+            $square = new Square('square_' . $newEntity->tile_i . '_' . $newEntity->tile_j);
+            $square->setOrigin($originX, $originY);
+            $square->setSize($tileSize);
+
+            $entityDraw = new EntityDraw($newEntity, $square);
+            $drawCommands = [];
+            foreach ($entityDraw->getDrawItems() as $entityDrawItem) {
+                $drawObject = new ObjectDraw($entityDrawItem, $sessionId);
+                $drawCommands[] = $drawObject->get();
+            }
+
+            ObjectCache::flush($sessionId);
+
+            if (!empty($drawCommands)) {
+                $requestId = Str::random(20);
+                DrawRequest::query()->create([
+                    'session_id' => $sessionId,
+                    'request_id' => $requestId,
+                    'player_id' => $player->id,
+                    'items' => json_encode($drawCommands),
+                ]);
+                event(new DrawInterfaceEvent($player, $requestId));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Unable to draw new spawned entity after division', [
+                'entity_id' => $newEntity->id ?? null,
+                'player_id' => $player->id,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function checkObjective(Request $request): \Illuminate\Http\JsonResponse
