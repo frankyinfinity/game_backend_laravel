@@ -89,6 +89,12 @@ class EntityDraw
 
         $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
         $jsContentClickEntity = file_get_contents($jsPathClickEntity);
+        $playerContainer = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_PLAYER)
+            ->where('parent_id', $dbEntity->specie->player_id)
+            ->first();
+        $playerWsPort = $playerContainer ? $playerContainer->ws_port : null;
+        $jsContentClickEntity = str_replace('__player_port__', $playerWsPort, $jsContentClickEntity);
         $jsContentClickEntity = Helper::setCommonJsCode($jsContentClickEntity, Str::random(20));
 
         $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickEntity);

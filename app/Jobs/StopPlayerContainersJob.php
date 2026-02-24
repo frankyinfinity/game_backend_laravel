@@ -64,6 +64,9 @@ class StopPlayerContainersJob implements ShouldQueue
                     })->orWhere(function ($sq2) use ($player) {
                         $sq2->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)
                             ->where('parent_id', $player->id);
+                    })->orWhere(function ($sq2) use ($player) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_PLAYER)
+                            ->where('parent_id', $player->id);
                     });
                 })
                 ->get();

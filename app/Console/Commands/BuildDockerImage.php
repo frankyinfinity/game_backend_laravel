@@ -39,6 +39,10 @@ class BuildDockerImage extends Command
                 'name' => 'objective:latest',
                 'path' => base_path('docker/objective')
             ],
+            [
+                'name' => 'player:latest',
+                'path' => base_path('docker/player')
+            ],
         ];
 
         foreach ($images as $image) {

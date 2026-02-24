@@ -827,6 +827,29 @@ class GameController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function getPlayerValues(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $playerId = (int) ($request->input('player_id') ?? $request->input('playerId'));
+        if ($playerId <= 0) {
+            return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
+        }
+
+        $rows = PlayerValue::query()
+            ->where('player_id', $playerId)
+            ->get(['key', 'data_type', 'value']);
+
+        $values = [];
+        foreach ($rows as $row) {
+            $values[$row->key] = PlayerValue::decodeValue($row->value, (string) $row->data_type);
+        }
+
+        return response()->json([
+            'success' => true,
+            'player_id' => $playerId,
+            'values' => $values,
+        ]);
+    }
+
     /**
      * Gestisce il consumo di un elemento da parte di un'entity
      */
