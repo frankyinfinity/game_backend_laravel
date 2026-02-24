@@ -59,7 +59,7 @@ class CheckObjectiveJob implements ShouldQueue
             return;
         }
 
-        if (PlayerValue::hasAnyActive($playerId)) {
+        if (PlayerValue::hasAnyActive($playerId, PlayerValue::ALL_KEYS)) {
             return;
         }
 

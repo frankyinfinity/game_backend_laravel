@@ -81,13 +81,29 @@ class PlayerValue extends Model
             ]);
     }
 
-    public static function hasAnyActive(int $playerId): bool
+    public static function hasAnyActive(int $playerId, array $keys): bool
     {
-        self::ensureDefaultsForPlayer($playerId);
+        $keys = array_values(array_filter(array_unique($keys), function ($key) {
+            return is_string($key) && in_array($key, self::ALL_KEYS, true);
+        }));
+
+        if (empty($keys)) {
+            return false;
+        }
+
+        foreach ($keys as $key) {
+            self::query()->updateOrCreate(
+                ['player_id' => $playerId, 'key' => $key],
+                [
+                    'data_type' => self::TYPE_BOOLEAN,
+                    'value' => '0',
+                ]
+            );
+        }
 
         $values = self::query()
             ->where('player_id', $playerId)
-            ->whereIn('key', self::ALL_KEYS)
+            ->whereIn('key', $keys)
             ->get(['data_type', 'value']);
 
         foreach ($values as $row) {
