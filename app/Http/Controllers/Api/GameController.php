@@ -1120,22 +1120,59 @@ class GameController extends Controller
 
                 $existingObjects = ObjectCache::all($sessionId);
                 $objectiveRenderable = $this->resolveObjectiveRenderableFromCache($existingObjects, $objectiveTreeUidPrefix);
-                foreach ($existingObjects as $uid => $object) {
-                    if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                $modalContext = $this->resolveObjectiveModalContext($existingObjects, $objectiveTreeUidPrefix);
+
+                if ($modalContext !== null) {
+                    foreach ($modalContext['uids_to_clear'] as $uid) {
+                        if (!isset($existingObjects[$uid])) {
+                            continue;
+                        }
                         $objectClear = new ObjectClear($uid, $sessionId);
                         $objectiveDrawCommands[] = $objectClear->get();
                         ObjectCache::forget($sessionId, $uid);
                     }
-                }
 
-                $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
-                $objectiveTree->setOrigin(20, 20);
-                $objectiveTree->setRenderable($objectiveRenderable);
-                $objectiveTree->build();
+                    $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                    $objectiveTree->setOrigin(0, 0);
+                    $objectiveTree->build();
 
-                foreach ($objectiveTree->getDrawItems() as $drawItem) {
-                    $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-                    $objectiveDrawCommands[] = $objectDraw->get();
+                    $modal = new ModalDraw($modalContext['modal_uid']);
+                    $modal->setOrigin($modalContext['x'], $modalContext['y']);
+                    $modal->setSize($modalContext['width'], $modalContext['height']);
+                    $modal->setTitle($modalContext['title']);
+                    $modal->setRenderable($modalContext['renderable']);
+
+                    foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                        $json = $drawItem->buildJson();
+                        $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
+                        $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+                        $modal->addContentItem($drawItem, $offsetX, $offsetY);
+                    }
+
+                    $modal->build();
+
+                    foreach ($modal->getDrawItems() as $drawItem) {
+                        $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                        $objectiveDrawCommands[] = $objectDraw->get();
+                    }
+                } else {
+                    foreach ($existingObjects as $uid => $object) {
+                        if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
+                            $objectClear = new ObjectClear($uid, $sessionId);
+                            $objectiveDrawCommands[] = $objectClear->get();
+                            ObjectCache::forget($sessionId, $uid);
+                        }
+                    }
+
+                    $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
+                    $objectiveTree->setOrigin(20, 20);
+                    $objectiveTree->setRenderable($objectiveRenderable);
+                    $objectiveTree->build();
+
+                    foreach ($objectiveTree->getDrawItems() as $drawItem) {
+                        $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                        $objectiveDrawCommands[] = $objectDraw->get();
+                    }
                 }
 
                 ObjectCache::flush($sessionId);
