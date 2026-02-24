@@ -27,6 +27,35 @@
         shapes[panel_uid].zIndex = 10000;
         AppData.actual_focus_uid_entity = show ? object_uid : null;
 
+        const resolveDivisionEnabled = () => {
+            const wsResponse = (typeof AppData !== 'undefined') ? AppData.player_values_ws_response : null;
+            if (!wsResponse || typeof wsResponse !== 'object') return false;
+
+            // Preferred shape from player docker ws: { data: { values: {...} } }
+            const valuesFromDocker = wsResponse.data && wsResponse.data.values;
+            if (valuesFromDocker && typeof valuesFromDocker === 'object') {
+                return !!valuesFromDocker.division;
+            }
+
+            // Fallback shape if raw API response is stored directly
+            const directValues = wsResponse.values;
+            if (directValues && typeof directValues === 'object') {
+                return !!directValues.division;
+            }
+
+            return false;
+        };
+
+        const applyDivisionButtonVisibility = () => {
+            const divisionEnabled = resolveDivisionEnabled();
+            const divisionButtonUids = [object_uid + '_button_division_rect', object_uid + '_button_division_text'];
+            divisionButtonUids.forEach((uid) => {
+                if (shapes[uid]) {
+                    shapes[uid].renderable = !!(show && divisionEnabled);
+                }
+            });
+        };
+
         // Figli del pannello entity
         for (const childUid of objects[panel_uid]['children']) {
             if (shapes[childUid]) {
@@ -34,6 +63,7 @@
                 shapes[childUid].zIndex = 10001;
             }
         }
+        applyDivisionButtonVisibility();
 
         // Quando apri il pannello entity, richiede player values al docker player via WS.
         if (show && playerPort) {
@@ -58,6 +88,7 @@
                         }
                         window.playerValuesWsResponse = response;
                         console.log('Player WS Response:', response);
+                        applyDivisionButtonVisibility();
                     } catch (e) {
                         console.error('Player WS Parse Error:', e);
                     }
@@ -104,4 +135,3 @@
     }
     window['__name__']();
 </script>
-

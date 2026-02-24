@@ -1701,6 +1701,17 @@ class GameController extends Controller
         ]);
     }
 
+    public function division(Request $request) {
+
+        $entity_uid = $request->entity_uid;
+        Log::info('Division: ' . $entity_uid);
+
+        return response()->json([
+            'success' => true
+        ]);
+
+    }
+
     public function checkObjective(Request $request): \Illuminate\Http\JsonResponse
     {
         $playerId = (int) $request->input('player_id');

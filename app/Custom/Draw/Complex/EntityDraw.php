@@ -108,7 +108,7 @@ class EntityDraw
 
         $panel = new Rectangle($dbEntity->uid.'_panel');
         $panel->setOrigin($panelX, y: $panelY);
-        $panel->setSize(400, 345);
+        $panel->setSize(400, 405);
         $panel->setColor(0xFFFFFF);
         $panel->setRenderable(false);
 
@@ -157,8 +157,9 @@ class EntityDraw
 
         }
 
-        //Up
+        // Movement row
         $panelY += 50;
+        $movementButtonsStartX = $panelX;
         $upButton = new ButtonDraw($dbEntity->uid.'_button_up');
         $upButton->setSize($sizeButton, $sizeButton);
         $upButton->setOrigin($panelX, $panelY);
@@ -209,6 +210,23 @@ class EntityDraw
         $rightButton->setRenderable(false);
         $rightButton->build();
 
+        // Division button (visible only when player_values.division is true)
+        $jsPathDivision = resource_path('js/function/entity/click_division.blade.php');
+        $jsContentDivision = file_get_contents($jsPathDivision);
+        $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
+
+        $divisionButtonY = $panelY + $sizeButton + 15;
+        $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
+        $divisionButton->setSize(220, 40);
+        $divisionButton->setOrigin($movementButtonsStartX, $divisionButtonY);
+        $divisionButton->setString('divisione');
+        $divisionButton->setColorButton(0x0000FF);
+        $divisionButton->setColorString($colorString);
+        $divisionButton->setTextFontSize(20);
+        $divisionButton->setOnClick($jsContentDivision);
+        $divisionButton->setRenderable(false);
+        $divisionButton->build();
+
         //Progress Bar
         $itemBars = [];
 
@@ -219,7 +237,7 @@ class EntityDraw
             ->get();
 
         $panelX = $centerSquare['x'] + ($size / 3) + 10; // Reset X to panel start
-        $panelY += $sizeButton + 60; // Space after buttons
+        $panelY += $sizeButton + 110; // Space after movement row + division button
 
         foreach($entityInformations as $entityInformation) {
             $genome = $entityInformation->genome;
@@ -251,6 +269,7 @@ class EntityDraw
         foreach ($leftButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($downButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($rightButton->getDrawItems() as $item) {$panel->addChild($item);}
+        foreach ($divisionButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($itemBars as $item) {
             foreach ($item as $item2) {
                 $panel->addChild($item2);
@@ -266,6 +285,7 @@ class EntityDraw
         foreach ($leftButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($downButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($rightButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        foreach ($divisionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($itemBars as $item) {
             foreach ($item as $item2) {
                 $this->drawItems[] = $item2->buildJson();
