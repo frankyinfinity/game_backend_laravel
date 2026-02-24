@@ -42,17 +42,18 @@ class ExecuteCompletedTargetRewardScriptJob implements ShouldQueue
             }
 
             $scriptContent = Storage::disk('rewards_player')->get($filename);
-            $completedTargetPlayerId = $this->targetPlayerId;
+            $player_id = (int) $player->id;
+            $runtimeScript = preg_replace('/^\s*<\?php/', '', $scriptContent) ?? $scriptContent;
+            $runtimeScript = preg_replace('/\?>\s*$/', '', $runtimeScript) ?? $runtimeScript;
+            $runtimeScript = "namespace App\\Rewards\\Runtime;\n" . $runtimeScript;
 
-            eval('?>' . $scriptContent);
+            eval($runtimeScript);
         } catch (\Throwable $e) {
             Log::error('Error executing rewards_player script', [
                 'player_id' => $player->id,
-                'target_player_id' => $this->targetPlayerId,
                 'filename' => $filename,
                 'error' => $e->getMessage(),
             ]);
         }
     }
 }
-

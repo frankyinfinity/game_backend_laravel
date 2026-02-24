@@ -15,11 +15,13 @@ class PlayerValue extends Model
     public const KEY_MOVEMENT = 'movement';
     public const KEY_CONSUME = 'consume';
     public const KEY_ATTACK = 'attack';
+    public const KEY_DIVISION = 'division';
 
     public const ALL_KEYS = [
         self::KEY_MOVEMENT,
         self::KEY_CONSUME,
         self::KEY_ATTACK,
+        self::KEY_DIVISION
     ];
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
@@ -66,19 +68,6 @@ class PlayerValue extends Model
                 'value' => self::encodeValue($value, $dataType),
             ]
         );
-    }
-
-    public static function resetAll(int $playerId): void
-    {
-        self::ensureDefaultsForPlayer($playerId);
-
-        self::query()
-            ->where('player_id', $playerId)
-            ->whereIn('key', self::ALL_KEYS)
-            ->update([
-                'data_type' => self::TYPE_BOOLEAN,
-                'value' => '0',
-            ]);
     }
 
     public static function hasAnyActive(int $playerId, array $keys): bool

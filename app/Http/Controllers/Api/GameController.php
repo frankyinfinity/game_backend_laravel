@@ -822,7 +822,9 @@ class GameController extends Controller
             return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
         }
 
-        PlayerValue::resetAll($playerId);
+        PlayerValue::setFlag($playerId, PlayerValue::KEY_MOVEMENT, false);
+        PlayerValue::setFlag($playerId, PlayerValue::KEY_CONSUME, false);
+        PlayerValue::setFlag($playerId, PlayerValue::KEY_ATTACK, false);
 
         return response()->json(['success' => true]);
     }
