@@ -83,11 +83,15 @@
                     }
                     shapes[childUid].zIndex = panelChildZIndex;
                 
-                // Update text for title and description
+                // Update text for title and description with word wrapping
                 if (childUid.endsWith('_panel_title')) {
                     shapes[childUid].text = target_title;
+                    shapes[childUid].style.wordWrap = true;
+                    shapes[childUid].style.wordWrapWidth = 300;
                 } else if (childUid.endsWith('_panel_description')) {
                     shapes[childUid].text = target_description;
+                    shapes[childUid].style.wordWrap = true;
+                    shapes[childUid].style.wordWrapWidth = 300;
                 } else if (childUid.endsWith('_panel_state_value')) {
                     shapes[childUid].text = getStateLabel(target_state);
                 }
