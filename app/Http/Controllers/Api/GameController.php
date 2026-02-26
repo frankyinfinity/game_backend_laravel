@@ -66,10 +66,7 @@ use App\Jobs\StopPlayerContainersJob;
 use App\Jobs\CheckObjectiveJob;
 use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Complex\EntityDraw;
-use Docker\Docker;
-use Docker\API\Model\ContainersCreatePostBody;
-use Docker\API\Model\HostConfig;
-use Docker\API\Model\PortBinding;
+use App\Services\DockerContainerService;
 
 class GameController extends Controller
 {
@@ -1830,7 +1827,9 @@ class GameController extends Controller
             }
 
             // 3) Crea e avvia container per la nuova entity
-            $container = $this->createAndStartEntityContainer($newEntity, $player);
+            /** @var DockerContainerService $containerService */
+            $containerService = app(DockerContainerService::class);
+            $container = $containerService->createEntityContainer($newEntity, $player->id, true);
 
             DB::commit();
 
@@ -1911,69 +1910,6 @@ class GameController extends Controller
 
         shuffle($candidates);
         return $candidates[0];
-    }
-
-    private function createAndStartEntityContainer(Entity $entity, Player $player): Container
-    {
-        putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
-        $docker = Docker::create();
-        $imageName = 'entity:latest';
-
-        $images = $docker->imageList();
-        $imageExists = collect($images)->contains(fn($img) =>
-            in_array($imageName, $img->getRepoTags() ?? [])
-        );
-        if (!$imageExists) {
-            throw new \RuntimeException("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build");
-        }
-
-        $maxPort = Container::query()->whereNotNull('ws_port')->max('ws_port') ?? 9000;
-        $wsPort = $maxPort + 1;
-
-        $containerConfig = new ContainersCreatePostBody();
-        $containerConfig->setImage($imageName);
-        $containerConfig->setHostname('entity_' . $entity->uid);
-
-        $appUrl = config('app.url') ?: 'http://localhost';
-        $backendPort = env('BACKEND_PORT', '8085');
-        $parsedUrl = parse_url($appUrl);
-        $backendHost = $parsedUrl['host'] ?? 'localhost';
-        if ($backendHost === 'localhost' || $backendHost === '127.0.0.1') {
-            $backendHost = 'host.docker.internal';
-        }
-        $backendUrl = ($parsedUrl['scheme'] ?? 'http') . '://' . $backendHost . ':' . $backendPort;
-
-        $containerConfig->setEnv([
-            'ENTITY_UID=' . $entity->uid,
-            'ENTITY_TILE_I=' . $entity->tile_i,
-            'ENTITY_TILE_J=' . $entity->tile_j,
-            'ENTITY_PLAYER_ID=' . $player->id,
-            'BACKEND_URL=' . $backendUrl,
-            'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
-            'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
-            'WS_PORT=8080',
-        ]);
-
-        $portBinding = new PortBinding();
-        $portBinding->setHostPort((string) $wsPort);
-
-        $hostConfig = new HostConfig();
-        $hostConfig->setPortBindings([
-            '8080/tcp' => [$portBinding],
-        ]);
-        $containerConfig->setHostConfig($hostConfig);
-
-        $container = $docker->containerCreate($containerConfig);
-        $containerId = $container->getId();
-        $docker->containerStart($containerId);
-
-        return Container::query()->create([
-            'container_id' => $containerId,
-            'name' => 'entity_' . $entity->uid,
-            'parent_type' => Container::PARENT_TYPE_ENTITY,
-            'parent_id' => $entity->id,
-            'ws_port' => $wsPort,
-        ]);
     }
 
     private function dispatchEntityLifepointProgressBarUpdate(Request $request, Player $player, string $entityUid, int $newValue): void
