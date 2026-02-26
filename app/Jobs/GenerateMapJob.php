@@ -9,6 +9,7 @@ use App\Custom\Draw\Complex\Appbar\HomeAppbarDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Draw\Support\ScrollGroup;
 use App\Events\DrawInterfaceEvent;
@@ -190,6 +191,21 @@ class GenerateMapJob implements ShouldQueue
         $baseX = Helper::MAP_START_X + $buttonPadding;
         $baseY = Helper::MAP_START_Y + $buttonPadding;
         $moveStep = Helper::TILE_SIZE;
+        $containerPadding = 8;
+        $containerX = $baseX - $containerPadding;
+        $containerY = $baseY - $containerPadding;
+        $containerWidth = ($buttonSize * 3) + ($buttonGap * 2) + ($containerPadding * 2);
+        $containerHeight = ($buttonSize * 2) + $buttonGap + ($containerPadding * 2);
+
+        $navContainer = new Rectangle('map_nav_container');
+        $navContainer->setOrigin($containerX, $containerY);
+        $navContainer->setSize($containerWidth, $containerHeight);
+        $navContainer->setColor(0x6B7280);
+        $navContainer->setBorderRadius(12);
+        $navContainer->addAttributes('alpha', 0.6);
+        $navContainer->addAttributes('z_index', 14999);
+        $objectDraw = new ObjectDraw($navContainer->buildJson(), $player->actual_session_id);
+        $drawItems[] = $objectDraw->get();
 
         $mapButtons = [
             [
@@ -244,7 +260,7 @@ class GenerateMapJob implements ShouldQueue
             $button->build();
 
             foreach ($button->getDrawItems() as $buttonItem) {
-                $buttonItem->addAttributes('z_index', 999999);
+                $buttonItem->addAttributes('z_index', 15000);
                 $objectDraw = new ObjectDraw($buttonItem->buildJson(), $player->actual_session_id);
                 $drawItems[] = $objectDraw->get();
             }

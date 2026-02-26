@@ -3,7 +3,7 @@
         if (appData && Array.isArray(appData.scroll_excluded_uids)) {
             return appData.scroll_excluded_uids;
         }
-        return ['map_nav_up', 'map_nav_left', 'map_nav_down', 'map_nav_right'];
+        return ['map_nav_container', 'map_nav_up', 'map_nav_left', 'map_nav_down', 'map_nav_right'];
     };
 
     window.getObjectScrollGroup = function (obj) {
