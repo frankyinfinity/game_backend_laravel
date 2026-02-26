@@ -3,96 +3,83 @@
 
         const deltaX = parseInt('__delta_x__', 10);
         const deltaY = parseInt('__delta_y__', 10);
-        const excludedPrefixes = ['appbar', 'map_nav_', 'modal_'];
-        AppData.map_offset_x = parseInt(AppData.map_offset_x || 0, 10);
-        AppData.map_offset_y = parseInt(AppData.map_offset_y || 0, 10);
+        const scrollGroup = '__scroll_group__';
+        if (typeof window.ensureScrollGroupState === 'function') {
+            window.ensureScrollGroupState(AppData, scrollGroup);
+        }
 
-        const isScoreUid = (uid) => {
-            return uid.indexOf('_score_') !== -1;
-        };
-
-        const shouldSkipUid = (uid) => {
-            return isScoreUid(uid) || excludedPrefixes.some((prefix) => uid.indexOf(prefix) === 0);
-        };
-
-        const getObjectMinY = (obj) => {
-            if (!obj) {
-                return null;
-            }
-
-            if (obj.type === 'multi_line' && Array.isArray(obj.points) && obj.points.length > 0) {
-                let minY = obj.points[0].y;
-                for (let i = 1; i < obj.points.length; i++) {
-                    if (obj.points[i].y < minY) {
-                        minY = obj.points[i].y;
-                    }
+        if (!window.ScrollGroupManager) {
+            window.ScrollGroupManager = class {
+                constructor(objectsRef, shapesRef) {
+                    this.objects = objectsRef;
+                    this.shapes = shapesRef;
                 }
-                return minY;
-            }
 
-            if (typeof obj.y === 'number') {
-                return obj.y;
-            }
+                isUiUid(uid) {
+                    return uid.indexOf('appbar') === 0
+                        || uid.indexOf('map_nav_') === 0
+                        || uid.indexOf('modal_') === 0
+                        || uid.indexOf('_score_') !== -1;
+                }
 
-            return null;
-        };
+                isInGroup(uid, obj, groupName) {
+                    const objGroup = obj?.attributes?.scroll_group ?? null;
+                    if (this.isUiUid(uid)) return false;
+                    return objGroup === groupName;
+                }
 
-        Object.keys(objects).forEach((uid) => {
-            if (shouldSkipUid(uid)) {
-                return;
-            }
+                move(groupName, dx, dy) {
+                    Object.keys(this.objects).forEach((uid) => {
+                        const object = this.objects[uid];
+                        const shape = this.shapes[uid];
+                        if (!object || !shape) return;
+                        if (!this.isInGroup(uid, object, groupName)) return;
 
-            const object = objects[uid];
-            const shape = shapes[uid];
-            if (!object || !shape) {
-                return;
-            }
+                        if (object.type === 'multi_line' && Array.isArray(object.points)) {
+                            object.points = object.points.map((point) => ({
+                                x: point.x + dx,
+                                y: point.y + dy
+                            }));
 
-            const minY = getObjectMinY(object);
-            if (minY === null) {
-                return;
-            }
-
-            if (object.type === 'multi_line' && Array.isArray(object.points)) {
-                object.points = object.points.map((point) => {
-                    return {
-                        x: point.x + deltaX,
-                        y: point.y + deltaY
-                    };
-                });
-
-                if (typeof shape.clear === 'function') {
-                    shape.clear();
-                    shape.lineStyle(object.thickness || 1, 0xFFFFFF);
-                    shape.tint = object.color;
-                    if (object.points.length > 0) {
-                        shape.moveTo(object.points[0].x, object.points[0].y);
-                        for (let i = 1; i < object.points.length; i++) {
-                            shape.lineTo(object.points[i].x, object.points[i].y);
+                            if (typeof shape.clear === 'function') {
+                                shape.clear();
+                                shape.lineStyle(object.thickness || 1, 0xFFFFFF);
+                                shape.tint = object.color;
+                                if (object.points.length > 0) {
+                                    shape.moveTo(object.points[0].x, object.points[0].y);
+                                    for (let i = 1; i < object.points.length; i++) {
+                                        shape.lineTo(object.points[i].x, object.points[i].y);
+                                    }
+                                }
+                            }
+                            return;
                         }
-                    }
+
+                        if (typeof object.x === 'number') {
+                            object.x += dx;
+                            shape.x += dx;
+                        }
+                        if (typeof object.y === 'number') {
+                            object.y += dy;
+                            shape.y += dy;
+                        }
+                    });
                 }
-                return;
-            }
+            };
+        }
 
-            if (typeof object.x === 'number') {
-                object.x += deltaX;
-                shape.x += deltaX;
-            }
-            if (typeof object.y === 'number') {
-                object.y += deltaY;
-                shape.y += deltaY;
-            }
-        });
+        const scrollGroupManager = new window.ScrollGroupManager(objects, shapes);
+        scrollGroupManager.move(scrollGroup, deltaX, deltaY);
 
-        AppData.map_offset_x += deltaX;
-        AppData.map_offset_y += deltaY;
+        if (typeof window.incrementScrollGroupOffset === 'function') {
+            window.incrementScrollGroupOffset(AppData, scrollGroup, deltaX, deltaY);
+        }
 
         if (typeof refreshAllModalViewportMasks === 'function') {
             refreshAllModalViewportMasks();
         }
-        if (typeof refreshMapClipping === 'function') {
-            refreshMapClipping();
+        if (typeof runScrollClipping === 'function') {
+            runScrollClipping();
         }
 
         if (app && app.stage) {

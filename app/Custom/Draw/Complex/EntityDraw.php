@@ -15,6 +15,7 @@ use App\Models\Gene;
 use App\Models\Container;
 use App\Models\EntityInformation;
 use Illuminate\Support\Str;
+use App\Custom\Draw\Support\ScrollGroup;
 
 class EntityDraw
 {
@@ -291,6 +292,8 @@ class EntityDraw
                 $this->drawItems[] = $item2->buildJson();
             }
         }
+
+        $this->drawItems = ScrollGroup::attachMany($this->drawItems, Helper::MAP_SCROLL_GROUP_MAIN);
 
     }
 

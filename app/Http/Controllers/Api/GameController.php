@@ -67,6 +67,7 @@ use App\Jobs\CheckObjectiveJob;
 use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Complex\EntityDraw;
 use App\Services\DockerContainerService;
+use App\Custom\Draw\Support\ScrollGroup;
 
 class GameController extends Controller
 {
@@ -731,8 +732,7 @@ class GameController extends Controller
             $circle->setColor('#FF0000');
 
             //Draw
-            $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
-            $drawCommands[] = $drawObject->get();
+            $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
             if((sizeof($pathFinding)-1) !== $key) {
 
@@ -760,8 +760,7 @@ class GameController extends Controller
                 $linePath->setThickness(2);
 
                 //Draw
-                $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
-                $drawCommands[] = $drawObject->get();
+                $drawCommands[] = $this->drawMapGroupObject($linePath, $player->actual_session_id);
 
                 //Update Entity
                 $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
@@ -930,8 +929,7 @@ class GameController extends Controller
             $circle->setColor('#FF0000'); // Red path for consumption
 
             //Draw
-            $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
-            $drawCommands[] = $drawObject->get();
+            $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
             if((sizeof($pathFinding)-1) !== $key) {
 
@@ -959,8 +957,7 @@ class GameController extends Controller
                 $linePath->setThickness(2);
 
                 //Draw
-                $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
-                $drawCommands[] = $drawObject->get();
+                $drawCommands[] = $this->drawMapGroupObject($linePath, $player->actual_session_id);
 
                 //Update Entity
                 $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
@@ -1037,8 +1034,7 @@ class GameController extends Controller
                                         }
                                         foreach ($updateObj->get() as $data) $drawCommands[] = $data;
                                     } elseif ($op['type'] === 'draw') {
-                                        $drawObj = new ObjectDraw($op['object'], $player->actual_session_id);
-                                        $drawCommands[] = $drawObj->get();
+                                        $drawCommands[] = $this->drawMapGroupObject($op['object'], $player->actual_session_id);
                                     } elseif ($op['type'] === 'clear') {
                                         $clearObj = new ObjectClear($op['uid'], $player->actual_session_id);
                                         $drawCommands[] = $clearObj->get();
@@ -1344,8 +1340,7 @@ class GameController extends Controller
             $circle->setRadius($tileSize / 6);
             $circle->setColor('#FF0000'); // Red path for attack
 
-            $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
-            $drawCommands[] = $drawObject->get();
+            $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
             if((sizeof($pathFinding)-1) !== $key) {
                 $nextPathNodeI = $pathFinding[$key+1][0];
@@ -1371,8 +1366,7 @@ class GameController extends Controller
                 $linePath->setColor('#FF0000'); // Red path for attack
                 $linePath->setThickness(2);
 
-                $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
-                $drawCommands[] = $drawObject->get();
+                $drawCommands[] = $this->drawMapGroupObject($linePath, $player->actual_session_id);
             }
         }
 
@@ -1593,8 +1587,7 @@ class GameController extends Controller
                 $circle->setRadius($tileSize / 6);
                 $circle->setColor('#FF0000'); // Red path for return (same as attack)
 
-                $drawObject = new ObjectDraw($circle->buildJson(), $player->actual_session_id);
-                $drawCommands[] = $drawObject->get();
+                $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
                 if((sizeof($pathBack)-1) !== $key) {
                     $nextPathNodeI = $pathBack[$key+1][0];
@@ -1620,8 +1613,7 @@ class GameController extends Controller
                     $linePath->setColor('#FF0000'); // Red path for return (same as attack)
                     $linePath->setThickness(2);
 
-                    $drawObject = new ObjectDraw($linePath->buildJson(), $player->actual_session_id);
-                    $drawCommands[] = $drawObject->get();
+                    $drawCommands[] = $this->drawMapGroupObject($linePath, $player->actual_session_id);
                 }
             }
 
@@ -1940,8 +1932,7 @@ class GameController extends Controller
                 }
 
                 if (($operation['type'] ?? null) === 'draw') {
-                    $drawObject = new ObjectDraw($operation['object'], $sessionId);
-                    $drawCommands[] = $drawObject->get();
+                    $drawCommands[] = $this->drawMapGroupObject($operation['object'], $sessionId);
                     continue;
                 }
 
@@ -2005,8 +1996,7 @@ class GameController extends Controller
             $entityDraw = new EntityDraw($newEntity, $square);
             $drawCommands = [];
             foreach ($entityDraw->getDrawItems() as $entityDrawItem) {
-                $drawObject = new ObjectDraw($entityDrawItem, $sessionId);
-                $drawCommands[] = $drawObject->get();
+                $drawCommands[] = $this->drawMapGroupObject($entityDrawItem, $sessionId);
             }
 
             ObjectCache::flush($sessionId);
@@ -2157,6 +2147,15 @@ class GameController extends Controller
         }
 
         return null;
+    }
+
+    private function drawMapGroupObject($objectOrArray, string $sessionId): array
+    {
+        $objectArray = is_array($objectOrArray) ? $objectOrArray : $objectOrArray->buildJson();
+        $objectArray = ScrollGroup::attach($objectArray, Helper::MAP_SCROLL_GROUP_MAIN);
+
+        $drawObject = new ObjectDraw($objectArray, $sessionId);
+        return $drawObject->get();
     }
 
     private function resolveSessionId(Request $request, Player $player): string

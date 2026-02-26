@@ -12,6 +12,7 @@ use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\ProgressBarDraw;
+use App\Custom\Draw\Support\ScrollGroup;
 use App\Custom\Colors;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
@@ -142,6 +143,8 @@ class ElementDraw
         foreach ($geneProgressBarItems as $item) {
             $this->drawItems[] = $item->buildJson();
         }
+
+        $this->drawItems = ScrollGroup::attachMany($this->drawItems, Helper::MAP_SCROLL_GROUP_MAIN);
 
     }
     

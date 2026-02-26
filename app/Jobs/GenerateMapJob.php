@@ -10,6 +10,7 @@ use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectDraw;
+use App\Custom\Draw\Support\ScrollGroup;
 use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Models\DrawRequest;
@@ -139,7 +140,8 @@ class GenerateMapJob implements ShouldQueue
                 }
 
                 //Draw
-                $objectDraw = new ObjectDraw($square->buildJson(), $player->actual_session_id);
+                $squareJson = ScrollGroup::attach($square->buildJson(), Helper::MAP_SCROLL_GROUP_MAIN);
+                $objectDraw = new ObjectDraw($squareJson, $player->actual_session_id);
                 $drawItems[] = $objectDraw->get();
 
                 //Borders
@@ -153,7 +155,8 @@ class GenerateMapJob implements ShouldQueue
                 $tileBorders->setColor(0xFFFFFF);
 
                 //Draw
-                $objectDraw = new ObjectDraw($tileBorders->buildJson(), $player->actual_session_id);
+                $tileBorderJson = ScrollGroup::attach($tileBorders->buildJson(), Helper::MAP_SCROLL_GROUP_MAIN);
+                $objectDraw = new ObjectDraw($tileBorderJson, $player->actual_session_id);
                 $drawItems[] = $objectDraw->get();
 
                 //Entity
@@ -165,6 +168,7 @@ class GenerateMapJob implements ShouldQueue
                     $entityDrawItems = $entityDraw->getDrawItems();
                     foreach ($entityDrawItems as $entityDrawItem) {
                         //Draw
+                        $entityDrawItem = ScrollGroup::attach($entityDrawItem, Helper::MAP_SCROLL_GROUP_MAIN);
                         $objectDraw = new ObjectDraw($entityDrawItem, $player->actual_session_id);
                         $drawItems[] = $objectDraw->get();
                     }
@@ -227,6 +231,7 @@ class GenerateMapJob implements ShouldQueue
             $onClick = str_replace('__delta_x__', (string) $mapButtonConfig['dx'], $onClick);
             $onClick = str_replace('__delta_y__', (string) $mapButtonConfig['dy'], $onClick);
             $onClick = str_replace('__map_start_y__', (string) Helper::MAP_START_Y, $onClick);
+            $onClick = str_replace('__scroll_group__', Helper::MAP_SCROLL_GROUP_MAIN, $onClick);
 
             $button = new ButtonDraw($mapButtonConfig['uid']);
             $button->setSize($buttonSize, $buttonSize);

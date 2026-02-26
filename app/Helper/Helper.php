@@ -22,6 +22,7 @@ class Helper
 
     public const MAP_START_X = 0;
     public const MAP_START_Y = 80;
+    public const MAP_SCROLL_GROUP_MAIN = 'map_main';
 
     const DRAW_REQUEST_TYPE_DRAW = 'draw';
     const DRAW_REQUEST_TYPE_UPDATE = 'update';
