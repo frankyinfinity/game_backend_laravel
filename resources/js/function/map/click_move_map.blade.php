@@ -4,6 +4,8 @@
         const deltaX = parseInt('__delta_x__', 10);
         const deltaY = parseInt('__delta_y__', 10);
         const excludedPrefixes = ['appbar', 'map_nav_', 'modal_'];
+        AppData.map_offset_x = parseInt(AppData.map_offset_x || 0, 10);
+        AppData.map_offset_y = parseInt(AppData.map_offset_y || 0, 10);
 
         const isScoreUid = (uid) => {
             return uid.indexOf('_score_') !== -1;
@@ -83,8 +85,14 @@
             }
         });
 
+        AppData.map_offset_x += deltaX;
+        AppData.map_offset_y += deltaY;
+
         if (typeof refreshAllModalViewportMasks === 'function') {
             refreshAllModalViewportMasks();
+        }
+        if (typeof refreshMapClipping === 'function') {
+            refreshMapClipping();
         }
 
         if (app && app.stage) {
