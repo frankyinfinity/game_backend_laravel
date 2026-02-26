@@ -31,7 +31,9 @@
                             <option value="5">5x5</option>
                             <option value="custom">Custom</option>
                         </select>
-                        <input type="number" id="map-brush-size-custom" class="form-control form-control-sm ml-2" min="1" max="25" value="6" style="width: 90px; display: none;">
+                        <input type="number" id="map-brush-size-custom-w" class="form-control form-control-sm ml-2" min="1" max="25" value="6" style="width: 70px; display: none;">
+                        <span id="map-brush-size-custom-sep" class="ml-1 mr-1" style="display: none;">x</span>
+                        <input type="number" id="map-brush-size-custom-h" class="form-control form-control-sm" min="1" max="25" value="6" style="width: 70px; display: none;">
                     </div>
                 </div>
             </div>
@@ -74,10 +76,12 @@
             let tile_selected_id = String(regionConfig.defaultTileId);
             let tile_selected_color = regionConfig.defaultTileColor;
             let activeTool = 'paint';
-            let brushSize = 1;
+            let brushWidth = 1;
+            let brushHeight = 1;
             let isPainting = false;
             let dragChangedKeys = {};
             let isSaving = false;
+            let hoveredCell = null;
             const undoStack = [];
             const maxUndoSteps = 25;
             const batchChunkSize = 300;
@@ -127,6 +131,10 @@
                 backgroundAlpha: 0
             });
             document.getElementById('region-map-pixi').appendChild(mapApp.view);
+            const mapTilesLayer = new PIXI.Container();
+            const mapPreviewLayer = new PIXI.Container();
+            mapApp.stage.addChild(mapTilesLayer);
+            mapApp.stage.addChild(mapPreviewLayer);
 
             const pickerCols = 3;
             const pickerPadding = 10;
@@ -149,12 +157,14 @@
                 activeTool = toolName;
                 $('.js-map-tool').removeClass('btn-primary').addClass('btn-outline-primary');
                 $('.js-map-tool[data-tool="' + toolName + '"]').removeClass('btn-outline-primary').addClass('btn-primary');
+                refreshPreviewFromHover();
             }
 
             function setSelectedTile(tileId, tileColor) {
                 tile_selected_id = String(tileId);
                 tile_selected_color = tileColor;
                 updatePickerSelection();
+                refreshPreviewFromHover();
             }
 
             function updateDirtyState(key) {
@@ -194,7 +204,7 @@
                 const key = getKey(i, j);
                 const previousGraphic = tileGraphics[key];
                 if (previousGraphic) {
-                    mapApp.stage.removeChild(previousGraphic);
+                    mapTilesLayer.removeChild(previousGraphic);
                     previousGraphic.destroy();
                 }
 
@@ -213,11 +223,21 @@
                 graphic.on('pointerdown', function () {
                     isPainting = true;
                     dragChangedKeys = {};
+                    hoveredCell = { i: i, j: j };
                     handleTileInteraction(i, j, true);
+                    refreshPreviewFromHover();
                 });
                 graphic.on('pointerover', function () {
+                    hoveredCell = { i: i, j: j };
                     if (isPainting && activeTool === 'paint') {
                         handleTileInteraction(i, j, true);
+                    }
+                    refreshPreviewFromHover();
+                });
+                graphic.on('pointerout', function () {
+                    if (hoveredCell && hoveredCell.i === i && hoveredCell.j === j) {
+                        hoveredCell = null;
+                        clearPreview();
                     }
                 });
                 graphic.on('pointertap', function () {
@@ -227,7 +247,116 @@
                 });
 
                 tileGraphics[key] = graphic;
-                mapApp.stage.addChild(graphic);
+                mapTilesLayer.addChild(graphic);
+            }
+
+            function clearPreview() {
+                mapPreviewLayer.removeChildren().forEach(function (child) {
+                    child.destroy();
+                });
+            }
+
+            function getFillPreviewCells(startI, startJ) {
+                const startKey = getKey(startI, startJ);
+                const startState = tileStates[startKey];
+                if (!startState || startState.id === tile_selected_id) {
+                    return [];
+                }
+
+                const cells = [];
+                const queue = [{ i: startI, j: startJ }];
+                let queueIndex = 0;
+                const visited = {};
+                visited[startKey] = true;
+
+                while (queueIndex < queue.length) {
+                    const node = queue[queueIndex];
+                    queueIndex += 1;
+                    const key = getKey(node.i, node.j);
+                    const state = tileStates[key];
+                    if (!state || state.id !== startState.id) {
+                        continue;
+                    }
+
+                    cells.push({ i: node.i, j: node.j });
+
+                    const neighbors = [
+                        { i: node.i - 1, j: node.j },
+                        { i: node.i + 1, j: node.j },
+                        { i: node.i, j: node.j - 1 },
+                        { i: node.i, j: node.j + 1 }
+                    ];
+
+                    neighbors.forEach(function (next) {
+                        if (next.i < 0 || next.j < 0 || next.i >= regionConfig.height || next.j >= regionConfig.width) {
+                            return;
+                        }
+                        const nextKey = getKey(next.i, next.j);
+                        if (visited[nextKey]) {
+                            return;
+                        }
+                        visited[nextKey] = true;
+                        queue.push(next);
+                    });
+                }
+
+                return cells;
+            }
+
+            function getPreviewCells(i, j) {
+                if (activeTool === 'paint' || activeTool === 'eraser') {
+                    return getBrushCells(i, j);
+                }
+                if (activeTool === 'fill') {
+                    return getFillPreviewCells(i, j);
+                }
+                if (activeTool === 'picker') {
+                    return [{ i: i, j: j }];
+                }
+                return [];
+            }
+
+            function drawPreview(i, j) {
+                clearPreview();
+                const cells = getPreviewCells(i, j);
+                if (!cells.length) {
+                    return;
+                }
+
+                const previewColor = activeTool === 'eraser' ? defaultState.color : tile_selected_color;
+                const previewHex = hexToNumber(previewColor);
+
+                cells.forEach(function (cell) {
+                    const g = new PIXI.Graphics();
+                    if (activeTool === 'picker') {
+                        g.lineStyle(2, 0xF59E0B, 1);
+                        g.drawRect(
+                            cell.j * regionConfig.tileSize + 1,
+                            cell.i * regionConfig.tileSize + 1,
+                            regionConfig.tileSize - 2,
+                            regionConfig.tileSize - 2
+                        );
+                    } else {
+                        g.beginFill(previewHex, 0.35);
+                        g.lineStyle(1, 0xFFFFFF, 0.5);
+                        g.drawRect(
+                            cell.j * regionConfig.tileSize,
+                            cell.i * regionConfig.tileSize,
+                            regionConfig.tileSize,
+                            regionConfig.tileSize
+                        );
+                        g.endFill();
+                    }
+                    mapPreviewLayer.addChild(g);
+                });
+            }
+
+            function refreshPreviewFromHover() {
+                if (hoveredCell) {
+                    drawPreview(hoveredCell.i, hoveredCell.j);
+                } else {
+                    clearPreview();
+                }
             }
 
             function drawPickerItem(item, isSelected) {
@@ -403,12 +532,13 @@
 
             function getBrushCells(centerI, centerJ) {
                 const cells = [];
-                const half = Math.floor(brushSize / 2);
-                const startI = centerI - half;
-                const startJ = centerJ - half;
+                const halfH = Math.floor(brushHeight / 2);
+                const halfW = Math.floor(brushWidth / 2);
+                const startI = centerI - halfH;
+                const startJ = centerJ - halfW;
 
-                for (let i = startI; i < startI + brushSize; i++) {
-                    for (let j = startJ; j < startJ + brushSize; j++) {
+                for (let i = startI; i < startI + brushHeight; i++) {
+                    for (let j = startJ; j < startJ + brushWidth; j++) {
                         if (i < 0 || j < 0 || i >= regionConfig.height || j >= regionConfig.width) {
                             continue;
                         }
@@ -611,6 +741,7 @@
             $(document).on('pointerup mouseup', function () {
                 isPainting = false;
                 dragChangedKeys = {};
+                refreshPreviewFromHover();
             });
 
             $(document).on('click', '.js-map-tool', function () {
@@ -620,23 +751,36 @@
             $(document).on('change', '#map-brush-size', function () {
                 const value = String($(this).val());
                 if (value === 'custom') {
-                    $('#map-brush-size-custom').show();
-                    const customSize = parseInt($('#map-brush-size-custom').val(), 10);
-                    brushSize = Number.isInteger(customSize) ? Math.max(1, Math.min(25, customSize)) : 1;
+                    $('#map-brush-size-custom-w').show();
+                    $('#map-brush-size-custom-sep').show();
+                    $('#map-brush-size-custom-h').show();
+                    const customW = parseInt($('#map-brush-size-custom-w').val(), 10);
+                    const customH = parseInt($('#map-brush-size-custom-h').val(), 10);
+                    brushWidth = Number.isInteger(customW) ? Math.max(1, Math.min(25, customW)) : 1;
+                    brushHeight = Number.isInteger(customH) ? Math.max(1, Math.min(25, customH)) : 1;
+                    refreshPreviewFromHover();
                     return;
                 }
 
-                $('#map-brush-size-custom').hide();
+                $('#map-brush-size-custom-w').hide();
+                $('#map-brush-size-custom-sep').hide();
+                $('#map-brush-size-custom-h').hide();
                 const size = parseInt(value, 10);
-                brushSize = Number.isInteger(size) ? Math.max(1, Math.min(25, size)) : 1;
+                const safeSize = Number.isInteger(size) ? Math.max(1, Math.min(25, size)) : 1;
+                brushWidth = safeSize;
+                brushHeight = safeSize;
+                refreshPreviewFromHover();
             });
 
-            $(document).on('input change', '#map-brush-size-custom', function () {
+            $(document).on('input change', '#map-brush-size-custom-w, #map-brush-size-custom-h', function () {
                 if (String($('#map-brush-size').val()) !== 'custom') {
                     return;
                 }
-                const size = parseInt($(this).val(), 10);
-                brushSize = Number.isInteger(size) ? Math.max(1, Math.min(25, size)) : 1;
+                const customW = parseInt($('#map-brush-size-custom-w').val(), 10);
+                const customH = parseInt($('#map-brush-size-custom-h').val(), 10);
+                brushWidth = Number.isInteger(customW) ? Math.max(1, Math.min(25, customW)) : 1;
+                brushHeight = Number.isInteger(customH) ? Math.max(1, Math.min(25, customH)) : 1;
+                refreshPreviewFromHover();
             });
 
             $(document).on('click', '#map-tool-undo', function () {
