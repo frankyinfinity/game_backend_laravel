@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Custom\Draw\Complex\EntityDraw;
+use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\Appbar\HomeAppbarDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
@@ -175,6 +176,73 @@ class GenerateMapJob implements ShouldQueue
             }
             $pixelX = $startPixelX;
             $pixelY += $tileSize;
+        }
+
+        $mapMoveScriptPath = resource_path('js/function/map/click_move_map.blade.php');
+        $mapMoveScriptTemplate = file_get_contents($mapMoveScriptPath);
+        $buttonSize = 34;
+        $buttonGap = 6;
+        $buttonPadding = 10;
+        $baseX = Helper::MAP_START_X + $buttonPadding;
+        $baseY = Helper::MAP_START_Y + $buttonPadding;
+        $moveStep = Helper::TILE_SIZE;
+
+        $mapButtons = [
+            [
+                'uid' => 'map_nav_up',
+                'label' => '^',
+                'x' => $baseX + $buttonSize + $buttonGap,
+                'y' => $baseY,
+                'dx' => 0,
+                'dy' => $moveStep,
+            ],
+            [
+                'uid' => 'map_nav_left',
+                'label' => '<',
+                'x' => $baseX,
+                'y' => $baseY + $buttonSize + $buttonGap,
+                'dx' => $moveStep,
+                'dy' => 0,
+            ],
+            [
+                'uid' => 'map_nav_down',
+                'label' => 'v',
+                'x' => $baseX + $buttonSize + $buttonGap,
+                'y' => $baseY + $buttonSize + $buttonGap,
+                'dx' => 0,
+                'dy' => -$moveStep,
+            ],
+            [
+                'uid' => 'map_nav_right',
+                'label' => '>',
+                'x' => $baseX + (($buttonSize + $buttonGap) * 2),
+                'y' => $baseY + $buttonSize + $buttonGap,
+                'dx' => -$moveStep,
+                'dy' => 0,
+            ],
+        ];
+
+        foreach ($mapButtons as $mapButtonConfig) {
+            $onClick = Helper::setCommonJsCode($mapMoveScriptTemplate, Str::random(20));
+            $onClick = str_replace('__delta_x__', (string) $mapButtonConfig['dx'], $onClick);
+            $onClick = str_replace('__delta_y__', (string) $mapButtonConfig['dy'], $onClick);
+            $onClick = str_replace('__map_start_y__', (string) Helper::MAP_START_Y, $onClick);
+
+            $button = new ButtonDraw($mapButtonConfig['uid']);
+            $button->setSize($buttonSize, $buttonSize);
+            $button->setOrigin($mapButtonConfig['x'], $mapButtonConfig['y']);
+            $button->setString($mapButtonConfig['label']);
+            $button->setColorButton(0x1F2937);
+            $button->setColorString(0xFFFFFF);
+            $button->setTextFontSize(16);
+            $button->setOnClick($onClick);
+            $button->build();
+
+            foreach ($button->getDrawItems() as $buttonItem) {
+                $buttonItem->addAttributes('z_index', 999999);
+                $objectDraw = new ObjectDraw($buttonItem->buildJson(), $player->actual_session_id);
+                $drawItems[] = $objectDraw->get();
+            }
         }
 
         ObjectCache::flush($player->actual_session_id);

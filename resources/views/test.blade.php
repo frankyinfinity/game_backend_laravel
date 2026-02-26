@@ -7,7 +7,14 @@
 @stop
 
 @section('content')
-    <div id="display_container" style="width: 100%; height: 80vh; background: #fff;"></div>
+    <div id="display_container" style="width: 100%; height: 80vh; background: #fff; position: relative;">
+        <div id="map_direction_pad" class="map-direction-pad">
+            <button type="button" class="map-dir-btn map-dir-up" data-dir="up"><i class="fa fa-chevron-up"></i></button>
+            <button type="button" class="map-dir-btn map-dir-left" data-dir="left"><i class="fa fa-chevron-left"></i></button>
+            <button type="button" class="map-dir-btn map-dir-right" data-dir="right"><i class="fa fa-chevron-right"></i></button>
+            <button type="button" class="map-dir-btn map-dir-down" data-dir="down"><i class="fa fa-chevron-down"></i></button>
+        </div>
+    </div>
     <div class="status-msg"
         style="position: absolute; bottom: 10px; right: 10px; opacity: 0.5; background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 5px; font-size: 0.8rem; color: white;">
         Test Page - Inizializzazione...</div>
@@ -23,6 +30,38 @@
             font-family: Arial, sans-serif;
             overflow: hidden;
         }
+
+        .map-direction-pad {
+            position: absolute;
+            left: 16px;
+            bottom: 16px;
+            width: 120px;
+            height: 120px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 6px;
+            z-index: 50;
+            pointer-events: auto;
+        }
+
+        .map-dir-btn {
+            border: 1px solid #cfd8dc;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #37474f;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .map-dir-btn:active {
+            background: #eceff1;
+        }
+
+        .map-dir-up { grid-column: 2; grid-row: 1; }
+        .map-dir-left { grid-column: 1; grid-row: 2; }
+        .map-dir-right { grid-column: 3; grid-row: 2; }
+        .map-dir-down { grid-column: 2; grid-row: 3; }
     </style>
 @stop
 
@@ -54,6 +93,8 @@
         let globalPan = { x: 0, y: 0 };
         let isGlobalDragging = false;
         let globalDragStart = { x: 0, y: 0 };
+        let directionPadTimer = null;
+        const DIRECTION_STEP = 60;
 
         function applyGlobalPan() {
             if (!worldLayer) return;
@@ -129,6 +170,41 @@
                 document.body.style.userSelect = '';
                 document.body.style.cursor = '';
             });
+        }
+
+        function moveMapByDirection(direction) {
+            switch (direction) {
+                case 'up':
+                    globalPan.y += DIRECTION_STEP;
+                    break;
+                case 'down':
+                    globalPan.y -= DIRECTION_STEP;
+                    break;
+                case 'left':
+                    globalPan.x += DIRECTION_STEP;
+                    break;
+                case 'right':
+                    globalPan.x -= DIRECTION_STEP;
+                    break;
+                default:
+                    return;
+            }
+            applyGlobalPan();
+        }
+
+        function startDirectionHold(direction) {
+            moveMapByDirection(direction);
+            if (directionPadTimer) clearInterval(directionPadTimer);
+            directionPadTimer = setInterval(() => {
+                moveMapByDirection(direction);
+            }, 120);
+        }
+
+        function stopDirectionHold() {
+            if (directionPadTimer) {
+                clearInterval(directionPadTimer);
+                directionPadTimer = null;
+            }
         }
 
         function status(msg) {
@@ -596,6 +672,20 @@
         $(document).ready(function() {
             initPixi();
             status('PixiJS Avviato - Connessione a Socket.io...');
+
+            $(document).on('mousedown touchstart', '.map-dir-btn', function(e) {
+                e.preventDefault();
+                const direction = $(this).data('dir');
+                startDirectionHold(direction);
+            });
+
+            $(document).on('mouseup mouseleave touchend touchcancel', '.map-dir-btn', function() {
+                stopDirectionHold();
+            });
+
+            $(window).on('mouseup touchend touchcancel blur', function() {
+                stopDirectionHold();
+            });
 
             const socket = io(config.SOCKETIO_URL, {
                 transports: ['websocket', 'polling'],
