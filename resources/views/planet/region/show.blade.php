@@ -84,11 +84,5 @@
 @stop
 
 @section('js')
-    <script> 
-        $(document).ready(function () {
-
-            
-
-        });
-    </script>
+    @parent
 @stop
