@@ -46,12 +46,6 @@
     <script> 
         $(document).ready(function () {
 
-            $(document).on('click', '.btn_edit', function (e) {
-                var url="{{ route('regions.show',['_id_']) }}";
-                url = url.replace('_id_',$(this).data('id'));
-                window.location.href = url;
-            });
-
             let url_table = "{{ route('regions.datatable',['_id_']) }}";
             url_table = url_table.replace('_id_', '{{$planet->id}}');
 
@@ -98,7 +92,20 @@
                     },
                     {
                         render: function(data, type, row){
-                            return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-eye"></i></button>';
+                            let editDataUrl = "{{ route('regions.edit', ['_id_']) }}";
+                            editDataUrl = editDataUrl.replace('_id_', data);
+
+                            let editMapUrl = "{{ route('regions.edit-map', ['_id_']) }}";
+                            editMapUrl = editMapUrl.replace('_id_', data);
+
+                            return '<div class="d-flex flex-column" style="gap: 4px;">' +
+                                '<a href="' + editDataUrl + '">' +
+                                    '<button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-edit"></i> Dati</button>' +
+                                '</a>' +
+                                '<a href="' + editMapUrl + '">' +
+                                    '<button type="button" class="btn btn-info btn-block btn-sm"><i class="fa fa-map"></i> Mappa</button>' +
+                                '</a>' +
+                            '</div>';
                         },
                         targets:   3
                     },

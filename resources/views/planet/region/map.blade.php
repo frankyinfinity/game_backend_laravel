@@ -4,6 +4,37 @@
     </div>
     <div class="card-body" style="overflow: auto;">
         <div class="row">
+            <div class="col-12 mb-3">
+                <div class="d-flex flex-wrap" style="gap: 8px;">
+                    <button type="button" class="btn btn-primary btn-sm js-map-tool" data-tool="paint">
+                        <i class="fa fa-paint-brush"></i> Pennello
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm js-map-tool" data-tool="fill">
+                        <i class="fa fa-fill-drip"></i> Riempi
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm js-map-tool" data-tool="eraser">
+                        <i class="fa fa-eraser"></i> Gomma
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm js-map-tool" data-tool="picker">
+                        <i class="fa fa-eye-dropper"></i> Pipetta
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="map-tool-undo">
+                        <i class="fa fa-undo"></i> Annulla
+                    </button>
+                    <div class="d-flex align-items-center ml-2">
+                        <label for="map-brush-size" class="mb-0 mr-2">Dimensione</label>
+                        <select id="map-brush-size" class="form-control form-control-sm" style="width: 90px;">
+                            <option value="1" selected>1x1</option>
+                            <option value="2">2x2</option>
+                            <option value="3">3x3</option>
+                            <option value="4">4x4</option>
+                            <option value="5">5x5</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <input type="number" id="map-brush-size-custom" class="form-control form-control-sm ml-2" min="1" max="25" value="6" style="width: 90px; display: none;">
+                    </div>
+                </div>
+            </div>
             <div class="col-12 mb-3" style="overflow: auto">
                 <div id="region-tile-picker-pixi" style="display: inline-block; border: 1px solid #d9d9d9; border-radius: 4px;"></div>
             </div>
@@ -33,27 +64,60 @@
                         'color' => $tile->color
                     ];
                 })->values()),
-                updateTileUrl: "{{ route('regions.tile') }}",
+                updateTilesBatchUrl: "{{ route('regions.tiles-batch') }}",
                 csrfToken: $('meta[name="csrf-token"]').attr('content')
             };
+            const mapItems = Array.isArray(regionConfig.map)
+                ? regionConfig.map
+                : (regionConfig.map && typeof regionConfig.map === 'object' ? Object.values(regionConfig.map) : []);
 
             let tile_selected_id = String(regionConfig.defaultTileId);
             let tile_selected_color = regionConfig.defaultTileColor;
+            let activeTool = 'paint';
+            let brushSize = 1;
+            let isPainting = false;
+            let dragChangedKeys = {};
+            let isSaving = false;
+            const undoStack = [];
+            const maxUndoSteps = 25;
+            const batchChunkSize = 300;
             const tileGraphics = {};
-            const tileColors = {};
+            const tileStates = {};
+            const initialTileStates = {};
+            const pendingChanges = {};
             const tilePickerItems = {};
+            const tileById = {};
             const hexToNumber = (hexColor) => parseInt(hexColor.replace('#', '0x'), 16);
+            const getKey = (i, j) => i + '_' + j;
+            const defaultState = {
+                id: String(regionConfig.defaultTileId),
+                color: regionConfig.defaultTileColor
+            };
+
+            regionConfig.tiles.forEach(function (tile) {
+                tileById[String(tile.id)] = tile;
+            });
 
             for (let i = 0; i < regionConfig.height; i++) {
                 for (let j = 0; j < regionConfig.width; j++) {
-                    tileColors[i + '_' + j] = regionConfig.defaultTileColor;
+                    tileStates[getKey(i, j)] = { id: defaultState.id, color: defaultState.color };
                 }
             }
 
-            regionConfig.map.forEach(item => {
-                if (item && item.tile && item.tile.color !== undefined) {
-                    tileColors[item.i + '_' + item.j] = item.tile.color;
+            mapItems.forEach(item => {
+                if (item && item.tile && item.i !== undefined && item.j !== undefined) {
+                    tileStates[getKey(item.i, item.j)] = {
+                        id: String(item.tile.id),
+                        color: item.tile.color
+                    };
                 }
+            });
+
+            Object.keys(tileStates).forEach(function (key) {
+                initialTileStates[key] = {
+                    id: tileStates[key].id,
+                    color: tileStates[key].color
+                };
             });
 
             const mapApp = new PIXI.Application({
@@ -81,8 +145,53 @@
             });
             document.getElementById('region-tile-picker-pixi').appendChild(pickerApp.view);
 
-            function drawMapTile(i, j, color) {
-                const key = i + '_' + j;
+            function setActiveTool(toolName) {
+                activeTool = toolName;
+                $('.js-map-tool').removeClass('btn-primary').addClass('btn-outline-primary');
+                $('.js-map-tool[data-tool="' + toolName + '"]').removeClass('btn-outline-primary').addClass('btn-primary');
+            }
+
+            function setSelectedTile(tileId, tileColor) {
+                tile_selected_id = String(tileId);
+                tile_selected_color = tileColor;
+                updatePickerSelection();
+            }
+
+            function updateDirtyState(key) {
+                const initial = initialTileStates[key];
+                const current = tileStates[key];
+                if (!initial || !current) {
+                    return;
+                }
+
+                if (initial.id === current.id && initial.color === current.color) {
+                    delete pendingChanges[key];
+                    return;
+                }
+
+                pendingChanges[key] = {
+                    i: parseInt(key.split('_')[0], 10),
+                    j: parseInt(key.split('_')[1], 10),
+                    tile_id: current.id
+                };
+            }
+
+            function getPendingPayload() {
+                return Object.values(pendingChanges);
+            }
+
+            function refreshSaveButtonState() {
+                const saveButton = $('#map-save-all');
+                if (!saveButton.length) {
+                    return;
+                }
+
+                const hasPending = getPendingPayload().length > 0;
+                saveButton.prop('disabled', isSaving || !hasPending);
+            }
+
+            function drawMapTile(i, j, state) {
+                const key = getKey(i, j);
                 const previousGraphic = tileGraphics[key];
                 if (previousGraphic) {
                     mapApp.stage.removeChild(previousGraphic);
@@ -90,7 +199,7 @@
                 }
 
                 const graphic = new PIXI.Graphics();
-                graphic.beginFill(hexToNumber(color));
+                graphic.beginFill(hexToNumber(state.color));
                 graphic.lineStyle(1, 0xFFFFFF, 0.5);
                 graphic.drawRect(
                     j * regionConfig.tileSize,
@@ -101,8 +210,20 @@
                 graphic.endFill();
                 graphic.eventMode = 'static';
                 graphic.cursor = 'pointer';
+                graphic.on('pointerdown', function () {
+                    isPainting = true;
+                    dragChangedKeys = {};
+                    handleTileInteraction(i, j, true);
+                });
+                graphic.on('pointerover', function () {
+                    if (isPainting && activeTool === 'paint') {
+                        handleTileInteraction(i, j, true);
+                    }
+                });
                 graphic.on('pointertap', function () {
-                    saveTile(i, j);
+                    if (activeTool !== 'paint') {
+                        handleTileInteraction(i, j, false);
+                    }
                 });
 
                 tileGraphics[key] = graphic;
@@ -156,9 +277,8 @@
                     itemContainer.addChild(label);
 
                     itemContainer.on('pointertap', function () {
-                        tile_selected_id = String(tile.id);
-                        tile_selected_color = tile.color;
-                        updatePickerSelection();
+                        setSelectedTile(tile.id, tile.color);
+                        setActiveTool('paint');
                     });
 
                     const pickerItem = {
@@ -171,7 +291,7 @@
                 });
             }
 
-            function saveTile(tile_i, tile_j) {
+            function saveTilesBatch(tiles, onError, onComplete) {
                 $.ajaxSetup({
                     headers: {
                         'X-CSRF-TOKEN': regionConfig.csrfToken
@@ -179,27 +299,35 @@
                 });
 
                 $.ajax({
-                    url: regionConfig.updateTileUrl,
+                    url: regionConfig.updateTilesBatchUrl,
                     type: 'POST',
                     data: {
                         region_id: regionConfig.id,
-                        tile_id: tile_selected_id,
-                        tile_i: tile_i,
-                        tile_j: tile_j
+                        tiles: tiles
                     },
                     success: function (result) {
-                        if (result.success) {
-                            tileColors[tile_i + '_' + tile_j] = tile_selected_color;
-                            drawMapTile(tile_i, tile_j, tile_selected_color);
-                        } else {
+                        if (!result.success) {
+                            if (typeof onError === 'function') {
+                                onError();
+                            }
                             let msg = 'Si e verificato un errore.';
                             if (result.msg != null) {
                                 msg = result.msg;
                             }
                             $.notify({ title: 'Ops!', message: msg }, { type: 'warning' });
+                            if (typeof onComplete === 'function') {
+                                onComplete(false);
+                            }
+                            return;
+                        }
+                        if (typeof onComplete === 'function') {
+                            onComplete(true);
                         }
                     },
                     error: function () {
+                        if (typeof onError === 'function') {
+                            onError();
+                        }
                         Swal.fire({
                             title: 'Ops!',
                             text: 'Si e verificato un errore imprevisto.',
@@ -209,17 +337,322 @@
                             confirmButtonClass: 'btn btn-info',
                             confirmButtonText: 'Ho Capito!'
                         });
+                        if (typeof onComplete === 'function') {
+                            onComplete(false);
+                        }
                     }
                 });
             }
 
+            function saveTilesInChunks(tilesPayload, onError, onComplete) {
+                if (!Array.isArray(tilesPayload) || !tilesPayload.length) {
+                    if (typeof onComplete === 'function') {
+                        onComplete();
+                    }
+                    return;
+                }
+
+                const chunks = [];
+                for (let i = 0; i < tilesPayload.length; i += batchChunkSize) {
+                    chunks.push(tilesPayload.slice(i, i + batchChunkSize));
+                }
+
+                let chunkIndex = 0;
+                const runNext = function (ok) {
+                    if (ok === false) {
+                        return;
+                    }
+
+                    if (chunkIndex >= chunks.length) {
+                        if (typeof onComplete === 'function') {
+                            onComplete();
+                        }
+                        return;
+                    }
+
+                    const chunk = chunks[chunkIndex];
+                    chunkIndex += 1;
+                    saveTilesBatch(chunk, onError, runNext);
+                };
+
+                runNext(true);
+            }
+
+            function applyChange(i, j, newState, changeSet) {
+                const key = getKey(i, j);
+                const current = tileStates[key];
+                if (!current || (current.id === newState.id && current.color === newState.color)) {
+                    return;
+                }
+
+                if (!changeSet[key]) {
+                    changeSet[key] = {
+                        i: i,
+                        j: j,
+                        before: { id: current.id, color: current.color },
+                        after: { id: newState.id, color: newState.color }
+                    };
+                } else {
+                    changeSet[key].after = { id: newState.id, color: newState.color };
+                }
+
+                tileStates[key] = { id: newState.id, color: newState.color };
+                drawMapTile(i, j, tileStates[key]);
+                updateDirtyState(key);
+            }
+
+            function getBrushCells(centerI, centerJ) {
+                const cells = [];
+                const half = Math.floor(brushSize / 2);
+                const startI = centerI - half;
+                const startJ = centerJ - half;
+
+                for (let i = startI; i < startI + brushSize; i++) {
+                    for (let j = startJ; j < startJ + brushSize; j++) {
+                        if (i < 0 || j < 0 || i >= regionConfig.height || j >= regionConfig.width) {
+                            continue;
+                        }
+                        cells.push({ i: i, j: j });
+                    }
+                }
+                return cells;
+            }
+
+            function pushUndo(changeSet) {
+                const keys = Object.keys(changeSet);
+                if (!keys.length) {
+                    return;
+                }
+                undoStack.push(keys.map(function (k) { return changeSet[k]; }));
+                if (undoStack.length > maxUndoSteps) {
+                    undoStack.shift();
+                }
+            }
+
+            function paintAt(i, j, changeSet) {
+                const cells = getBrushCells(i, j);
+                cells.forEach(function (cell) {
+                    const key = getKey(cell.i, cell.j);
+                    if (dragChangedKeys[key]) {
+                        return;
+                    }
+                    dragChangedKeys[key] = true;
+                    applyChange(cell.i, cell.j, { id: tile_selected_id, color: tile_selected_color }, changeSet);
+                });
+            }
+
+            function fillAt(startI, startJ, changeSet) {
+                const startKey = getKey(startI, startJ);
+                const startState = tileStates[startKey];
+                if (!startState) {
+                    return;
+                }
+                if (startState.id === tile_selected_id) {
+                    return;
+                }
+
+                const queue = [{ i: startI, j: startJ }];
+                let queueIndex = 0;
+                const visited = {};
+                visited[startKey] = true;
+
+                while (queueIndex < queue.length) {
+                    const node = queue[queueIndex];
+                    queueIndex += 1;
+                    const key = getKey(node.i, node.j);
+                    const state = tileStates[key];
+                    if (!state || state.id !== startState.id) {
+                        continue;
+                    }
+
+                    applyChange(node.i, node.j, { id: tile_selected_id, color: tile_selected_color }, changeSet);
+
+                    const neighbors = [
+                        { i: node.i - 1, j: node.j },
+                        { i: node.i + 1, j: node.j },
+                        { i: node.i, j: node.j - 1 },
+                        { i: node.i, j: node.j + 1 }
+                    ];
+
+                    neighbors.forEach(function (next) {
+                        if (next.i < 0 || next.j < 0 || next.i >= regionConfig.height || next.j >= regionConfig.width) {
+                            return;
+                        }
+                        const nextKey = getKey(next.i, next.j);
+                        if (visited[nextKey]) {
+                            return;
+                        }
+                        visited[nextKey] = true;
+                        queue.push(next);
+                    });
+                }
+            }
+
+            function eraseAt(i, j, changeSet) {
+                const cells = getBrushCells(i, j);
+                cells.forEach(function (cell) {
+                    applyChange(cell.i, cell.j, { id: defaultState.id, color: defaultState.color }, changeSet);
+                });
+            }
+
+            function pickAt(i, j) {
+                const state = tileStates[getKey(i, j)];
+                if (!state) {
+                    return;
+                }
+
+                const tile = tileById[state.id];
+                if (!tile) {
+                    return;
+                }
+                setSelectedTile(tile.id, tile.color);
+                setActiveTool('paint');
+            }
+
+            function handleTileInteraction(i, j, fromDrag) {
+                const changeSet = {};
+                if (activeTool === 'paint') {
+                    paintAt(i, j, changeSet);
+                    if (!fromDrag) {
+                        dragChangedKeys = {};
+                    }
+                } else if (activeTool === 'fill') {
+                    fillAt(i, j, changeSet);
+                } else if (activeTool === 'eraser') {
+                    eraseAt(i, j, changeSet);
+                } else if (activeTool === 'picker') {
+                    pickAt(i, j);
+                }
+
+                if (activeTool !== 'picker') {
+                    pushUndo(changeSet);
+                    refreshSaveButtonState();
+                }
+            }
+
+            function undoLast() {
+                const last = undoStack.pop();
+                if (!last || !last.length) {
+                    return;
+                }
+
+                last.forEach(function (item) {
+                    const key = getKey(item.i, item.j);
+                    tileStates[key] = { id: item.before.id, color: item.before.color };
+                    drawMapTile(item.i, item.j, tileStates[key]);
+                    updateDirtyState(key);
+                });
+                refreshSaveButtonState();
+            }
+
+            function saveAllChanges() {
+                if (isSaving) {
+                    return;
+                }
+
+                const payload = getPendingPayload().map(function (item) {
+                    return {
+                        tile_i: item.i,
+                        tile_j: item.j,
+                        tile_id: item.tile_id
+                    };
+                });
+
+                if (!payload.length) {
+                    $.notify({ title: 'Info', message: 'Nessuna modifica da salvare.' }, { type: 'info' });
+                    return;
+                }
+
+                isSaving = true;
+                const saveButton = $('#map-save-all');
+                if (saveButton.length) {
+                    saveButton.html('<i class="fa fa-spinner fa-spin"></i> Salvataggio...');
+                }
+                refreshSaveButtonState();
+
+                saveTilesInChunks(
+                    payload,
+                    function () {
+                        isSaving = false;
+                        if (saveButton.length) {
+                            saveButton.html('<i class="fa fa-save"></i> Salva');
+                        }
+                        refreshSaveButtonState();
+                    },
+                    function () {
+                        Object.keys(pendingChanges).forEach(function (key) {
+                            initialTileStates[key] = {
+                                id: tileStates[key].id,
+                                color: tileStates[key].color
+                            };
+                            delete pendingChanges[key];
+                        });
+                        undoStack.length = 0;
+                        isSaving = false;
+                        if (saveButton.length) {
+                            saveButton.html('<i class="fa fa-save"></i> Salva');
+                        }
+                        refreshSaveButtonState();
+                        $.notify({ title: 'OK', message: 'Mappa salvata correttamente.' }, { type: 'success' });
+                    }
+                );
+            }
+
             for (let i = 0; i < regionConfig.height; i++) {
                 for (let j = 0; j < regionConfig.width; j++) {
-                    drawMapTile(i, j, tileColors[i + '_' + j]);
+                    drawMapTile(i, j, tileStates[getKey(i, j)]);
                 }
             }
 
             buildPicker();
+            setActiveTool('paint');
+            refreshSaveButtonState();
+
+            $(document).on('pointerup mouseup', function () {
+                isPainting = false;
+                dragChangedKeys = {};
+            });
+
+            $(document).on('click', '.js-map-tool', function () {
+                setActiveTool($(this).data('tool'));
+            });
+
+            $(document).on('change', '#map-brush-size', function () {
+                const value = String($(this).val());
+                if (value === 'custom') {
+                    $('#map-brush-size-custom').show();
+                    const customSize = parseInt($('#map-brush-size-custom').val(), 10);
+                    brushSize = Number.isInteger(customSize) ? Math.max(1, Math.min(25, customSize)) : 1;
+                    return;
+                }
+
+                $('#map-brush-size-custom').hide();
+                const size = parseInt(value, 10);
+                brushSize = Number.isInteger(size) ? Math.max(1, Math.min(25, size)) : 1;
+            });
+
+            $(document).on('input change', '#map-brush-size-custom', function () {
+                if (String($('#map-brush-size').val()) !== 'custom') {
+                    return;
+                }
+                const size = parseInt($(this).val(), 10);
+                brushSize = Number.isInteger(size) ? Math.max(1, Math.min(25, size)) : 1;
+            });
+
+            $(document).on('click', '#map-tool-undo', function () {
+                undoLast();
+            });
+
+            $(document).on('click', '#map-save-all', function () {
+                saveAllChanges();
+            });
+
+            window.addEventListener('beforeunload', function (event) {
+                if (getPendingPayload().length > 0 && !isSaving) {
+                    event.preventDefault();
+                    event.returnValue = '';
+                }
+            });
         });
     </script>
 @stop

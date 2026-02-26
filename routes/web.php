@@ -56,10 +56,12 @@ Route::group(['middleware' => ['auth']], function (){
     Route::get('/regions/page/create/{planet_id}', [App\Http\Controllers\RegionController::class, 'create'])->name(name: 'regions.create');
     Route::get('/regions/page/show/{id}', [App\Http\Controllers\RegionController::class, 'show'])->name(name: 'regions.show');
     Route::get('/regions/page/edit/{id}', [App\Http\Controllers\RegionController::class, 'edit'])->name(name: 'regions.edit');
+    Route::get('/regions/page/edit-map/{id}', [App\Http\Controllers\RegionController::class, 'editMap'])->name(name: 'regions.edit-map');
     Route::post('/regions/action/store', [App\Http\Controllers\RegionController::class, 'store'])->name(name: 'regions.store');
     Route::put('/regions/action/update/{id}', [App\Http\Controllers\RegionController::class, 'update'])->name(name: 'regions.update');
     Route::post('/regions/action/delete', action: [App\Http\Controllers\RegionController::class, 'delete'])->name('regions.delete');
     Route::post('/regions/action/tile', action: [App\Http\Controllers\RegionController::class, 'updateTile'])->name('regions.tile');
+    Route::post('/regions/action/tiles-batch', action: [App\Http\Controllers\RegionController::class, 'updateTiles'])->name('regions.tiles-batch');
 
     //Entity
     Route::get('entities/position', [App\Http\Controllers\EntityController::class, 'position']);
