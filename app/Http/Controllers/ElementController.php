@@ -12,6 +12,7 @@ use App\Models\Tile;
 use App\Models\ElementHasTile;
 use App\Models\Gene;
 use App\Models\Neuron;
+use App\Models\NeuronLink;
 use App\Models\Score;
 use App\Models\ElementHasGene;
 use Illuminate\Http\Request;
@@ -94,7 +95,7 @@ class ElementController extends Controller
      */
     public function edit(Element $element)
     {
-        $element->load('brain.neurons');
+        $element->load('brain.neurons.outgoingLinks', 'brain.neurons.incomingLinks');
 
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
@@ -394,6 +395,7 @@ class ElementController extends Controller
         return response()->json([
             'success' => true,
             'neuron' => [
+                'id' => (int) $neuron->id,
                 'type' => $neuron->type,
                 'grid_i' => (int) $neuron->grid_i,
                 'grid_j' => (int) $neuron->grid_j,
@@ -420,6 +422,79 @@ class ElementController extends Controller
             ->where('brain_id', $element->brain->id)
             ->where('grid_i', (int) $request->input('grid_i'))
             ->where('grid_j', (int) $request->input('grid_j'))
+            ->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function saveNeuronLink(Request $request, Element $element)
+    {
+        if (!$element->isInteractive() || !$element->brain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Brain non disponibile',
+            ], 422);
+        }
+
+        $request->validate([
+            'from_neuron_id' => 'required|integer|min:1',
+            'to_neuron_id' => 'required|integer|min:1|different:from_neuron_id',
+        ]);
+
+        $fromNeuron = Neuron::query()
+            ->where('id', (int) $request->input('from_neuron_id'))
+            ->where('brain_id', $element->brain->id)
+            ->first();
+        $toNeuron = Neuron::query()
+            ->where('id', (int) $request->input('to_neuron_id'))
+            ->where('brain_id', $element->brain->id)
+            ->first();
+
+        if (!$fromNeuron || !$toNeuron) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Neuroni non validi per questo brain',
+            ], 422);
+        }
+
+        $link = NeuronLink::query()->firstOrCreate([
+            'from_neuron_id' => $fromNeuron->id,
+            'to_neuron_id' => $toNeuron->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'link' => [
+                'id' => (int) $link->id,
+                'from_neuron_id' => (int) $link->from_neuron_id,
+                'to_neuron_id' => (int) $link->to_neuron_id,
+            ],
+        ]);
+    }
+
+    public function deleteNeuronLink(Request $request, Element $element)
+    {
+        if (!$element->isInteractive() || !$element->brain) {
+            return response()->json(['success' => true]);
+        }
+
+        $request->validate([
+            'from_neuron_id' => 'required|integer|min:1',
+            'to_neuron_id' => 'required|integer|min:1',
+        ]);
+
+        $fromNeuronId = (int) $request->input('from_neuron_id');
+        $toNeuronId = (int) $request->input('to_neuron_id');
+
+        NeuronLink::query()
+            ->where('from_neuron_id', $fromNeuronId)
+            ->where('to_neuron_id', $toNeuronId)
+            ->whereHas('fromNeuron', function ($q) use ($element) {
+                $q->where('brain_id', $element->brain->id);
+            })
+            ->whereHas('toNeuron', function ($q) use ($element) {
+                $q->where('brain_id', $element->brain->id);
+            })
             ->delete();
 
         return response()->json(['success' => true]);

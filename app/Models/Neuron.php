@@ -52,4 +52,14 @@ class Neuron extends Model
     {
         return $this->belongsTo(Brain::class);
     }
+
+    public function outgoingLinks()
+    {
+        return $this->hasMany(NeuronLink::class, 'from_neuron_id');
+    }
+
+    public function incomingLinks()
+    {
+        return $this->hasMany(NeuronLink::class, 'to_neuron_id');
+    }
 }

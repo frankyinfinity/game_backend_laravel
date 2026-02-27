@@ -78,6 +78,8 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/elements/{element}/save-graphics', [App\Http\Controllers\ElementController::class, 'saveGraphics'])->name('elements.save-graphics');
     Route::post('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'saveBrainNeuron'])->name('elements.brain.neurons.save');
     Route::delete('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'deleteBrainNeuron'])->name('elements.brain.neurons.delete');
+    Route::post('/elements/{element}/brain/neuron-links', [App\Http\Controllers\ElementController::class, 'saveNeuronLink'])->name('elements.brain.neuron-links.save');
+    Route::delete('/elements/{element}/brain/neuron-links', [App\Http\Controllers\ElementController::class, 'deleteNeuronLink'])->name('elements.brain.neuron-links.delete');
 
     //Scores
     Route::resource('scores', App\Http\Controllers\ScoreController::class);

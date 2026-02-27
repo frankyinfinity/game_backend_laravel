@@ -22,4 +22,16 @@ class Brain extends Model
     {
         return $this->hasMany(Neuron::class);
     }
+
+    public function neuronLinks()
+    {
+        return $this->hasManyThrough(
+            NeuronLink::class,
+            Neuron::class,
+            'brain_id',
+            'from_neuron_id',
+            'id',
+            'id'
+        );
+    }
 }

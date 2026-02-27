@@ -5,6 +5,7 @@
     $existingNeuronItems = $element->brain && $element->brain->neurons
         ? $element->brain->neurons->map(function ($n) {
             return [
+                'id' => (int) $n->id,
                 'type' => $n->type,
                 'grid_i' => (int) $n->grid_i,
                 'grid_j' => (int) $n->grid_j,
@@ -13,6 +14,19 @@
                 'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
                 'target_entity_id' => $n->target_entity_id !== null ? (int) $n->target_entity_id : null,
             ];
+        })->values()->all()
+        : [];
+    $existingNeuronLinks = $element->brain && $element->brain->neurons
+        ? $element->brain->neurons->flatMap(function ($n) {
+            return $n->outgoingLinks->map(function ($l) {
+                return [
+                    'id' => (int) $l->id,
+                    'from_neuron_id' => (int) $l->from_neuron_id,
+                    'to_neuron_id' => (int) $l->to_neuron_id,
+                ];
+            });
+        })->unique(function ($l) {
+            return $l['from_neuron_id'] . '_' . $l['to_neuron_id'];
         })->values()->all()
         : [];
 @endphp
@@ -63,6 +77,9 @@
     <div class="col-12">
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-save"></i> Salva
+        </button>
+        <button type="button" class="btn btn-info" id="btn_link_mode_toggle">
+            <i class="fas fa-link"></i> Modalità Link: OFF
         </button>
         <a href="{{ route('elements.index') }}" class="btn btn-secondary">
             <i class="fas fa-times"></i> Annulla
@@ -160,28 +177,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const neuronTargetTypeGroup = document.getElementById('neuron_target_type_group');
     const neuronTargetElementGroup = document.getElementById('neuron_target_element_group');
     const neuronTargetElementIdInput = document.getElementById('neuron_target_element_id');
-    const neuronTargetEntityGroup = null;
-    const neuronTargetEntityIdInput = null;
     const selectedCellLabel = document.getElementById('selected_cell_label');
     const saveNeuronBtn = document.getElementById('btn_save_neuron');
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || typeof PIXI === 'undefined') {
+    const linkModeToggleBtn = document.getElementById('btn_link_mode_toggle');
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !linkModeToggleBtn || typeof PIXI === 'undefined') {
         return;
     }
 
     const fixedCellSize = 36;
     const typeDetection = @json(\App\Models\Neuron::TYPE_DETECTION);
-    const typePath = @json(\App\Models\Neuron::TYPE_PATH);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
+    const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
+    const deleteNeuronLinkUrl = @json(route('elements.brain.neuron-links.delete', $element));
     const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
+
     let app = null;
     let selectedCell = null;
     let neuronItems = [];
+    let neuronLinks = [];
+    let linkMode = false;
+    let fromNeuronId = null;
 
     try {
         const parsed = JSON.parse(neuronItemsInput.value || '[]');
@@ -189,35 +210,15 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (e) {
         neuronItems = [];
     }
+    neuronLinks = @json($existingNeuronLinks);
+    if (!Array.isArray(neuronLinks)) {
+        neuronLinks = [];
+    }
 
     function normalize(value) {
         const parsed = parseInt(value, 10);
         if (Number.isNaN(parsed) || parsed < 1) return 1;
         return parsed;
-    }
-
-    function drawDashedLine(graphics, x1, y1, x2, y2, dash = 6, gap = 4) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const distance = Math.sqrt((dx * dx) + (dy * dy));
-        if (distance === 0) return;
-
-        const ux = dx / distance;
-        const uy = dy / distance;
-        let drawn = 0;
-
-        while (drawn < distance) {
-            const startX = x1 + (ux * drawn);
-            const startY = y1 + (uy * drawn);
-            const dashLength = Math.min(dash, distance - drawn);
-            const endX = startX + (ux * dashLength);
-            const endY = startY + (uy * dashLength);
-
-            graphics.moveTo(startX, startY);
-            graphics.lineTo(endX, endY);
-
-            drawn += dash + gap;
-        }
     }
 
     function neuronKey(i, j) {
@@ -241,6 +242,31 @@ document.addEventListener('DOMContentLoaded', function () {
         return neuronItems.find((item) => neuronKey(Number(item.grid_i), Number(item.grid_j)) === key) || null;
     }
 
+    function findNeuronById(id) {
+        return neuronItems.find((item) => Number(item.id) === Number(id)) || null;
+    }
+
+    function drawDashedLine(graphics, x1, y1, x2, y2, dash = 6, gap = 4) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const distance = Math.sqrt((dx * dx) + (dy * dy));
+        if (distance === 0) return;
+
+        const ux = dx / distance;
+        const uy = dy / distance;
+        let drawn = 0;
+        while (drawn < distance) {
+            const sx = x1 + (ux * drawn);
+            const sy = y1 + (uy * drawn);
+            const len = Math.min(dash, distance - drawn);
+            const ex = sx + (ux * len);
+            const ey = sy + (uy * len);
+            graphics.moveTo(sx, sy);
+            graphics.lineTo(ex, ey);
+            drawn += dash + gap;
+        }
+    }
+
     function toggleDetectionFieldsByType() {
         const isDetection = neuronTypeInput.value === typeDetection;
         neuronRadiusGroup.style.display = isDetection ? '' : 'none';
@@ -249,17 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronTargetElementGroup.style.display = 'none';
             return;
         }
-
-        if (neuronTargetTypeEntityInput.checked) {
-            neuronTargetElementGroup.style.display = 'none';
-            return;
-        }
-
-        if (neuronTargetTypeElementInput.checked) {
-            neuronTargetElementGroup.style.display = '';
-        } else {
-            neuronTargetElementGroup.style.display = 'none';
-        }
+        neuronTargetElementGroup.style.display = neuronTargetTypeElementInput.checked ? '' : 'none';
     }
 
     function openNeuronModal(i, j) {
@@ -267,40 +283,69 @@ document.addEventListener('DOMContentLoaded', function () {
         selectedCellLabel.textContent = `(${i}, ${j})`;
 
         const existing = findNeuronAtCell(i, j);
-        const resetCreateFields = function () {
-            neuronTypeInput.value = typeDetection;
-            neuronRadiusInput.value = 1;
-            neuronTargetTypeElementInput.checked = true;
-            neuronTargetTypeEntityInput.checked = false;
-            neuronTargetElementIdInput.value = '';
-        };
-
         if (existing) {
             const inferredTargetType = existing.target_type
                 || (existing.target_element_id != null ? targetTypeElement : null)
                 || (existing.target_entity_id != null ? targetTypeEntity : null)
                 || targetTypeElement;
-            const inferredElementTargetId = existing.target_element_id != null
-                ? String(existing.target_element_id)
-                : (inferredTargetType === targetTypeElement && existing.target_entity_id != null ? String(existing.target_entity_id) : '');
 
             neuronTypeInput.value = existing.type;
             neuronRadiusInput.value = existing.radius != null ? Number(existing.radius) : 1;
             neuronTargetTypeElementInput.checked = inferredTargetType === targetTypeElement;
             neuronTargetTypeEntityInput.checked = inferredTargetType === targetTypeEntity;
-            if (inferredElementTargetId !== '' && neuronTargetElementIdInput.querySelector(`option[value="${inferredElementTargetId}"]`)) {
-                neuronTargetElementIdInput.value = inferredElementTargetId;
-            } else {
-                neuronTargetElementIdInput.value = '';
-            }
+            neuronTargetElementIdInput.value = existing.target_element_id != null ? String(existing.target_element_id) : '';
             deleteNeuronBtn.style.display = '';
         } else {
-            resetCreateFields();
+            neuronTypeInput.value = typeDetection;
+            neuronRadiusInput.value = 1;
+            neuronTargetTypeElementInput.checked = true;
+            neuronTargetTypeEntityInput.checked = false;
+            neuronTargetElementIdInput.value = '';
             deleteNeuronBtn.style.display = 'none';
         }
 
         toggleDetectionFieldsByType();
         $(neuronModalEl).modal('show');
+    }
+
+    function drawNeuronLinks(layer, cellSize) {
+        for (const link of neuronLinks) {
+            const fromN = findNeuronById(link.from_neuron_id);
+            const toN = findNeuronById(link.to_neuron_id);
+            if (!fromN || !toN) continue;
+
+            const x1 = (Number(fromN.grid_j) * cellSize) + (cellSize / 2);
+            const y1 = (Number(fromN.grid_i) * cellSize) + (cellSize / 2);
+            const x2 = (Number(toN.grid_j) * cellSize) + (cellSize / 2);
+            const y2 = (Number(toN.grid_i) * cellSize) + (cellSize / 2);
+
+            const line = new PIXI.Graphics();
+            line.lineStyle(2, 0x0ea5e9, 1);
+            line.moveTo(x1, y1);
+            line.lineTo(x2, y2);
+            line.eventMode = 'static';
+            line.cursor = 'pointer';
+            line.hitArea = new PIXI.Rectangle(
+                Math.min(x1, x2) - 5,
+                Math.min(y1, y2) - 5,
+                Math.abs(x2 - x1) + 10,
+                Math.abs(y2 - y1) + 10
+            );
+            line.on('pointerdown', async () => {
+                if (!confirm('Vuoi eliminare questo collegamento?')) return;
+                try {
+                    await requestDeleteNeuronLink({
+                        from_neuron_id: Number(link.from_neuron_id),
+                        to_neuron_id: Number(link.to_neuron_id),
+                    });
+                    neuronLinks = neuronLinks.filter((l) => !(Number(l.from_neuron_id) === Number(link.from_neuron_id) && Number(l.to_neuron_id) === Number(link.to_neuron_id)));
+                    renderGrid();
+                } catch (error) {
+                    alert(error.message || 'Errore durante la rimozione del collegamento');
+                }
+            });
+            layer.addChild(line);
+        }
     }
 
     function drawNeuronSymbols(layer, cellSize) {
@@ -309,15 +354,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const j = Number(neuron.grid_j);
             const symbol = typeSymbols[neuron.type] || '?';
 
+            const isSelectedFrom = Number(neuron.id) === Number(fromNeuronId);
             const neuronBorder = new PIXI.Graphics();
-            neuronBorder.lineStyle(2, 0x111827, 1);
+            neuronBorder.lineStyle(2, isSelectedFrom ? 0xdc2626 : 0x111827, 1);
             neuronBorder.beginFill(0xFFFFFF, 0.001);
-            neuronBorder.drawRect(
-                (j * cellSize) + 1,
-                (i * cellSize) + 1,
-                cellSize - 2,
-                cellSize - 2
-            );
+            neuronBorder.drawRect((j * cellSize) + 1, (i * cellSize) + 1, cellSize - 2, cellSize - 2);
             neuronBorder.endFill();
             layer.addChild(neuronBorder);
 
@@ -352,21 +393,56 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             container.innerHTML = '';
             container.appendChild(app.view);
-            app.view.style.cursor = 'pointer';
-            app.view.addEventListener('click', function (event) {
+            app.view.addEventListener('click', async (event) => {
                 const rect = app.view.getBoundingClientRect();
                 const x = event.clientX - rect.left;
                 const y = event.clientY - rect.top;
                 const i = Math.floor(y / fixedCellSize);
                 const j = Math.floor(x / fixedCellSize);
-
                 const maxRows = normalize(heightInput.value || 5);
                 const maxCols = normalize(widthInput.value || 5);
-                if (i < 0 || j < 0 || i >= maxRows || j >= maxCols) {
+                if (i < 0 || j < 0 || i >= maxRows || j >= maxCols) return;
+
+                const neuron = findNeuronAtCell(i, j);
+                if (linkMode) {
+                    if (!neuron) return;
+                    if (!fromNeuronId) {
+                        fromNeuronId = Number(neuron.id);
+                        renderGrid();
+                        return;
+                    }
+                    if (Number(neuron.id) === Number(fromNeuronId)) {
+                        fromNeuronId = null;
+                        renderGrid();
+                        return;
+                    }
+                    try {
+                        const savedLink = await requestSaveNeuronLink({
+                            from_neuron_id: Number(fromNeuronId),
+                            to_neuron_id: Number(neuron.id),
+                        });
+                        const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));
+                        if (!exists) neuronLinks.push(savedLink);
+                    } catch (error) {
+                        alert(error.message || 'Errore durante il collegamento');
+                    } finally {
+                        fromNeuronId = null;
+                        renderGrid();
+                    }
                     return;
                 }
 
                 openNeuronModal(i, j);
+            });
+
+            app.view.addEventListener('mousemove', (event) => {
+                const rect = app.view.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                const i = Math.floor(y / fixedCellSize);
+                const j = Math.floor(x / fixedCellSize);
+                const hoveredNeuron = findNeuronAtCell(i, j);
+                app.view.style.cursor = hoveredNeuron ? 'crosshair' : 'default';
             });
         } else {
             app.renderer.resize(canvasWidth, canvasHeight);
@@ -381,18 +457,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const lines = new PIXI.Graphics();
         lines.lineStyle(1, 0x555555, 1);
-
         for (let c = 0; c <= cols; c++) {
             const x = c * cellSize;
             drawDashedLine(lines, x, 0, x, canvasHeight);
         }
-
         for (let r = 0; r <= rows; r++) {
             const y = r * cellSize;
             drawDashedLine(lines, 0, y, canvasWidth, y);
         }
-
         app.stage.addChild(lines);
+        drawNeuronLinks(app.stage, cellSize);
         drawNeuronSymbols(app.stage, cellSize);
     }
 
@@ -407,9 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
             body: JSON.stringify(payload),
         });
         const data = await response.json();
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Errore durante il salvataggio neurone');
-        }
+        if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante il salvataggio neurone');
         return data.neuron;
     }
 
@@ -424,30 +496,63 @@ document.addEventListener('DOMContentLoaded', function () {
             body: JSON.stringify(payload),
         });
         const data = await response.json();
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Errore durante la rimozione neurone');
-        }
+        if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante la rimozione neurone');
+    }
+
+    async function requestSaveNeuronLink(payload) {
+        const response = await fetch(saveNeuronLinkUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante il salvataggio collegamento');
+        return data.link;
+    }
+
+    async function requestDeleteNeuronLink(payload) {
+        const response = await fetch(deleteNeuronLinkUrl, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante la rimozione collegamento');
     }
 
     widthInput.addEventListener('input', renderGrid);
     heightInput.addEventListener('input', renderGrid);
     neuronTypeInput.addEventListener('change', toggleDetectionFieldsByType);
     neuronTargetTypeElementInput.addEventListener('change', function () {
-        if (neuronTargetTypeElementInput.checked) {
-            neuronTargetTypeEntityInput.checked = false;
-        }
+        if (neuronTargetTypeElementInput.checked) neuronTargetTypeEntityInput.checked = false;
         toggleDetectionFieldsByType();
     });
     neuronTargetTypeEntityInput.addEventListener('change', function () {
-        if (neuronTargetTypeEntityInput.checked) {
-            neuronTargetTypeElementInput.checked = false;
-        }
+        if (neuronTargetTypeEntityInput.checked) neuronTargetTypeElementInput.checked = false;
         toggleDetectionFieldsByType();
     });
+
+    linkModeToggleBtn.addEventListener('click', function () {
+        linkMode = !linkMode;
+        fromNeuronId = null;
+        linkModeToggleBtn.innerHTML = linkMode
+            ? '<i class="fas fa-link"></i> Modalità Link: ON'
+            : '<i class="fas fa-link"></i> Modalità Link: OFF';
+        linkModeToggleBtn.classList.toggle('btn-success', linkMode);
+        linkModeToggleBtn.classList.toggle('btn-info', !linkMode);
+        renderGrid();
+    });
+
     saveNeuronBtn.addEventListener('click', async function () {
-        if (!selectedCell) {
-            return;
-        }
+        if (!selectedCell) return;
 
         const type = neuronTypeInput.value;
         const i = Number(selectedCell.i);
@@ -455,14 +560,10 @@ document.addEventListener('DOMContentLoaded', function () {
         let radius = null;
         let targetType = null;
         let targetElementId = null;
-        let targetEntityId = null;
         if (type === typeDetection) {
             radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
-            if (neuronTargetTypeEntityInput.checked) {
-                targetType = targetTypeEntity;
-            } else if (neuronTargetTypeElementInput.checked) {
-                targetType = targetTypeElement;
-            }
+            if (neuronTargetTypeEntityInput.checked) targetType = targetTypeEntity;
+            else if (neuronTargetTypeElementInput.checked) targetType = targetTypeElement;
             if (targetType === targetTypeElement) {
                 const parsed = parseInt(neuronTargetElementIdInput.value, 10);
                 targetElementId = Number.isNaN(parsed) ? null : parsed;
@@ -480,9 +581,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 radius: radius,
                 target_type: targetType,
                 target_element_id: targetElementId,
-                target_entity_id: targetEntityId,
             });
-
             neuronItems = neuronItems.filter((item) => !(Number(item.grid_i) === i && Number(item.grid_j) === j));
             neuronItems.push(savedNeuron);
             updateNeuronHiddenInput();
@@ -494,21 +593,20 @@ document.addEventListener('DOMContentLoaded', function () {
             saveNeuronBtn.disabled = false;
         }
     });
-    deleteNeuronBtn.addEventListener('click', async function () {
-        if (!selectedCell) {
-            return;
-        }
 
+    deleteNeuronBtn.addEventListener('click', async function () {
+        if (!selectedCell) return;
         const i = Number(selectedCell.i);
         const j = Number(selectedCell.j);
+        const neuron = findNeuronAtCell(i, j);
+
         deleteNeuronBtn.disabled = true;
         try {
-            await requestDeleteNeuron({
-                grid_i: i,
-                grid_j: j,
-            });
-
+            await requestDeleteNeuron({ grid_i: i, grid_j: j });
             neuronItems = neuronItems.filter((item) => !(Number(item.grid_i) === i && Number(item.grid_j) === j));
+            if (neuron) {
+                neuronLinks = neuronLinks.filter((l) => Number(l.from_neuron_id) !== Number(neuron.id) && Number(l.to_neuron_id) !== Number(neuron.id));
+            }
             updateNeuronHiddenInput();
             renderGrid();
             $(neuronModalEl).modal('hide');
