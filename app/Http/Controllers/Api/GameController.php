@@ -640,6 +640,115 @@ class GameController extends Controller
 
     }
 
+    public function getTilesByBirthRegion(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $birthRegionId = (int) $request->input('birth_region_id');
+        if ($birthRegionId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'birth_region_id obbligatorio',
+            ], 422);
+        }
+
+        $birthRegion = BirthRegion::query()
+            ->with(['birthClimate'])
+            ->find($birthRegionId);
+
+        if ($birthRegion === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Birth region non trovata',
+            ], 404);
+        }
+
+        $playerIds = Player::query()
+            ->where('birth_region_id', $birthRegionId)
+            ->pluck('id');
+
+        $tiles = Helper::getBirthRegionTiles($birthRegion)->values()->toArray();
+        $tileIndexByCoordinate = [];
+        foreach ($tiles as $index => $tileData) {
+            $tiles[$index]['entity'] = null;
+            $tiles[$index]['element'] = null;
+            $coordinateKey = $tileData['i'] . '_' . $tileData['j'];
+            $tileIndexByCoordinate[$coordinateKey] = $index;
+        }
+
+        if ($playerIds->isNotEmpty()) {
+            $entities = Entity::query()
+                ->whereNotNull('tile_i')
+                ->whereNotNull('tile_j')
+                ->where('state', Entity::STATE_LIFE)
+                ->whereHas('specie', function ($query) use ($playerIds) {
+                    $query->whereIn('player_id', $playerIds);
+                })
+                ->get();
+
+            foreach ($entities as $entity) {
+                $coordinateKey = $entity->tile_i . '_' . $entity->tile_j;
+                if (!array_key_exists($coordinateKey, $tileIndexByCoordinate)) {
+                    continue;
+                }
+                $tileIndex = $tileIndexByCoordinate[$coordinateKey];
+                if ($tiles[$tileIndex]['entity'] === null) {
+                    $tiles[$tileIndex]['entity'] = $entity->toArray();
+                }
+            }
+        }
+
+        if ($playerIds->isNotEmpty()) {
+            $elementPositionsQuery = ElementHasPosition::query()
+                ->whereIn('player_id', $playerIds)
+                ->whereNotNull('tile_i')
+                ->whereNotNull('tile_j');
+
+            if ($playerIds->count() === 1) {
+                $singlePlayer = Player::query()->find($playerIds->first());
+                if ($singlePlayer !== null && !empty($singlePlayer->actual_session_id)) {
+                    $elementPositionsQuery->where('session_id', $singlePlayer->actual_session_id);
+                }
+            }
+
+            $elementPositions = $elementPositionsQuery->get();
+            $elementIds = $elementPositions->pluck('element_id')->unique()->filter()->values();
+            $elementsById = Element::query()
+                ->whereIn('id', $elementIds)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($elementPositions as $elementPosition) {
+                $coordinateKey = $elementPosition->tile_i . '_' . $elementPosition->tile_j;
+                if (!array_key_exists($coordinateKey, $tileIndexByCoordinate)) {
+                    continue;
+                }
+
+                $element = $elementsById->get($elementPosition->element_id);
+                if ($element === null) {
+                    continue;
+                }
+
+                $tileIndex = $tileIndexByCoordinate[$coordinateKey];
+                if ($tiles[$tileIndex]['element'] !== null) {
+                    continue;
+                }
+
+                $elementData = $element->toArray();
+                $elementData['uid'] = $elementPosition->uid;
+                $elementData['tile_i'] = $elementPosition->tile_i;
+                $elementData['tile_j'] = $elementPosition->tile_j;
+                $elementData['session_id'] = $elementPosition->session_id;
+                $elementData['player_id'] = $elementPosition->player_id;
+                $tiles[$tileIndex]['element'] = $elementData;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'birth_region_id' => $birthRegionId,
+            'tiles' => $tiles,
+        ]);
+    }
+
     /**
      * Gestisce il movimento di un'entity
      */

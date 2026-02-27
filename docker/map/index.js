@@ -1,20 +1,96 @@
 // map.js
 
 const http = require('http');
+const WebSocket = require('ws');
 
 // Leggi i parametri dalle variabili d'ambiente
 const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
 const birthRegionId = process.env.BIRTH_REGION_ID;
+const wsPort = process.env.WS_PORT || 8080;
 
 console.log(`Map service started.`);
 console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
 console.log(`Birth Region ID: ${birthRegionId || 'MISSING'}`);
+console.log(`WebSocket Port: ${wsPort}`);
 
 // function to handle login and session
 let sessionCookie = null;
 let xsrfToken = null;
+let latestTilesByBirthRegion = null;
+
+function findTileInCache(tileI, tileJ) {
+  if (!latestTilesByBirthRegion || !Array.isArray(latestTilesByBirthRegion.tiles)) {
+    return null;
+  }
+
+  return latestTilesByBirthRegion.tiles.find((tile) => (
+    Number(tile.i) === Number(tileI) && Number(tile.j) === Number(tileJ)
+  )) || null;
+}
+
+function handleWebSocketCommand(data, ws) {
+  const { command, params } = data || {};
+
+  if (command === 'get_tile_info') {
+    const tileI = params ? params.tile_i : undefined;
+    const tileJ = params ? params.tile_j : undefined;
+
+    if (tileI === undefined || tileJ === undefined) {
+      ws.send(JSON.stringify({
+        success: false,
+        error: 'Missing tile_i or tile_j',
+      }));
+      return;
+    }
+
+    const tile = findTileInCache(tileI, tileJ);
+    if (!tile) {
+      ws.send(JSON.stringify({
+        success: false,
+        error: 'Tile not found or cache not ready',
+        tile_i: Number(tileI),
+        tile_j: Number(tileJ),
+      }));
+      return;
+    }
+
+    ws.send(JSON.stringify({
+      success: true,
+      tile,
+    }));
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    success: false,
+    error: `Unknown command: ${command}`,
+  }));
+}
+
+const wss = new WebSocket.Server({ port: wsPort });
+console.log(`WebSocket server listening on port ${wsPort}`);
+
+wss.on('connection', (ws) => {
+  ws.send(JSON.stringify({
+    success: true,
+    message: 'Connected to map websocket',
+    birth_region_id: birthRegionId,
+  }));
+
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      handleWebSocketCommand(data, ws);
+    } catch (error) {
+      ws.send(JSON.stringify({
+        success: false,
+        error: 'Invalid JSON',
+      }));
+    }
+  });
+});
 
 function parseCookies(response) {
   const list = {};
@@ -82,8 +158,8 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful, starting set_element_in_map loop...');
-        scheduleNextCycle();
+        console.log('Login successful, running initial get_tiles_by_birth_region...');
+        bootstrapAndStartLoop();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', d => console.error(d.toString()));
@@ -99,57 +175,110 @@ function performLogin() {
   reqGet.end();
 }
 
-function callSetElementInMap() {
-  if (!sessionCookie) {
-    console.log('No session cookie, skipping set_element_in_map...');
-    scheduleNextCycle();
-    return;
+async function bootstrapAndStartLoop() {
+  try {
+    const initialTiles = await callGetTilesByBirthRegion();
+    latestTilesByBirthRegion = initialTiles;
+    console.log('[Map] Initial get_tiles_by_birth_region completed.');
+  } catch (error) {
+    console.error(`[Map] Initial get_tiles_by_birth_region error: ${error.message}`);
   }
 
-  const path = `/api/auth/game/set_element_in_map`;
-  const postData = JSON.stringify({ birth_region_id: birthRegionId });
+  scheduleNextCycle();
+}
 
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: path,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(postData),
-      'Accept': 'application/json',
-      'Cookie': sessionCookie,
-      'X-XSRF-TOKEN': xsrfToken
-    },
-  };
+function callGameApi(path, payload, label) {
+  return new Promise((resolve, reject) => {
+    if (!sessionCookie) {
+      reject(new Error(`No session cookie, skipping ${label}`));
+      return;
+    }
 
-  const req = http.request(options, (res) => {
-    let data = '';
+    const postData = JSON.stringify(payload);
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
 
-    res.on('data', (chunk) => {
-      data += chunk;
+    const req = http.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const response = data ? JSON.parse(data) : {};
+          console.log(`[Map] ${label} response:`, response);
+          resolve(response);
+        } catch (error) {
+          reject(new Error(`${label} invalid JSON response: ${error.message}`));
+        }
+      });
     });
 
-    res.on('end', () => {
-      const response = JSON.parse(data);
-      console.log(`[Map] Response:`, response);
-      scheduleNextCycle();
+    req.on('error', (error) => {
+      reject(new Error(`${label} request error: ${error.message}`));
     });
-  });
 
-  req.on('error', (error) => {
-    console.error(`[Map] Error calling set_element_in_map: ${error.message}`);
-    scheduleNextCycle();
+    req.write(postData);
+    req.end();
   });
+}
 
-  req.write(postData);
-  req.end();
+function callSetElementInMap() {
+  return callGameApi(
+    '/api/auth/game/set_element_in_map',
+    { birth_region_id: birthRegionId },
+    'set_element_in_map'
+  );
+}
+
+function callGetTilesByBirthRegion() {
+  return callGameApi(
+    '/api/auth/game/get_tiles_by_birth_region',
+    { birth_region_id: birthRegionId },
+    'get_tiles_by_birth_region'
+  );
+}
+
+async function runCycle() {
+  const results = await Promise.allSettled([
+    callSetElementInMap(),
+    callGetTilesByBirthRegion(),
+  ]);
+
+  const getTilesResult = results[1];
+  if (getTilesResult && getTilesResult.status === 'fulfilled') {
+    latestTilesByBirthRegion = getTilesResult.value;
+  }
+
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error(`[Map] Cycle error: ${result.reason.message}`);
+    }
+  }
+
+  scheduleNextCycle();
 }
 
 // Funzione per programmare il prossimo ciclo (ogni 10 secondi)
 function scheduleNextCycle() {
   setTimeout(() => {
-    callSetElementInMap();
+    runCycle().catch((error) => {
+      console.error(`[Map] Unexpected cycle error: ${error.message}`);
+      scheduleNextCycle();
+    });
   }, 10000);
 }
 

@@ -109,6 +109,7 @@ class DockerContainerService
         $imageName = 'map:latest';
         $this->ensureImageExists($docker, $imageName);
 
+        $wsPort = $this->nextWsPort();
         $containerConfig = new ContainersCreatePostBody();
         $containerConfig->setImage($imageName);
         $containerConfig->setHostname('map_' . $birthRegion->uid);
@@ -117,7 +118,9 @@ class DockerContainerService
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'BIRTH_REGION_ID=' . $birthRegion->id,
+            'WS_PORT=8080',
         ]);
+        $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
 
         $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
 
@@ -126,7 +129,7 @@ class DockerContainerService
             'name' => 'map_' . $birthRegion->uid,
             'parent_type' => Container::PARENT_TYPE_MAP,
             'parent_id' => $birthRegion->id,
-            'ws_port' => null,
+            'ws_port' => $wsPort,
         ]);
     }
 
