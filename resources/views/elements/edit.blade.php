@@ -36,6 +36,11 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
                     </li>
+                    @if($element->isInteractive())
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-brain-link" data-toggle="pill" href="#tab-brain" role="tab" aria-controls="tab-brain" aria-selected="false">Cervello</a>
+                    </li>
+                    @endif
                 </ul>
             </div>
             
@@ -75,6 +80,13 @@
                     <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
                         @include('elements.tabs.graphics')
                     </div>
+
+                    <!-- TAB BRAIN -->
+                    @if($element->isInteractive())
+                    <div class="tab-pane fade" id="tab-brain" role="tabpanel" aria-labelledby="tab-brain-link">
+                        @include('elements.tabs.brain')
+                    </div>
+                    @endif
 
                 </div>
             </div>

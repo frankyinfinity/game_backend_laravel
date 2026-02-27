@@ -60,11 +60,15 @@ class ElementController extends Controller
             'name' => 'required|string|max:255',
             'element_type_id' => 'required|exists:element_types,id',
             'characteristic' => 'required|integer',
+            'brain_grid_width' => 'nullable|integer|min:1',
+            'brain_grid_height' => 'nullable|integer|min:1',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $data = $request->only('name', 'element_type_id', 'characteristic');
+        $data = $request->only('name', 'element_type_id', 'characteristic', 'brain_grid_width', 'brain_grid_height');
+        $data['brain_grid_width'] = (int) ($data['brain_grid_width'] ?? 5);
+        $data['brain_grid_height'] = (int) ($data['brain_grid_height'] ?? 5);
         
         $element = Element::create($data);
         
@@ -126,11 +130,15 @@ class ElementController extends Controller
             'name' => 'required|string|max:255',
             'element_type_id' => 'required|exists:element_types,id',
             'characteristic' => 'required|integer',
+            'brain_grid_width' => 'nullable|integer|min:1',
+            'brain_grid_height' => 'nullable|integer|min:1',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $data = $request->only('name', 'element_type_id', 'characteristic');
+        $data = $request->only('name', 'element_type_id', 'characteristic', 'brain_grid_width', 'brain_grid_height');
+        $data['brain_grid_width'] = (int) ($data['brain_grid_width'] ?? 5);
+        $data['brain_grid_height'] = (int) ($data['brain_grid_height'] ?? 5);
 
         $element->update($data);
 

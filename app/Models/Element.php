@@ -13,7 +13,7 @@ class Element extends Model
         self::INTERACTIVE => 'Interattivo'
     ];
 
-    protected $fillable = ['element_type_id', 'name', 'characteristic'];
+    protected $fillable = ['element_type_id', 'name', 'characteristic', 'brain_grid_width', 'brain_grid_height'];
 
     /**
      * Get the human-readable label for the characteristic
@@ -27,6 +27,8 @@ class Element extends Model
 
     protected $casts = [
         'characteristic' => 'integer',
+        'brain_grid_width' => 'integer',
+        'brain_grid_height' => 'integer',
     ];
 
     public function elementType()

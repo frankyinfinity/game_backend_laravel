@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnLoadCurrent = document.getElementById('btn-load-current');
     
     let isDrawing = false;
+    let hasGraphicsChanges = false;
     
     // Initialize canvases
     function initCanvases() {
@@ -196,6 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.clearRect(x * cellSize, y * cellSize, cellSize, cellSize);
         }
         
+        hasGraphicsChanges = true;
         updatePreview();
     }
     
@@ -224,6 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
     btnClear.addEventListener('click', () => {
         if (confirm('Sei sicuro di voler pulire tutto?')) {
             ctx.clearRect(0, 0, canvasSize, canvasSize);
+            hasGraphicsChanges = true;
             updatePreview();
         }
     });
@@ -276,8 +279,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const mainForm = canvas.closest('form');
     if (mainForm) {
         mainForm.addEventListener('submit', function() {
-            const dataUrl = previewCanvas.toDataURL('image/png');
-            document.getElementById('image_base64').value = dataUrl;
+            const imageInput = document.getElementById('image_base64');
+            if (!imageInput) {
+                return;
+            }
+
+            // Avoid overwriting existing element graphic when no change was made.
+            if (hasGraphicsChanges) {
+                imageInput.value = previewCanvas.toDataURL('image/png');
+            } else {
+                imageInput.value = '';
+            }
         });
     }
     
