@@ -76,6 +76,8 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');
     Route::post('/elements/delete', [App\Http\Controllers\ElementController::class, 'delete'])->name('elements.delete');
     Route::post('/elements/{element}/save-graphics', [App\Http\Controllers\ElementController::class, 'saveGraphics'])->name('elements.save-graphics');
+    Route::post('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'saveBrainNeuron'])->name('elements.brain.neurons.save');
+    Route::delete('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'deleteBrainNeuron'])->name('elements.brain.neurons.delete');
 
     //Scores
     Route::resource('scores', App\Http\Controllers\ScoreController::class);

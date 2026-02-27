@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Brain;
 use App\Models\Element;
+use App\Models\Entity;
 use App\Models\ElementType;
 use App\Models\Climate;
 use App\Models\Tile;
 use App\Models\ElementHasTile;
 use App\Models\Gene;
+use App\Models\Neuron;
 use App\Models\Score;
 use App\Models\ElementHasGene;
 use Illuminate\Http\Request;
@@ -64,6 +66,7 @@ class ElementController extends Controller
             'characteristic' => 'required|integer',
             'brain_grid_width' => 'nullable|integer|min:1',
             'brain_grid_height' => 'nullable|integer|min:1',
+            'neuron_items' => 'nullable|string',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
@@ -91,7 +94,7 @@ class ElementController extends Controller
      */
     public function edit(Element $element)
     {
-        $element->load('brain');
+        $element->load('brain.neurons');
 
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
@@ -111,6 +114,14 @@ class ElementController extends Controller
         
         // Fetch Scores for reward tab
         $allScores = Score::orderBy('name')->get();
+
+        $brainTargetElements = Element::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $brainTargetEntities = Entity::query()
+            ->orderBy('uid')
+            ->get(['id', 'uid']);
         
         // Prepare gene data for JavaScript
         $geneData = $allGenes->map(function($gene) {
@@ -124,7 +135,18 @@ class ElementController extends Controller
             ];
         });
 
-        return view('elements.edit', compact('element', 'elementTypes', 'climates', 'allTiles', 'diffusionMap', 'allGenes', 'geneData', 'allScores'));
+        return view('elements.edit', compact(
+            'element',
+            'elementTypes',
+            'climates',
+            'allTiles',
+            'diffusionMap',
+            'allGenes',
+            'geneData',
+            'allScores',
+            'brainTargetElements',
+            'brainTargetEntities'
+        ));
     }
 
     public function update(Request $request, Element $element)
@@ -135,6 +157,7 @@ class ElementController extends Controller
             'characteristic' => 'required|integer',
             'brain_grid_width' => 'nullable|integer|min:1',
             'brain_grid_height' => 'nullable|integer|min:1',
+            'neuron_items' => 'nullable|string',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
@@ -294,6 +317,114 @@ class ElementController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function saveBrainNeuron(Request $request, Element $element)
+    {
+        if (!$element->isInteractive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Elemento non interattivo',
+            ], 422);
+        }
+
+        $request->validate([
+            'brain_grid_width' => 'nullable|integer|min:1',
+            'brain_grid_height' => 'nullable|integer|min:1',
+            'type' => 'required|string',
+            'grid_i' => 'required|integer|min:0',
+            'grid_j' => 'required|integer|min:0',
+            'radius' => 'nullable|integer|min:1',
+            'target_type' => 'nullable|string',
+            'target_element_id' => 'nullable|integer|min:1',
+        ]);
+
+        $gridWidth = max(1, (int) $request->input('brain_grid_width', $element->brain->grid_width ?? 5));
+        $gridHeight = max(1, (int) $request->input('brain_grid_height', $element->brain->grid_height ?? 5));
+        $brain = $this->ensureElementBrain($element, $gridWidth, $gridHeight);
+
+        $gridI = (int) $request->input('grid_i');
+        $gridJ = (int) $request->input('grid_j');
+        if ($gridI < 0 || $gridJ < 0 || $gridI >= $gridHeight || $gridJ >= $gridWidth) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Coordinate neurone fuori griglia',
+            ], 422);
+        }
+
+        $type = (string) $request->input('type');
+        if (!in_array($type, Neuron::TYPES, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tipo neurone non valido',
+            ], 422);
+        }
+
+        $radius = null;
+        $targetType = null;
+        $targetElementId = null;
+        $targetEntityId = null;
+
+        if ($type === Neuron::TYPE_DETECTION) {
+            $radius = max(1, (int) $request->input('radius', 1));
+            $candidateTargetType = (string) $request->input('target_type', '');
+            if (in_array($candidateTargetType, Neuron::TARGET_TYPES, true)) {
+                $targetType = $candidateTargetType;
+            }
+
+            if ($targetType === Neuron::TARGET_TYPE_ELEMENT) {
+                $candidateElementId = (int) $request->input('target_element_id', 0);
+                $targetElementId = $candidateElementId > 0 ? $candidateElementId : null;
+            }
+        }
+
+        $neuron = Neuron::query()->updateOrCreate(
+            [
+                'brain_id' => $brain->id,
+                'grid_i' => $gridI,
+                'grid_j' => $gridJ,
+            ],
+            [
+                'type' => $type,
+                'radius' => $radius,
+                'target_type' => $targetType,
+                'target_element_id' => $targetElementId,
+                'target_entity_id' => $targetEntityId,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'neuron' => [
+                'type' => $neuron->type,
+                'grid_i' => (int) $neuron->grid_i,
+                'grid_j' => (int) $neuron->grid_j,
+                'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
+                'target_type' => $neuron->target_type,
+                'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+                'target_entity_id' => $neuron->target_entity_id !== null ? (int) $neuron->target_entity_id : null,
+            ],
+        ]);
+    }
+
+    public function deleteBrainNeuron(Request $request, Element $element)
+    {
+        if (!$element->isInteractive() || !$element->brain) {
+            return response()->json(['success' => true]);
+        }
+
+        $request->validate([
+            'grid_i' => 'required|integer|min:0',
+            'grid_j' => 'required|integer|min:0',
+        ]);
+
+        Neuron::query()
+            ->where('brain_id', $element->brain->id)
+            ->where('grid_i', (int) $request->input('grid_i'))
+            ->where('grid_j', (int) $request->input('grid_j'))
+            ->delete();
+
+        return response()->json(['success' => true]);
+    }
+
     private function syncElementBrain(Element $element, Request $request): void
     {
         if (!$element->isInteractive()) {
@@ -307,13 +438,19 @@ class ElementController extends Controller
 
         $gridWidth = max(1, (int) $request->input('brain_grid_width', 5));
         $gridHeight = max(1, (int) $request->input('brain_grid_height', 5));
+        $brain = $this->ensureElementBrain($element, $gridWidth, $gridHeight);
 
+        $this->syncBrainNeurons($brain, $request, $gridHeight, $gridWidth);
+    }
+
+    private function ensureElementBrain(Element $element, int $gridWidth, int $gridHeight): Brain
+    {
         if ($element->brain) {
             $element->brain->update([
                 'grid_width' => $gridWidth,
                 'grid_height' => $gridHeight,
             ]);
-            return;
+            return $element->brain;
         }
 
         $brain = Brain::query()->create([
@@ -323,5 +460,76 @@ class ElementController extends Controller
         ]);
 
         $element->update(['brain_id' => $brain->id]);
+        return $brain;
+    }
+
+    private function syncBrainNeurons(Brain $brain, Request $request, int $maxI, int $maxJ): void
+    {
+        $json = $request->input('neuron_items');
+        if (!is_string($json) || trim($json) === '') {
+            return;
+        }
+
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return;
+        }
+
+        $syncRows = [];
+        foreach ($decoded as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $type = (string) ($item['type'] ?? '');
+            if (!in_array($type, Neuron::TYPES, true)) {
+                continue;
+            }
+
+            $gridI = (int) ($item['grid_i'] ?? -1);
+            $gridJ = (int) ($item['grid_j'] ?? -1);
+            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ) {
+                continue;
+            }
+
+            $radius = null;
+            $targetType = null;
+            $targetElementId = null;
+            $targetEntityId = null;
+            if ($type === Neuron::TYPE_DETECTION) {
+                $radius = max(1, (int) ($item['radius'] ?? 1));
+                $candidateTargetType = (string) ($item['target_type'] ?? '');
+                if (in_array($candidateTargetType, Neuron::TARGET_TYPES, true)) {
+                    $targetType = $candidateTargetType;
+                }
+
+                if ($targetType === Neuron::TARGET_TYPE_ELEMENT) {
+                    $targetElementId = (int) ($item['target_element_id'] ?? 0);
+                    if ($targetElementId <= 0) {
+                        $targetElementId = null;
+                    }
+                } elseif ($targetType === Neuron::TARGET_TYPE_ENTITY) {
+                    $targetEntityId = (int) ($item['target_entity_id'] ?? 0);
+                    if ($targetEntityId <= 0) {
+                        $targetEntityId = null;
+                    }
+                }
+            }
+
+            $syncRows[] = [
+                'type' => $type,
+                'grid_i' => $gridI,
+                'grid_j' => $gridJ,
+                'radius' => $radius,
+                'target_type' => $targetType,
+                'target_element_id' => $targetElementId,
+                'target_entity_id' => $targetEntityId,
+            ];
+        }
+
+        $brain->neurons()->delete();
+        foreach ($syncRows as $row) {
+            $brain->neurons()->create($row);
+        }
     }
 }

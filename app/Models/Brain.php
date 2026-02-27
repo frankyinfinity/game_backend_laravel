@@ -17,5 +17,9 @@ class Brain extends Model
     {
         return $this->hasOne(Element::class);
     }
-}
 
+    public function neurons()
+    {
+        return $this->hasMany(Neuron::class);
+    }
+}
