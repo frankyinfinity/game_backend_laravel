@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Brain;
 use App\Models\Element;
 use App\Models\ElementType;
 use App\Models\Climate;
@@ -12,6 +13,7 @@ use App\Models\Gene;
 use App\Models\Score;
 use App\Models\ElementHasGene;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ElementController extends Controller
 {
@@ -66,11 +68,10 @@ class ElementController extends Controller
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $data = $request->only('name', 'element_type_id', 'characteristic', 'brain_grid_width', 'brain_grid_height');
-        $data['brain_grid_width'] = (int) ($data['brain_grid_width'] ?? 5);
-        $data['brain_grid_height'] = (int) ($data['brain_grid_height'] ?? 5);
+        $data = $request->only('name', 'element_type_id', 'characteristic');
         
         $element = Element::create($data);
+        $this->syncElementBrain($element, $request);
         
         if ($request->has('climates')) {
             $element->climates()->sync($request->climates);
@@ -90,6 +91,8 @@ class ElementController extends Controller
      */
     public function edit(Element $element)
     {
+        $element->load('brain');
+
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
         
@@ -136,11 +139,10 @@ class ElementController extends Controller
             'climates.*' => 'exists:climates,id'
         ]);
 
-        $data = $request->only('name', 'element_type_id', 'characteristic', 'brain_grid_width', 'brain_grid_height');
-        $data['brain_grid_width'] = (int) ($data['brain_grid_width'] ?? 5);
-        $data['brain_grid_height'] = (int) ($data['brain_grid_height'] ?? 5);
+        $data = $request->only('name', 'element_type_id', 'characteristic');
 
         $element->update($data);
+        $this->syncElementBrain($element, $request);
 
         if ($request->has('climates')) {
             $element->climates()->sync($request->climates);
@@ -290,5 +292,36 @@ class ElementController extends Controller
         \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
 
         return response()->json(['success' => true]);
+    }
+
+    private function syncElementBrain(Element $element, Request $request): void
+    {
+        if (!$element->isInteractive()) {
+            if (!empty($element->brain_id)) {
+                $brainId = (int) $element->brain_id;
+                $element->update(['brain_id' => null]);
+                Brain::query()->where('id', $brainId)->delete();
+            }
+            return;
+        }
+
+        $gridWidth = max(1, (int) $request->input('brain_grid_width', 5));
+        $gridHeight = max(1, (int) $request->input('brain_grid_height', 5));
+
+        if ($element->brain) {
+            $element->brain->update([
+                'grid_width' => $gridWidth,
+                'grid_height' => $gridHeight,
+            ]);
+            return;
+        }
+
+        $brain = Brain::query()->create([
+            'uid' => (string) Str::uuid(),
+            'grid_width' => $gridWidth,
+            'grid_height' => $gridHeight,
+        ]);
+
+        $element->update(['brain_id' => $brain->id]);
     }
 }

@@ -91,7 +91,7 @@
                 </div>
             </div>
             
-            <div class="card-footer">
+            <div class="card-footer" id="main-form-footer">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-save"></i> Aggiorna
                 </button>
@@ -347,6 +347,22 @@
             });
             
             updateRewardOptions();
+
+            function toggleMainFooterByTab() {
+                const footer = document.getElementById('main-form-footer');
+                if (!footer) {
+                    return;
+                }
+
+                const brainTabPane = document.getElementById('tab-brain');
+                const isBrainActive = brainTabPane && brainTabPane.classList.contains('active') && brainTabPane.classList.contains('show');
+                footer.style.display = isBrainActive ? 'none' : '';
+            }
+
+            toggleMainFooterByTab();
+            $('a[data-toggle="pill"]').on('shown.bs.tab', function () {
+                toggleMainFooterByTab();
+            });
         })
     </script>
 @stop

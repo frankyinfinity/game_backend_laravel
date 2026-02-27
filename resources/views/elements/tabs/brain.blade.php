@@ -12,7 +12,7 @@
                    name="brain_grid_width"
                    min="1"
                    step="1"
-                   value="{{ old('brain_grid_width', $element->brain_grid_width ?? 5) }}"
+                   value="{{ old('brain_grid_width', optional($element->brain)->grid_width ?? 5) }}"
                    placeholder="Es. 5">
             @error('brain_grid_width')
                 <span class="invalid-feedback" role="alert">
@@ -31,7 +31,7 @@
                    name="brain_grid_height"
                    min="1"
                    step="1"
-                   value="{{ old('brain_grid_height', $element->brain_grid_height ?? 5) }}"
+                   value="{{ old('brain_grid_height', optional($element->brain)->grid_height ?? 5) }}"
                    placeholder="Es. 5">
             @error('brain_grid_height')
                 <span class="invalid-feedback" role="alert">
@@ -47,6 +47,9 @@
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-save"></i> Salva
         </button>
+        <a href="{{ route('elements.index') }}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Annulla
+        </a>
         <small class="text-muted ml-2">Ricordati di salvare per mantenere le modifiche.</small>
     </div>
 </div>
