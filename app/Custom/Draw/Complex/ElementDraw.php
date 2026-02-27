@@ -20,15 +20,17 @@ use Illuminate\Support\Str;
 class ElementDraw
 {
     private Element $element;
+    private ?ElementHasPosition $elementHasPosition;
     private $tileI;
     private $tileJ;
     private $playerId;
     private $sessionId;
     private array $drawItems = [];
 
-    public function __construct(Element $element, $tileI, $tileJ, $playerId, $sessionId)
+    public function __construct(Element $element, $tileI, $tileJ, $playerId, $sessionId, ?ElementHasPosition $elementHasPosition = null)
     {
         $this->element = $element;
+        $this->elementHasPosition = $elementHasPosition;
         $this->tileI = $tileI;
         $this->tileJ = $tileJ;
         $this->playerId = $playerId;
@@ -56,15 +58,21 @@ class ElementDraw
         $uid = 'element_' . $this->element->id . '_' . $this->tileI . '_' . $this->tileJ;
         $imagePath = '/storage/elements/' . $this->element->id . '.png';
 
-        // Save position in Database
-        $elementHasPosition = ElementHasPosition::query()->create([
-            'player_id' => $this->playerId,
-            'session_id' => $this->sessionId,
-            'element_id' => $this->element->id,
-            'uid' => $uid,
-            'tile_i' => $this->tileI,
-            'tile_j' => $this->tileJ,
-        ]);
+        // Save position in Database only when no existing record is provided.
+        $elementHasPosition = $this->elementHasPosition;
+        if ($elementHasPosition === null) {
+            $elementHasPosition = ElementHasPosition::query()->create([
+                'player_id' => $this->playerId,
+                'session_id' => $this->sessionId,
+                'element_id' => $this->element->id,
+                'uid' => $uid,
+                'tile_i' => $this->tileI,
+                'tile_j' => $this->tileJ,
+            ]);
+        } else {
+            // Keep draw uid aligned with existing DB uid.
+            $uid = (string) $elementHasPosition->uid;
+        }
         
         $x = ($this->tileJ * Helper::TILE_SIZE) + Helper::MAP_START_X;
         $y = ($this->tileI * Helper::TILE_SIZE) + Helper::MAP_START_Y;

@@ -11,7 +11,11 @@ use App\Models\ElementHasScore;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\ElementHasPositionNeuronLink;
 use App\Models\ElementHasPositionScore;
+use App\Models\Container;
+use Docker\Docker;
 use Illuminate\Support\Str;
+use App\Services\DockerContainerService;
+use Illuminate\Support\Facades\Log;
 
 class ElementHasPositionObserver
 {
@@ -93,8 +97,102 @@ class ElementHasPositionObserver
                         ]);
                     }
                 }
+
+                // Create and start a dedicated element container for cloned brain execution
+                try {
+                    app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, true);
+                } catch (\Throwable $e) {
+                    Log::error('Unable to create element container', [
+                        'element_has_position_id' => $elementHasPosition->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
+        }
+    }
+
+    /**
+     * Handle the ElementHasPosition "deleting" event.
+     */
+    public function deleting(ElementHasPosition $elementHasPosition): void
+    {
+        // Force-cleanup of the full DB tree for this element instance.
+        ElementHasPositionInformation::query()
+            ->where('element_has_position_id', $elementHasPosition->id)
+            ->delete();
+
+        ElementHasPositionScore::query()
+            ->where('element_has_position_id', $elementHasPosition->id)
+            ->delete();
+
+        $brainIds = ElementHasPositionBrain::query()
+            ->where('element_has_position_id', $elementHasPosition->id)
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($brainIds)) {
+            $neuronIds = ElementHasPositionNeuron::query()
+                ->whereIn('element_has_position_brain_id', $brainIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($neuronIds)) {
+                ElementHasPositionNeuronLink::query()
+                    ->whereIn('from_element_has_position_neuron_id', $neuronIds)
+                    ->orWhereIn('to_element_has_position_neuron_id', $neuronIds)
+                    ->delete();
+
+                ElementHasPositionNeuron::query()
+                    ->whereIn('id', $neuronIds)
+                    ->delete();
+            }
+
+            ElementHasPositionBrain::query()
+                ->whereIn('id', $brainIds)
+                ->delete();
+        }
+    }
+
+    /**
+     * Handle the ElementHasPosition "deleted" event.
+     */
+    public function deleted(ElementHasPosition $elementHasPosition): void
+    {
+        $container = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->where('parent_id', $elementHasPosition->id)
+            ->first();
+
+        if ($container === null) {
+            return;
+        }
+
+        try {
+            putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+            $docker = Docker::create();
+
+            try {
+                $docker->containerStop($container->container_id);
+            } catch (\Throwable $e) {
+                Log::warning('Unable to stop element container before delete', [
+                    'element_has_position_id' => $elementHasPosition->id,
+                    'container_id' => $container->container_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            if (method_exists($docker, 'containerDelete')) {
+                $docker->containerDelete($container->container_id, ['force' => true]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Unable to delete element container', [
+                'element_has_position_id' => $elementHasPosition->id,
+                'container_id' => $container->container_id,
+                'error' => $e->getMessage(),
+            ]);
+        } finally {
+            $container->delete();
         }
     }
     

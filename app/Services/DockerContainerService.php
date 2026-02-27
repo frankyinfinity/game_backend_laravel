@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BirthRegion;
 use App\Models\Container;
 use App\Models\Entity;
+use App\Models\ElementHasPosition;
 use App\Models\Player;
 use Docker\API\Model\ContainersCreatePostBody;
 use Docker\API\Model\HostConfig;
@@ -64,6 +65,28 @@ class DockerContainerService
             try {
                 $docker->containerStop($containerRecord->container_id);
                 \Log::info("Container {$containerRecord->container_id} terminato per parent {$containerRecord->parent_id}");
+            } catch (\Throwable $e) {
+                \Log::error("Errore nella terminazione del container {$containerRecord->container_id}: " . $e->getMessage());
+            }
+        }
+    }
+
+    public function stopElementHasPositionContainers(array $elementHasPositionIds): void
+    {
+        if (empty($elementHasPositionIds)) {
+            return;
+        }
+
+        $docker = $this->docker();
+        $containers = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->whereIn('parent_id', array_map('strval', $elementHasPositionIds))
+            ->get();
+
+        foreach ($containers as $containerRecord) {
+            try {
+                $docker->containerStop($containerRecord->container_id);
+                \Log::info("Container {$containerRecord->container_id} terminato per ElementHasPosition {$containerRecord->parent_id}");
             } catch (\Throwable $e) {
                 \Log::error("Errore nella terminazione del container {$containerRecord->container_id}: " . $e->getMessage());
             }
@@ -190,6 +213,33 @@ class DockerContainerService
         ]);
     }
 
+    public function createElementHasPositionContainer(ElementHasPosition $elementHasPosition, bool $start = false): Container
+    {
+        $docker = $this->docker();
+        $imageName = 'element:latest';
+        $this->ensureImageExists($docker, $imageName);
+
+        $containerConfig = new ContainersCreatePostBody();
+        $containerConfig->setImage($imageName);
+        $containerConfig->setHostname('element_' . $elementHasPosition->uid);
+        $containerConfig->setEnv([
+            'BACKEND_URL=' . $this->backendUrl(),
+            'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+            'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+            'ELEMENT_HAS_POSITION_ID=' . $elementHasPosition->id,
+        ]);
+
+        $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
+
+        return Container::query()->create([
+            'container_id' => $containerId,
+            'name' => 'element_' . $elementHasPosition->uid,
+            'parent_type' => Container::PARENT_TYPE_ELEMENT_HAS_POSITION,
+            'parent_id' => $elementHasPosition->id,
+            'ws_port' => null,
+        ]);
+    }
+
     private function docker(): Docker
     {
         putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
@@ -258,11 +308,15 @@ class DockerContainerService
             })
             ->pluck('id')
             ->toArray();
+        $elementHasPositionIds = ElementHasPosition::query()
+            ->where('player_id', $player->id)
+            ->pluck('id')
+            ->toArray();
 
         $birthRegionId = (int) ($player->birth_region_id ?? 0);
 
         return Container::query()
-            ->where(function ($q) use ($entityIds, $birthRegionId, $player) {
+            ->where(function ($q) use ($entityIds, $birthRegionId, $player, $elementHasPositionIds) {
                 if (!empty($entityIds)) {
                     $q->orWhere(function ($sq2) use ($entityIds) {
                         $sq2->where('parent_type', Container::PARENT_TYPE_ENTITY)
@@ -282,6 +336,12 @@ class DockerContainerService
                     $sq2->where('parent_type', Container::PARENT_TYPE_PLAYER)
                         ->where('parent_id', $player->id);
                 });
+                if (!empty($elementHasPositionIds)) {
+                    $q->orWhere(function ($sq2) use ($elementHasPositionIds) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+                            ->whereIn('parent_id', $elementHasPositionIds);
+                    });
+                }
             })
             ->get();
     }

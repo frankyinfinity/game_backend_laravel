@@ -19,6 +19,7 @@ use App\Models\Entity;
 use App\Models\Container;
 use App\Models\Player;
 use App\Models\Tile;
+use App\Models\ElementHasPosition;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Log;
@@ -181,6 +182,32 @@ class GenerateMapJob implements ShouldQueue
             }
             $pixelX = $startPixelX;
             $pixelY += $tileSize;
+        }
+
+        // Draw all existing ElementHasPosition records for this player/session.
+        $existingElementPositions = ElementHasPosition::query()
+            ->where('player_id', $player_id)
+            ->with('element')
+            ->get();
+
+        foreach ($existingElementPositions as $existingElementPosition) {
+            if ($existingElementPosition->element === null) {
+                continue;
+            }
+
+            $elementDraw = new \App\Custom\Draw\Complex\ElementDraw(
+                $existingElementPosition->element,
+                (int) $existingElementPosition->tile_i,
+                (int) $existingElementPosition->tile_j,
+                $player_id,
+                $player->actual_session_id,
+                $existingElementPosition
+            );
+
+            foreach ($elementDraw->getDrawItems() as $item) {
+                $objectDraw = new ObjectDraw($item, $player->actual_session_id);
+                $drawItems[] = $objectDraw->get();
+            }
         }
 
         $mapMoveScriptPath = resource_path('js/function/map/click_move_map.blade.php');

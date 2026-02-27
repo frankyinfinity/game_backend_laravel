@@ -519,17 +519,25 @@ class GameController extends Controller
 
         $player = Player::find($player_id);
         if ($player) {
+            $sessionId = $player->actual_session_id;
+            $elementHasPositionIds = ElementHasPosition::query()
+                ->where('player_id', $player_id)
+                ->where('session_id', $sessionId)
+                ->pluck('id')
+                ->toArray();
+
+            // Stop element containers immediately before delete, because the async stop job may run later.
+            if (!empty($elementHasPositionIds)) {
+                try {
+                    app(DockerContainerService::class)->stopElementHasPositionContainers($elementHasPositionIds);
+                } catch (\Throwable $e) {
+                    \Log::error("Errore nello stop dei container element su close per player {$player_id}: " . $e->getMessage());
+                }
+            }
 
             //Stop Container
             StopPlayerContainersJob::dispatch($player);
             \Log::info("StopPlayerContainersJob dispatched for player {$player_id}");
-
-            //Remove ElementHasPosition
-            $sessionId = $player->actual_session_id;
-            ElementHasPosition::query()
-                ->where('player_id', $player_id)
-                ->where('session_id', $sessionId)
-                ->delete();
 
         }
 
@@ -2147,6 +2155,18 @@ class GameController extends Controller
         return response()->json([
             'success' => true,
         ]);
+    }
+
+    public function brain(Request $request) {
+
+        $validated = $request->validate([
+            'element_has_position_id' => ['required', 'integer'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+        ]); 
+
     }
 
     /**
