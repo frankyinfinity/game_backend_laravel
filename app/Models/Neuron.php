@@ -45,7 +45,6 @@ class Neuron extends Model
         'grid_j' => 'integer',
         'radius' => 'integer',
         'target_element_id' => 'integer',
-        'target_entity_id' => 'integer',
     ];
 
     public function brain()

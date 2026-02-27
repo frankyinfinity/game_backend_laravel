@@ -12,7 +12,6 @@
                 'radius' => $n->radius !== null ? (int) $n->radius : null,
                 'target_type' => $n->target_type,
                 'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
-                'target_entity_id' => $n->target_entity_id !== null ? (int) $n->target_entity_id : null,
             ];
         })->values()->all()
         : [];
@@ -286,7 +285,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (existing) {
             const inferredTargetType = existing.target_type
                 || (existing.target_element_id != null ? targetTypeElement : null)
-                || (existing.target_entity_id != null ? targetTypeEntity : null)
                 || targetTypeElement;
 
             neuronTypeInput.value = existing.type;

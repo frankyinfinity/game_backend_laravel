@@ -29,4 +29,9 @@ class ElementHasPosition extends Model
     {
         return $this->hasMany(ElementHasPositionScore::class);
     }
+
+    public function brain()
+    {
+        return $this->hasOne(ElementHasPositionBrain::class);
+    }
 }

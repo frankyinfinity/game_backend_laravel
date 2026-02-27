@@ -362,7 +362,6 @@ class ElementController extends Controller
         $radius = null;
         $targetType = null;
         $targetElementId = null;
-        $targetEntityId = null;
 
         if ($type === Neuron::TYPE_DETECTION) {
             $radius = max(1, (int) $request->input('radius', 1));
@@ -388,7 +387,6 @@ class ElementController extends Controller
                 'radius' => $radius,
                 'target_type' => $targetType,
                 'target_element_id' => $targetElementId,
-                'target_entity_id' => $targetEntityId,
             ]
         );
 
@@ -402,7 +400,6 @@ class ElementController extends Controller
                 'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
                 'target_type' => $neuron->target_type,
                 'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
-                'target_entity_id' => $neuron->target_entity_id !== null ? (int) $neuron->target_entity_id : null,
             ],
         ]);
     }
@@ -570,7 +567,6 @@ class ElementController extends Controller
             $radius = null;
             $targetType = null;
             $targetElementId = null;
-            $targetEntityId = null;
             if ($type === Neuron::TYPE_DETECTION) {
                 $radius = max(1, (int) ($item['radius'] ?? 1));
                 $candidateTargetType = (string) ($item['target_type'] ?? '');
@@ -583,11 +579,6 @@ class ElementController extends Controller
                     if ($targetElementId <= 0) {
                         $targetElementId = null;
                     }
-                } elseif ($targetType === Neuron::TARGET_TYPE_ENTITY) {
-                    $targetEntityId = (int) ($item['target_entity_id'] ?? 0);
-                    if ($targetEntityId <= 0) {
-                        $targetEntityId = null;
-                    }
                 }
             }
 
@@ -598,7 +589,6 @@ class ElementController extends Controller
                 'radius' => $radius,
                 'target_type' => $targetType,
                 'target_element_id' => $targetElementId,
-                'target_entity_id' => $targetEntityId,
             ];
         }
 
