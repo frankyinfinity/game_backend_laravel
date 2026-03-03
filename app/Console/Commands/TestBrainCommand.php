@@ -8,16 +8,17 @@ use Illuminate\Console\Command;
 
 class TestBrainCommand extends Command
 {
-    protected $signature = 'test:brain';
+    protected $signature = 'test:brain {element_has_position_id=7745}';
 
-    protected $description = 'Test ElementHasPosition::find(7741)';
+    protected $description = 'Test ElementHasPosition::find(7745)';
 
     public function handle(): int
     {
-        $elementHasPositionId = 7741;
+        $elementHasPositionId = (int) $this->argument('element_has_position_id');
         $item = ElementHasPosition::query()
             ->with([
                 'brain.neurons.outgoingLinks',
+                'brain.neurons.incomingLinks',
             ])
             ->find($elementHasPositionId);
 
@@ -26,14 +27,14 @@ class TestBrainCommand extends Command
             return self::FAILURE;
         }
 
-        $orderedFlow = $this->buildOrderedNeuronsWithNextLink($item);
+        $orderedFlow = $this->buildOrderedNeuronsWithFromLink($item);
 
         $this->line(json_encode($orderedFlow, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return self::SUCCESS;
     }
 
-    private function buildOrderedNeuronsWithNextLink(ElementHasPosition $elementHasPosition): array
+    private function buildOrderedNeuronsWithFromLink(ElementHasPosition $elementHasPosition): array
     {
         $brain = $elementHasPosition->brain;
         if ($brain === null) {
@@ -45,25 +46,34 @@ class TestBrainCommand extends Command
             ->values();
 
         $result = [];
-        $count = $neurons->count();
+        $neuronsById = $neurons->keyBy('id');
 
-        for ($i = 0; $i < $count; $i++) {
+        foreach ($neurons as $current) {
             /** @var ElementHasPositionNeuron $current */
-            $current = $neurons[$i];
-            $next = ($i + 1 < $count) ? $neurons[$i + 1] : null;
+            $neuronFrom = null;
+            foreach ($current->incomingLinks->sortBy('id') as $link) {
+                /** @var ElementHasPositionNeuron|null $toNeuron */
+                $fromNeuron = $neuronsById->get((int) $link->from_element_has_position_neuron_id);
 
-            $linkToNext = null;
-            if ($next !== null) {
-                $link = $current->outgoingLinks
-                    ->firstWhere('to_element_has_position_neuron_id', (int) $next->id);
-
-                if ($link !== null) {
-                    $linkToNext = [
-                        'id' => (int) $link->id,
-                        'from_element_has_position_neuron_id' => (int) $link->from_element_has_position_neuron_id,
-                        'to_element_has_position_neuron_id' => (int) $link->to_element_has_position_neuron_id,
+                if ($fromNeuron !== null) {
+                    $neuronFrom = [
+                        'id' => (int) $fromNeuron->id,
+                        'type' => $fromNeuron->type,
+                        'grid_i' => (int) $fromNeuron->grid_i,
+                        'grid_j' => (int) $fromNeuron->grid_j,
+                        'link_id' => (int) $link->id,
                     ];
+                    break;
                 }
+
+                $neuronFrom = [
+                    'id' => (int) $link->from_element_has_position_neuron_id,
+                    'type' => null,
+                    'grid_i' => null,
+                    'grid_j' => null,
+                    'link_id' => (int) $link->id,
+                ];
+                break;
             }
 
             $result[] = [
@@ -71,7 +81,7 @@ class TestBrainCommand extends Command
                 'type' => $current->type,
                 'grid_i' => (int) $current->grid_i,
                 'grid_j' => (int) $current->grid_j,
-                'link_to_next' => $linkToNext,
+                'neuron_from' => $neuronFrom,
             ];
         }
 
