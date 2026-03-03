@@ -68,6 +68,7 @@ class ElementController extends Controller
             'brain_grid_width' => 'nullable|integer|min:1',
             'brain_grid_height' => 'nullable|integer|min:1',
             'neuron_items' => 'nullable|string',
+            'neuron_links' => 'nullable|string',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
@@ -165,6 +166,7 @@ class ElementController extends Controller
             'brain_grid_width' => 'nullable|integer|min:1',
             'brain_grid_height' => 'nullable|integer|min:1',
             'neuron_items' => 'nullable|string',
+            'neuron_links' => 'nullable|string',
             'climates' => 'array',
             'climates.*' => 'exists:climates,id'
         ]);
@@ -540,7 +542,7 @@ class ElementController extends Controller
         $gridHeight = max(1, (int) $request->input('brain_grid_height', 5));
         $brain = $this->ensureElementBrain($element, $gridWidth, $gridHeight);
 
-        $this->syncBrainNeurons($brain, $request, $gridHeight, $gridWidth);
+        $this->syncBrainGraph($brain, $request, $gridHeight, $gridWidth);
     }
 
     private function ensureElementBrain(Element $element, int $gridWidth, int $gridHeight): Brain
@@ -563,7 +565,7 @@ class ElementController extends Controller
         return $brain;
     }
 
-    private function syncBrainNeurons(Brain $brain, Request $request, int $maxI, int $maxJ): void
+    private function syncBrainGraph(Brain $brain, Request $request, int $maxI, int $maxJ): void
     {
         $json = $request->input('neuron_items');
         if (!is_string($json) || trim($json) === '') {
@@ -575,7 +577,8 @@ class ElementController extends Controller
             return;
         }
 
-        $syncRows = [];
+        $syncRowsByGrid = [];
+        $clientIdToGridKey = [];
         foreach ($decoded as $item) {
             if (!is_array($item)) {
                 continue;
@@ -627,7 +630,8 @@ class ElementController extends Controller
                 }
             }
 
-            $syncRows[] = [
+            $gridKey = $gridI . '_' . $gridJ;
+            $syncRowsByGrid[$gridKey] = [
                 'type' => $type,
                 'grid_i' => $gridI,
                 'grid_j' => $gridJ,
@@ -637,11 +641,108 @@ class ElementController extends Controller
                 'gene_life_id' => $geneLifeId,
                 'gene_attack_id' => $geneAttackId,
             ];
+            $clientId = (int) ($item['id'] ?? 0);
+            if ($clientId > 0) {
+                $clientIdToGridKey[$clientId] = $gridKey;
+            }
         }
 
-        $brain->neurons()->delete();
-        foreach ($syncRows as $row) {
-            $brain->neurons()->create($row);
+        $existingNeurons = $brain->neurons()->get()->keyBy(function ($neuron) {
+            return ((int) $neuron->grid_i) . '_' . ((int) $neuron->grid_j);
+        });
+
+        $desiredGridKeys = array_keys($syncRowsByGrid);
+        foreach ($existingNeurons as $gridKey => $existingNeuron) {
+            if (!in_array($gridKey, $desiredGridKeys, true)) {
+                $existingNeuron->delete();
+            }
+        }
+
+        $savedNeuronsByGrid = [];
+        foreach ($syncRowsByGrid as $gridKey => $row) {
+            $savedNeuron = Neuron::query()->updateOrCreate(
+                [
+                    'brain_id' => $brain->id,
+                    'grid_i' => $row['grid_i'],
+                    'grid_j' => $row['grid_j'],
+                ],
+                [
+                    'type' => $row['type'],
+                    'radius' => $row['radius'],
+                    'target_type' => $row['target_type'],
+                    'target_element_id' => $row['target_element_id'],
+                    'gene_life_id' => $row['gene_life_id'],
+                    'gene_attack_id' => $row['gene_attack_id'],
+                ]
+            );
+            $savedNeuronsByGrid[$gridKey] = $savedNeuron;
+        }
+
+        $this->syncBrainLinks($brain, $request, $savedNeuronsByGrid, $clientIdToGridKey);
+    }
+
+    private function syncBrainLinks(Brain $brain, Request $request, array $savedNeuronsByGrid, array $clientIdToGridKey): void
+    {
+        $jsonLinks = $request->input('neuron_links');
+        if (!is_string($jsonLinks) || trim($jsonLinks) === '') {
+            NeuronLink::query()
+                ->whereHas('fromNeuron', function ($q) use ($brain) {
+                    $q->where('brain_id', $brain->id);
+                })
+                ->orWhereHas('toNeuron', function ($q) use ($brain) {
+                    $q->where('brain_id', $brain->id);
+                })
+                ->delete();
+            return;
+        }
+
+        $decodedLinks = json_decode($jsonLinks, true);
+        if (!is_array($decodedLinks)) {
+            return;
+        }
+
+        $validPairs = [];
+        foreach ($decodedLinks as $link) {
+            if (!is_array($link)) {
+                continue;
+            }
+
+            $fromClientId = (int) ($link['from_neuron_id'] ?? 0);
+            $toClientId = (int) ($link['to_neuron_id'] ?? 0);
+            if ($fromClientId <= 0 || $toClientId <= 0 || $fromClientId === $toClientId) {
+                continue;
+            }
+
+            $fromGridKey = $clientIdToGridKey[$fromClientId] ?? null;
+            $toGridKey = $clientIdToGridKey[$toClientId] ?? null;
+            if ($fromGridKey === null || $toGridKey === null) {
+                continue;
+            }
+
+            $fromNeuron = $savedNeuronsByGrid[$fromGridKey] ?? null;
+            $toNeuron = $savedNeuronsByGrid[$toGridKey] ?? null;
+            if (!$fromNeuron || !$toNeuron) {
+                continue;
+            }
+
+            $pairKey = ((int) $fromNeuron->id) . '_' . ((int) $toNeuron->id);
+            $validPairs[$pairKey] = [
+                'from_neuron_id' => (int) $fromNeuron->id,
+                'to_neuron_id' => (int) $toNeuron->id,
+            ];
+        }
+
+        NeuronLink::query()
+            ->whereHas('fromNeuron', function ($q) use ($brain) {
+                $q->where('brain_id', $brain->id);
+            })
+            ->orWhereHas('toNeuron', function ($q) use ($brain) {
+                $q->where('brain_id', $brain->id);
+            })
+            ->delete();
+
+        foreach ($validPairs as $pair) {
+            NeuronLink::query()->create($pair);
         }
     }
 }
