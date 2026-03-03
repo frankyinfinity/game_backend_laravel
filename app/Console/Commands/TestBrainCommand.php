@@ -229,7 +229,13 @@ class TestBrainCommand extends Command
         }
 
         $didAttack = $this->performAttackForElement(self::DRAW_PLAYER_ID, $elementHasPosition, $target, $attackGeneId, $lifeGeneId);
-        $neuron['attack_debug'] = $didAttack ? 'ok' : 'attack_not_applied';
+        if ($didAttack) {
+            $didRetreat = $this->moveElementAwayOneTile(self::DRAW_PLAYER_ID, $elementHasPosition, $target);
+            $neuron['attack_debug'] = $didRetreat ? 'ok_attack_and_retreat' : 'ok_attack_no_valid_retreat';
+            return;
+        }
+
+        $neuron['attack_debug'] = 'attack_not_applied';
     }
 
     private function handleUnknownNeuron(array $neuron): void
@@ -932,6 +938,132 @@ class TestBrainCommand extends Command
 
         ObjectCache::flush($sessionId);
         $this->queueDrawCommands($player, $sessionId, $drawCommands);
+        return true;
+    }
+
+    private function moveElementAwayOneTile(int $playerId, ElementHasPosition $elementHasPosition, array $targetTile): bool
+    {
+        $player = Player::query()->with('birthRegion')->find($playerId);
+        if ($player === null || $player->birthRegion === null || empty($player->actual_session_id)) {
+            return false;
+        }
+
+        $currentI = (int) $elementHasPosition->tile_i;
+        $currentJ = (int) $elementHasPosition->tile_j;
+        $targetI = (int) ($targetTile['i'] ?? $currentI);
+        $targetJ = (int) ($targetTile['j'] ?? $currentJ);
+
+        $awayI = $currentI <=> $targetI;
+        $awayJ = $currentJ <=> $targetJ;
+
+        $candidateDirections = [];
+        if ($awayI !== 0) {
+            $candidateDirections[] = [$awayI, 0];
+        }
+        if ($awayJ !== 0) {
+            $candidateDirections[] = [0, $awayJ];
+        }
+        $candidateDirections[] = [-1, 0];
+        $candidateDirections[] = [1, 0];
+        $candidateDirections[] = [0, -1];
+        $candidateDirections[] = [0, 1];
+
+        $uniqueDirections = [];
+        $seen = [];
+        foreach ($candidateDirections as $dir) {
+            $key = $dir[0] . '_' . $dir[1];
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $uniqueDirections[] = $dir;
+        }
+
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $solidMap = Helper::getMapSolidTiles($tiles, $birthRegion);
+
+        $destination = null;
+        foreach ($uniqueDirections as [$di, $dj]) {
+            $nextI = $currentI + $di;
+            $nextJ = $currentJ + $dj;
+
+            if ($nextI < 0 || $nextJ < 0 || $nextI >= (int) $birthRegion->height || $nextJ >= (int) $birthRegion->width) {
+                continue;
+            }
+
+            if (($solidMap[$nextI][$nextJ] ?? 'X') !== '0') {
+                continue;
+            }
+
+            $hasLiveEntity = Entity::query()
+                ->where('state', Entity::STATE_LIFE)
+                ->where('tile_i', $nextI)
+                ->where('tile_j', $nextJ)
+                ->exists();
+            if ($hasLiveEntity) {
+                continue;
+            }
+
+            $hasElement = ElementHasPosition::query()
+                ->where('id', '!=', (int) $elementHasPosition->id)
+                ->where('tile_i', $nextI)
+                ->where('tile_j', $nextJ)
+                ->exists();
+            if ($hasElement) {
+                continue;
+            }
+
+            $destination = ['i' => $nextI, 'j' => $nextJ];
+            break;
+        }
+
+        if ($destination === null) {
+            return false;
+        }
+
+        $elementHasPosition->update([
+            'tile_i' => (int) $destination['i'],
+            'tile_j' => (int) $destination['j'],
+        ]);
+
+        $tileSize = Helper::TILE_SIZE;
+        $endX = ($tileSize * (int) $destination['j']) + Helper::MAP_START_X;
+        $endY = ($tileSize * (int) $destination['i']) + Helper::MAP_START_Y;
+        $panelX = $endX + ($tileSize / 2);
+        $panelY = $endY + ($tileSize / 2);
+        $elementUid = (string) $elementHasPosition->uid;
+        $sessionId = (string) $player->actual_session_id;
+
+        ObjectCache::buffer($sessionId);
+        $drawCommands = [];
+
+        $updateObject = new ObjectUpdate($elementUid, $sessionId, 250);
+        $updateObject->setAttributes('x', $endX);
+        $updateObject->setAttributes('y', $endY);
+        $updateObject->setAttributes('zIndex', 100);
+        foreach ($updateObject->get() as $data) {
+            $drawCommands[] = $data;
+        }
+
+        $updateObject = new ObjectUpdate($elementUid . '_panel', $sessionId);
+        $updateObject->setAttributes('x', $panelX);
+        $updateObject->setAttributes('y', $panelY);
+        $updateObject->setAttributes('zIndex', 100);
+        foreach ($updateObject->get() as $data) {
+            $drawCommands[] = $data;
+        }
+
+        $updateObject = new ObjectUpdate($elementUid . '_text_name', $sessionId);
+        $updateObject->setAttributes('x', $panelX + 10);
+        $updateObject->setAttributes('y', $panelY + 10);
+        foreach ($updateObject->get() as $data) {
+            $drawCommands[] = $data;
+        }
+
+        ObjectCache::flush($sessionId);
+        $this->queueDrawCommands($player, $sessionId, $drawCommands);
+
         return true;
     }
 

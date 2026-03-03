@@ -173,6 +173,7 @@ class ProgressBarDraw {
         $border->setOrigin($this->x, $this->y);
         $border->setColor($this->borderColor);
         $border->setThickness(2); // Giving it some thickness to look like a border
+        $border->setBorderRadius(0);
         $border->setRenderable($this->renderable);
         $this->drawItems[] = $border;
 
@@ -190,6 +191,7 @@ class ProgressBarDraw {
             $bar->setSize($barWidth, $barHeight);
             $bar->setOrigin($this->x + 2, $this->y + 2);
             $bar->setColor($this->barColor);
+            $bar->setBorderRadius(0);
             $bar->setRenderable($this->renderable);
             $this->drawItems[] = $bar;
         }

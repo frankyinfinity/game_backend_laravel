@@ -19,6 +19,8 @@ use Illuminate\Support\Str;
 
 class ElementDraw
 {
+    private const PROGRESS_BAR_VERTICAL_STEP = 65;
+
     private Element $element;
     private ?ElementHasPosition $elementHasPosition;
     private $tileI;
@@ -116,7 +118,7 @@ class ElementDraw
         }
 
         // Attack Button position (after gene progress bars)
-        $attackBtnY = $panelY + 60 + ($geneProgressBarCount * 30) + 20;
+        $attackBtnY = $panelY + 70 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
         
         // Consumable Button (encapsulated in function)
         $btnItems = [];
@@ -127,7 +129,7 @@ class ElementDraw
         // Attack Button (for interactive elements, below progress bars)
         $attackBtnItems = [];
         if ($this->element->isInteractive()) {
-            $attackBtnItems = $this->addAttackButton($panel, $panelX, $attackBtnY, $uid);
+            $attackBtnItems = $this->addAttackButton($panel, $panelX, $panelY, $attackBtnY, $uid);
             // Mark button as only visible when both entity and element panels are open
             foreach ($attackBtnItems as $item) {
                 $item->addAttributes('requires_entity_focus', true);
@@ -173,7 +175,7 @@ class ElementDraw
         
         if ($informationCount > 0) {
             // Increase panel height to accommodate progress bars
-            $panel->setSize(200, 50 + ($informationCount * 60));
+            $panel->setSize(200, 60 + ($informationCount * 105));
             
             $progressBarY = $panelY + 60; // Start below the name text
             
@@ -201,7 +203,7 @@ class ElementDraw
                     $geneProgressBarItems[] = $item;
                 }
                 
-                $progressBarY += 30; // Space between progress bars
+                $progressBarY += self::PROGRESS_BAR_VERTICAL_STEP; // Space between progress bars
             }
         }
         
@@ -248,10 +250,11 @@ class ElementDraw
      * 
      * @return array Array of draw items from the button
      */
-    private function addAttackButton(Rectangle $panel, $panelX, $attackBtnY, $uid): array
+    private function addAttackButton(Rectangle $panel, $panelX, $panelY, $attackBtnY, $uid): array
     {
-        // Increase panel height for button
-        $panel->setSize(200, 200);
+        // Ensure enough room for the button after all progress bars.
+        $panelHeight = max(220, ($attackBtnY + 95) - $panelY);
+        $panel->setSize(200, $panelHeight);
         
         $btnX = $panelX + 10;
         $btnY = $attackBtnY;
