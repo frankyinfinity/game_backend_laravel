@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 
 class TestBrainCommand extends Command
 {
+    private array $processedNeuronsById = [];
+
     protected $signature = 'test:brain {element_has_position_id=7753} {--ws_host=127.0.0.1 : Host websocket mappa}';
 
     protected $description = 'Test ElementHasPosition::find(7753)';
@@ -32,8 +34,12 @@ class TestBrainCommand extends Command
         }
 
         $orderedFlow = $this->buildOrderedNeuronsWithFromLink($item);
+        $this->processedNeuronsById = [];
         foreach ($orderedFlow as &$orderedNeuron) {
             $this->handleNeuronByType($orderedNeuron);
+            if (isset($orderedNeuron['id'])) {
+                $this->processedNeuronsById[(int) $orderedNeuron['id']] = $orderedNeuron;
+            }
         }
         unset($orderedNeuron);
 
@@ -131,6 +137,31 @@ class TestBrainCommand extends Command
 
     private function handlePathNeuron(array $neuron): void
     {
+        $neuronFrom = $neuron['neuron_from'] ?? null;
+        if (!is_array($neuronFrom) || !isset($neuronFrom['id'])) {
+            return;
+        }
+
+        $fromNeuronId = (int) $neuronFrom['id'];
+        if ($fromNeuronId <= 0 || !isset($this->processedNeuronsById[$fromNeuronId])) {
+            return;
+        }
+
+        $fromNeuron = $this->processedNeuronsById[$fromNeuronId];
+        $fromDetectionResult = $fromNeuron['detection_result'] ?? null;
+        if ($fromDetectionResult === null) {
+            return;
+        }
+
+        // Placeholder: path logic will use $fromDetectionResult.
+        Log::info('path');
+        $strCoordinate = str_replace('(', '', $fromDetectionResult);
+        $strCoordinate = str_replace(')', '', $strCoordinate);
+        $coordinates = explode(',', $strCoordinate);
+        $tileI = $coordinates[0];
+        $tileJ = $coordinates[1];
+        Log::info($tileI);
+        Log::info($tileJ);
 
     }
 
