@@ -36,7 +36,7 @@ class TestBrainCommand extends Command
         $orderedFlow = $this->buildOrderedNeuronsWithFromLink($item);
         $this->processedNeuronsById = [];
         foreach ($orderedFlow as &$orderedNeuron) {
-            $this->handleNeuronByType($orderedNeuron);
+            $this->handleNeuronByType($orderedNeuron, $item);
             if (isset($orderedNeuron['id'])) {
                 $this->processedNeuronsById[(int) $orderedNeuron['id']] = $orderedNeuron;
             }
@@ -93,14 +93,14 @@ class TestBrainCommand extends Command
         return $result;
     }
 
-    private function handleNeuronByType(array &$neuron): void
+    private function handleNeuronByType(array &$neuron, $elementHasPosition): void
     {
         switch ($neuron['type'] ?? null) {
             case Neuron::TYPE_DETECTION:
                 $this->handleDetectionNeuron($neuron);
                 break;
             case Neuron::TYPE_PATH:
-                $this->handlePathNeuron($neuron);
+                $this->handlePathNeuron($neuron, $elementHasPosition);
                 break;
             default:
                 $this->handleUnknownNeuron($neuron);
@@ -135,7 +135,7 @@ class TestBrainCommand extends Command
         );
     }
 
-    private function handlePathNeuron(array $neuron): void
+    private function handlePathNeuron(array $neuron, $elementHasPosition): void
     {
         $neuronFrom = $neuron['neuron_from'] ?? null;
         if (!is_array($neuronFrom) || !isset($neuronFrom['id'])) {
@@ -155,13 +155,21 @@ class TestBrainCommand extends Command
 
         // Placeholder: path logic will use $fromDetectionResult.
         Log::info('path');
+
+        $fromI = $elementHasPosition->tile_i;
+        $fromJ = $elementHasPosition->tile_j;
+
         $strCoordinate = str_replace('(', '', $fromDetectionResult);
         $strCoordinate = str_replace(')', '', $strCoordinate);
         $coordinates = explode(',', $strCoordinate);
-        $tileI = $coordinates[0];
-        $tileJ = $coordinates[1];
-        Log::info($tileI);
-        Log::info($tileJ);
+        $toI = $coordinates[0];
+        $toJ = $coordinates[1];
+
+        Log::info($fromI);
+        Log::info($fromJ);
+        Log::info('---');
+        Log::info($toI);
+        Log::info($toJ);
 
     }
 
