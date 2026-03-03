@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionNeuron;
+use App\Models\Neuron;
 use Illuminate\Console\Command;
 
 class TestBrainCommand extends Command
@@ -28,6 +29,9 @@ class TestBrainCommand extends Command
         }
 
         $orderedFlow = $this->buildOrderedNeuronsWithFromLink($item);
+        foreach ($orderedFlow as $orderedNeuron) {
+            $this->handleNeuronByType($orderedNeuron);
+        }
 
         $this->line(json_encode($orderedFlow, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
@@ -86,5 +90,35 @@ class TestBrainCommand extends Command
         }
 
         return $result;
+    }
+
+    private function handleNeuronByType(array $neuron): void
+    {
+        switch ($neuron['type'] ?? null) {
+            case Neuron::TYPE_DETECTION:
+                $this->handleDetectionNeuron($neuron);
+                break;
+            case Neuron::TYPE_PATH:
+                $this->handlePathNeuron($neuron);
+                break;
+            default:
+                $this->handleUnknownNeuron($neuron);
+                break;
+        }
+    }
+
+    private function handleDetectionNeuron(array $neuron): void
+    {
+
+    }
+
+    private function handlePathNeuron(array $neuron): void
+    {
+
+    }
+
+    private function handleUnknownNeuron(array $neuron): void
+    {
+        
     }
 }
