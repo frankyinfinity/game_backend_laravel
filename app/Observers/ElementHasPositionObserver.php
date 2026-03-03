@@ -78,6 +78,8 @@ class ElementHasPositionObserver
                         'radius' => $templateNeuron->radius,
                         'target_type' => $templateNeuron->target_type,
                         'target_element_id' => $templateNeuron->target_element_id,
+                        'gene_life_id' => $templateNeuron->gene_life_id,
+                        'gene_attack_id' => $templateNeuron->gene_attack_id,
                     ]);
 
                     $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;

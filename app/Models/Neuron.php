@@ -8,20 +8,24 @@ class Neuron extends Model
 {
     public const TYPE_DETECTION = 'detection';
     public const TYPE_PATH = 'path';
+    public const TYPE_ATTACK = 'attack';
 
     public const TYPES = [
         self::TYPE_DETECTION,
         self::TYPE_PATH,
+        self::TYPE_ATTACK,
     ];
 
     public const TYPE_LABELS = [
         self::TYPE_DETECTION => 'Individuazione',
         self::TYPE_PATH => 'Percorso',
+        self::TYPE_ATTACK => 'Attacco',
     ];
 
     public const TYPE_SYMBOLS = [
-        self::TYPE_DETECTION => '◎',
-        self::TYPE_PATH => '➤',
+        self::TYPE_DETECTION => 'O',
+        self::TYPE_PATH => '>',
+        self::TYPE_ATTACK => 'X',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
@@ -45,6 +49,8 @@ class Neuron extends Model
         'grid_j' => 'integer',
         'radius' => 'integer',
         'target_element_id' => 'integer',
+        'gene_life_id' => 'integer',
+        'gene_attack_id' => 'integer',
     ];
 
     public function brain()

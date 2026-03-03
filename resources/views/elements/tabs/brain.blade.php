@@ -12,6 +12,8 @@
                 'radius' => $n->radius !== null ? (int) $n->radius : null,
                 'target_type' => $n->target_type,
                 'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
+                'gene_life_id' => $n->gene_life_id !== null ? (int) $n->gene_life_id : null,
+                'gene_attack_id' => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
             ];
         })->values()->all()
         : [];
@@ -145,6 +147,24 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="form-group" id="neuron_gene_life_group" style="display:none;">
+                    <label for="neuron_gene_life_id">Gene Vita</label>
+                    <select class="form-control" id="neuron_gene_life_id">
+                        <option value="">-- Seleziona Gene Vita --</option>
+                        @foreach(($brainGenes ?? collect()) as $brainGene)
+                            <option value="{{ $brainGene->id }}">{{ $brainGene->name }} (#{{ $brainGene->id }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group" id="neuron_gene_attack_group" style="display:none;">
+                    <label for="neuron_gene_attack_id">Gene Attacco</label>
+                    <select class="form-control" id="neuron_gene_attack_id">
+                        <option value="">-- Seleziona Gene Attacco --</option>
+                        @foreach(($brainGenes ?? collect()) as $brainGene)
+                            <option value="{{ $brainGene->id }}">{{ $brainGene->name }} (#{{ $brainGene->id }})</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger mr-auto" id="btn_delete_neuron">Rimuovi</button>
@@ -176,17 +196,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const neuronTargetTypeGroup = document.getElementById('neuron_target_type_group');
     const neuronTargetElementGroup = document.getElementById('neuron_target_element_group');
     const neuronTargetElementIdInput = document.getElementById('neuron_target_element_id');
+    const neuronGeneLifeGroup = document.getElementById('neuron_gene_life_group');
+    const neuronGeneLifeIdInput = document.getElementById('neuron_gene_life_id');
+    const neuronGeneAttackGroup = document.getElementById('neuron_gene_attack_group');
+    const neuronGeneAttackIdInput = document.getElementById('neuron_gene_attack_id');
     const selectedCellLabel = document.getElementById('selected_cell_label');
     const saveNeuronBtn = document.getElementById('btn_save_neuron');
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
     const linkModeToggleBtn = document.getElementById('btn_link_mode_toggle');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !linkModeToggleBtn || typeof PIXI === 'undefined') {
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !linkModeToggleBtn || typeof PIXI === 'undefined') {
         return;
     }
 
     const fixedCellSize = 36;
     const typeDetection = @json(\App\Models\Neuron::TYPE_DETECTION);
+    const typeAttack = @json(\App\Models\Neuron::TYPE_ATTACK);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
@@ -268,8 +293,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function toggleDetectionFieldsByType() {
         const isDetection = neuronTypeInput.value === typeDetection;
+        const isAttack = neuronTypeInput.value === typeAttack;
         neuronRadiusGroup.style.display = isDetection ? '' : 'none';
         neuronTargetTypeGroup.style.display = isDetection ? '' : 'none';
+        neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
+        neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
         if (!isDetection) {
             neuronTargetElementGroup.style.display = 'none';
             return;
@@ -292,6 +320,8 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronTargetTypeElementInput.checked = inferredTargetType === targetTypeElement;
             neuronTargetTypeEntityInput.checked = inferredTargetType === targetTypeEntity;
             neuronTargetElementIdInput.value = existing.target_element_id != null ? String(existing.target_element_id) : '';
+            neuronGeneLifeIdInput.value = existing.gene_life_id != null ? String(existing.gene_life_id) : '';
+            neuronGeneAttackIdInput.value = existing.gene_attack_id != null ? String(existing.gene_attack_id) : '';
             deleteNeuronBtn.style.display = '';
         } else {
             neuronTypeInput.value = typeDetection;
@@ -299,6 +329,8 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronTargetTypeElementInput.checked = true;
             neuronTargetTypeEntityInput.checked = false;
             neuronTargetElementIdInput.value = '';
+            neuronGeneLifeIdInput.value = '';
+            neuronGeneAttackIdInput.value = '';
             deleteNeuronBtn.style.display = 'none';
         }
 
@@ -558,6 +590,8 @@ document.addEventListener('DOMContentLoaded', function () {
         let radius = null;
         let targetType = null;
         let targetElementId = null;
+        let geneLifeId = null;
+        let geneAttackId = null;
         if (type === typeDetection) {
             radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
             if (neuronTargetTypeEntityInput.checked) targetType = targetTypeEntity;
@@ -565,6 +599,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (targetType === targetTypeElement) {
                 const parsed = parseInt(neuronTargetElementIdInput.value, 10);
                 targetElementId = Number.isNaN(parsed) ? null : parsed;
+            }
+        } else if (type === typeAttack) {
+            const parsedLife = parseInt(neuronGeneLifeIdInput.value, 10);
+            const parsedAttack = parseInt(neuronGeneAttackIdInput.value, 10);
+            geneLifeId = Number.isNaN(parsedLife) ? null : parsedLife;
+            geneAttackId = Number.isNaN(parsedAttack) ? null : parsedAttack;
+            if (geneLifeId == null || geneAttackId == null) {
+                alert('Per il neurone Attacco devi selezionare Gene Vita e Gene Attacco');
+                return;
             }
         }
 
@@ -579,6 +622,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 radius: radius,
                 target_type: targetType,
                 target_element_id: targetElementId,
+                gene_life_id: geneLifeId,
+                gene_attack_id: geneAttackId,
             });
             neuronItems = neuronItems.filter((item) => !(Number(item.grid_i) === i && Number(item.grid_j) === j));
             neuronItems.push(savedNeuron);

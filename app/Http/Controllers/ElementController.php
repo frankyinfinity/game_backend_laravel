@@ -123,6 +123,11 @@ class ElementController extends Controller
         $brainTargetEntities = Entity::query()
             ->orderBy('uid')
             ->get(['id', 'uid']);
+
+        $brainGenes = Gene::query()
+            ->where('type', Gene::DYNAMIC_MAX)
+            ->orderBy('name')
+            ->get(['id', 'name']);
         
         // Prepare gene data for JavaScript
         $geneData = $allGenes->map(function($gene) {
@@ -146,7 +151,8 @@ class ElementController extends Controller
             'geneData',
             'allScores',
             'brainTargetElements',
-            'brainTargetEntities'
+            'brainTargetEntities',
+            'brainGenes'
         ));
     }
 
@@ -336,6 +342,8 @@ class ElementController extends Controller
             'radius' => 'nullable|integer|min:1',
             'target_type' => 'nullable|string',
             'target_element_id' => 'nullable|integer|min:1',
+            'gene_life_id' => 'nullable|integer|exists:genes,id',
+            'gene_attack_id' => 'nullable|integer|exists:genes,id',
         ]);
 
         $gridWidth = max(1, (int) $request->input('brain_grid_width', $element->brain->grid_width ?? 5));
@@ -362,6 +370,8 @@ class ElementController extends Controller
         $radius = null;
         $targetType = null;
         $targetElementId = null;
+        $geneLifeId = null;
+        $geneAttackId = null;
 
         if ($type === Neuron::TYPE_DETECTION) {
             $radius = max(1, (int) $request->input('radius', 1));
@@ -376,6 +386,20 @@ class ElementController extends Controller
             }
         }
 
+        if ($type === Neuron::TYPE_ATTACK) {
+            $candidateGeneLifeId = (int) $request->input('gene_life_id', 0);
+            $candidateGeneAttackId = (int) $request->input('gene_attack_id', 0);
+            $geneLifeId = $candidateGeneLifeId > 0 ? $candidateGeneLifeId : null;
+            $geneAttackId = $candidateGeneAttackId > 0 ? $candidateGeneAttackId : null;
+
+            if ($geneLifeId === null || $geneAttackId === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Per il neurone Attacco devi selezionare Gene Vita e Gene Attacco',
+                ], 422);
+            }
+        }
+
         $neuron = Neuron::query()->updateOrCreate(
             [
                 'brain_id' => $brain->id,
@@ -387,6 +411,8 @@ class ElementController extends Controller
                 'radius' => $radius,
                 'target_type' => $targetType,
                 'target_element_id' => $targetElementId,
+                'gene_life_id' => $geneLifeId,
+                'gene_attack_id' => $geneAttackId,
             ]
         );
 
@@ -400,6 +426,8 @@ class ElementController extends Controller
                 'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
                 'target_type' => $neuron->target_type,
                 'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+                'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
+                'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
             ],
         ]);
     }
@@ -567,6 +595,8 @@ class ElementController extends Controller
             $radius = null;
             $targetType = null;
             $targetElementId = null;
+            $geneLifeId = null;
+            $geneAttackId = null;
             if ($type === Neuron::TYPE_DETECTION) {
                 $radius = max(1, (int) ($item['radius'] ?? 1));
                 $candidateTargetType = (string) ($item['target_type'] ?? '');
@@ -581,6 +611,21 @@ class ElementController extends Controller
                     }
                 }
             }
+            if ($type === Neuron::TYPE_ATTACK) {
+                $geneLifeId = (int) ($item['gene_life_id'] ?? 0);
+                if ($geneLifeId <= 0) {
+                    $geneLifeId = null;
+                }
+
+                $geneAttackId = (int) ($item['gene_attack_id'] ?? 0);
+                if ($geneAttackId <= 0) {
+                    $geneAttackId = null;
+                }
+
+                if ($geneLifeId === null || $geneAttackId === null) {
+                    continue;
+                }
+            }
 
             $syncRows[] = [
                 'type' => $type,
@@ -589,6 +634,8 @@ class ElementController extends Controller
                 'radius' => $radius,
                 'target_type' => $targetType,
                 'target_element_id' => $targetElementId,
+                'gene_life_id' => $geneLifeId,
+                'gene_attack_id' => $geneAttackId,
             ];
         }
 

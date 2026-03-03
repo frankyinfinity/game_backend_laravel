@@ -14,6 +14,8 @@ class ElementHasPositionNeuron extends Model
         'grid_j' => 'integer',
         'radius' => 'integer',
         'target_element_id' => 'integer',
+        'gene_life_id' => 'integer',
+        'gene_attack_id' => 'integer',
     ];
 
     public function brain()

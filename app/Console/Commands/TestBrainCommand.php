@@ -7,11 +7,16 @@ use App\Models\ElementHasPositionNeuron;
 use App\Models\Container;
 use App\Models\DrawRequest;
 use App\Models\Entity;
+use App\Models\EntityInformation;
+use App\Models\ElementHasPositionInformation;
+use App\Models\Gene;
 use App\Models\Neuron;
 use App\Models\Player;
+use App\Models\Genome;
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
@@ -22,16 +27,18 @@ use App\Helper\Helper;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Docker\Docker;
 
 class TestBrainCommand extends Command
 {
-    private const DRAW_PLAYER_ID = 76;
+    private const DRAW_PLAYER_ID = 77;
 
     private array $processedNeuronsById = [];
+    private array $queuedDrawBySession = [];
 
-    protected $signature = 'test:brain {element_has_position_id=7753} {--ws_host=127.0.0.1 : Host websocket mappa}';
+    protected $signature = 'test:brain {element_has_position_id=7755} {--ws_host=127.0.0.1 : Host websocket mappa}';
 
-    protected $description = 'Test ElementHasPosition::find(7753)';
+    protected $description = 'Test ElementHasPosition::find(7755)';
 
     public function handle(): int
     {
@@ -50,6 +57,7 @@ class TestBrainCommand extends Command
 
         $orderedFlow = $this->buildOrderedNeuronsWithFromLink($item);
         $this->processedNeuronsById = [];
+        $this->queuedDrawBySession = [];
         foreach ($orderedFlow as &$orderedNeuron) {
             $this->handleNeuronByType($orderedNeuron, $item);
             if (isset($orderedNeuron['id'])) {
@@ -57,6 +65,8 @@ class TestBrainCommand extends Command
             }
         }
         unset($orderedNeuron);
+
+        $this->dispatchQueuedDrawRequests();
 
         $this->line(json_encode($orderedFlow, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
@@ -116,6 +126,9 @@ class TestBrainCommand extends Command
                 break;
             case Neuron::TYPE_PATH:
                 $this->handlePathNeuron($neuron, $elementHasPosition);
+                break;
+            case Neuron::TYPE_ATTACK:
+                $this->handleAttackNeuron($neuron, $elementHasPosition);
                 break;
             default:
                 $this->handleUnknownNeuron($neuron);
@@ -179,6 +192,44 @@ class TestBrainCommand extends Command
         ];
 
         $this->drawPathForPlayer(self::DRAW_PLAYER_ID, $from, $to, $elementHasPosition);
+    }
+
+    private function handleAttackNeuron(array $neuron, ElementHasPosition $elementHasPosition): void
+    {
+        $resolvedDetectionResult = $this->resolveDetectionResultFromChain($neuron);
+        if ($resolvedDetectionResult === null) {
+            $neuron['attack_debug'] = 'no_detection_result_in_chain';
+            return;
+        }
+
+        $target = $this->parseCoordinateString((string) $resolvedDetectionResult);
+        if ($target === null) {
+            $neuron['attack_debug'] = 'invalid_detection_coordinate';
+            return;
+        }
+
+        $from = [
+            'i' => (int) $elementHasPosition->tile_i,
+            'j' => (int) $elementHasPosition->tile_j,
+        ];
+
+        $this->drawPathForPlayer(self::DRAW_PLAYER_ID, $from, $target, $elementHasPosition);
+
+        $attackGeneId = (int) ($neuron['gene_attack_id'] ?? 0);
+        $lifeGeneId = (int) ($neuron['gene_life_id'] ?? 0);
+        if ($attackGeneId <= 0) {
+            $attackGeneId = (int) (Gene::query()->where('key', Gene::KEY_ATTACK)->value('id') ?? 0);
+        }
+        if ($lifeGeneId <= 0) {
+            $lifeGeneId = (int) (Gene::query()->where('key', Gene::KEY_LIFEPOINT)->value('id') ?? 0);
+        }
+        if ($attackGeneId <= 0 || $lifeGeneId <= 0) {
+            $neuron['attack_debug'] = 'missing_attack_or_life_gene';
+            return;
+        }
+
+        $didAttack = $this->performAttackForElement(self::DRAW_PLAYER_ID, $elementHasPosition, $target, $attackGeneId, $lifeGeneId);
+        $neuron['attack_debug'] = $didAttack ? 'ok' : 'attack_not_applied';
     }
 
     private function handleUnknownNeuron(array $neuron): void
@@ -696,15 +747,298 @@ class TestBrainCommand extends Command
         }
 
         ObjectCache::flush($sessionId);
+        $this->queueDrawCommands($player, $sessionId, $drawCommands);
+    }
 
-        $requestId = Str::random(20);
-        DrawRequest::query()->create([
-            'session_id' => $sessionId,
-            'request_id' => $requestId,
-            'player_id' => (int) $player->id,
-            'items' => json_encode($drawCommands),
-        ]);
-        event(new DrawInterfaceEvent($player, $requestId));
+    private function performAttackForElement(
+        int $playerId,
+        ElementHasPosition $attackerElementPosition,
+        array $targetTile,
+        int $attackGeneId,
+        int $lifeGeneId
+    ): bool {
+        $player = Player::query()->find($playerId);
+        if ($player === null || empty($player->actual_session_id)) {
+            return false;
+        }
+
+        $targetEntity = Entity::query()
+            ->where('state', Entity::STATE_LIFE)
+            ->where('tile_i', (int) $targetTile['i'])
+            ->where('tile_j', (int) $targetTile['j'])
+            ->first();
+
+        $attackInfo = ElementHasPositionInformation::query()
+            ->where('element_has_position_id', $attackerElementPosition->id)
+            ->where('gene_id', $attackGeneId)
+            ->first();
+        $damage = (int) ($attackInfo->value ?? 0);
+        if ($damage <= 0) {
+            return false;
+        }
+
+        $sessionId = (string) $player->actual_session_id;
+        $drawCommands = [];
+        ObjectCache::buffer($sessionId);
+
+        $lifeGene = Gene::query()->find($lifeGeneId);
+        $newLife = null;
+        $targetType = null;
+        $targetUid = null;
+        $targetEntityId = null;
+        $targetElementPosition = null;
+
+        if ($targetEntity !== null) {
+            $lifeGenome = Genome::query()
+                ->where('entity_id', $targetEntity->id)
+                ->where('gene_id', $lifeGeneId)
+                ->first();
+            if ($lifeGenome === null) {
+                ObjectCache::flush($sessionId);
+                return false;
+            }
+
+            $targetLifeInfo = EntityInformation::query()
+                ->where('genome_id', $lifeGenome->id)
+                ->first();
+            if ($targetLifeInfo === null) {
+                ObjectCache::flush($sessionId);
+                return false;
+            }
+
+            $targetLifeInfo->update(['value' => ((int) $targetLifeInfo->value) - $damage]);
+            $newLife = (int) $targetLifeInfo->value;
+            $targetType = 'entity';
+            $targetUid = (string) $targetEntity->uid;
+            $targetEntityId = (int) $targetEntity->id;
+        } else {
+            $targetElementPosition = ElementHasPosition::query()
+                ->where('tile_i', (int) $targetTile['i'])
+                ->where('tile_j', (int) $targetTile['j'])
+                ->where('id', '!=', (int) $attackerElementPosition->id)
+                ->first();
+            if ($targetElementPosition === null) {
+                ObjectCache::flush($sessionId);
+                return false;
+            }
+
+            $targetLifeInfo = ElementHasPositionInformation::query()
+                ->where('element_has_position_id', $targetElementPosition->id)
+                ->where('gene_id', $lifeGeneId)
+                ->first();
+            if ($targetLifeInfo === null) {
+                ObjectCache::flush($sessionId);
+                return false;
+            }
+
+            $targetLifeInfo->update(['value' => ((int) $targetLifeInfo->value) - $damage]);
+            $newLife = (int) $targetLifeInfo->value;
+            $targetType = 'element';
+            $targetUid = (string) $targetElementPosition->uid;
+        }
+
+        if ($lifeGene !== null && $targetUid !== null) {
+            $progressBarUid = $targetType === 'entity'
+                ? ($targetUid . '_progress_bar_' . $lifeGene->key)
+                : ('gene_progress_' . $lifeGene->key . '_element_' . $targetUid);
+            $isPanelRenderable = $this->isTargetPanelRenderable($sessionId, $targetUid);
+            try {
+                $progressBar = new ProgressBarDraw($progressBarUid);
+                $operations = $progressBar->updateValue($newLife, $sessionId);
+                foreach ($operations as $operation) {
+                    if (($operation['type'] ?? null) === 'update') {
+                        if ($isPanelRenderable === false) {
+                            if (!isset($operation['attributes']) || !is_array($operation['attributes'])) {
+                                $operation['attributes'] = [];
+                            }
+                            $operation['attributes']['renderable'] = false;
+                        }
+                        $updateObject = new ObjectUpdate($operation['uid'], $sessionId);
+                        foreach (($operation['attributes'] ?? []) as $attribute => $value) {
+                            $updateObject->setAttributes($attribute, $value);
+                        }
+                        foreach ($updateObject->get() as $data) {
+                            $drawCommands[] = $data;
+                        }
+                        continue;
+                    }
+
+                    if (($operation['type'] ?? null) === 'draw') {
+                        if ($isPanelRenderable === false) {
+                            continue;
+                        }
+                        $drawCommands[] = $this->drawMapGroupObject($operation['object'], $sessionId);
+                        continue;
+                    }
+
+                    if (($operation['type'] ?? null) === 'clear') {
+                        $clearObject = new ObjectClear($operation['uid'], $sessionId);
+                        $drawCommands[] = $clearObject->get();
+                        ObjectCache::forget($sessionId, $operation['uid']);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('ProgressBar update failed in handleAttackNeuron', ['error' => $e->getMessage()]);
+            }
+        }
+
+        if ($newLife !== null && $newLife <= 0) {
+            if ($targetType === 'entity' && $targetEntity !== null) {
+                $targetEntity->update(['state' => Entity::STATE_DEATH]);
+                $idsToClear = [
+                    $targetUid,
+                    $targetUid . '_panel',
+                    $targetUid . '_text_row_1',
+                    $targetUid . '_text_row_2',
+                    $targetUid . '_btn_division',
+                    $targetUid . '_btn_division_rect',
+                    $targetUid . '_btn_division_text',
+                ];
+
+                foreach ($idsToClear as $idToClear) {
+                    $clearObject = new ObjectClear($idToClear, $sessionId);
+                    $drawCommands[] = $clearObject->get();
+                    ObjectCache::forget($sessionId, $idToClear);
+                }
+
+                if ($targetEntityId !== null) {
+                    $this->stopContainerByParent(Container::PARENT_TYPE_ENTITY, $targetEntityId);
+                }
+            }
+
+            if ($targetType === 'element' && $targetElementPosition !== null) {
+                $idsToClear = [
+                    $targetUid,
+                    $targetUid . '_panel',
+                    $targetUid . '_text_name',
+                    $targetUid . '_btn_attack',
+                    $targetUid . '_btn_attack_rect',
+                    $targetUid . '_btn_attack_text',
+                    $targetUid . '_btn_consume',
+                    $targetUid . '_btn_consume_rect',
+                    $targetUid . '_btn_consume_text',
+                ];
+                foreach ($idsToClear as $idToClear) {
+                    $clearObject = new ObjectClear($idToClear, $sessionId);
+                    $drawCommands[] = $clearObject->get();
+                    ObjectCache::forget($sessionId, $idToClear);
+                }
+
+                // Explicit stop requested for element death.
+                $this->stopContainerByParent(Container::PARENT_TYPE_ELEMENT_HAS_POSITION, (int) $targetElementPosition->id);
+                $targetElementPosition->delete();
+            }
+        }
+
+        ObjectCache::flush($sessionId);
+        $this->queueDrawCommands($player, $sessionId, $drawCommands);
+        return true;
+    }
+
+    private function isTargetPanelRenderable(string $sessionId, string $targetUid): bool
+    {
+        $panel = ObjectCache::find($sessionId, $targetUid . '_panel');
+        if (!is_array($panel)) {
+            return true;
+        }
+
+        $attributes = $panel['attributes'] ?? null;
+        if (!is_array($attributes)) {
+            return true;
+        }
+
+        return (bool) ($attributes['renderable'] ?? true);
+    }
+
+    private function resolveDetectionResultFromChain(array $neuron): ?string
+    {
+        $current = $neuron;
+        for ($depth = 0; $depth < 20; $depth++) {
+            $detectionResult = $current['detection_result'] ?? null;
+            if (is_string($detectionResult) && trim($detectionResult) !== '') {
+                return $detectionResult;
+            }
+
+            $from = $current['neuron_from'] ?? null;
+            if (!is_array($from) || !isset($from['id'])) {
+                return null;
+            }
+            $fromId = (int) $from['id'];
+            if ($fromId <= 0 || !isset($this->processedNeuronsById[$fromId])) {
+                return null;
+            }
+
+            $current = $this->processedNeuronsById[$fromId];
+        }
+
+        return null;
+    }
+
+    private function stopContainerByParent(string $parentType, int $parentId): void
+    {
+        $container = Container::query()
+            ->where('parent_type', $parentType)
+            ->where('parent_id', $parentId)
+            ->orderByDesc('id')
+            ->first();
+        if ($container === null) {
+            return;
+        }
+
+        try {
+            putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+            $docker = Docker::create();
+            $docker->containerStop($container->container_id);
+        } catch (\Throwable $e) {
+            Log::warning('Unable to stop container for dead target', [
+                'parent_type' => $parentType,
+                'parent_id' => $parentId,
+                'container_id' => $container->container_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function queueDrawCommands(Player $player, string $sessionId, array $drawCommands): void
+    {
+        if (empty($drawCommands)) {
+            return;
+        }
+
+        if (!isset($this->queuedDrawBySession[$sessionId])) {
+            $this->queuedDrawBySession[$sessionId] = [
+                'player' => $player,
+                'player_id' => (int) $player->id,
+                'items' => [],
+            ];
+        }
+
+        foreach ($drawCommands as $drawCommand) {
+            $this->queuedDrawBySession[$sessionId]['items'][] = $drawCommand;
+        }
+    }
+
+    private function dispatchQueuedDrawRequests(): void
+    {
+        foreach ($this->queuedDrawBySession as $sessionId => $payload) {
+            $items = $payload['items'] ?? [];
+            if (empty($items)) {
+                continue;
+            }
+
+            $requestId = Str::random(20);
+            DrawRequest::query()->create([
+                'session_id' => (string) $sessionId,
+                'request_id' => $requestId,
+                'player_id' => (int) ($payload['player_id'] ?? 0),
+                'items' => json_encode($items),
+            ]);
+
+            $player = $payload['player'] ?? null;
+            if ($player instanceof Player) {
+                event(new DrawInterfaceEvent($player, $requestId));
+            }
+        }
     }
 
     private function drawMapGroupObject($objectOrArray, string $sessionId): array
