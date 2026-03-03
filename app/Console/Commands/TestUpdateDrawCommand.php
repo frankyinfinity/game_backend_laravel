@@ -79,6 +79,12 @@ class TestUpdateDrawCommand extends Command
                 $drawItems[] = $objectClear->get();
             } elseif ($type === 'draw') {
                 $drawItems[] = $operation['object'];
+            } elseif ($type === 'code') {
+                $drawItems[] = [
+                    'type' => 'code',
+                    'code' => $operation['code'] ?? '',
+                    'sleep' => $operation['sleep'] ?? 0,
+                ];
             }
         }
 

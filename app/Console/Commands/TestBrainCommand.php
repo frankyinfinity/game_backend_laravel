@@ -19,6 +19,7 @@ use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Draw\Support\ScrollGroup;
@@ -66,6 +67,7 @@ class TestBrainCommand extends Command
         }
         unset($orderedNeuron);
 
+        $this->queueCodeAtEndOfQueuedDraws($this->getEndOfTestBrainCode());
         $this->dispatchQueuedDrawRequests();
 
         $this->line(json_encode($orderedFlow, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -1171,6 +1173,33 @@ class TestBrainCommand extends Command
                 event(new DrawInterfaceEvent($player, $requestId));
             }
         }
+    }
+
+    private function queueCodeAtEndOfQueuedDraws(string $code): void
+    {
+        if (trim($code) === '') {
+            return;
+        }
+
+        foreach ($this->queuedDrawBySession as &$payload) {
+            $payload['items'][] = (new ObjectCode($code))->get();
+        }
+        unset($payload);
+    }
+
+    private function getEndOfTestBrainCode(): string
+    {
+        $jsPath = resource_path('js/function/test_brain/on_end_test_brain.blade.php');
+        if (!is_file($jsPath)) {
+            return '';
+        }
+
+        $jsContent = file_get_contents($jsPath);
+        if ($jsContent === false) {
+            return '';
+        }
+
+        return Helper::setCommonJsCode($jsContent, Str::random(20));
     }
 
     private function drawMapGroupObject($objectOrArray, string $sessionId): array

@@ -8,6 +8,7 @@ use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Helper\Helper;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
@@ -146,6 +147,9 @@ class TestDrawCommand extends Command
             $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
+
+        // Backend-triggered JS code execution (processed as the last item)
+        $drawItems[] = (new ObjectCode("console.log('Hello World');"))->get();
 
         // Flush to cache
         ObjectCache::flush($sessionId);

@@ -27,6 +27,7 @@ class Helper
     const DRAW_REQUEST_TYPE_DRAW = 'draw';
     const DRAW_REQUEST_TYPE_UPDATE = 'update';
     const DRAW_REQUEST_TYPE_CLEAR = 'clear';
+    const DRAW_REQUEST_TYPE_CODE = 'code';
 
     public static function setCommonJsCode($code, $name): array|string
     {

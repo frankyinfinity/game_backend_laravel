@@ -216,6 +216,15 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        function runBackendCode(code) {
+            if (typeof code !== 'string' || code.trim() === '') return;
+            try {
+                (new Function('app', 'shapes', 'objects', 'AppData', code))(app, shapes, objects, AppData);
+            } catch (error) {
+                console.error('Error executing backend code item:', error);
+            }
+        }
+
         function toPixiColor(value, fallback = 0xFFFFFF) {
             if (value === null || value === undefined) return fallback;
             if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -818,6 +827,9 @@
                                 delete shapes[item.uid];
                                 delete objects[item.uid];
                             }
+                        } else if (itemType === 'code') {
+                            if (item.sleep) await sleep(item.sleep);
+                            runBackendCode(item.code);
                         }
                     }
                     refreshAllModalViewportMasks();
