@@ -13,7 +13,9 @@ use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectCache;
+use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
+use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Draw\Support\ScrollGroup;
 use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
@@ -176,7 +178,7 @@ class TestBrainCommand extends Command
             'j' => (int) $elementHasPosition->tile_j,
         ];
 
-        $this->drawPathForPlayer(self::DRAW_PLAYER_ID, $from, $to);
+        $this->drawPathForPlayer(self::DRAW_PLAYER_ID, $from, $to, $elementHasPosition);
     }
 
     private function handleUnknownNeuron(array $neuron): void
@@ -572,7 +574,7 @@ class TestBrainCommand extends Command
         ];
     }
 
-    private function drawPathForPlayer(int $playerId, array $from, array $to): void
+    private function drawPathForPlayer(int $playerId, array $from, array $to, ElementHasPosition $elementHasPosition): void
     {
         $player = Player::query()->with('birthRegion')->find($playerId);
         if ($player === null || $player->birthRegion === null || empty($player->actual_session_id)) {
@@ -598,12 +600,20 @@ class TestBrainCommand extends Command
         }
 
         $sessionId = (string) $player->actual_session_id;
+        $elementUid = (string) $elementHasPosition->uid;
+        $updateCommands = [];
+        $idsToClear = [];
         $drawCommands = [];
         ObjectCache::buffer($sessionId);
 
         foreach ($pathFinding as $key => $path) {
             $pathNodeI = (int) $path[0];
             $pathNodeJ = (int) $path[1];
+            $elementHasPosition->update([
+                'tile_i' => $pathNodeI,
+                'tile_j' => $pathNodeJ,
+            ]);
+
             $tileSize = Helper::TILE_SIZE;
 
             $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
@@ -616,7 +626,9 @@ class TestBrainCommand extends Command
             $xStart = $startCenterSquare['x'];
             $yStart = $startCenterSquare['y'];
 
-            $circle = new Circle('brain_path_circle_' . Str::random(20));
+            $circleName = 'brain_path_circle_' . Str::random(20);
+            $idsToClear[] = $circleName;
+            $circle = new Circle($circleName);
             $circle->setOrigin($xStart, $yStart);
             $circle->setRadius($tileSize / 6);
             $circle->setColor('#FF0000');
@@ -638,12 +650,49 @@ class TestBrainCommand extends Command
             $xEnd = $endCenterSquare['x'];
             $yEnd = $endCenterSquare['y'];
 
-            $linePath = new MultiLine('brain_path_line_' . Str::random(20));
+            $lineName = 'brain_path_line_' . Str::random(20);
+            $idsToClear[] = $lineName;
+            $linePath = new MultiLine($lineName);
             $linePath->setPoint($xStart, $yStart);
             $linePath->setPoint($xEnd, $yEnd);
             $linePath->setColor('#FF0000');
             $linePath->setThickness(2);
             $drawCommands[] = $this->drawMapGroupObject($linePath, $sessionId);
+
+            $updateObject = new ObjectUpdate($elementUid, $sessionId, 250);
+            // ElementDraw uses tile top-left origin, not tile center.
+            $updateObject->setAttributes('x', $endX);
+            $updateObject->setAttributes('y', $endY);
+            $updateObject->setAttributes('zIndex', 100);
+            foreach ($updateObject->get() as $data) {
+                $updateCommands[] = $data;
+            }
+
+            $panelX = $endX + ($tileSize / 2);
+            $panelY = $endY + ($tileSize / 2);
+            $updateObject = new ObjectUpdate($elementUid . '_panel', $sessionId);
+            $updateObject->setAttributes('x', $panelX);
+            $updateObject->setAttributes('y', $panelY);
+            $updateObject->setAttributes('zIndex', 100);
+            foreach ($updateObject->get() as $data) {
+                $updateCommands[] = $data;
+            }
+
+            $updateObject = new ObjectUpdate($elementUid . '_text_name', $sessionId);
+            $updateObject->setAttributes('x', $panelX + 10);
+            $updateObject->setAttributes('y', $panelY + 10);
+            foreach ($updateObject->get() as $data) {
+                $updateCommands[] = $data;
+            }
+        }
+
+        foreach ($updateCommands as $update) {
+            $drawCommands[] = $update;
+        }
+        foreach ($idsToClear as $idToClear) {
+            $clearObject = new ObjectClear($idToClear, $sessionId);
+            $drawCommands[] = $clearObject->get();
+            ObjectCache::forget($sessionId, $idToClear);
         }
 
         ObjectCache::flush($sessionId);
