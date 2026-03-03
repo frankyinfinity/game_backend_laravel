@@ -34,4 +34,9 @@ class ElementHasPosition extends Model
     {
         return $this->hasOne(ElementHasPositionBrain::class);
     }
+
+    public function brainSchedules()
+    {
+        return $this->hasMany(BrainSchedule::class);
+    }
 }

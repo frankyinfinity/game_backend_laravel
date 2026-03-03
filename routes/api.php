@@ -37,5 +37,6 @@ Route::group(['prefix' => 'auth'], function (){
     Route::post('/game/objective/start', [App\Http\Controllers\Api\GameController::class, 'startObjective'])->name('game.objective.start');
     Route::post('/game/objective/check', [App\Http\Controllers\Api\GameController::class, 'checkObjective'])->name('game.objective.check');
     Route::post('/game/brain', [App\Http\Controllers\Api\GameController::class, 'brain'])->name('game.brain');
+    Route::post('/game/brain_schedule/finish', [App\Http\Controllers\Api\GameController::class, 'finishBrainSchedule'])->name('game.brain_schedule.finish');
 
 });

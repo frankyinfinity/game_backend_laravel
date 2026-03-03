@@ -38,6 +38,7 @@ use App\Models\PhasePlayer;
 use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Models\PlayerValue;
+use App\Models\BrainSchedule;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -2167,6 +2168,39 @@ class GameController extends Controller
             'success' => true,
         ]); 
 
+    }
+
+    public function finishBrainSchedule(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'element_has_position_id' => ['required', 'integer'],
+        ]);
+
+        $elementHasPositionId = (int) $validated['element_has_position_id'];
+
+        $brainSchedule = BrainSchedule::query()
+            ->where('element_has_position_id', $elementHasPositionId)
+            ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($brainSchedule === null) {
+            return response()->json([
+                'success' => true,
+                'updated' => false,
+                'message' => 'BrainSchedule non trovato',
+            ]);
+        }
+
+        $brainSchedule->update([
+            'state' => BrainSchedule::STATE_FINISH,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'updated' => true,
+            'brain_schedule_id' => (int) $brainSchedule->id,
+        ]);
     }
 
     /**

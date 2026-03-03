@@ -70,6 +70,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
         const BACK_URL = '{{ url('/') }}';
+        window.BACK_URL = BACK_URL;
         const config = {
             SOCKETIO_URL: '{{ config('broadcasting.connections.socketio.url') }}'
         };
