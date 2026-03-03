@@ -5,13 +5,26 @@ namespace App\Console\Commands;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\Container;
+use App\Models\DrawRequest;
 use App\Models\Entity;
 use App\Models\Neuron;
+use App\Models\Player;
+use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\MultiLine;
+use App\Custom\Draw\Primitive\Square;
+use App\Custom\Manipulation\ObjectCache;
+use App\Custom\Manipulation\ObjectDraw;
+use App\Custom\Draw\Support\ScrollGroup;
+use App\Events\DrawInterfaceEvent;
+use App\Helper\Helper;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TestBrainCommand extends Command
 {
+    private const DRAW_PLAYER_ID = 76;
+
     private array $processedNeuronsById = [];
 
     protected $signature = 'test:brain {element_has_position_id=7753} {--ws_host=127.0.0.1 : Host websocket mappa}';
@@ -153,24 +166,17 @@ class TestBrainCommand extends Command
             return;
         }
 
-        // Placeholder: path logic will use $fromDetectionResult.
-        Log::info('path');
+        $to = $this->parseCoordinateString((string) $fromDetectionResult);
+        if ($to === null) {
+            return;
+        }
 
-        $fromI = $elementHasPosition->tile_i;
-        $fromJ = $elementHasPosition->tile_j;
+        $from = [
+            'i' => (int) $elementHasPosition->tile_i,
+            'j' => (int) $elementHasPosition->tile_j,
+        ];
 
-        $strCoordinate = str_replace('(', '', $fromDetectionResult);
-        $strCoordinate = str_replace(')', '', $strCoordinate);
-        $coordinates = explode(',', $strCoordinate);
-        $toI = $coordinates[0];
-        $toJ = $coordinates[1];
-
-        Log::info($fromI);
-        Log::info($fromJ);
-        Log::info('---');
-        Log::info($toI);
-        Log::info($toJ);
-
+        $this->drawPathForPlayer(self::DRAW_PLAYER_ID, $from, $to);
     }
 
     private function handleUnknownNeuron(array $neuron): void
@@ -552,5 +558,112 @@ class TestBrainCommand extends Command
             $data .= $chunk;
         }
         return $data;
+    }
+
+    private function parseCoordinateString(string $value): ?array
+    {
+        if (!preg_match('/^\(\s*(\d+)\s*,\s*(\d+)\s*\)$/', trim($value), $matches)) {
+            return null;
+        }
+
+        return [
+            'i' => (int) $matches[1],
+            'j' => (int) $matches[2],
+        ];
+    }
+
+    private function drawPathForPlayer(int $playerId, array $from, array $to): void
+    {
+        $player = Player::query()->with('birthRegion')->find($playerId);
+        if ($player === null || $player->birthRegion === null || empty($player->actual_session_id)) {
+            return;
+        }
+
+        $tiles = Helper::getBirthRegionTiles($player->birthRegion);
+        $mapSolidTiles = Helper::getMapSolidTiles($tiles, $player->birthRegion);
+        $mapSolidTiles[(int) $from['i']][(int) $from['j']] = 'A';
+        $mapSolidTiles[(int) $to['i']][(int) $to['j']] = 'B';
+
+        $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
+        if (!is_array($pathFinding) || empty($pathFinding)) {
+            return;
+        }
+
+        // Stop one tile before the detection target.
+        if (count($pathFinding) > 1) {
+            array_pop($pathFinding);
+        }
+        if (empty($pathFinding)) {
+            return;
+        }
+
+        $sessionId = (string) $player->actual_session_id;
+        $drawCommands = [];
+        ObjectCache::buffer($sessionId);
+
+        foreach ($pathFinding as $key => $path) {
+            $pathNodeI = (int) $path[0];
+            $pathNodeJ = (int) $path[1];
+            $tileSize = Helper::TILE_SIZE;
+
+            $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
+            $originY = ($tileSize * $pathNodeI) + Helper::MAP_START_Y;
+
+            $startSquare = new Square();
+            $startSquare->setOrigin($originX, $originY);
+            $startSquare->setSize($tileSize);
+            $startCenterSquare = $startSquare->getCenter();
+            $xStart = $startCenterSquare['x'];
+            $yStart = $startCenterSquare['y'];
+
+            $circle = new Circle('brain_path_circle_' . Str::random(20));
+            $circle->setOrigin($xStart, $yStart);
+            $circle->setRadius($tileSize / 6);
+            $circle->setColor('#FF0000');
+            $drawCommands[] = $this->drawMapGroupObject($circle, $sessionId);
+
+            if ((count($pathFinding) - 1) === $key) {
+                continue;
+            }
+
+            $nextPathNodeI = (int) $pathFinding[$key + 1][0];
+            $nextPathNodeJ = (int) $pathFinding[$key + 1][1];
+            $endX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
+            $endY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
+
+            $endSquare = new Square();
+            $endSquare->setSize($tileSize);
+            $endSquare->setOrigin($endX, $endY);
+            $endCenterSquare = $endSquare->getCenter();
+            $xEnd = $endCenterSquare['x'];
+            $yEnd = $endCenterSquare['y'];
+
+            $linePath = new MultiLine('brain_path_line_' . Str::random(20));
+            $linePath->setPoint($xStart, $yStart);
+            $linePath->setPoint($xEnd, $yEnd);
+            $linePath->setColor('#FF0000');
+            $linePath->setThickness(2);
+            $drawCommands[] = $this->drawMapGroupObject($linePath, $sessionId);
+        }
+
+        ObjectCache::flush($sessionId);
+
+        $requestId = Str::random(20);
+        DrawRequest::query()->create([
+            'session_id' => $sessionId,
+            'request_id' => $requestId,
+            'player_id' => (int) $player->id,
+            'items' => json_encode($drawCommands),
+        ]);
+        event(new DrawInterfaceEvent($player, $requestId));
+    }
+
+    private function drawMapGroupObject($objectOrArray, string $sessionId): array
+    {
+        $objectArray = is_array($objectOrArray) ? $objectOrArray : $objectOrArray->buildJson();
+        $objectArray = ScrollGroup::attach($objectArray, Helper::MAP_SCROLL_GROUP_MAIN);
+
+        $drawObject = new ObjectDraw($objectArray, $sessionId);
+        return $drawObject->get();
     }
 }
