@@ -10,6 +10,7 @@ use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Image;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
@@ -60,6 +61,7 @@ use App\Custom\Draw\Complex\Table\TableCellDraw;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
@@ -768,6 +770,7 @@ class GameController extends Controller
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
 
         $player_id = $entity->specie->player_id;
+        $resetToken = $this->issuePlayerValuesResetToken($player_id);
         PlayerValue::setFlag($player_id, PlayerValue::KEY_MOVEMENT, true);
 
         $currentTileI = $entity->tile_i;
@@ -921,6 +924,7 @@ class GameController extends Controller
             $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
             $drawCommands[] = $clearObject->get();
         }
+        $drawCommands[] = (new ObjectCode($this->buildPlayerValuesResetCode($player_id, $resetToken), 1000))->get();
         ObjectCache::flush($player->actual_session_id);
 
         $request_id = Str::random(20);
@@ -940,6 +944,12 @@ class GameController extends Controller
         $playerId = (int) $request->input('player_id');
         if ($playerId <= 0) {
             return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
+        }
+
+        $token = (string) $request->input('reset_token', '');
+        $expectedToken = (string) Cache::get($this->getPlayerValuesResetTokenCacheKey($playerId), '');
+        if ($token === '' || $expectedToken === '' || !hash_equals($expectedToken, $token)) {
+            return response()->json(['success' => true, 'skipped' => true]);
         }
 
         PlayerValue::setFlag($playerId, PlayerValue::KEY_MOVEMENT, false);
@@ -990,6 +1000,7 @@ class GameController extends Controller
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
+        $resetToken = $this->issuePlayerValuesResetToken($player_id);
         PlayerValue::setFlag($player_id, PlayerValue::KEY_CONSUME, true);
 
         $currentTileI = $entity->tile_i;
@@ -1183,6 +1194,7 @@ class GameController extends Controller
             $drawCommands[] = $clearObject->get();
             ObjectCache::forget($player->actual_session_id, $idToClear);
         }
+        $drawCommands[] = (new ObjectCode($this->buildPlayerValuesResetCode($player_id, $resetToken), 1000))->get();
         
         ObjectCache::flush($player->actual_session_id);
 
@@ -1400,6 +1412,7 @@ class GameController extends Controller
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
+        $resetToken = $this->issuePlayerValuesResetToken($player_id);
         PlayerValue::setFlag($player_id, PlayerValue::KEY_ATTACK, true);
 
         // Store original position
@@ -1808,6 +1821,7 @@ class GameController extends Controller
             $drawCommands[] = $clearObject->get();
             ObjectCache::forget($player->actual_session_id, $idToClear);
         }
+        $drawCommands[] = (new ObjectCode($this->buildPlayerValuesResetCode($player_id, $resetToken), 1000))->get();
 
         ObjectCache::flush($player->actual_session_id);
 
@@ -2180,7 +2194,7 @@ class GameController extends Controller
         ]);
         $elementHasPositionId = $request->element_has_position_id;
 
-        $alreadyCreate = BrainSchedule::query()
+        /*$alreadyCreate = BrainSchedule::query()
             ->where('element_has_position_id', $elementHasPositionId)
             ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
             ->exists();
@@ -2190,7 +2204,7 @@ class GameController extends Controller
                 'element_has_position_id' => $elementHasPositionId,
                 'state' => BrainSchedule::STATE_CREATE,
             ]);
-        }
+        }*/
 
         return response()->json([
             'success' => true,
@@ -2369,6 +2383,34 @@ class GameController extends Controller
         }
 
         return array_values(array_unique($uids));
+    }
+
+    private function buildPlayerValuesResetCode(int $playerId, string $resetToken): string
+    {
+        $safePlayerId = max(0, $playerId);
+        $jsPath = resource_path('js/function/player_values/reset.blade.php');
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__PLAYER_ID__', (string) $safePlayerId, $jsContent);
+                $jsContent = str_replace('__RESET_TOKEN__', addslashes($resetToken), $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return '$.ajax({url: window.BACK_URL + \'/api/auth/game/player_values/reset\', type: \'POST\', data: { player_id: ' . $safePlayerId . ', reset_token: \'' . addslashes($resetToken) . '\' }});';
+    }
+
+    private function issuePlayerValuesResetToken(int $playerId): string
+    {
+        $token = Str::random(48);
+        Cache::put($this->getPlayerValuesResetTokenCacheKey($playerId), $token, now()->addHours(6));
+        return $token;
+    }
+
+    private function getPlayerValuesResetTokenCacheKey(int $playerId): string
+    {
+        return 'player_values_reset_token_' . $playerId;
     }
 
     private function drawMapGroupObject($objectOrArray, string $sessionId): array

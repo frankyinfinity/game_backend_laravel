@@ -214,4 +214,3 @@ function handleWebSocketCommand(data, ws) {
 }
 
 performLogin();
-

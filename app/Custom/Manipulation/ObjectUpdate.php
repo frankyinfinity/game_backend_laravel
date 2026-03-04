@@ -48,11 +48,19 @@ class ObjectUpdate
         ];
 
         if(array_key_exists('x', $attributes) || array_key_exists('y', $attributes)) {
-            
-            $x = $attributes['x'];
-            $y = $attributes['y'];
+
+            $parentCached = ObjectCache::find($this->sessionId, $uid);
+            $x = array_key_exists('x', $attributes)
+                ? $attributes['x']
+                : ($parentCached['x'] ?? null);
+            $y = array_key_exists('y', $attributes)
+                ? $attributes['y']
+                : ($parentCached['y'] ?? null);
+            if ($x === null || $y === null) {
+                return $items;
+            }
          
-            $dataDraw = ObjectCache::find($this->sessionId, $uid);
+            $dataDraw = $parentCached;
 
             if($dataDraw !== null) {
                 $drawChildren = $dataDraw['children'] ?? [];
@@ -78,6 +86,12 @@ class ObjectUpdate
                                 ],
                                 'sleep' => $this->sleep
                             ];
+
+                            // Keep cache in sync with emitted child move updates.
+                            ObjectCache::update($this->sessionId, $uidChild, [
+                                'x' => $newX,
+                                'y' => $newY
+                            ]);
 
                         }
                     }
