@@ -97,8 +97,9 @@ class PlayerValue extends Model
             return false;
         }
 
+        // Ensure rows exist without overwriting current values.
         foreach ($keys as $key) {
-            self::query()->updateOrCreate(
+            self::query()->firstOrCreate(
                 ['player_id' => $playerId, 'key' => $key],
                 [
                     'data_type' => self::TYPE_BOOLEAN,

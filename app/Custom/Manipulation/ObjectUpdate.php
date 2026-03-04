@@ -33,11 +33,11 @@ class ObjectUpdate
 
     public function get(): array
     {
-        
-        $this->write();
-
         $uid = $this->uid;
         $attributes = $this->attributes;
+        $parentBefore = ObjectCache::find($this->sessionId, $uid);
+
+        $this->write();
 
         $items = [];
         $items[] = [
@@ -48,59 +48,73 @@ class ObjectUpdate
         ];
 
         if(array_key_exists('x', $attributes) || array_key_exists('y', $attributes)) {
+            $xBefore = is_array($parentBefore) ? ($parentBefore['x'] ?? null) : null;
+            $yBefore = is_array($parentBefore) ? ($parentBefore['y'] ?? null) : null;
 
-            $parentCached = ObjectCache::find($this->sessionId, $uid);
-            $x = array_key_exists('x', $attributes)
-                ? $attributes['x']
-                : ($parentCached['x'] ?? null);
-            $y = array_key_exists('y', $attributes)
-                ? $attributes['y']
-                : ($parentCached['y'] ?? null);
-            if ($x === null || $y === null) {
+            $xAfter = array_key_exists('x', $attributes) ? $attributes['x'] : $xBefore;
+            $yAfter = array_key_exists('y', $attributes) ? $attributes['y'] : $yBefore;
+
+            if ($xAfter === null || $yAfter === null) {
                 return $items;
             }
-         
-            $dataDraw = $parentCached;
 
-            if($dataDraw !== null) {
-                $drawChildren = $dataDraw['children'] ?? [];
-                if(is_array($drawChildren) && count($drawChildren) > 0) {
-                    foreach($drawChildren as $uidChild) {
-                        
-                        $dataChild = ObjectCache::find($this->sessionId, $uidChild);
-                        
-                        if($dataChild !== null) {
-
-                            $relativeX = $dataChild['relative_x'];
-                            $relativeY = $dataChild['relative_y'];
-
-                            $newX = $x + $relativeX;
-                            $newY = $y + $relativeY;
-                            
-                            $items[] = [
-                                'type' => Helper::DRAW_REQUEST_TYPE_UPDATE,
-                                'uid' => $uidChild,
-                                'attributes' => [
-                                    'x' => $newX,
-                                    'y' => $newY
-                                ],
-                                'sleep' => $this->sleep
-                            ];
-
-                            // Keep cache in sync with emitted child move updates.
-                            ObjectCache::update($this->sessionId, $uidChild, [
-                                'x' => $newX,
-                                'y' => $newY
-                            ]);
-
-                        }
-                    }
-                }
+            $dx = ((float) $xAfter) - ((float) ($xBefore ?? $xAfter));
+            $dy = ((float) $yAfter) - ((float) ($yBefore ?? $yAfter));
+            if ($dx === 0.0 && $dy === 0.0) {
+                return $items;
             }
+
+            $moved = [];
+            $this->appendChildrenMoveUpdates($uid, $dx, $dy, $items, $moved);
         }
 
         return $items;
 
+    }
+
+    private function appendChildrenMoveUpdates(string $parentUid, float $dx, float $dy, array &$items, array &$moved): void
+    {
+        $parent = ObjectCache::find($this->sessionId, $parentUid);
+        if (!is_array($parent)) {
+            return;
+        }
+
+        $children = $parent['children'] ?? [];
+        if (!is_array($children) || empty($children)) {
+            return;
+        }
+
+        foreach ($children as $childUid) {
+            if (!is_string($childUid) || $childUid === '' || isset($moved[$childUid])) {
+                continue;
+            }
+
+            $child = ObjectCache::find($this->sessionId, $childUid);
+            if (!is_array($child)) {
+                continue;
+            }
+
+            $newAttributes = [];
+            if (isset($child['x']) && is_numeric($child['x'])) {
+                $newAttributes['x'] = ((float) $child['x']) + $dx;
+            }
+            if (isset($child['y']) && is_numeric($child['y'])) {
+                $newAttributes['y'] = ((float) $child['y']) + $dy;
+            }
+
+            if (!empty($newAttributes)) {
+                $items[] = [
+                    'type' => Helper::DRAW_REQUEST_TYPE_UPDATE,
+                    'uid' => $childUid,
+                    'attributes' => $newAttributes,
+                    'sleep' => $this->sleep
+                ];
+                ObjectCache::update($this->sessionId, $childUid, $newAttributes);
+                $moved[$childUid] = true;
+            }
+
+            $this->appendChildrenMoveUpdates($childUid, $dx, $dy, $items, $moved);
+        }
     }
 
 }

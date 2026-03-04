@@ -5,7 +5,7 @@
             type: 'POST',
             data: {
                 player_id: __PLAYER_ID__,
-                reset_token: '__RESET_TOKEN__'
+                reset_action: '__RESET_ACTION__'
             }
         });
     }

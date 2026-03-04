@@ -48,7 +48,6 @@ class CheckObjectiveJob implements ShouldQueue
     {
         $request = new Request($this->payload);
         $playerId = (int) $request->player_id;
-        Log::info('Check objective player: ' . $playerId);
 
         if ($playerId <= 0) {
             return;

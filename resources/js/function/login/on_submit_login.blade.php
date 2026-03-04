@@ -73,23 +73,6 @@
                         error: function (err) { status('Errore home'); console.error(err); }
                     });
 
-                    /*playerId = result.player.id;
-                    sessionId = result.session_id;
-
-                    status('Tentativo di generazione home...');
-                     $.ajax({
-                        url: `${BACK_URL}/api/game/home`,
-                        type: 'POST',
-                        data: {
-                            player_id: playerId,
-                            session_id: sessionId
-                        },
-                        success: function (result) { 
-                            console.log(result);
-                        },
-                        error: function (err) { status('Errore home'); console.error(err); }
-                    });*/
-
                 }   
             },
             error: function (err) { status('Errore login'); console.error(err); }
