@@ -36,7 +36,7 @@ class DockerContainerService
             throw new RuntimeException("Nessuna birthRegion trovata per il player {$player->id}");
         }
 
-        $this->createMapContainer($birthRegion, false);
+        $this->createMapContainer($birthRegion, $player->id, false);
         $this->createPlayerContainer($player, false);
         $this->createObjectiveContainer($player, false);
     }
@@ -113,6 +113,7 @@ class DockerContainerService
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'WS_PORT=8080',
         ]);
+        $containerConfig->setLabels($this->playerGroupingLabels($playerId, 'entity'));
         $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
 
         $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
@@ -126,7 +127,7 @@ class DockerContainerService
         ]);
     }
 
-    public function createMapContainer(BirthRegion $birthRegion, bool $start = false): Container
+    public function createMapContainer(BirthRegion $birthRegion, int $playerId, bool $start = false): Container
     {
         $docker = $this->docker();
         $imageName = 'map:latest';
@@ -143,6 +144,7 @@ class DockerContainerService
             'BIRTH_REGION_ID=' . $birthRegion->id,
             'WS_PORT=8080',
         ]);
+        $containerConfig->setLabels($this->playerGroupingLabels($playerId, 'map'));
         $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
 
         $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
@@ -173,6 +175,7 @@ class DockerContainerService
             'PLAYER_ID=' . $player->id,
             'WS_PORT=8080',
         ]);
+        $containerConfig->setLabels($this->playerGroupingLabels($player->id, 'player'));
         $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
 
         $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
@@ -201,6 +204,7 @@ class DockerContainerService
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'PLAYER_ID=' . $player->id,
         ]);
+        $containerConfig->setLabels($this->playerGroupingLabels($player->id, 'objective'));
 
         $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
 
@@ -228,6 +232,7 @@ class DockerContainerService
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'ELEMENT_HAS_POSITION_ID=' . $elementHasPosition->id,
         ]);
+        $containerConfig->setLabels($this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element'));
 
         $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
 
@@ -297,6 +302,17 @@ class DockerContainerService
             $docker->containerStart($containerId);
         }
         return $containerId;
+    }
+
+    private function playerGroupingLabels(int $playerId, string $service): array
+    {
+        $project = 'player_' . $playerId;
+
+        return [
+            'com.docker.compose.project' => $project,
+            'com.docker.compose.service' => $service,
+            'game.player.group' => $project,
+        ];
     }
 
     private function resolvePlayerContainers(Player $player)
