@@ -150,10 +150,11 @@ function callGameBrain() {
   req.end();
 }
 
+let SECOND_TIMEOUT = 20;
 function scheduleNextCycle() {
   setTimeout(() => {
     callGameBrain();
-  }, 10000);
+  }, SECOND_TIMEOUT * 1000);
 }
 
 performLogin();

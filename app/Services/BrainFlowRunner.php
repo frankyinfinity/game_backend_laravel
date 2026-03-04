@@ -886,15 +886,15 @@ class BrainFlowRunner
         if ($newLife !== null && $newLife <= 0) {
             if ($targetType === 'entity' && $targetEntity !== null) {
                 $targetEntity->update(['state' => Entity::STATE_DEATH]);
-                $idsToClear = [
-                    $targetUid,
+                $idsToClear = $this->resolveDrawUidsForObject($sessionId, (string) $targetUid, [
+                    (string) $targetUid,
                     $targetUid . '_panel',
                     $targetUid . '_text_row_1',
                     $targetUid . '_text_row_2',
-                    $targetUid . '_btn_division',
-                    $targetUid . '_btn_division_rect',
-                    $targetUid . '_btn_division_text',
-                ];
+                    $targetUid . '_button_division',
+                    $targetUid . '_button_division_rect',
+                    $targetUid . '_button_division_text',
+                ]);
 
                 foreach ($idsToClear as $idToClear) {
                     $clearObject = new ObjectClear($idToClear, $sessionId);
@@ -908,8 +908,8 @@ class BrainFlowRunner
             }
 
             if ($targetType === 'element' && $targetElementPosition !== null) {
-                $idsToClear = [
-                    $targetUid,
+                $idsToClear = $this->resolveDrawUidsForObject($sessionId, (string) $targetUid, [
+                    (string) $targetUid,
                     $targetUid . '_panel',
                     $targetUid . '_text_name',
                     $targetUid . '_btn_attack',
@@ -918,7 +918,7 @@ class BrainFlowRunner
                     $targetUid . '_btn_consume',
                     $targetUid . '_btn_consume_rect',
                     $targetUid . '_btn_consume_text',
-                ];
+                ]);
                 foreach ($idsToClear as $idToClear) {
                     $clearObject = new ObjectClear($idToClear, $sessionId);
                     $drawCommands[] = $clearObject->get();
@@ -1075,6 +1075,37 @@ class BrainFlowRunner
         }
 
         return (bool) ($attributes['renderable'] ?? true);
+    }
+
+    private function resolveDrawUidsForObject(string $sessionId, string $rootUid, array $fallbackUids = []): array
+    {
+        $uids = [];
+        $rootObject = ObjectCache::find($sessionId, $rootUid);
+        if (is_array($rootObject)) {
+            $attributes = $rootObject['attributes'] ?? null;
+            $cachedUids = is_array($attributes) ? ($attributes['uids'] ?? null) : null;
+            if (is_array($cachedUids)) {
+                foreach ($cachedUids as $uid) {
+                    if (is_string($uid) && $uid !== '') {
+                        $uids[] = $uid;
+                    }
+                }
+            }
+        }
+
+        if (empty($uids)) {
+            foreach ($fallbackUids as $uid) {
+                if (is_string($uid) && $uid !== '') {
+                    $uids[] = $uid;
+                }
+            }
+        }
+
+        if ($rootUid !== '') {
+            $uids[] = $rootUid;
+        }
+
+        return array_values(array_unique($uids));
     }
 
     private function resolveDetectionResultFromChain(array $neuron): ?string

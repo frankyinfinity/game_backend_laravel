@@ -1101,14 +1101,22 @@ class GameController extends Controller
 
         // --- END OF MOVEMENT ---
         
-        // Clear Element from UI
-        // We clear the main UID, the panel, and other potential components
-        $idsToClear[] = $elementUid;
-        $idsToClear[] = $elementUid . '_panel';
-        $idsToClear[] = $elementUid . '_text_name';
-        $idsToClear[] = $elementUid . '_btn_consume';
-        $idsToClear[] = $elementUid . '_btn_consume_rect';
-        $idsToClear[] = $elementUid . '_btn_consume_text';
+        // Clear Element from UI by using all draw UIDs attached to the root object.
+        $idsToClear = array_merge($idsToClear, $this->resolveDrawUidsForObject(
+            $player->actual_session_id,
+            $elementUid,
+            [
+                $elementUid,
+                $elementUid . '_panel',
+                $elementUid . '_text_name',
+                $elementUid . '_btn_attack',
+                $elementUid . '_btn_attack_rect',
+                $elementUid . '_btn_attack_text',
+                $elementUid . '_btn_consume',
+                $elementUid . '_btn_consume_rect',
+                $elementUid . '_btn_consume_text',
+            ]
+        ));
         
         // Actual removal from DB
         $elementId = $elementPosition->element_id;
@@ -1587,18 +1595,19 @@ class GameController extends Controller
                 $elementDied = true;
                 Log::info("Element {$elementUid} died!");
 
-                // Clear element from UI
-                $idsToClear[] = $elementUid;
-                $idsToClear[] = $elementUid . '_panel';
-                $idsToClear[] = $elementUid . '_text_name';
-                $idsToClear[] = $elementUid . '_btn_attack';
-                $idsToClear[] = $elementUid . '_btn_attack_rect';
-                $idsToClear[] = $elementUid . '_btn_attack_text';
-                $idsToClear[] = $elementUid . '_btn_consume';
-                $idsToClear[] = $elementUid . '_btn_consume_rect';
-                $idsToClear[] = $elementUid . '_btn_consume_text';
+                // Clear all gene progress bars for this element (fallback only).
+                $fallbackElementUids = [
+                    $elementUid,
+                    $elementUid . '_panel',
+                    $elementUid . '_text_name',
+                    $elementUid . '_btn_attack',
+                    $elementUid . '_btn_attack_rect',
+                    $elementUid . '_btn_attack_text',
+                    $elementUid . '_btn_consume',
+                    $elementUid . '_btn_consume_rect',
+                    $elementUid . '_btn_consume_text',
+                ];
 
-                // Clear all gene progress bars for this element
                 $elementHasPositionInformations = ElementHasPositionInformation::query()
                     ->where('element_has_position_id', $elementPosition->id)
                     ->with(['gene'])
@@ -1609,11 +1618,17 @@ class GameController extends Controller
                     $progressBarUid = 'gene_progress_' . $gene->key . '_element_' . $elementUid;
                     
                     // Clear all progress bar components
-                    $idsToClear[] = $progressBarUid . '_border';
-                    $idsToClear[] = $progressBarUid . '_bar';
-                    $idsToClear[] = $progressBarUid . '_text';
-                    $idsToClear[] = $progressBarUid . '_range';
+                    $fallbackElementUids[] = $progressBarUid . '_border';
+                    $fallbackElementUids[] = $progressBarUid . '_bar';
+                    $fallbackElementUids[] = $progressBarUid . '_text';
+                    $fallbackElementUids[] = $progressBarUid . '_range';
                 }
+
+                $idsToClear = array_merge($idsToClear, $this->resolveDrawUidsForObject(
+                    $player->actual_session_id,
+                    $elementUid,
+                    $fallbackElementUids
+                ));
 
                 // Delete from DB
                 // === AWARD SCORES FOR KILLING ELEMENT (from ElementHasPositionScore) ===
@@ -2163,6 +2178,19 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
+        $elementHasPositionId = $request->element_has_position_id;
+
+        $alreadyCreate = BrainSchedule::query()
+            ->where('element_has_position_id', $elementHasPositionId)
+            ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
+            ->exists();
+
+        if (!$alreadyCreate) {
+            BrainSchedule::query()->create([
+                'element_has_position_id' => $elementHasPositionId,
+                'state' => BrainSchedule::STATE_CREATE,
+            ]);
+        }
 
         return response()->json([
             'success' => true,
@@ -2310,6 +2338,37 @@ class GameController extends Controller
         }
 
         return null;
+    }
+
+    private function resolveDrawUidsForObject(string $sessionId, string $rootUid, array $fallbackUids = []): array
+    {
+        $uids = [];
+        $rootObject = ObjectCache::find($sessionId, $rootUid);
+        if (is_array($rootObject)) {
+            $attributes = $rootObject['attributes'] ?? null;
+            $cachedUids = is_array($attributes) ? ($attributes['uids'] ?? null) : null;
+            if (is_array($cachedUids)) {
+                foreach ($cachedUids as $uid) {
+                    if (is_string($uid) && $uid !== '') {
+                        $uids[] = $uid;
+                    }
+                }
+            }
+        }
+
+        if (empty($uids)) {
+            foreach ($fallbackUids as $uid) {
+                if (is_string($uid) && $uid !== '') {
+                    $uids[] = $uid;
+                }
+            }
+        }
+
+        if ($rootUid !== '') {
+            $uids[] = $rootUid;
+        }
+
+        return array_values(array_unique($uids));
     }
 
     private function drawMapGroupObject($objectOrArray, string $sessionId): array

@@ -294,7 +294,35 @@ class EntityDraw
         }
 
         $this->drawItems = ScrollGroup::attachMany($this->drawItems, Helper::MAP_SCROLL_GROUP_MAIN);
+        $this->attachUidCollectionAttribute((string) $dbEntity->uid);
 
+    }
+
+    private function attachUidCollectionAttribute(string $rootUid): void
+    {
+        $uids = [];
+        foreach ($this->drawItems as $drawItem) {
+            $uid = $drawItem['uid'] ?? null;
+            if (is_string($uid) && $uid !== '') {
+                $uids[] = $uid;
+            }
+        }
+        $uids = array_values(array_unique($uids));
+        if (!in_array($rootUid, $uids, true)) {
+            array_unshift($uids, $rootUid);
+        }
+
+        foreach ($this->drawItems as &$drawItem) {
+            if (($drawItem['uid'] ?? null) !== $rootUid) {
+                continue;
+            }
+            if (!isset($drawItem['attributes']) || !is_array($drawItem['attributes'])) {
+                $drawItem['attributes'] = [];
+            }
+            $drawItem['attributes']['uids'] = $uids;
+            break;
+        }
+        unset($drawItem);
     }
 
 }
