@@ -232,8 +232,32 @@ class DockerContainerService
 
     private function docker(): Docker
     {
-        putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+        putenv('DOCKER_HOST=' . $this->dockerHost());
         return Docker::create();
+    }
+
+    private function dockerHost(): string
+    {
+        return (string) (env('DOCKER_HOST') ?: 'tcp://127.0.0.1:2375');
+    }
+
+    private function dockerCliEnv(): array
+    {
+        $env = [
+            'DOCKER_HOST' => $this->dockerHost(),
+        ];
+
+        $dockerTlsVerify = env('DOCKER_TLS_VERIFY');
+        if ($dockerTlsVerify !== null && $dockerTlsVerify !== '') {
+            $env['DOCKER_TLS_VERIFY'] = (string) $dockerTlsVerify;
+        }
+
+        $dockerCertPath = env('DOCKER_CERT_PATH');
+        if ($dockerCertPath !== null && $dockerCertPath !== '') {
+            $env['DOCKER_CERT_PATH'] = (string) $dockerCertPath;
+        }
+
+        return $env;
     }
 
     private function ensureImageExists(Docker $docker, string $imageName): void
@@ -350,7 +374,7 @@ class DockerContainerService
     private function runComposeOperationForPlayer(Player $player, string $operation): bool
     {
         $project = 'player_' . $player->id;
-        $process = new Process(['docker', 'compose', '-p', $project, $operation], base_path());
+        $process = new Process(['docker', 'compose', '-p', $project, $operation], base_path(), $this->dockerCliEnv());
         $process->run();
 
         if ($process->isSuccessful()) {
@@ -380,7 +404,7 @@ class DockerContainerService
             return;
         }
 
-        $process = new Process(array_merge(['docker', $operation], $containerIds), base_path());
+        $process = new Process(array_merge(['docker', $operation], $containerIds), base_path(), $this->dockerCliEnv());
         $process->run();
 
         if (!$process->isSuccessful()) {
