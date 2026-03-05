@@ -12,6 +12,7 @@ use Docker\API\Model\HostConfig;
 use Docker\API\Model\PortBinding;
 use Docker\Docker;
 use RuntimeException;
+use InvalidArgumentException;
 use Symfony\Component\Process\Process;
 
 class DockerContainerService
@@ -44,16 +45,13 @@ class DockerContainerService
 
     public function startContainersForPlayer(Player $player): void
     {
-        if (!$this->runComposeOperationForPlayer($player, 'start')) {
-            $this->runSingleCliOperationForPlayerContainers($player, 'start');
-        }
+        $this->startContainer($player);
     }
 
     public function stopContainersForPlayer(Player $player): void
     {
-        if (!$this->runComposeOperationForPlayer($player, 'stop')) {
-            $this->runSingleCliOperationForPlayerContainers($player, 'stop');
-        }
+        // Prefer a single CLI operation for all containers of this player
+        $this->stopContainer($player);
     }
 
     public function stopElementHasPositionContainers(array $elementHasPositionIds): void
@@ -415,5 +413,113 @@ class DockerContainerService
         }
 
         \Log::info("docker {$operation} eseguito in una singola operazione per il player {$player->id}");
+    }
+
+    /**
+     * Start a container or all containers of a player using a single docker CLI operation.
+     *
+     * @param Container|Player $target
+     */
+    public function startContainer($target): void
+    {
+        if ($target instanceof Player) {
+            $containers = $this->resolvePlayerContainers($target);
+            $containerIds = $containers->pluck('container_id')->filter()->values()->all();
+
+            if (empty($containerIds)) {
+                \Log::info("Nessun container trovato per il player {$target->id} durante start");
+                return;
+            }
+
+            $process = new Process(array_merge(['docker', 'start'], $containerIds), base_path(), $this->dockerCliEnv());
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                throw new RuntimeException(
+                    "Errore durante docker start per il player {$target->id}: " .
+                    trim($process->getErrorOutput() ?: $process->getOutput())
+                );
+            }
+
+            \Log::info("docker start eseguito in una singola operazione per il player {$target->id}");
+            return;
+        }
+
+        if ($target instanceof Container) {
+            $containerId = (string) $target->container_id;
+            if ($containerId === '') {
+                \Log::warning('Container senza container_id, skip start', ['container_db_id' => $target->id]);
+                return;
+            }
+
+            $process = new Process(['docker', 'start', $containerId], base_path(), $this->dockerCliEnv());
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                throw new RuntimeException(
+                    "Errore durante docker start per il container {$containerId}: " .
+                    trim($process->getErrorOutput() ?: $process->getOutput())
+                );
+            }
+
+            \Log::info("docker start eseguito per il container {$containerId}");
+            return;
+        }
+
+        throw new InvalidArgumentException('startContainer accetta Player o Container');
+    }
+
+    /**
+     * Stop a container or all containers of a player using a single docker CLI operation.
+     *
+     * @param Container|Player $target
+     */
+    public function stopContainer($target): void
+    {
+        if ($target instanceof Player) {
+            $containers = $this->resolvePlayerContainers($target);
+            $containerIds = $containers->pluck('container_id')->filter()->values()->all();
+
+            if (empty($containerIds)) {
+                \Log::info("Nessun container trovato per il player {$target->id} durante stop");
+                return;
+            }
+
+            $process = new Process(array_merge(['docker', 'stop'], $containerIds), base_path(), $this->dockerCliEnv());
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                throw new RuntimeException(
+                    "Errore durante docker stop per il player {$target->id}: " .
+                    trim($process->getErrorOutput() ?: $process->getOutput())
+                );
+            }
+
+            \Log::info("docker stop eseguito in una singola operazione per il player {$target->id}");
+            return;
+        }
+
+        if ($target instanceof Container) {
+            $containerId = (string) $target->container_id;
+            if ($containerId === '') {
+                \Log::warning('Container senza container_id, skip stop', ['container_db_id' => $target->id]);
+                return;
+            }
+
+            $process = new Process(['docker', 'stop', $containerId], base_path(), $this->dockerCliEnv());
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                throw new RuntimeException(
+                    "Errore durante docker stop per il container {$containerId}: " .
+                    trim($process->getErrorOutput() ?: $process->getOutput())
+                );
+            }
+
+            \Log::info("docker stop eseguito per il container {$containerId}");
+            return;
+        }
+
+        throw new InvalidArgumentException('stopContainer accetta Player o Container');
     }
 }
