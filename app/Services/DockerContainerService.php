@@ -12,6 +12,7 @@ use Docker\API\Model\HostConfig;
 use Docker\API\Model\PortBinding;
 use Docker\Docker;
 use RuntimeException;
+use Symfony\Component\Process\Process;
 
 class DockerContainerService
 {
@@ -43,31 +44,15 @@ class DockerContainerService
 
     public function startContainersForPlayer(Player $player): void
     {
-        $docker = $this->docker();
-        $containers = $this->resolvePlayerContainers($player);
-
-        foreach ($containers as $containerRecord) {
-            try {
-                $docker->containerStart($containerRecord->container_id);
-                \Log::info("Container {$containerRecord->container_id} avviato per parent {$containerRecord->parent_id}");
-            } catch (\Throwable $e) {
-                \Log::error("Errore nell'avvio del container {$containerRecord->container_id}: " . $e->getMessage());
-            }
+        if (!$this->runComposeOperationForPlayer($player, 'start')) {
+            $this->runSingleCliOperationForPlayerContainers($player, 'start');
         }
     }
 
     public function stopContainersForPlayer(Player $player): void
     {
-        $docker = $this->docker();
-        $containers = $this->resolvePlayerContainers($player);
-
-        foreach ($containers as $containerRecord) {
-            try {
-                $docker->containerStop($containerRecord->container_id);
-                \Log::info("Container {$containerRecord->container_id} terminato per parent {$containerRecord->parent_id}");
-            } catch (\Throwable $e) {
-                \Log::error("Errore nella terminazione del container {$containerRecord->container_id}: " . $e->getMessage());
-            }
+        if (!$this->runComposeOperationForPlayer($player, 'stop')) {
+            $this->runSingleCliOperationForPlayerContainers($player, 'stop');
         }
     }
 
@@ -360,5 +345,51 @@ class DockerContainerService
                 }
             })
             ->get();
+    }
+
+    private function runComposeOperationForPlayer(Player $player, string $operation): bool
+    {
+        $project = 'player_' . $player->id;
+        $process = new Process(['docker', 'compose', '-p', $project, $operation], base_path());
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            \Log::info("Operazione docker compose {$operation} completata per stack {$project}");
+            return true;
+        }
+
+        \Log::warning(
+            "docker compose {$operation} fallito per stack {$project}: " .
+            trim($process->getErrorOutput() ?: $process->getOutput())
+        );
+
+        return false;
+    }
+
+    private function runSingleCliOperationForPlayerContainers(Player $player, string $operation): void
+    {
+        $containers = $this->resolvePlayerContainers($player);
+        $containerIds = $containers
+            ->pluck('container_id')
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($containerIds)) {
+            \Log::info("Nessun container trovato per il player {$player->id} durante {$operation}");
+            return;
+        }
+
+        $process = new Process(array_merge(['docker', $operation], $containerIds), base_path());
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            throw new RuntimeException(
+                "Errore durante docker {$operation} per il player {$player->id}: " .
+                trim($process->getErrorOutput() ?: $process->getOutput())
+            );
+        }
+
+        \Log::info("docker {$operation} eseguito in una singola operazione per il player {$player->id}");
     }
 }
