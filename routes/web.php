@@ -100,6 +100,7 @@ Route::group(['middleware' => ['auth']], function (){
      Route::post('/ages/{age}/phases/delete', [App\Http\Controllers\PhaseController::class, 'delete'])->name('ages.phases.delete');
      Route::get('/ages/{age}/phases/{phase}/move-up', [App\Http\Controllers\PhaseController::class, 'moveUp'])->name('ages.phases.move-up');
      Route::get('/ages/{age}/phases/{phase}/move-down', [App\Http\Controllers\PhaseController::class, 'moveDown'])->name('ages.phases.move-down');
+     Route::get('/ages/{age}/phases/{phase}/data', [App\Http\Controllers\PhaseController::class, 'getData'])->name('ages.phases.data');
 
       //Phase Columns
       Route::post('/ages/{age}/phases/{phase}/columns', [App\Http\Controllers\PhaseColumnController::class, 'store'])->name('ages.phases.columns.store');

@@ -117,4 +117,10 @@ class PhaseController extends Controller
         $phase->moveDown();
         return response()->json(['success' => true, 'message' => 'Ordinamento aggiornato con successo.']);
     }
+
+    public function getData(Age $age, Phase $phase)
+    {
+        $phase->load('phaseColumns.targets');
+        return response()->json($phase);
+    }
 }

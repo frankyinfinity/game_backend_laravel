@@ -4,50 +4,10 @@
 
 @section('content_header')
 <style>
-    .link-anchor {
-        transition: all 0.2s ease;
-        border-radius: 50%;
-    }
-    .link-anchor:hover {
-        transform: scale(1.3);
-        box-shadow: 0 0 8px rgba(0, 123, 255, 0.6);
-    }
-    .link-line {
-        transition: stroke 0.2s ease, stroke-width 0.2s ease;
-    }
-    .link-line:hover {
-        stroke: #dc3545;
-        stroke-width: 4;
-        cursor: pointer;
-    }
-    #links-canvas {
-        pointer-events: none;
-    }
-    #links-canvas line {
-        pointer-events: stroke;
-    }
-    /* Drag & Drop styles for targets */
-    .target-item {
-        transition: all 0.2s ease;
-    }
-    .target-item:active {
-        cursor: grabbing;
-    }
-    .target-item.dragging {
-        opacity: 0.5;
-        border: 2px dashed #007bff;
-        background-color: #e3f2fd;
-    }
-    .drop-zone {
-        transition: all 0.2s ease;
-    }
-    .drop-zone.drag-over {
-        background-color: #d4edda;
-        border: 2px dashed #28a745;
-    }
-    .drop-zone.invalid-drop {
-        background-color: #f8d7da;
-        border: 2px dashed #dc3545;
+    #pixi-phase-container canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
     }
 </style>
 @stop
@@ -55,7 +15,7 @@
 @section('content')
 <div class="card">
     <div class="card-header pb-0">
-        <h4 class="mb-0">Dettagli Fase - {{ $phase->name }}</h5>
+        <h4 class="mb-0">Dettagli Fase - {{ $phase->name }}</h4>
     </div>
     <div class="card-body">
         <div class="row mb-4">
@@ -78,65 +38,8 @@
         </div>
         <div class="row">
             <div class="col-md-12">
-                <h5 class="mb-3">Fasce</h5>
-                <div class="d-flex gap-4 overflow-x-auto" id="columns-container" style="position: relative; min-height: 500px;">
-                    <svg id="links-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"></svg>
-                    @foreach($phase->phaseColumns as $column)
-                        @php
-                            $columnIndex = $loop->index;
-                        @endphp
-                        <div class="column-card card" data-column-id="{{ $column->id }}" style="min-width: 300px;">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6>Fascia {{ $loop->index + 1 }}</h6>
-                                <button type="button" class="btn btn-danger btn-sm js-delete-column" data-column-id="{{ $column->id }}">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div class="d-flex flex-column gap-2" id="buttons-container-{{ $column->id }}">
-                                    @for($i = 0; $i < $phase->height; $i++)
-                                        @php
-                                            $target = $column->targets->where('slot', $i)->first();
-                                        @endphp
-                                        @if($target)
-                                            <div class="border border-black p-3 target-item" data-target-id="{{ $target->id }}" data-column-id="{{ $column->id }}" data-slot="{{ $i }}" draggable="true" style="min-height: 80px; background-color: #f5f5f5; position: relative; cursor: grab;">
-                                                <!-- Ancore di collegamento -->
-                                                <div class="d-flex justify-content-between align-items-center" style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); pointer-events: none;">
-                                                    @if($columnIndex == 0)
-                                                        <div></div>
-                                                        <div class="link-anchor right-anchor" data-target-id="{{ $target->id }}" data-column-index="{{ $columnIndex }}" data-slot="{{ $i }}" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>
-                                                    @elseif($columnIndex == $phase->phaseColumns->count() - 1)
-                                                        <div class="link-anchor left-anchor" data-target-id="{{ $target->id }}" data-column-index="{{ $columnIndex }}" data-slot="{{ $i }}" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>
-                                                        <div></div>
-                                                    @else
-                                                        <div class="link-anchor left-anchor" data-target-id="{{ $target->id }}" data-column-index="{{ $columnIndex }}" data-slot="{{ $i }}" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>
-                                                        <div class="link-anchor right-anchor" data-target-id="{{ $target->id }}" data-column-index="{{ $columnIndex }}" data-slot="{{ $i }}" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>
-                                                    @endif
-                                                </div>
-                                                <h6 class="font-weight-bold">{{ $target->title }}</h6>
-                                                @if($target->description)
-                                                    <p class="text-sm">{{ $target->description }}</p>
-                                                @endif
-                                                <div class="d-flex gap-2 mt-2">
-                                                    <button type="button" class="btn btn-info mr-2 btn-xs js-view-target-details" data-column-id="{{ $column->id }}" data-target-id="{{ $target->id }}" data-slot="{{ $i }}">
-                                                        <i class="fa fa-info-circle"></i> Dettagli
-                                                    </button>
-                                                    <button type="button" class="btn btn-danger btn-xs js-delete-target" data-column-id="{{ $column->id }}" data-target-id="{{ $target->id }}" data-slot="{{ $i }}">
-                                                        <i class="fa fa-trash"></i> Elimina
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        @else
-                                            <div class="border border-black d-flex align-items-center justify-content-center js-add-target drop-zone" style="width: 100%; height: 80px; cursor: pointer; font-size: 40px" data-column-id="{{ $column->id }}" data-slot="{{ $i }}">
-                                                <span>+</span>
-                                            </div>
-                                        @endif
-                                    @endfor
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
+                <h5 class="mb-3">Configurazione Obiettivi</h5>
+                <div id="pixi-phase-container" style="width: 100%; height: 650px; border: 1px solid #ddd; background: #f4f6f9; border-radius: 8px; overflow: hidden; position: relative; box-shadow: inset 0 0 10px rgba(0,0,0,0.05);"></div>
             </div>
         </div>
     </div>
@@ -254,7 +157,6 @@
                             </button>
                         </div>
                         <div class="form-group">
-                            <!-- Monaco Editor Container -->
                             <div id="rewardMonacoEditor" style="height: 400px; border: 1px solid #ccc; border-radius: 4px;"></div>
                             <textarea class="d-none" id="rewardEditor" name="reward"></textarea>
                         </div>
@@ -300,23 +202,16 @@
 @stop
 
 @section('js')
-    <!-- Monaco Editor -->
+    <script src="https://pixijs.download/v7.4.2/pixi.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <script>
-        // Variabile globale per l'editor Monaco
-        var monacoEditor = null;
-        
-        // Inizializza Monaco Editor
+        // Monaco Initialization
         require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
-            // Registra il linguaggio PHP se non già presente
             monaco.languages.register({ id: 'php' });
-            
-            // Valore iniziale dell'editor
-            var initialValue = '<' + '?php\n// Scrivi qui il codice PHP per la ricompensa\n';
-            
-            // Crea l'editor
-            monacoEditor = monaco.editor.create(document.getElementById('rewardMonacoEditor'), {
+            const pOpen = String.fromCharCode(60) + '?';
+            const initialValue = pOpen + 'php\n// Scrivi qui il codice PHP per la ricompensa\n';
+            window.mEditor = monaco.editor.create(document.getElementById('rewardMonacoEditor'), {
                 value: initialValue,
                 language: 'php',
                 theme: 'vs-dark',
@@ -324,1025 +219,576 @@
                 minimap: { enabled: false },
                 fontSize: 14,
                 lineNumbers: 'on',
-                roundedSelection: false,
                 scrollBeyondLastLine: false,
-                readOnly: false,
-                wordWrap: 'on',
-                folding: true,
-                tabSize: 4,
-                insertSpaces: true,
-                formatOnPaste: true,
-                formatOnType: true
+                wordWrap: 'on'
             });
-            
-            // Sincronizza il contenuto con il textarea nascosto
-            monacoEditor.onDidChangeModelContent(function () {
-                document.getElementById('rewardEditor').value = monacoEditor.getValue();
+            window.mEditor.onDidChangeModelContent(function () {
+                document.getElementById('rewardEditor').value = window.mEditor.getValue();
             });
         });
-    </script>
-    <script>
-        $(document).ready(function () {
-            // Variabili per tracciare la colonna e lo slot selezionato
-            var selectedColumnId;
-            var selectedSlot;
-            
-            // Variabili per tracciare il collegamento tra obiettivi
-            var selectedFromTargetId;
-            var selectedFromColumnIndex;
-            var selectedFromSlot;
-            var isDragging = false;
-            var startX, startY, endX, endY;
-            var tempLine = null;
-            var tempLineId = 'temp-drag-line';
-            
-            // Funzione per ottenere le coordinate relative al container
-            function getRelativeCoordinates(element) {
-                var containerRect = $('#columns-container')[0].getBoundingClientRect();
-                var elementRect = element[0].getBoundingClientRect();
-                return {
-                    x: elementRect.left + elementRect.width / 2 - containerRect.left,
-                    y: elementRect.top + elementRect.height / 2 - containerRect.top
-                };
+
+        // Config & Data
+        const CONFIG = {
+            ageId: {{ $age->id }},
+            phaseId: {{ $phase->id }},
+            height: {{ $phase->height }},
+            routes: {
+                addColumn: "{{ route('ages.phases.columns.store', [$age, $phase]) }}",
+                deleteColumn: "{{ route('ages.phases.columns.destroy', [$age, $phase, ':columnId']) }}",
+                addTarget: "{{ route('ages.phases.columns.targets.store', [$age, $phase, ':columnId']) }}",
+                showTarget: "{{ route('ages.phases.columns.targets.show', [$age, $phase, ':columnId', ':targetId']) }}",
+                updateTarget: "{{ route('ages.phases.columns.targets.update', [$age, $phase, ':columnId', ':targetId']) }}",
+                deleteTarget: "{{ route('ages.phases.columns.targets.destroy', [$age, $phase, ':columnId', ':targetId']) }}",
+                linksIndex: "{{ route('ages.phases.target-links.index', [$age, $phase]) }}",
+                saveLink: "{{ route('ages.phases.columns.targets.target-links.store', [$age, $phase, ':columnId', ':targetId']) }}",
+                deleteLink: "{{ route('ages.phases.columns.targets.target-links.destroy', [$age, $phase, ':columnId', ':targetId', ':linkId']) }}",
+                scoresIndex: "{{ route('scores.index') }}",
+                targetScoresIndex: "{{ route('ages.phases.columns.targets.target-has-scores.index', [$age, $phase, ':columnId', ':targetId']) }}",
+                storeTargetScore: "{{ route('ages.phases.columns.targets.target-has-scores.store', [$age, $phase, ':columnId', ':targetId']) }}",
+                updateTargetScore: "{{ route('ages.phases.columns.targets.target-has-scores.update', [$age, $phase, ':columnId', ':targetId', ':id']) }}",
+                deleteTargetScore: "{{ route('ages.phases.columns.targets.target-has-scores.destroy', [$age, $phase, ':columnId', ':targetId', ':id']) }}",
+                phaseData: "{{ route('ages.phases.data', [$age, $phase]) }}"
             }
-            
-            // Funzione per disegnare una linea SVG
-            function drawLine(x1, y1, x2, y2, isTemporary, fromTargetId, toTargetId) {
-                var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', x1);
-                line.setAttribute('y1', y1);
-                line.setAttribute('x2', x2);
-                line.setAttribute('y2', y2);
-                
-                if (isTemporary) {
-                    line.setAttribute('id', tempLineId);
-                    line.setAttribute('stroke', '#28a745');
-                    line.setAttribute('stroke-width', 3);
-                    line.setAttribute('stroke-dasharray', '5,5');
-                    line.setAttribute('stroke-linecap', 'round');
-                    line.setAttribute('pointer-events', 'none');
-                } else {
-                    line.setAttribute('stroke', '#007bff');
-                    line.setAttribute('stroke-width', 3);
-                    line.setAttribute('data-from-target-id', fromTargetId);
-                    line.setAttribute('data-to-target-id', toTargetId);
-                    line.setAttribute('pointer-events', 'stroke');
-                    line.setAttribute('cursor', 'pointer');
-                    line.setAttribute('class', 'link-line');
-                }
-                
-                $('#links-canvas').append(line);
-                return line;
-            }
-            
-            // Funzione per rimuovere la linea temporanea
-            function removeTempLine() {
-                $('#' + tempLineId).remove();
-                tempLine = null;
-            }
-            
-            // Funzione per evidenziare le ancore valide
-            function highlightValidAnchors(fromColumnIndex) {
-                $('.link-anchor').each(function() {
-                    var anchorColumnIndex = $(this).data('column-index');
-                    var anchorTargetId = $(this).data('target-id');
-                    var isLeftAnchor = $(this).hasClass('left-anchor');
-                    
-                    // Reset stile
-                    $(this).css({
-                        'background-color': '#007bff',
-                        'transform': 'scale(1)',
-                        'transition': 'all 0.2s ease'
-                    });
-                    
-                    // Evidenzia solo ancore sinistre in una qualsiasi fascia successiva
-                    if (isLeftAnchor && anchorColumnIndex > fromColumnIndex && anchorTargetId) {
-                        $(this).css({
-                            'background-color': '#28a745',
-                            'transform': 'scale(1.3)',
-                            'box-shadow': '0 0 8px rgba(40, 167, 69, 0.6)'
-                        });
-                    }
-                });
-            }
-            
-            // Funzione per resettare lo stile delle ancore
-            function resetAnchorsStyle() {
-                $('.link-anchor').css({
-                    'background-color': '#007bff',
-                    'transform': 'scale(1)',
-                    'box-shadow': 'none'
-                });
-            }
-            
-            // Funzione per caricare i collegamenti esistenti
-            function loadExistingLinks() {
-                var phaseLinksUrl = "{{ route('ages.phases.target-links.index', [$age, $phase]) }}";
-                $.ajax({
-                    url: phaseLinksUrl,
-                    type: 'GET',
-                    success: function(response) {
-                        var links = response.links;
-                        links.forEach(function(link) {
-                            // Trova le ancore di partenza (right-anchor) e arrivo (left-anchor)
-                            var fromAnchor = $('.right-anchor[data-target-id="' + link.from_target_id + '"]');
-                            var toAnchor = $('.left-anchor[data-target-id="' + link.to_target_id + '"]');
-                            
-                            if (fromAnchor.length > 0 && toAnchor.length > 0) {
-                                var fromCoords = getRelativeCoordinates(fromAnchor);
-                                var toCoords = getRelativeCoordinates(toAnchor);
-                                
-                                drawLine(fromCoords.x, fromCoords.y, toCoords.x, toCoords.y, false, link.from_target_id, link.to_target_id);
-                            }
-                        });
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                    }
-                });
-            }
-            
-            // Carica i collegamenti esistenti al caricamento della pagina
-            loadExistingLinks();
+        };
 
-            // Add column button click
-            $(document).on('click', '.js-add-column', function (e) {
-                e.preventDefault();
-                var url = "{{ route('ages.phases.columns.store', [$age, $phase]) }}";
-                var uid = 'column-' + Date.now(); // Genera un UID casuale
+        let phaseData = @json($phase->load('phaseColumns.targets'));
+        let linkData = [];
 
-                $.ajax({
-                    url: url,
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: {
-                        uid: uid
-                    },
-                    success: function(response) {
-                        // Aggiorna la pagina per visualizzare la nuova colonna
-                        location.reload();
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                    }
-                });
-            });
-
-            // Delete column button click
-            $(document).on('click', '.js-delete-column', function (e) {
-                e.preventDefault();
-                var columnId = $(this).data('column-id');
-                var url = "{{ route('ages.phases.columns.destroy', [$age, $phase, '_column_']) }}";
-                url = url.replace('_column_', columnId);
-
-                if (confirm('Sei sicuro di voler eliminare questa fascia?')) {
-                    $.ajax({
-                        url: url,
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function(response) {
-                            // Rimuovi la colonna dalla pagina
-                            $('div[data-column-id="' + columnId + '"]').remove();
-                            
-                            // Riallinea i numeri delle fasce
-                            $('#columns-container .column-card').each(function(index, element) {
-                                $(element).find('.card-header h6').text('Fascia ' + (index + 1));
-                            });
-                        },
-                        error: function(xhr) {
-                            console.error(xhr.responseText);
-                        }
-                    });
-                }
-            });
-
-            // Add target button click (clic su container +)
-            $(document).on('click', '.js-add-target', function (e) {
-                e.preventDefault();
-                selectedColumnId = $(this).data('column-id');
-                selectedSlot = $(this).data('slot');
-                
-                // Recupera il numero della fascia
-                var columnIndex = $('#columns-container .column-card').index($('div[data-column-id="' + selectedColumnId + '"]'));
-                var columnNumber = columnIndex + 1;
-                
-                // Resetta il form
-                $('#createTargetForm')[0].reset();
-                
-                // Aggiorna il titolo della modal con la fascia e lo slot
-                $('#createTargetModalLabel').text('Crea Nuovo Obiettivo - Fascia ' + columnNumber + ', Slot ' + (selectedSlot + 1));
-                
-                // Mostra la modal
-                $('#createTargetModal').modal('show');
-            });
-
-            // Create target form submission
-            $(document).on('submit', '#createTargetForm', function (e) {
-                e.preventDefault();
-                
-                var url = "{{ route('ages.phases.columns.targets.store', [$age, $phase, '_column_']) }}";
-                url = url.replace('_column_', selectedColumnId);
-                
-                var formData = $(this).serializeArray();
-                formData.push({name: 'slot', value: selectedSlot});
-
-                $.ajax({
-                    url: url,
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: formData,
-                    success: function(response) {
-                        // Chiudi la modal
-                        $('#createTargetModal').modal('hide');
-                        
-                        // Recupera il numero della fascia
-                        var columnIndex = $('#columns-container .column-card').index($('div[data-column-id="' + selectedColumnId + '"]'));
-                        
-                        // Crea l'HTML per il nuovo obiettivo
-                        var targetHtml = '<div class="border border-black p-3" style="min-height: 80px; background-color: #f5f5f5; position: relative;">' +
-                            // Ancore di collegamento
-                            '<div class="d-flex justify-content-between align-items-center" style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); pointer-events: none;">';
-                        
-                        if (columnIndex == 0) {
-                            targetHtml += '<div></div>' +
-                                '<div class="link-anchor right-anchor" data-target-id="' + response.target.id + '" data-column-index="' + columnIndex + '" data-slot="' + selectedSlot + '" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>';
-                        } else if (columnIndex == $('#columns-container .column-card').length - 1) {
-                            targetHtml += '<div class="link-anchor left-anchor" data-target-id="' + response.target.id + '" data-column-index="' + columnIndex + '" data-slot="' + selectedSlot + '" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>' +
-                                '<div></div>';
-                        } else {
-                            targetHtml += '<div class="link-anchor left-anchor" data-target-id="' + response.target.id + '" data-column-index="' + columnIndex + '" data-slot="' + selectedSlot + '" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>' +
-                                '<div class="link-anchor right-anchor" data-target-id="' + response.target.id + '" data-column-index="' + columnIndex + '" data-slot="' + selectedSlot + '" style="width: 12px; height: 12px; background-color: blue; cursor: pointer; pointer-events: auto;"></div>';
-                        }
-                        
-                        targetHtml += '</div>' +
-                            '<h6 class="font-weight-bold">' + response.target.title + '</h6>';
-                        
-                        if (response.target.description) {
-                            targetHtml += '<p class="text-sm">' + response.target.description + '</p>';
-                        }
-                        
-                        targetHtml += '<div class="d-flex gap-2 mt-2">' +
-                            '<button type="button" class="btn btn-info mr-2 btn-xs js-view-target-details" data-column-id="' + selectedColumnId + '" data-target-id="' + response.target.id + '" data-slot="' + selectedSlot + '">' +
-                                '<i class="fa fa-info-circle"></i> Dettagli' +
-                            '</button>' +
-                            '<button type="button" class="btn btn-danger btn-xs js-delete-target" data-column-id="' + selectedColumnId + '" data-target-id="' + response.target.id + '" data-slot="' + selectedSlot + '">' +
-                                '<i class="fa fa-trash"></i> Elimina' +
-                            '</button>' +
-                        '</div>' +
-                        '</div>';
-                        
-                        // Sostituisce il container + con l'obiettivo
-                        $('#buttons-container-' + selectedColumnId + ' .js-add-target[data-slot="' + selectedSlot + '"]').replaceWith(targetHtml);
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                    }
-                });
-            });
-
-            // View target details button click
-            var selectedTargetId;
-            var selectedTargetColumnId;
-            
-            $(document).on('click', '.js-view-target-details', function (e) {
-                e.preventDefault();
-                selectedTargetId = $(this).data('target-id');
-                selectedTargetColumnId = $(this).data('column-id');
-                
-                // Recupera i dettagli dell'obiettivo
-                var showUrl = "{{ route('ages.phases.columns.targets.show', [$age, $phase, '_column_', '_target_']) }}";
-                showUrl = showUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                
-                $.ajax({
-                    url: showUrl,
-                    type: 'GET',
-                    success: function(response) {
-                        // Popola il form di modifica
-                        $('#updateTargetTitle').val(response.target.title);
-                        $('#updateTargetDescription').val(response.target.description);
-                        
-                        // Aggiorna il contenuto di Monaco Editor
-                        if (monacoEditor) {
-                            var rewardValue = response.target.reward || '<' + '?php\n// Scrivi qui il codice PHP per la ricompensa\n';
-                            monacoEditor.setValue(rewardValue);
-                        }
-                        
-                        // Recupera i target_has_scores
-                        var targetHasScoresUrl = "{{ route('ages.phases.columns.targets.target-has-scores.index', [$age, $phase, '_column_', '_target_']) }}";
-                        targetHasScoresUrl = targetHasScoresUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                        
-                        $.ajax({
-                            url: targetHasScoresUrl,
-                            type: 'GET',
-                            success: function(response) {
-                                // Memorizza i target_has_scores
-                                var targetHasScores = response.target_has_scores;
-                                
-                                // Popola la tabella dei costi
-                                populateTargetHasScoresTable(targetHasScores);
-                                
-                                // Recupera i scores per il select
-                                $.ajax({
-                                    url: "{{ route('scores.index') }}",
-                                    type: 'GET',
-                                    success: function(response) {
-                                        // Popola il select dei scores
-                                        populateScoreSelect(response, targetHasScores);
-                                    },
-                                    error: function(xhr) {
-                                        console.error(xhr.responseText);
-                                    }
-                                });
-                            },
-                            error: function(xhr) {
-                                console.error(xhr.responseText);
-                            }
-                        });
-                        
-                        // Recupera i scores per il select
-                        $.ajax({
-                            url: "{{ route('scores.index') }}",
-                            type: 'GET',
-                            success: function(response) {
-                                // Popola il select dei scores
-                                populateScoreSelect(response, targetHasScores);
-                            },
-                            error: function(xhr) {
-                                console.error(xhr.responseText);
-                            }
-                        });
-                        
-                        // Mostra la modal
-                        $('#viewTargetDetailsModal').modal('show');
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                    }
-                });
-            });
-            
-            // Save reward button click
-            $(document).on('click', '#saveRewardButton', function (e) {
-                e.preventDefault();
-                
-                var updateUrl = "{{ route('ages.phases.columns.targets.update', [$age, $phase, '_column_', '_target_']) }}";
-                updateUrl = updateUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                
-                // Ottieni il valore da Monaco Editor
-                var reward = monacoEditor ? monacoEditor.getValue() : $('#rewardEditor').val();
-                
-                var formData = new FormData();
-                formData.append('reward', reward);
-                formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
-                formData.append('_method', 'PUT');
-                
-                $.ajax({
-                    url: updateUrl,
-                    type: 'POST',
-                    data: formData,
-                    contentType: false,
-                    processData: false,
-                    dataType: 'json',
-                    success: function(response) {
-                        // Mostra un messaggio di successo
-                        alert('Ricompensa salvata con successo');
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                        alert('Errore nel salvataggio: ' + xhr.responseText);
-                    }
-                });
-            });
-            
-            // Update target form submission
-            $(document).on('submit', '#updateTargetForm', function (e) {
-                e.preventDefault();
-                
-                var updateUrl = "{{ route('ages.phases.columns.targets.update', [$age, $phase, '_column_', '_target_']) }}";
-                updateUrl = updateUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                
-                var formData = $(this).serialize();
-                
-                $.ajax({
-                    url: updateUrl,
-                    type: 'PUT',
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: formData,
-                    success: function(response) {
-                        // Aggiorna l'obiettivo nella pagina
-                        $('#buttons-container-' + selectedTargetColumnId + ' .js-view-target-details[data-target-id="' + selectedTargetId + '"]').closest('.border').find('h6').text(response.target.title);
-                        var descriptionElement = $('#buttons-container-' + selectedTargetColumnId + ' .js-view-target-details[data-target-id="' + selectedTargetId + '"]').closest('.border').find('p');
-                        if (response.target.description) {
-                            if (descriptionElement.length === 0) {
-                                $('#buttons-container-' + selectedTargetColumnId + ' .js-view-target-details[data-target-id="' + selectedTargetId + '"]').closest('.border').find('h6').after('<p class="text-sm">' + response.target.description + '</p>');
-                            } else {
-                                descriptionElement.text(response.target.description);
-                            }
-                        } else {
-                            descriptionElement.remove();
-                        }
-                        
-                        // Chiudi la modal
-                        $('#viewTargetDetailsModal').modal('hide');
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                    }
-                });
-            });
-            
-            // Add cost button click
-            $(document).on('click', '#addCostButton', function (e) {
-                e.preventDefault();
-                $('#addEditCostModalLabel').text('Aggiungi Costo');
-                $('#addEditCostForm')[0].reset();
-                $('#addEditCostForm').attr('data-method', 'POST');
-                $('#addEditCostModal').modal('show');
-            });
-            
-            // Add/Edit cost form submission
-            $(document).on('submit', '#addEditCostForm', function (e) {
-                e.preventDefault();
-                
-                var url;
-                var method;
-                
-                if ($(this).attr('data-method') === 'POST') {
-                    url = "{{ route('ages.phases.columns.targets.target-has-scores.store', [$age, $phase, '_column_', '_target_']) }}";
-                    url = url.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                    method = 'POST';
-                } else {
-                    url = "{{ route('ages.phases.columns.targets.target-has-scores.update', [$age, $phase, '_column_', '_target_', '_targetHasScore_']) }}";
-                    url = url.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId).replace('_targetHasScore_', $(this).attr('data-target-has-score-id'));
-                    method = 'PUT';
-                }
-                
-                var formData = $(this).serialize();
-                
-                $.ajax({
-                    url: url,
-                    type: method,
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: formData,
-                    success: function(response) {
-                        // Aggiorna la tabella dei costi
-                        var targetHasScoresUrl = "{{ route('ages.phases.columns.targets.target-has-scores.index', [$age, $phase, '_column_', '_target_']) }}";
-                        targetHasScoresUrl = targetHasScoresUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                        
-                        $.ajax({
-                            url: targetHasScoresUrl,
-                            type: 'GET',
-                            success: function(response) {
-                                populateTargetHasScoresTable(response.target_has_scores);
-                            },
-                            error: function(xhr) {
-                                console.error(xhr.responseText);
-                            }
-                        });
-                        
-                        // Chiudi la modal
-                        $('#addEditCostModal').modal('hide');
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                    }
-                });
-            });
-            
-            // Edit cost button click
-            $(document).on('click', '.js-edit-cost', function (e) {
-                e.preventDefault();
-                var targetHasScoreId = $(this).data('target-has-score-id');
-                var scoreId = $(this).data('score-id');
-                var value = $(this).data('value');
-                
-                $('#addEditCostModalLabel').text('Modifica Costo');
-                $('#scoreSelect').val(scoreId);
-                $('#costValue').val(value);
-                $('#addEditCostForm').attr('data-method', 'PUT');
-                $('#addEditCostForm').attr('data-target-has-score-id', targetHasScoreId);
-                $('#addEditCostModal').modal('show');
-            });
-            
-            // Delete cost button click
-            $(document).on('click', '.js-delete-cost', function (e) {
-                e.preventDefault();
-                var targetHasScoreId = $(this).data('target-has-score-id');
-                
-                if (confirm('Sei sicuro di voler eliminare questo costo?')) {
-                    var deleteUrl = "{{ route('ages.phases.columns.targets.target-has-scores.destroy', [$age, $phase, '_column_', '_target_', '_targetHasScore_']) }}";
-                    deleteUrl = deleteUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId).replace('_targetHasScore_', targetHasScoreId);
-                    
-                    $.ajax({
-                        url: deleteUrl,
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function(response) {
-                            // Aggiorna la tabella dei costi
-                            var targetHasScoresUrl = "{{ route('ages.phases.columns.targets.target-has-scores.index', [$age, $phase, '_column_', '_target_']) }}";
-                            targetHasScoresUrl = targetHasScoresUrl.replace('_column_', selectedTargetColumnId).replace('_target_', selectedTargetId);
-                            
-                            $.ajax({
-                                url: targetHasScoresUrl,
-                                type: 'GET',
-                                success: function(response) {
-                                    populateTargetHasScoresTable(response.target_has_scores);
-                                },
-                                error: function(xhr) {
-                                    console.error(xhr.responseText);
-                                }
-                            });
-                        },
-                        error: function(xhr) {
-                            console.error(xhr.responseText);
-                        }
-                    });
-                }
-            });
-            
-            // Link anchor mousedown - Inizia il drag
-            $(document).on('mousedown', '.link-anchor', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                var targetId = $(this).data('target-id');
-                var columnIndex = $(this).data('column-index');
-                var slot = $(this).data('slot');
-                
-                // Se l'ancora non ha un target id (obiettivo vuoto), ignoriamo
-                if (!targetId) {
-                    return;
-                }
-                
-                // Verifica che sia un'ancora destra (per partire verso destra)
-                if (!$(this).hasClass('right-anchor')) {
-                    return;
-                }
-                
-                // Inizia il drag
-                isDragging = true;
-                selectedFromTargetId = targetId;
-                selectedFromColumnIndex = columnIndex;
-                selectedFromSlot = slot;
-                
-                // Ottiene le coordinate iniziali
-                var coords = getRelativeCoordinates($(this));
-                startX = coords.x;
-                startY = coords.y;
-                
-                // Evidenzia l'ancora di partenza
-                $(this).css({
-                    'background-color': '#dc3545',
-                    'transform': 'scale(1.5)',
-                    'box-shadow': '0 0 10px rgba(220, 53, 69, 0.8)'
-                });
-                
-                // Evidenzia le ancore valide (fasce successive)
-                highlightValidAnchors(columnIndex);
-                
-                // Crea la linea temporanea
-                drawLine(startX, startY, startX, startY, true);
-                
-                // Cambia il cursore
-                $('body').css('cursor', 'crosshair');
-            });
-            
-            // Mouse move - Aggiorna la linea durante il drag
-            $(document).on('mousemove', function (e) {
-                if (!isDragging) return;
-                
-                // Ottiene le coordinate correnti
-                var containerRect = $('#columns-container')[0].getBoundingClientRect();
-                endX = e.clientX - containerRect.left;
-                endY = e.clientY - containerRect.top;
-                
-                // Aggiorna la linea temporanea
-                $('#' + tempLineId).attr({
-                    'x2': endX,
-                    'y2': endY
-                });
-                
-                // Verifica se siamo sopra un'ancora valida
-                var hoveredAnchor = null;
-                $('.link-anchor').each(function() {
-                    if (!$(this).data('target-id')) return;
-                    if (!$(this).hasClass('left-anchor')) return;
-                    if ($(this).data('column-index') <= selectedFromColumnIndex) return;
-                    
-                    var anchorCoords = getRelativeCoordinates($(this));
-                    var distance = Math.sqrt(Math.pow(endX - anchorCoords.x, 2) + Math.pow(endY - anchorCoords.y, 2));
-                    
-                    if (distance < 20) {
-                        hoveredAnchor = $(this);
-                    }
-                });
-                
-                // Aggiorna lo stile dell'ancora sotto il mouse
-                $('.link-anchor').each(function() {
-                    if ($(this).hasClass('left-anchor') && $(this).data('column-index') > selectedFromColumnIndex) {
-                        if ($(this).is(hoveredAnchor)) {
-                            $(this).css({
-                                'background-color': '#ffc107',
-                                'transform': 'scale(1.5)',
-                                'box-shadow': '0 0 12px rgba(255, 193, 7, 0.8)'
-                            });
-                        } else {
-                            $(this).css({
-                                'background-color': '#28a745',
-                                'transform': 'scale(1.3)',
-                                'box-shadow': '0 0 8px rgba(40, 167, 69, 0.6)'
-                            });
-                        }
-                    }
-                });
-            });
-            
-            // Mouse up - Termina il drag
-            $(document).on('mouseup', function (e) {
-                if (!isDragging) return;
-                
-                // Termina il drag
-                isDragging = false;
-                
-                // Reset del cursore
-                $('body').css('cursor', 'default');
-                
-                // Ottiene le coordinate finali
-                var containerRect = $('#columns-container')[0].getBoundingClientRect();
-                endX = e.clientX - containerRect.left;
-                endY = e.clientY - containerRect.top;
-                
-                // Trova l'ancora di arrivo (deve essere left-anchor in una fascia successiva)
-                var targetAnchor = null;
-                $('.left-anchor').each(function() {
-                    if (!$(this).data('target-id')) return;
-                    
-                    var anchorCoords = getRelativeCoordinates($(this));
-                    var distance = Math.sqrt(Math.pow(endX - anchorCoords.x, 2) + Math.pow(endY - anchorCoords.y, 2));
-                    
-                    if (distance < 20) {
-                        var toColumnIndex = $(this).data('column-index');
-                        // Verifica che sia in una fascia successiva
-                        if (toColumnIndex > selectedFromColumnIndex) {
-                            targetAnchor = $(this);
-                        }
-                    }
-                });
-                
-                // Se è stata trovata un'ancora di arrivo valida
-                if (targetAnchor && targetAnchor.data('target-id') !== selectedFromTargetId) {
-                    var toTargetId = targetAnchor.data('target-id');
-                    
-                    // Verifica se esiste già un collegamento tra questi target
-                    var existingLink = $('#links-canvas line[data-from-target-id="' + selectedFromTargetId + '"][data-to-target-id="' + toTargetId + '"]');
-                    if (existingLink.length > 0) {
-                        // Collegamento già esistente, mostra messaggio
-                        alert('Questo collegamento esiste già.');
-                        removeTempLine();
-                        resetAnchorsStyle();
-                        selectedFromTargetId = null;
-                        selectedFromColumnIndex = null;
-                        selectedFromSlot = null;
-                        return;
-                    }
-                    
-                    // Crea il collegamento sul database
-                    var url = "{{ route('ages.phases.columns.targets.target-links.store', [$age, $phase, '_column_', '_target_']) }}";
-                    var fromTarget = $('.right-anchor[data-target-id="' + selectedFromTargetId + '"]');
-                    var fromColumnId = fromTarget.closest('.column-card').data('column-id');
-                    url = url.replace('_column_', fromColumnId).replace('_target_', selectedFromTargetId);
-                    
-                    $.ajax({
-                        url: url,
-                        type: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        data: {
-                            from_target_id: selectedFromTargetId,
-                            to_target_id: toTargetId
-                        },
-                        success: function(response) {
-                            // Rimuovi la linea temporanea
-                            removeTempLine();
-                            
-                            // Crea la linea permanente
-                            var targetCoords = getRelativeCoordinates(targetAnchor);
-                            drawLine(startX, startY, targetCoords.x, targetCoords.y, false, selectedFromTargetId, toTargetId);
-                            
-                            // Reset della selezione e stile
-                            resetAnchorsStyle();
-                            selectedFromTargetId = null;
-                            selectedFromColumnIndex = null;
-                            selectedFromSlot = null;
-                            
-                            // Mostra messaggio di successo
-                            console.log('Collegamento creato con successo');
-                        },
-                        error: function(xhr) {
-                            console.error(xhr.responseText);
-                            removeTempLine();
-                            resetAnchorsStyle();
-                            selectedFromTargetId = null;
-                            selectedFromColumnIndex = null;
-                            selectedFromSlot = null;
-                            
-                            // Mostra errore
-                            var errorMsg = 'Errore nella creazione del collegamento';
-                            if (xhr.responseJSON && xhr.responseJSON.message) {
-                                errorMsg = xhr.responseJSON.message;
-                            }
-                            alert(errorMsg);
-                        }
-                    });
-                } else {
-                    // Nessuna ancora valida trovata, annulla
-                    removeTempLine();
-                    resetAnchorsStyle();
-                    selectedFromTargetId = null;
-                    selectedFromColumnIndex = null;
-                    selectedFromSlot = null;
-                }
-            });
-            
-            // Funzione per popolare la tabella dei costi
-            function populateTargetHasScoresTable(targetHasScores) {
-                var tbody = $('#targetHasScoresTableBody');
-                tbody.empty();
-                
-                targetHasScores.forEach(function(targetHasScore) {
-                    var tr = $('<tr>');
-                    tr.append('<td>' + targetHasScore.id + '</td>');
-                    tr.append('<td>' + targetHasScore.score.name + '</td>');
-                    tr.append('<td>' + targetHasScore.value + '</td>');
-                    tr.append('<td>' +
-                        '<button type="button" class="btn btn-info btn-xs js-edit-cost" data-target-has-score-id="' + targetHasScore.id + '" data-score-id="' + targetHasScore.score_id + '" data-value="' + targetHasScore.value + '">' +
-                            '<i class="fa fa-edit"></i> Modifica' +
-                        '</button>' +
-                        '<button type="button" class="btn btn-danger btn-xs ml-1 js-delete-cost" data-target-has-score-id="' + targetHasScore.id + '">' +
-                            '<i class="fa fa-trash"></i> Elimina' +
-                        '</button>' +
-                    '</td>');
-                    tbody.append(tr);
-                });
-            }
-            
-            // Funzione per popolare il select dei scores
-            function populateScoreSelect(scores, existingTargetHasScores) {
-                var select = $('#scoreSelect');
-                select.empty();
-                
-                // Crea un array con gli score_id già presenti
-                var existingScoreIds = [];
-                existingTargetHasScores.forEach(function(targetHasScore) {
-                    existingScoreIds.push(targetHasScore.score_id);
-                });
-                
-                // Popola il select con i scores non già presenti
-                scores.forEach(function(score) {
-                    if (!existingScoreIds.includes(score.id)) {
-                        var option = $('<option>');
-                        option.attr('value', score.id);
-                        option.text(score.name);
-                        select.append(option);
-                    }
-                });
-                
-                // Se non ci sono scores disponibili, disabilita il select
-                if (select.children().length === 0) {
-                    select.attr('disabled', 'disabled');
-                    select.append('<option value="">Nessun score disponibile</option>');
-                } else {
-                    select.removeAttr('disabled');
-                }
-            }
-            
-            // Delete target button click
-            $(document).on('click', '.js-delete-target', function (e) {
-                e.preventDefault();
-                var columnId = $(this).data('column-id');
-                var targetId = $(this).data('target-id');
-                var slot = $(this).data('slot');
-                
-                var url = "{{ route('ages.phases.columns.targets.destroy', [$age, $phase, '_column_', '_target_']) }}";
-                url = url.replace('_column_', columnId).replace('_target_', targetId);
-
-                if (confirm('Sei sicuro di voler eliminare questo obiettivo? Anche i collegamenti associati verranno rimossi.')) {
-                    $.ajax({
-                        url: url,
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function(response) {
-                            // Rimuove i collegamenti relativi all'obiettivo dal canvas
-                            $('#links-canvas line[data-from-target-id="' + targetId + '"], #links-canvas line[data-to-target-id="' + targetId + '"]').remove();
-                            
-                            // Rimuove l'obiettivo dalla pagina
-                            var targetElement = $('#buttons-container-' + columnId + ' .js-view-target-details[data-target-id="' + targetId + '"]').closest('.border');
-                            var columnIndex = $('#columns-container .column-card').index($('div[data-column-id="' + columnId + '"]'));
-                            
-                            var addTargetHtml = '<div class="border border-black d-flex align-items-center justify-content-center js-add-target" style="width: 100%; height: 80px; cursor: pointer; font-size: 40px" data-column-id="' + columnId + '" data-slot="' + slot + '"><span>+</span></div>';
-                            targetElement.replaceWith(addTargetHtml);
-                        },
-                        error: function(xhr) {
-                            console.error(xhr.responseText);
-                        }
-                    });
-                }
-            });
-            
-            // Click su una linea per eliminarla
-            $(document).on('click', '#links-canvas line', function (e) {
-                e.stopPropagation();
-                
-                var fromTargetId = $(this).data('from-target-id');
-                var toTargetId = $(this).data('to-target-id');
-                
-                if (!fromTargetId || !toTargetId) return;
-                
-                if (confirm('Vuoi eliminare questo collegamento?')) {
-                    // Trova il link da eliminare
-                    var linkElement = $(this);
-                    
-                    // Prima elimina dal database
-                    // Ottieni il target di partenza e la sua colonna
-                    var fromAnchor = $('.right-anchor[data-target-id="' + fromTargetId + '"]');
-                    var fromColumnId = fromAnchor.closest('.column-card').data('column-id');
-                    
-                    // Cerca il link nel database
-                    var findLinkUrl = "{{ route('ages.phases.columns.targets.target-links.index', [$age, $phase, '_column_', '_target_']) }}";
-                    findLinkUrl = findLinkUrl.replace('_column_', fromColumnId).replace('_target_', fromTargetId);
-                    
-                    $.ajax({
-                        url: findLinkUrl,
-                        type: 'GET',
-                        success: function(response) {
-                            var links = response.links;
-                            var linkToDelete = links.find(function(link) {
-                                return link.from_target_id == fromTargetId && link.to_target_id == toTargetId;
-                            });
-                            
-                            if (linkToDelete) {
-                                // Elimina il link
-                                var deleteUrl = "{{ route('ages.phases.columns.targets.target-links.destroy', [$age, $phase, '_column_', '_target_', '_link_']) }}";
-                                deleteUrl = deleteUrl.replace('_column_', fromColumnId).replace('_target_', fromTargetId).replace('_link_', linkToDelete.id);
-                                
-                                $.ajax({
-                                    url: deleteUrl,
-                                    type: 'DELETE',
-                                    headers: {
-                                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                                    },
-                                    success: function(response) {
-                                        // Rimuovi la linea dal canvas
-                                        linkElement.remove();
-                                        console.log('Collegamento eliminato con successo');
-                                    },
-                                    error: function(xhr) {
-                                        console.error(xhr.responseText);
-                                        alert('Errore durante l\'eliminazione del collegamento');
-                                    }
-                                });
-                            }
-                        },
-                        error: function(xhr) {
-                            console.error(xhr.responseText);
-                        }
-                    });
-                }
-            });
-            
-            // Rende le linee cliccabili
-            $(document).ready(function() {
-                $('#links-canvas line').css('pointer-events', 'auto').css('cursor', 'pointer');
-            });
-            
-            // Aggiorna le linee quando la finestra viene ridimensionata
-            $(window).on('resize', function() {
-                // Rimuovi tutte le linee esistenti
-                $('#links-canvas line').remove();
-                // Ricarica i collegamenti
-                loadExistingLinks();
-            });
-            
-            // ==========================================
-            // DRAG & DROP PER CAMBIARE SLOT DEI TARGET
-            // ==========================================
-            
-            var draggedTarget = null;
-            var draggedTargetId = null;
-            var draggedFromColumnId = null;
-            var draggedFromSlot = null;
-            
-            // Drag start - Inizia il trascinamento
-            $(document).on('dragstart', '.target-item', function(e) {
-                draggedTarget = $(this);
-                draggedTargetId = $(this).data('target-id');
-                draggedFromColumnId = $(this).data('column-id');
-                draggedFromSlot = $(this).data('slot');
-                
-                $(this).addClass('dragging');
-                
-                // Imposta i dati del drag
-                e.originalEvent.dataTransfer.setData('text/plain', draggedTargetId);
-                e.originalEvent.dataTransfer.effectAllowed = 'move';
-                
-                // Nascondi le linee durante il drag
-                $('#links-canvas').css('opacity', '0.3');
-            });
-            
-            // Drag end - Termina il trascinamento
-            $(document).on('dragend', '.target-item', function(e) {
-                $(this).removeClass('dragging');
-                $('.drop-zone').removeClass('drag-over invalid-drop');
-                
-                // Ripristina le linee
-                $('#links-canvas').css('opacity', '1');
-                
-                draggedTarget = null;
-                draggedTargetId = null;
-                draggedFromColumnId = null;
-                draggedFromSlot = null;
-            });
-            
-            // Drag over - Quando si trascina sopra una drop zone
-            $(document).on('dragover', '.drop-zone', function(e) {
-                e.preventDefault();
-                e.originalEvent.dataTransfer.dropEffect = 'move';
-                
-                var targetColumnId = $(this).data('column-id');
-                
-                // Evidenzia solo se è nella stessa colonna
-                if (targetColumnId == draggedFromColumnId) {
-                    $(this).addClass('drag-over');
-                    $(this).removeClass('invalid-drop');
-                } else {
-                    $(this).addClass('invalid-drop');
-                }
-            });
-            
-            // Drag leave - Quando si esce dalla drop zone
-            $(document).on('dragleave', '.drop-zone', function(e) {
-                $(this).removeClass('drag-over invalid-drop');
-            });
-            
-            // Drop - Rilascio del target
-            $(document).on('drop', '.drop-zone', function(e) {
-                e.preventDefault();
-                
-                var targetColumnId = $(this).data('column-id');
-                var targetSlot = $(this).data('slot');
-                
-                $(this).removeClass('drag-over invalid-drop');
-                
-                // Verifica che sia nella stessa colonna
-                if (targetColumnId != draggedFromColumnId) {
-                    alert('Non puoi spostare obiettivi tra colonne diverse.');
-                    return;
-                }
-                
-                // Aggiorna lo slot nel database
-                var updateUrl = "{{ route('ages.phases.columns.targets.update', [$age, $phase, '_column_', '_target_']) }}";
-                updateUrl = updateUrl.replace('_column_', draggedFromColumnId).replace('_target_', draggedTargetId);
-                
-                $.ajax({
-                    url: updateUrl,
-                    type: 'PUT',
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: {
-                        slot: targetSlot
-                    },
-                    success: function(response) {
-                        // Ricarica la pagina per aggiornare le posizioni
-                        location.reload();
-                    },
-                    error: function(xhr) {
-                        console.error(xhr.responseText);
-                        alert('Errore durante lo spostamento dell\'obiettivo.');
-                    }
-                });
-            });
-            
-            // Previeni il drop sui target esistenti (non permettere sovrascrittura)
-            $(document).on('dragover', '.target-item', function(e) {
-                e.preventDefault();
-                e.originalEvent.dataTransfer.dropEffect = 'none';
-            });
+        // App PIXI
+        const container = document.getElementById('pixi-phase-container');
+        const app = new PIXI.Application({
+            width: container.clientWidth,
+            height: container.clientHeight,
+            backgroundColor: 0xf4f6f9,
+            antialias: true,
+            resolution: window.devicePixelRatio || 1,
+            autoDensity: true
         });
+        container.appendChild(app.view);
+
+        const world = new PIXI.Container();
+        app.stage.addChild(world);
+        app.stage.eventMode = 'static';
+        app.stage.hitArea = app.screen;
+
+        const linkLayer = new PIXI.Graphics();
+        const gridLayer = new PIXI.Container();
+        const uiLayer = new PIXI.Container();
+        world.addChild(gridLayer, linkLayer, uiLayer);
+
+        const COLUMN_WIDTH = 320;
+        const TARGET_HEIGHT = 100;
+        const SPACING = 20;
+        const HEADER_HEIGHT = 50;
+
+        let draggingTarget = null;
+        let dragOffset = { x: 0, y: 0 };
+        let tempLinkLine = new PIXI.Graphics();
+        world.addChild(tempLinkLine);
+
+        let activeFromTargetId = null;
+
+        // Inizializzazione
+        async function init() {
+            console.log("PIXI Init - Phase:", CONFIG.phaseId);
+            await loadLinks();
+            render();
+            console.log("PIXI Render Complete - Links:", linkData.length);
+            
+            window.addEventListener('resize', () => {
+                app.renderer.resize(container.clientWidth, container.clientHeight);
+                app.stage.hitArea = app.screen;
+                render();
+            });
+        }
+
+        async function softReload() {
+            try {
+                const res = await fetch(CONFIG.routes.phaseData);
+                phaseData = await res.json();
+                await loadLinks();
+                render();
+            } catch (e) { console.error("Soft reload failed:", e); }
+        }
+
+        async function loadLinks() {
+            try {
+                const res = await fetch(CONFIG.routes.linksIndex);
+                const json = await res.json();
+                linkData = json.links;
+            } catch (e) { console.error(e); }
+        }
+
+        function getTargetPos(columnId, slot) {
+            const colIndex = phaseData.phase_columns.findIndex(c => c.id === columnId);
+            if (colIndex === -1) return { x: 0, y: 0 };
+            return {
+                x: colIndex * COLUMN_WIDTH + SPACING,
+                y: slot * (TARGET_HEIGHT + SPACING) + HEADER_HEIGHT + SPACING
+            };
+        }
+
+        function findTargetById(id) {
+            for (const col of phaseData.phase_columns) {
+                const t = col.targets.find(t => t.id === id);
+                if (t) return { target: t, column: col };
+            }
+            return null;
+        }
+
+        function render() {
+            gridLayer.removeChildren();
+            uiLayer.removeChildren();
+            linkLayer.clear();
+
+            // Sfondi colonne
+            phaseData.phase_columns.forEach((col, idx) => {
+                const x = idx * COLUMN_WIDTH + SPACING;
+                
+                // Card colonna
+                const colBg = new PIXI.Graphics()
+                    .beginFill(0xffffff)
+                    .drawRoundedRect(0, 0, COLUMN_WIDTH - SPACING, app.screen.height - SPACING * 2, 8)
+                    .endFill();
+                colBg.x = x;
+                colBg.y = SPACING;
+                colBg.alpha = 0.5;
+                gridLayer.addChild(colBg);
+
+                // Header colonna
+                const header = new PIXI.Text(`Fascia ${idx + 1}`, { fontSize: 16, fontWeight: 'bold', fill: 0x333 });
+                header.x = x + 15;
+                header.y = SPACING + 15;
+                uiLayer.addChild(header);
+
+                // Delete colonna
+                const delCol = createIconButton(0xdc3545, 'fa-trash', 14);
+                delCol.x = x + COLUMN_WIDTH - SPACING - 30;
+                delCol.y = SPACING + 15;
+                delCol.on('pointerdown', (e) => {
+                    e.stopPropagation();
+                    deleteColumn(col.id);
+                });
+                uiLayer.addChild(delCol);
+
+                // Slot
+                for (let i = 0; i < CONFIG.height; i++) {
+                    const py = i * (TARGET_HEIGHT + SPACING) + HEADER_HEIGHT + SPACING;
+                    const target = col.targets.find(t => t.slot === i);
+
+                    if (target) {
+                        drawTarget(target, col, x, py);
+                    } else {
+                        drawEmptySlot(col, i, x, py);
+                    }
+                }
+            });
+
+            drawLinks();
+        }
+
+        function drawTarget(target, column, x, y) {
+            const card = new PIXI.Container();
+            card.x = x;
+            card.y = y;
+
+            const bg = new PIXI.Graphics()
+                .lineStyle(1, 0x333, 1)
+                .beginFill(0xf5f5f5)
+                .drawRect(8, 0, COLUMN_WIDTH - SPACING - 16, TARGET_HEIGHT)
+                .endFill();
+            card.addChild(bg);
+
+            const title = new PIXI.Text(target.title, { fontSize: 14, fontWeight: 'bold', fill: 0x000, wordWrap: true, wordWrapWidth: COLUMN_WIDTH - 50 });
+            title.x = 20;
+            title.y = 10;
+            card.addChild(title);
+
+            if (target.description) {
+                const desc = new PIXI.Text(target.description.substring(0, 40) + (target.description.length > 40 ? '...' : ''), { fontSize: 11, fill: 0x666 });
+                desc.x = 20;
+                desc.y = 30;
+                card.addChild(desc);
+            }
+
+            // Pulsanti
+            const btnDetails = createSmallButton("Dettagli", 0x17a2b8);
+            btnDetails.x = 20;
+            btnDetails.y = 65;
+            btnDetails.on('pointerdown', (e) => e.stopPropagation());
+            btnDetails.on('pointertap', (e) => {
+                e.stopPropagation();
+                openTargetModal(column.id, target.id);
+            });
+            card.addChild(btnDetails);
+
+            const btnDel = createSmallButton("Elimina", 0xdc3545);
+            btnDel.x = 100;
+            btnDel.y = 65;
+            btnDel.on('pointerdown', (e) => e.stopPropagation());
+            btnDel.on('pointertap', (e) => {
+                e.stopPropagation();
+                deleteTarget(column.id, target.id);
+            });
+            card.addChild(btnDel);
+
+            // Ancore
+            const colIndex = phaseData.phase_columns.findIndex(c => c.id === column.id);
+            if (colIndex < phaseData.phase_columns.length - 1) {
+                const anchorR = createAnchor(target.id, 'right');
+                anchorR.x = COLUMN_WIDTH - SPACING - 8;
+                anchorR.y = TARGET_HEIGHT / 2;
+                card.addChild(anchorR);
+            }
+            if (colIndex > 0) {
+                const anchorL = createAnchor(target.id, 'left');
+                anchorL.x = 8;
+                anchorL.y = TARGET_HEIGHT / 2;
+                card.addChild(anchorL);
+            }
+
+            card.eventMode = 'static';
+            card.cursor = 'grab';
+            card.on('pointerdown', (e) => startDragTarget(e, target, column, card));
+
+            uiLayer.addChild(card);
+        }
+
+        function drawEmptySlot(column, slot, x, y) {
+            const bg = new PIXI.Graphics()
+                .lineStyle(1, 0xccc, 1)
+                .beginFill(0xffffff)
+                .drawRect(8, 0, COLUMN_WIDTH - SPACING - 16, TARGET_HEIGHT)
+                .endFill();
+            bg.x = x;
+            bg.y = y;
+            bg.eventMode = 'static';
+            bg.cursor = 'pointer';
+            bg.on('pointerdown', (e) => e.stopPropagation());
+            bg.on('pointertap', (e) => {
+                console.log("Empty slot clicked", column.id, slot);
+                e.stopPropagation();
+                openCreateTargetModal(column.id, slot);
+            });
+
+            const txt = new PIXI.Text("+", { fontSize: 40, fill: 0xccc });
+            txt.eventMode = 'none';
+            txt.anchor.set(0.5);
+            txt.x = x + (COLUMN_WIDTH - SPACING) / 2;
+            txt.y = y + TARGET_HEIGHT / 2;
+
+            uiLayer.addChild(bg, txt);
+        }
+
+        function createSmallButton(text, color) {
+            const container = new PIXI.Container();
+            const bg = new PIXI.Graphics().beginFill(color).drawRoundedRect(0, 0, 70, 24, 4).endFill();
+            const txt = new PIXI.Text(text, { fontSize: 10, fill: 0xffffff });
+            txt.anchor.set(0.5);
+            txt.x = 35;
+            txt.y = 12;
+            container.addChild(bg, txt);
+            container.eventMode = 'static';
+            container.cursor = 'pointer';
+            return container;
+        }
+
+        function createIconButton(color, iconClass, size) {
+            const g = new PIXI.Graphics().beginFill(color).drawCircle(0, 0, 12).endFill();
+            const txt = new PIXI.Text("×", { fontSize: 20, fill: 0xffffff }); // Placeholder for trash
+            txt.anchor.set(0.5);
+            g.addChild(txt);
+            g.eventMode = 'static';
+            g.cursor = 'pointer';
+            return g;
+        }
+
+        function createAnchor(targetId, side) {
+            const g = new PIXI.Graphics().beginFill(0x007bff).drawCircle(0, 0, 8).endFill();
+            g.eventMode = 'static';
+            g.cursor = 'crosshair';
+            if (side === 'right') {
+                g.on('pointerdown', (e) => {
+                    e.stopPropagation();
+                    startCreateLink(e, targetId);
+                });
+            }
+            g.targetId = targetId;
+            g.side = side;
+            return g;
+        }
+
+        function drawLinks() {
+            linkLayer.clear();
+            linkData.forEach(link => {
+                const from = findTargetById(link.from_target_id);
+                const to = findTargetById(link.to_target_id);
+                if (from && to) {
+                    const p1 = getTargetPos(from.column.id, from.target.slot);
+                    const p2 = getTargetPos(to.column.id, to.target.slot);
+                    
+                    const x1 = p1.x + (COLUMN_WIDTH - SPACING) - 8;
+                    const y1 = p1.y + TARGET_HEIGHT / 2;
+                    const x2 = p2.x + 8;
+                    const y2 = p2.y + TARGET_HEIGHT / 2;
+
+                    linkLayer.lineStyle(3, 0x007bff, 1);
+                    linkLayer.moveTo(x1, y1);
+                    linkLayer.lineTo(x2, y2);
+
+                    // Pulsante cancella link
+                    const mx = (x1 + x2) / 2;
+                    const my = (y1 + y2) / 2;
+                    drawLinkDelete(mx, my, from.column.id, from.target.id, link.id);
+                }
+            });
+        }
+
+        function drawLinkDelete(x, y, colId, targetId, linkId) {
+            const btn = new PIXI.Graphics().beginFill(0xdc3545).drawCircle(0, 0, 8).endFill();
+            btn.x = x;
+            btn.y = y;
+            btn.eventMode = 'static';
+            btn.cursor = 'pointer';
+            const txt = new PIXI.Text("×", { fontSize: 12, fill: 0xffffff, fontWeight: 'bold' });
+            txt.anchor.set(0.5);
+            btn.addChild(txt);
+            btn.on('pointerdown', (e) => {
+                e.stopPropagation();
+                deleteLink(colId, targetId, linkId);
+            });
+            uiLayer.addChild(btn);
+        }
+
+        // Actions
+        async function deleteColumn(id) {
+            if (!confirm('Eliminare fascia?')) return;
+            try {
+                const url = CONFIG.routes.deleteColumn.replace(':columnId', id);
+                await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                await softReload();
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteTarget(colId, id) {
+            if (!confirm('Eliminare obiettivo?')) return;
+            try {
+                const url = CONFIG.routes.deleteTarget.replace(':columnId', colId).replace(':targetId', id);
+                await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                await softReload();
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteLink(colId, targetId, linkId) {
+            if (!confirm('Eliminare collegamento?')) return;
+            try {
+                const url = CONFIG.routes.deleteLink.replace(':columnId', colId).replace(':targetId', targetId).replace(':linkId', linkId);
+                await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                await loadLinks();
+                render();
+            } catch (e) { console.error(e); }
+        }
+
+        let selectedColumnId, selectedSlot;
+        function openCreateTargetModal(colId, slot) {
+            selectedColumnId = colId;
+            selectedSlot = slot;
+            $('#createTargetForm')[0].reset();
+            $('#createTargetModal').modal('show');
+        }
+
+        $('#createTargetForm').on('submit', async function(e) {
+            e.preventDefault();
+            const url = CONFIG.routes.addTarget.replace(':columnId', selectedColumnId);
+            const data = $(this).serialize() + `&slot=${selectedSlot}`;
+            try {
+                await $.post(url, data);
+                $('#createTargetModal').modal('hide');
+                await softReload();
+            } catch (e) { console.error(e); }
+        });
+
+        async function openTargetModal(colId, targetId) {
+            const url = CONFIG.routes.showTarget.replace(':columnId', colId).replace(':targetId', targetId);
+            const res = await fetch(url);
+            const json = await res.json();
+            const target = json.target;
+            
+            $('#updateTargetTitle').val(target.title);
+            $('#updateTargetDescription').val(target.description);
+            if (window.mEditor) {
+                window.mEditor.setValue(target.reward || String.fromCharCode(60) + '?php\n// ...\n');
+            }
+            
+            // Setup scores list
+            await refreshScoresTable(colId, targetId);
+
+            $('#updateTargetForm').off('submit').on('submit', async function(e) {
+                e.preventDefault();
+                const updateUrl = CONFIG.routes.updateTarget.replace(':columnId', colId).replace(':targetId', targetId);
+                await $.ajax({ url: updateUrl, method: 'PUT', data: $(this).serialize() });
+                $('#viewTargetDetailsModal').modal('hide');
+                await softReload();
+            });
+
+            $('#saveRewardButton').off('click').on('click', async function() {
+                const updateUrl = CONFIG.routes.updateTarget.replace(':columnId', colId).replace(':targetId', targetId);
+                await $.ajax({ url: updateUrl, method: 'PUT', data: { reward: window.mEditor.getValue(), _token: '{{ csrf_token() }}' } });
+                alert('Ricompensa salvata');
+            });
+
+            $('#viewTargetDetailsModal').modal('show');
+        }
+
+        // Link Creation
+        function startCreateLink(e, fromId) {
+            activeFromTargetId = fromId;
+            const from = findTargetById(fromId);
+            const p = getTargetPos(from.column.id, from.target.slot);
+            const x1 = p.x + (COLUMN_WIDTH - SPACING) - 8;
+            const y1 = p.y + TARGET_HEIGHT / 2;
+
+            const onMove = (ev) => {
+                const pos = ev.getLocalPosition(world);
+                tempLinkLine.clear().lineStyle(2, 0x28a745, 0.8).moveTo(x1, y1).lineTo(pos.x, pos.y);
+            };
+
+            const onUp = async (ev) => {
+                const pos = ev.getLocalPosition(world);
+                tempLinkLine.clear();
+                app.stage.off('pointermove', onMove);
+                app.stage.off('pointerup', onUp);
+
+                // Find valid target L anchor
+                let hitToId = null;
+                for (const col of phaseData.phase_columns) {
+                    for (const t of col.targets) {
+                        const tp = getTargetPos(col.id, t.slot);
+                        const ax = tp.x + 8;
+                        const ay = tp.y + TARGET_HEIGHT / 2;
+                        if (Math.hypot(pos.x - ax, pos.y - ay) < 20) {
+                            hitToId = t.id;
+                            break;
+                        }
+                    }
+                }
+
+                if (hitToId && hitToId !== activeFromTargetId) {
+                    const from = findTargetById(activeFromTargetId);
+                    try {
+                        const url = CONFIG.routes.saveLink.replace(':columnId', from.column.id).replace(':targetId', activeFromTargetId);
+                        await $.post(url, { 
+                            from_target_id: activeFromTargetId,
+                            to_target_id: hitToId, 
+                            _token: '{{ csrf_token() }}' 
+                        });
+                        await loadLinks();
+                        render();
+                    } catch (e) { alert(e.responseJSON?.message || 'Errore'); }
+                }
+                activeFromTargetId = null;
+            };
+
+            app.stage.on('pointermove', onMove);
+            app.stage.on('pointerup', onUp);
+        }
+
+        function startDragTarget(e, target, column, cardGraphic) {
+            console.log("Start dragging target", target.id);
+            // Porta l'elemento in cima alla lista dei figli per renderlo sopra gli altri
+            cardGraphic.parent.addChild(cardGraphic);
+            
+            draggingTarget = { target, column, originalSlot: target.slot, graphic: cardGraphic };
+            cardGraphic.alpha = 0.8; // Leggera trasparenza per feedback visivo
+            const p = getTargetPos(column.id, target.slot);
+            const startPos = e.getLocalPosition(world);
+            dragOffset = { x: startPos.x - p.x, y: startPos.y - p.y };
+
+            const onMove = (ev) => {
+                const pos = ev.getLocalPosition(world);
+                draggingTarget.graphic.x = pos.x - dragOffset.x;
+                draggingTarget.graphic.y = pos.y - dragOffset.y;
+            };
+
+            const onUp = async (ev) => {
+                const pos = ev.getLocalPosition(world);
+                console.log("Release target at y", pos.y);
+                app.stage.off('pointermove', onMove);
+                app.stage.off('pointerup', onUp);
+                
+                draggingTarget.graphic.alpha = 1.0;
+
+                const colIndex = phaseData.phase_columns.findIndex(c => c.id === column.id);
+                const colLeft = colIndex * COLUMN_WIDTH + SPACING;
+                if (pos.x >= colLeft && pos.x <= colLeft + COLUMN_WIDTH) {
+                    const newSlot = Math.floor((pos.y - HEADER_HEIGHT - SPACING) / (TARGET_HEIGHT + SPACING));
+                    if (newSlot >= 0 && newSlot < CONFIG.height && newSlot !== draggingTarget.originalSlot) {
+                        const url = CONFIG.routes.updateTarget.replace(':columnId', column.id).replace(':targetId', target.id).replace(':id', target.id);
+                        try {
+                            await $.ajax({ url, method: 'PUT', data: { slot: newSlot, _token: '{{ csrf_token() }}' } });
+                            await softReload();
+                        } catch(e) { console.error(e); }
+                    }
+                }
+                draggingTarget = null;
+                render();
+            };
+
+            app.stage.on('pointermove', onMove);
+            app.stage.on('pointerup', onUp);
+        }
+
+        // Cost/Scores management
+        async function refreshScoresTable(colId, targetId) {
+            const url = CONFIG.routes.targetScoresIndex.replace(':columnId', colId).replace(':targetId', targetId);
+            const res = await fetch(url);
+            const json = await res.json();
+            const tbody = $('#targetHasScoresTableBody').empty();
+            json.target_has_scores.forEach(ths => {
+                tbody.append(`<tr>
+                    <td>${ths.id}</td>
+                    <td>${ths.score.name}</td>
+                    <td>${ths.value}</td>
+                    <td>
+                        <button class="btn btn-danger btn-xs" onclick="deleteTargetScore(${colId}, ${targetId}, ${ths.id})">Elimina</button>
+                    </td>
+                </tr>`);
+            });
+
+            // Re-bind modal buttons
+            $('#addCostButton').off('click').on('click', () => openAddScoreModal(colId, targetId));
+        }
+
+        async function openAddScoreModal(colId, targetId) {
+            const res = await fetch(CONFIG.routes.scoresIndex);
+            const json = await res.json();
+            const select = $('#scoreSelect').empty();
+            json.forEach(s => select.append(`<option value="${s.id}">${s.name}</option>`));
+            
+            $('#addEditCostForm').off('submit').on('submit', async function(e) {
+                e.preventDefault();
+                const url = CONFIG.routes.storeTargetScore.replace(':columnId', colId).replace(':targetId', targetId);
+                await $.post(url, $(this).serialize());
+                $('#addEditCostModal').modal('hide');
+                await refreshScoresTable(colId, targetId);
+            });
+            $('#addEditCostModal').modal('show');
+        }
+
+        window.deleteTargetScore = async (colId, targetId, id) => {
+            if (!confirm('Eliminare costo?')) return;
+            const url = CONFIG.routes.deleteTargetScore.replace(':columnId', colId).replace(':targetId', targetId).replace(':id', id);
+            await $.ajax({ url, method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+            await refreshScoresTable(colId, targetId);
+        };
+
+        $(document).on('click', '.js-add-column', async function() {
+            try {
+                await $.post(CONFIG.routes.addColumn, { uid: 'col-' + Date.now(), _token: '{{ csrf_token() }}' });
+                await softReload();
+            } catch (e) { console.error(e); }
+        });
+
+        init();
     </script>
 @stop
