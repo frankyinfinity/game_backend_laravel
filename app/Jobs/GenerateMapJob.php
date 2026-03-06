@@ -12,7 +12,6 @@ use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Draw\Support\ScrollGroup;
-use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use App\Models\DrawRequest;
 use App\Models\Entity;

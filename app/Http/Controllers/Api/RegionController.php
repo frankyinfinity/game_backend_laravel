@@ -8,7 +8,6 @@ use App\Models\Region;
 use Illuminate\Support\Str;
 use App\Models\Player;
 use App\Custom\Manipulation\ObjectCache;
-use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
 use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Draw\Complex\Form\InputDraw;

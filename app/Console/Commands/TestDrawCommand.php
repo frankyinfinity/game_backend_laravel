@@ -10,7 +10,6 @@ use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
-use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
 use App\Models\Player;
 use Illuminate\Console\Command;

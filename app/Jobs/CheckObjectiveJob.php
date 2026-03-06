@@ -8,7 +8,6 @@ use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
-use App\Events\DrawInterfaceEvent;
 use App\Models\AgePlayer;
 use App\Models\DrawRequest;
 use App\Models\PhaseColumnPlayer;

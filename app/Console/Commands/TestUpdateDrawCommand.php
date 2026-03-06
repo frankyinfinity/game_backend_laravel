@@ -6,7 +6,6 @@ use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Manipulation\ObjectClear;
-use App\Events\DrawInterfaceEvent;
 use App\Models\DrawRequest;
 use App\Models\Player;
 use App\Models\Score;

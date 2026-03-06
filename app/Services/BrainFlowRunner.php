@@ -23,7 +23,6 @@ use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Draw\Support\ScrollGroup;
-use App\Events\DrawInterfaceEvent;
 use App\Helper\Helper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
