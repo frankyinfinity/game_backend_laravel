@@ -507,7 +507,6 @@ class CheckObjectiveJob implements ShouldQueue
                     'player_id' => $drawPlayerId,
                     'items' => json_encode($objectiveDrawCommands),
                 ]);
-                event(new DrawInterfaceEvent($drawPlayer, $objectiveRequestId));
 
                 foreach (array_values(array_unique($completedTargetIds)) as $completedTargetId) {
                     ExecuteCompletedTargetRewardScriptJob::dispatch(

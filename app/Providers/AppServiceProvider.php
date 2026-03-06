@@ -11,6 +11,8 @@ use App\Models\Player;
 use App\Observers\PlayerObserver;
 use App\Models\BrainSchedule;
 use App\Observers\BrainScheduleObserver;
+use App\Models\DrawRequest;
+use App\Observers\DrawRequestObserver;
 use Illuminate\Support\Facades\Broadcast;
 use App\Broadcasting\SocketIoBroadcaster;
 use GuzzleHttp\Client;
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
         ElementHasPosition::observe(ElementHasPositionObserver::class);
         Player::observe(PlayerObserver::class);
         BrainSchedule::observe(BrainScheduleObserver::class);
+        DrawRequest::observe(DrawRequestObserver::class);
 
         // Register Socket.io broadcaster
         Broadcast::extend('socketio', function ($app) {

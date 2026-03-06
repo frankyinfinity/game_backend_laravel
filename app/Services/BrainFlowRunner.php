@@ -1184,18 +1184,19 @@ class BrainFlowRunner
                 continue;
             }
 
-            $requestId = Str::random(20);
-            DrawRequest::query()->create([
-                'session_id' => (string) $sessionId,
-                'request_id' => $requestId,
-                'player_id' => (int) ($payload['player_id'] ?? 0),
-                'items' => json_encode($items),
-            ]);
+            $playerId = (int) ($payload['player_id'] ?? 0);
+            if($playerId > 0) {
 
-            $player = $payload['player'] ?? null;
-            if ($player instanceof Player) {
-                event(new DrawInterfaceEvent($player, $requestId));
+                $requestId = Str::random(20);
+                DrawRequest::query()->create([
+                    'session_id' => (string) $sessionId,
+                    'request_id' => $requestId,
+                    'player_id' => $playerId,
+                    'items' => json_encode($items),
+                ]);
+
             }
+
         }
     }
 

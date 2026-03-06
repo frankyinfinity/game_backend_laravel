@@ -203,7 +203,6 @@ class GameController extends Controller
             'player_id' => $playerId,
             'items' => json_encode($drawItems),
         ]);
-        event(new DrawInterfaceEvent($player, $requestId));
 
         return response()->json(['success' => true]);
 
@@ -449,7 +448,6 @@ class GameController extends Controller
             'player_id' => $playerId,
             'items' => json_encode($drawItems),
         ]);
-        event(new DrawInterfaceEvent($player, $requestId));
 
         return response()->json(['success' => true]);
 
@@ -643,7 +641,6 @@ class GameController extends Controller
                 'player_id' => $player->id,
                 'items' => json_encode($drawItems),
             ]);
-            event(new DrawInterfaceEvent($player, $requestId));
         }
 
         return response()->json(['success' => true, 'message' => 'Birh Region ' . $birth_region_id]);
@@ -932,7 +929,6 @@ class GameController extends Controller
             'player_id' => $player_id,
             'items' => json_encode($drawCommands),
         ]);
-        event(new DrawInterfaceEvent($player, $request_id));
         
         return response()->json(['success' => true]);
     }
@@ -1209,7 +1205,6 @@ class GameController extends Controller
             'player_id' => $player_id,
             'items' => json_encode($drawCommands),
         ]);
-        event(new DrawInterfaceEvent($player, $request_id));
 
         Log::info("Consume process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Cleared IDs: " . implode(', ', $idsToClear));
 
@@ -1339,7 +1334,6 @@ class GameController extends Controller
                         'player_id' => $drawPlayerId,
                         'items' => json_encode($objectiveDrawCommands),
                     ]);
-                    event(new DrawInterfaceEvent($drawPlayer, $objectiveRequestId));
                 }
             }
         }
@@ -1835,7 +1829,6 @@ class GameController extends Controller
             'player_id' => $player_id,
             'items' => json_encode($drawCommands),
         ]);
-        event(new DrawInterfaceEvent($player, $request_id));
 
         Log::info("Attack process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Element died: " . ($elementDied ? 'YES' : 'NO'));
 
@@ -2103,7 +2096,6 @@ class GameController extends Controller
                     'player_id' => $player->id,
                     'items' => json_encode($drawCommands),
                 ]);
-                event(new DrawInterfaceEvent($player, $requestId));
             }
         } catch (\Throwable $e) {
             Log::warning('Unable to update entity lifepoint progressbar after division', [
@@ -2159,7 +2151,6 @@ class GameController extends Controller
                     'player_id' => $player->id,
                     'items' => json_encode($drawCommands),
                 ]);
-                event(new DrawInterfaceEvent($player, $requestId));
             }
         } catch (\Throwable $e) {
             Log::warning('Unable to draw new spawned entity after division', [

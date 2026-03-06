@@ -303,7 +303,6 @@ class RegionController extends Controller
             'player_id' => $playerId,
             'items' => json_encode($drawItems),
         ]);
-        event(new DrawInterfaceEvent($player, $requestId));
 
         return response()->json(['success' => true]);
 

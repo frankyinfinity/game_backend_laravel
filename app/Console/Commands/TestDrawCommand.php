@@ -163,7 +163,6 @@ class TestDrawCommand extends Command
             'player_id' => $eventPlayerId,
             'items' => json_encode($drawItems),
         ]);
-        event(new DrawInterfaceEvent($eventPlayer, $requestId));
 
         $this->info('Test draw event sent. Check the /test page.');
     }

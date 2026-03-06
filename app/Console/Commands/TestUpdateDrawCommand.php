@@ -98,7 +98,6 @@ class TestUpdateDrawCommand extends Command
             'player_id' => $playerId,
             'items' => json_encode($drawItems),
         ]);
-        event(new DrawInterfaceEvent($player, $requestId));
 
         $this->info("Score {$scoreId} updated to value: {$newValue}. Check the /test page.");
     }
