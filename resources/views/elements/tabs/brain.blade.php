@@ -80,9 +80,6 @@
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-save"></i> Salva
         </button>
-        <button type="button" class="btn btn-info" id="btn_link_mode_toggle">
-            <i class="fas fa-link"></i> Modalità Link: OFF
-        </button>
         <a href="{{ route('elements.index') }}" class="btn btn-secondary">
             <i class="fas fa-times"></i> Annulla
         </a>
@@ -206,13 +203,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveNeuronBtn = document.getElementById('btn_save_neuron');
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
-    const linkModeToggleBtn = document.getElementById('btn_link_mode_toggle');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !linkModeToggleBtn || typeof PIXI === 'undefined') {
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl) {
+        console.warn('One or more required elements for the brain tab are missing.');
+        return;
+    }
+
+    if (typeof PIXI === 'undefined') {
+        console.error('PIXI.js is not loaded.');
         return;
     }
 
     const fixedCellSize = 36;
     const typeDetection = @json(\App\Models\Neuron::TYPE_DETECTION);
+    const typePath = @json(\App\Models\Neuron::TYPE_PATH);
     const typeAttack = @json(\App\Models\Neuron::TYPE_ATTACK);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
@@ -227,8 +230,15 @@ document.addEventListener('DOMContentLoaded', function () {
     let selectedCell = null;
     let neuronItems = [];
     let neuronLinks = [];
-    let linkMode = false;
+    let isLinkDragging = false;
+    let isNeuronDragging = false;
+    let draggedNeuronId = null;
+    let dragStartCell = null;
+    let dragStartMousePos = null;
+    let currentDragPos = null;
+    let tempLineGraphics = null;
     let fromNeuronId = null;
+    let currentNeuronId = null;
 
     try {
         const parsed = JSON.parse(neuronItemsInput.value || '[]');
@@ -317,6 +327,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const existing = findNeuronAtCell(i, j);
         if (existing) {
+            currentNeuronId = existing.id;
             const inferredTargetType = existing.target_type
                 || (existing.target_element_id != null ? targetTypeElement : null)
                 || targetTypeElement;
@@ -330,6 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronGeneAttackIdInput.value = existing.gene_attack_id != null ? String(existing.gene_attack_id) : '';
             deleteNeuronBtn.style.display = '';
         } else {
+            currentNeuronId = null;
             neuronTypeInput.value = typeDetection;
             neuronRadiusInput.value = 1;
             neuronTargetTypeElementInput.checked = true;
@@ -350,24 +362,49 @@ document.addEventListener('DOMContentLoaded', function () {
             const toN = findNeuronById(link.to_neuron_id);
             if (!fromN || !toN) continue;
 
-            const x1 = (Number(fromN.grid_j) * cellSize) + (cellSize / 2);
-            const y1 = (Number(fromN.grid_i) * cellSize) + (cellSize / 2);
-            const x2 = (Number(toN.grid_j) * cellSize) + (cellSize / 2);
-            const y2 = (Number(toN.grid_i) * cellSize) + (cellSize / 2);
+            let x1 = (Number(fromN.grid_j) * cellSize) + cellSize;
+            let y1 = (Number(fromN.grid_i) * cellSize) + (cellSize / 2);
+            let x2 = Number(toN.grid_j) * cellSize;
+            let y2 = (Number(toN.grid_i) * cellSize) + (cellSize / 2);
+
+            if (isNeuronDragging && currentDragPos && draggedNeuronId) {
+                if (Number(fromN.id) === Number(draggedNeuronId)) {
+                    x1 = currentDragPos.x + cellSize;
+                    y1 = currentDragPos.y + (cellSize / 2);
+                }
+                if (Number(toN.id) === Number(draggedNeuronId)) {
+                    x2 = currentDragPos.x;
+                    y2 = currentDragPos.y + (cellSize / 2);
+                }
+            }
 
             const line = new PIXI.Graphics();
-            line.lineStyle(2, 0x0ea5e9, 1);
+            line.lineStyle(3, 0x007bff, 1); // Darker blue and thicker
             line.moveTo(x1, y1);
             line.lineTo(x2, y2);
-            line.eventMode = 'static';
-            line.cursor = 'pointer';
-            line.hitArea = new PIXI.Rectangle(
-                Math.min(x1, x2) - 5,
-                Math.min(y1, y2) - 5,
-                Math.abs(x2 - x1) + 10,
-                Math.abs(y2 - y1) + 10
-            );
-            line.on('pointerdown', async () => {
+            layer.addChild(line);
+
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2;
+
+            const deleteBtn = new PIXI.Graphics();
+            deleteBtn.beginFill(0xdc3545);
+            deleteBtn.drawCircle(0, 0, 9);
+            deleteBtn.endFill();
+            
+            deleteBtn.lineStyle(2, 0xffffff, 1);
+            deleteBtn.moveTo(-4, -4);
+            deleteBtn.lineTo(4, 4);
+            deleteBtn.moveTo(4, -4);
+            deleteBtn.lineTo(-4, 4);
+
+            deleteBtn.x = mx;
+            deleteBtn.y = my;
+            deleteBtn.eventMode = 'static';
+            deleteBtn.cursor = 'pointer';
+
+            deleteBtn.on('pointerdown', async (e) => {
+                e.stopPropagation();
                 if (!confirm('Vuoi eliminare questo collegamento?')) return;
                 try {
                     await requestDeleteNeuronLink({
@@ -381,22 +418,44 @@ document.addEventListener('DOMContentLoaded', function () {
                     alert(error.message || 'Errore durante la rimozione del collegamento');
                 }
             });
-            layer.addChild(line);
+            layer.addChild(deleteBtn);
         }
     }
 
     function drawNeuronSymbols(layer, cellSize) {
         for (const neuron of neuronItems) {
-            const i = Number(neuron.grid_i);
-            const j = Number(neuron.grid_j);
-            const symbol = typeSymbols[neuron.type] || '?';
+            let i = Number(neuron.grid_i);
+            let j = Number(neuron.grid_j);
+            const isDragging = Number(neuron.id) === Number(draggedNeuronId);
 
+            if (isDragging && currentDragPos) {
+                j = currentDragPos.x / cellSize;
+                i = currentDragPos.y / cellSize;
+            }
+
+            const symbol = typeSymbols[neuron.type] || '?';
+            
             const isSelectedFrom = Number(neuron.id) === Number(fromNeuronId);
+            
             const neuronBorder = new PIXI.Graphics();
             neuronBorder.lineStyle(2, isSelectedFrom ? 0xdc2626 : 0x111827, 1);
             neuronBorder.beginFill(0xFFFFFF, 0.001);
             neuronBorder.drawRect((j * cellSize) + 1, (i * cellSize) + 1, cellSize - 2, cellSize - 2);
             neuronBorder.endFill();
+
+            neuronBorder.eventMode = 'static';
+            neuronBorder.cursor = 'grab';
+            neuronBorder.on('pointerdown', (e) => {
+                e.stopPropagation();
+                isNeuronDragging = true;
+                draggedNeuronId = neuron.id;
+                dragStartCell = { i: Number(neuron.grid_i), j: Number(neuron.grid_j) };
+                
+                dragStartMousePos = { x: e.global.x, y: e.global.y };
+                app.view.style.cursor = 'grabbing';
+                renderGrid(); // Redraw immediately to show ghost effect
+            });
+
             layer.addChild(neuronBorder);
 
             const text = new PIXI.Text(symbol, {
@@ -406,9 +465,48 @@ document.addEventListener('DOMContentLoaded', function () {
                 fontFamily: 'Consolas',
                 align: 'center',
             });
+            text.eventMode = 'none'; // Ensure clicks pass through to border
+            text.alpha = 1;
             text.x = (j * cellSize) + (cellSize / 2) - (text.width / 2);
             text.y = (i * cellSize) + (cellSize / 2) - (text.height / 2);
             layer.addChild(text);
+
+            const hasLeftAnchor = neuron.type === typePath || neuron.type === typeAttack;
+            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath;
+
+            if (hasLeftAnchor) {
+                const leftAnchor = new PIXI.Graphics();
+                leftAnchor.beginFill(0x0ea5e9);
+                leftAnchor.lineStyle(2, 0xffffff, 1);
+                leftAnchor.drawCircle((j * cellSize), (i * cellSize) + (cellSize / 2), 8);
+                leftAnchor.endFill();
+                leftAnchor.alpha = isDragging ? 0.5 : 1;
+                leftAnchor.eventMode = 'static';
+                leftAnchor.cursor = 'default';
+                layer.addChild(leftAnchor);
+            }
+
+            if (hasRightAnchor) {
+                const rightAnchor = new PIXI.Graphics();
+                rightAnchor.beginFill(0x3b82f6);
+                rightAnchor.lineStyle(2, 0xffffff, 1);
+                rightAnchor.drawCircle((j * cellSize) + cellSize, (i * cellSize) + (cellSize / 2), 8);
+                rightAnchor.endFill();
+                rightAnchor.alpha = isDragging ? 0.5 : 1;
+                rightAnchor.eventMode = 'static';
+                rightAnchor.cursor = 'crosshair';
+                
+                rightAnchor.on('pointerdown', (e) => {
+                    e.stopPropagation();
+                    fromNeuronId = neuron.id;
+                    isLinkDragging = true;
+                    if (!tempLineGraphics) {
+                        tempLineGraphics = new PIXI.Graphics();
+                        layer.addChild(tempLineGraphics);
+                    }
+                });
+                layer.addChild(rightAnchor);
+            }
         }
     }
 
@@ -425,68 +523,35 @@ document.addEventListener('DOMContentLoaded', function () {
             app = new PIXI.Application({
                 width: canvasWidth,
                 height: canvasHeight,
-                antialias: false,
-                backgroundAlpha: 0
+                antialias: true,
+                backgroundAlpha: 1,
+                backgroundColor: 0xffffff
             });
             container.innerHTML = '';
             container.appendChild(app.view);
-            app.view.addEventListener('click', async (event) => {
-                const rect = app.view.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const y = event.clientY - rect.top;
-                const i = Math.floor(y / fixedCellSize);
-                const j = Math.floor(x / fixedCellSize);
+            
+            app.stage.eventMode = 'static';
+            app.stage.hitArea = new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight);
+
+            app.stage.on('pointerdown', async (event) => {
+                if (isLinkDragging || isNeuronDragging) return;
+                
+                const i = Math.floor(event.global.y / fixedCellSize);
+                const j = Math.floor(event.global.x / fixedCellSize);
                 const maxRows = normalize(heightInput.value || 5);
                 const maxCols = normalize(widthInput.value || 5);
                 if (i < 0 || j < 0 || i >= maxRows || j >= maxCols) return;
 
-                const neuron = findNeuronAtCell(i, j);
-                if (linkMode) {
-                    if (!neuron) return;
-                    if (!fromNeuronId) {
-                        fromNeuronId = Number(neuron.id);
-                        renderGrid();
-                        return;
-                    }
-                    if (Number(neuron.id) === Number(fromNeuronId)) {
-                        fromNeuronId = null;
-                        renderGrid();
-                        return;
-                    }
-                    try {
-                        const savedLink = await requestSaveNeuronLink({
-                            from_neuron_id: Number(fromNeuronId),
-                            to_neuron_id: Number(neuron.id),
-                        });
-                        const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));
-                        if (!exists) neuronLinks.push(savedLink);
-                        updateNeuronLinksHiddenInput();
-                    } catch (error) {
-                        alert(error.message || 'Errore durante il collegamento');
-                    } finally {
-                        fromNeuronId = null;
-                        renderGrid();
-                    }
-                    return;
-                }
-
                 openNeuronModal(i, j);
             });
 
-            app.view.addEventListener('mousemove', (event) => {
-                const rect = app.view.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const y = event.clientY - rect.top;
-                const i = Math.floor(y / fixedCellSize);
-                const j = Math.floor(x / fixedCellSize);
-                const hoveredNeuron = findNeuronAtCell(i, j);
-                app.view.style.cursor = hoveredNeuron ? 'crosshair' : 'default';
-            });
         } else {
             app.renderer.resize(canvasWidth, canvasHeight);
             app.stage.removeChildren();
+            tempLineGraphics = null;
         }
 
+        // Draw background rectangle to ensure it's not transparent
         const bg = new PIXI.Graphics();
         bg.beginFill(0xFFFFFF);
         bg.drawRect(0, 0, canvasWidth, canvasHeight);
@@ -494,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function () {
         app.stage.addChild(bg);
 
         const lines = new PIXI.Graphics();
-        lines.lineStyle(1, 0x555555, 1);
+        lines.lineStyle(1, 0xdddddd, 1); // Lighter gray for better visibility on white
         for (let c = 0; c <= cols; c++) {
             const x = c * cellSize;
             drawDashedLine(lines, x, 0, x, canvasHeight);
@@ -504,8 +569,14 @@ document.addEventListener('DOMContentLoaded', function () {
             drawDashedLine(lines, 0, y, canvasWidth, y);
         }
         app.stage.addChild(lines);
-        drawNeuronLinks(app.stage, cellSize);
-        drawNeuronSymbols(app.stage, cellSize);
+
+        const linksLayer = new PIXI.Container();
+        app.stage.addChild(linksLayer);
+        drawNeuronLinks(linksLayer, cellSize);
+
+        const symbolsLayer = new PIXI.Container();
+        app.stage.addChild(symbolsLayer);
+        drawNeuronSymbols(symbolsLayer, cellSize);
     }
 
     async function requestSaveNeuron(payload) {
@@ -578,17 +649,6 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleDetectionFieldsByType();
     });
 
-    linkModeToggleBtn.addEventListener('click', function () {
-        linkMode = !linkMode;
-        fromNeuronId = null;
-        linkModeToggleBtn.innerHTML = linkMode
-            ? '<i class="fas fa-link"></i> Modalità Link: ON'
-            : '<i class="fas fa-link"></i> Modalità Link: OFF';
-        linkModeToggleBtn.classList.toggle('btn-success', linkMode);
-        linkModeToggleBtn.classList.toggle('btn-info', !linkMode);
-        renderGrid();
-    });
-
     saveNeuronBtn.addEventListener('click', async function () {
         if (!selectedCell) return;
 
@@ -622,6 +682,7 @@ document.addEventListener('DOMContentLoaded', function () {
         saveNeuronBtn.disabled = true;
         try {
             const savedNeuron = await requestSaveNeuron({
+                id: currentNeuronId,
                 brain_grid_width: normalize(widthInput.value || 5),
                 brain_grid_height: normalize(heightInput.value || 5),
                 type: type,
@@ -676,6 +737,204 @@ document.addEventListener('DOMContentLoaded', function () {
             updateNeuronLinksHiddenInput();
         });
     }
+
+    window.addEventListener('pointermove', (event) => {
+        if (!app || !app.view) return;
+        const rect = app.view.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        let hoveredNeuron = null;
+        if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+            const i = Math.floor(y / fixedCellSize);
+            const j = Math.floor(x / fixedCellSize);
+            hoveredNeuron = findNeuronAtCell(i, j);
+            app.view.style.cursor = (!isLinkDragging && hoveredNeuron) ? 'crosshair' : 'default';
+        } else {
+            app.view.style.cursor = 'default';
+        }
+
+        if (isLinkDragging && fromNeuronId) {
+            const fromN = findNeuronById(fromNeuronId);
+            if (!fromN) return;
+
+            const startX = (Number(fromN.grid_j) * fixedCellSize) + fixedCellSize;
+            const startY = (Number(fromN.grid_i) * fixedCellSize) + (fixedCellSize / 2);
+
+            if (!tempLineGraphics) {
+                tempLineGraphics = new PIXI.Graphics();
+                app.stage.addChild(tempLineGraphics);
+            }
+            
+            tempLineGraphics.clear();
+            
+            let endX = x;
+            let endY = y;
+            let lineColor = 0x28a745; // Green (default dragging)
+            let isOverValidTarget = false;
+
+            if (hoveredNeuron && Number(hoveredNeuron.id) !== Number(fromNeuronId)) {
+                const hasLeftAnchor = hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack;
+                if (hasLeftAnchor) {
+                    isOverValidTarget = true;
+                    lineColor = 0x0ea5e9; // Cyan/Blue (valid target)
+                    // Snap to the left anchor of the target neuron
+                    endX = Number(hoveredNeuron.grid_j) * fixedCellSize;
+                    endY = (Number(hoveredNeuron.grid_i) * fixedCellSize) + (fixedCellSize / 2);
+                }
+            }
+
+            if (isOverValidTarget) {
+                // Draw a solid line when snapped
+                tempLineGraphics.lineStyle(4, lineColor, 1);
+                tempLineGraphics.moveTo(startX, startY);
+                tempLineGraphics.lineTo(endX, endY);
+                
+                // Add a small pulse effect circle at target
+                tempLineGraphics.beginFill(lineColor, 0.3);
+                tempLineGraphics.drawCircle(endX, endY, 12);
+                tempLineGraphics.endFill();
+            } else {
+                // Draw dashed line when searching
+                tempLineGraphics.lineStyle(3, lineColor, 0.8);
+                drawDashedLine(tempLineGraphics, startX, startY, endX, endY, 8, 8);
+            }
+        }
+
+        if (isNeuronDragging && draggedNeuronId) {
+            const dragN = findNeuronById(draggedNeuronId);
+            if (!dragN) return;
+
+            const targetI = Math.floor(y / fixedCellSize);
+            const targetJ = Math.floor(x / fixedCellSize);
+            
+            // Move visuals: exact mouse snap minus center offset
+            currentDragPos = { 
+                x: x - (fixedCellSize / 2), 
+                y: y - (fixedCellSize / 2) 
+            };
+
+            if (!tempLineGraphics) {
+                tempLineGraphics = new PIXI.Graphics();
+                app.stage.addChild(tempLineGraphics);
+            }
+            tempLineGraphics.clear();
+
+            const maxRows = normalize(heightInput.value || 5);
+            const maxCols = normalize(widthInput.value || 5);
+
+            // Draw placement helper
+            if (targetI >= 0 && targetJ >= 0 && targetI < maxRows && targetJ < maxCols) {
+                const isOccupied = findNeuronAtCell(targetI, targetJ) && (targetI !== dragStartCell.i || targetJ !== dragStartCell.j);
+                tempLineGraphics.lineStyle(2, isOccupied ? 0xdc3545 : 0x28a745, 1);
+                tempLineGraphics.beginFill(isOccupied ? 0xdc3545 : 0x28a745, 0.15);
+                tempLineGraphics.drawRect(targetJ * fixedCellSize + 2, targetI * fixedCellSize + 2, fixedCellSize - 4, fixedCellSize - 4);
+                tempLineGraphics.endFill();
+            }
+            
+            // Re-draw everything to move the neuron and its links live
+            renderGrid();
+        }
+    });
+    
+    window.addEventListener('pointerup', async (event) => {
+        const wasDraggingLink = isLinkDragging;
+        const wasDraggingNeuron = isNeuronDragging;
+        const oldId = draggedNeuronId;
+        const startCell = dragStartCell;
+
+        isLinkDragging = false;
+        isNeuronDragging = false;
+        currentDragPos = null;
+        draggedNeuronId = null;
+        dragStartCell = null;
+        
+        if (app && app.view) {
+            app.view.style.cursor = 'default';
+        }
+        
+        if (tempLineGraphics) {
+            tempLineGraphics.clear();
+        }
+
+        if (!app || !app.view) return;
+        const rect = app.view.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Handle dropping a neuron
+        if (wasDraggingNeuron && oldId) {
+            const targetI = Math.floor(y / fixedCellSize);
+            const targetJ = Math.floor(x / fixedCellSize);
+            const maxRows = normalize(heightInput.value || 5);
+            const maxCols = normalize(widthInput.value || 5);
+            
+            const dist = dragStartMousePos ? Math.sqrt(Math.pow(x - dragStartMousePos.x, 2) + Math.pow(y - dragStartMousePos.y, 2)) : 0;
+            const shifted = targetI !== startCell.i || targetJ !== startCell.j;
+
+            if (shifted && targetI >= 0 && targetJ >= 0 && targetI < maxRows && targetJ < maxCols && !findNeuronAtCell(targetI, targetJ)) {
+                const neuron = findNeuronById(oldId);
+                if (neuron) {
+                    try {
+                        // Persist immediately by updating the existing record
+                        const savedN = await requestSaveNeuron({
+                            id: oldId, // Pass the ID to perform an update
+                            grid_i: targetI,
+                            grid_j: targetJ,
+                            type: neuron.type,
+                            radius: neuron.radius,
+                            target_type: neuron.target_type,
+                            target_element_id: neuron.target_element_id,
+                            gene_life_id: neuron.gene_life_id,
+                            gene_attack_id: neuron.gene_attack_id
+                        });
+                        
+                        // ID remains the same, but we update the local grid coordinates
+                        neuron.grid_i = targetI;
+                        neuron.grid_j = targetJ;
+
+                        updateNeuronHiddenInput();
+                        updateNeuronLinksHiddenInput();
+                    } catch (error) {
+                        alert(error.message || 'Errore durante lo spostamento del neurone');
+                    }
+                }
+            } else if (!shifted || dist < 5) {
+                openNeuronModal(startCell.i, startCell.j);
+            }
+            dragStartMousePos = null;
+            renderGrid();
+            return;
+        }
+        // Handle dropping a link
+        if (wasDraggingLink && fromNeuronId) {
+            if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+                const i = Math.floor(y / fixedCellSize);
+                const j = Math.floor(x / fixedCellSize);
+                const toNeuron = findNeuronAtCell(i, j);
+
+                if (toNeuron && Number(toNeuron.id) !== Number(fromNeuronId)) {
+                    const hasLeftAnchor = toNeuron.type === typePath || toNeuron.type === typeAttack;
+                    if (hasLeftAnchor) {
+                        try {
+                            const savedLink = await requestSaveNeuronLink({
+                                from_neuron_id: Number(fromNeuronId),
+                                to_neuron_id: Number(toNeuron.id),
+                            });
+                            const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));
+                            if (!exists) neuronLinks.push(savedLink);
+                            updateNeuronLinksHiddenInput();
+                        } catch (error) {
+                            alert(error.message || 'Errore durante il collegamento');
+                        }
+                    }
+                }
+            }
+            fromNeuronId = null;
+            renderGrid();
+            return;
+        }
+    });
 
     toggleDetectionFieldsByType();
     updateNeuronLinksHiddenInput();

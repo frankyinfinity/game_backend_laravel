@@ -23,9 +23,9 @@ class Neuron extends Model
     ];
 
     public const TYPE_SYMBOLS = [
-        self::TYPE_DETECTION => 'O',
-        self::TYPE_PATH => '>',
-        self::TYPE_ATTACK => 'X',
+        self::TYPE_DETECTION => '👁',
+        self::TYPE_PATH => '➔',
+        self::TYPE_ATTACK => '⚔',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';

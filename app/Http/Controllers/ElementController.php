@@ -336,6 +336,7 @@ class ElementController extends Controller
         }
 
         $request->validate([
+            'id' => 'nullable|integer|exists:neurons,id',
             'brain_grid_width' => 'nullable|integer|min:1',
             'brain_grid_height' => 'nullable|integer|min:1',
             'type' => 'required|string',
@@ -399,6 +400,38 @@ class ElementController extends Controller
                     'success' => false,
                     'message' => 'Per il neurone Attacco devi selezionare Gene Vita e Gene Attacco',
                 ], 422);
+            }
+        }
+
+        $neuronId = $request->input('id');
+        if ($neuronId) {
+            $neuron = Neuron::query()->where('brain_id', $brain->id)->find($neuronId);
+            if ($neuron) {
+                $neuron->update([
+                    'grid_i' => $gridI,
+                    'grid_j' => $gridJ,
+                    'type' => $type,
+                    'radius' => $radius,
+                    'target_type' => $targetType,
+                    'target_element_id' => $targetElementId,
+                    'gene_life_id' => $geneLifeId,
+                    'gene_attack_id' => $geneAttackId,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'neuron' => [
+                        'id' => (int) $neuron->id,
+                        'type' => $neuron->type,
+                        'grid_i' => (int) $neuron->grid_i,
+                        'grid_j' => (int) $neuron->grid_j,
+                        'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
+                        'target_type' => $neuron->target_type,
+                        'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+                        'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
+                        'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
+                    ],
+                ]);
             }
         }
 
@@ -577,106 +610,67 @@ class ElementController extends Controller
             return;
         }
 
-        $syncRowsByGrid = [];
-        $clientIdToGridKey = [];
-        foreach ($decoded as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
+        $existingNeurons = $brain->neurons()->get()->keyBy('id');
+        $processedIds = [];
+        $savedNeuronsByGrid = [];
 
+        foreach ($decoded as $item) {
             $type = (string) ($item['type'] ?? '');
-            if (!in_array($type, Neuron::TYPES, true)) {
-                continue;
-            }
+            if (!in_array($type, Neuron::TYPES, true)) continue;
 
             $gridI = (int) ($item['grid_i'] ?? -1);
             $gridJ = (int) ($item['grid_j'] ?? -1);
-            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ) {
-                continue;
-            }
+            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ) continue;
 
-            $radius = null;
-            $targetType = null;
-            $targetElementId = null;
-            $geneLifeId = null;
-            $geneAttackId = null;
-            if ($type === Neuron::TYPE_DETECTION) {
-                $radius = max(1, (int) ($item['radius'] ?? 1));
-                $candidateTargetType = (string) ($item['target_type'] ?? '');
-                if (in_array($candidateTargetType, Neuron::TARGET_TYPES, true)) {
-                    $targetType = $candidateTargetType;
-                }
+            $radius = $type === Neuron::TYPE_DETECTION ? max(1, (int) ($item['radius'] ?? 1)) : null;
+            $targetType = $type === Neuron::TYPE_DETECTION ? (string) ($item['target_type'] ?? '') : null;
+            $targetElementId = ($type === Neuron::TYPE_DETECTION && $targetType === Neuron::TARGET_TYPE_ELEMENT) ? (int) ($item['target_element_id'] ?? 0) : null;
+            $geneLifeId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_life_id'] ?? 0) : null;
+            $geneAttackId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_attack_id'] ?? 0) : null;
 
-                if ($targetType === Neuron::TARGET_TYPE_ELEMENT) {
-                    $targetElementId = (int) ($item['target_element_id'] ?? 0);
-                    if ($targetElementId <= 0) {
-                        $targetElementId = null;
-                    }
-                }
-            }
-            if ($type === Neuron::TYPE_ATTACK) {
-                $geneLifeId = (int) ($item['gene_life_id'] ?? 0);
-                if ($geneLifeId <= 0) {
-                    $geneLifeId = null;
-                }
+            if ($type === Neuron::TYPE_ATTACK && ($geneLifeId <= 0 || $geneAttackId <= 0)) continue;
 
-                $geneAttackId = (int) ($item['gene_attack_id'] ?? 0);
-                if ($geneAttackId <= 0) {
-                    $geneAttackId = null;
-                }
-
-                if ($geneLifeId === null || $geneAttackId === null) {
-                    continue;
-                }
-            }
-
-            $gridKey = $gridI . '_' . $gridJ;
-            $syncRowsByGrid[$gridKey] = [
-                'type' => $type,
-                'grid_i' => $gridI,
-                'grid_j' => $gridJ,
-                'radius' => $radius,
-                'target_type' => $targetType,
-                'target_element_id' => $targetElementId,
-                'gene_life_id' => $geneLifeId,
-                'gene_attack_id' => $geneAttackId,
-            ];
             $clientId = (int) ($item['id'] ?? 0);
+            $neuron = null;
+            if ($clientId > 0) {
+                $neuron = $existingNeurons->get($clientId);
+            }
+
+            if ($neuron) {
+                $neuron->update([
+                    'grid_i' => $gridI,
+                    'grid_j' => $gridJ,
+                    'type' => $type,
+                    'radius' => $radius,
+                    'target_type' => $targetType,
+                    'target_element_id' => $targetElementId ?: null,
+                    'gene_life_id' => $geneLifeId ?: null,
+                    'gene_attack_id' => $geneAttackId ?: null,
+                ]);
+            } else {
+                $neuron = Neuron::query()->create([
+                    'brain_id' => $brain->id,
+                    'grid_i' => $gridI,
+                    'grid_j' => $gridJ,
+                    'type' => $type,
+                    'radius' => $radius,
+                    'target_type' => $targetType,
+                    'target_element_id' => $targetElementId ?: null,
+                    'gene_life_id' => $geneLifeId ?: null,
+                    'gene_attack_id' => $geneAttackId ?: null,
+                ]);
+            }
+
+            $processedIds[] = $neuron->id;
+            $gridKey = $gridI . '_' . $gridJ;
+            $savedNeuronsByGrid[$gridKey] = $neuron;
             if ($clientId > 0) {
                 $clientIdToGridKey[$clientId] = $gridKey;
             }
         }
 
-        $existingNeurons = $brain->neurons()->get()->keyBy(function ($neuron) {
-            return ((int) $neuron->grid_i) . '_' . ((int) $neuron->grid_j);
-        });
-
-        $desiredGridKeys = array_keys($syncRowsByGrid);
-        foreach ($existingNeurons as $gridKey => $existingNeuron) {
-            if (!in_array($gridKey, $desiredGridKeys, true)) {
-                $existingNeuron->delete();
-            }
-        }
-
-        $savedNeuronsByGrid = [];
-        foreach ($syncRowsByGrid as $gridKey => $row) {
-            $savedNeuron = Neuron::query()->updateOrCreate(
-                [
-                    'brain_id' => $brain->id,
-                    'grid_i' => $row['grid_i'],
-                    'grid_j' => $row['grid_j'],
-                ],
-                [
-                    'type' => $row['type'],
-                    'radius' => $row['radius'],
-                    'target_type' => $row['target_type'],
-                    'target_element_id' => $row['target_element_id'],
-                    'gene_life_id' => $row['gene_life_id'],
-                    'gene_attack_id' => $row['gene_attack_id'],
-                ]
-            );
-            $savedNeuronsByGrid[$gridKey] = $savedNeuron;
-        }
+        // Delete neurons that were not in the JSON
+        $brain->neurons()->whereNotIn('id', $processedIds)->delete();
 
         $this->syncBrainLinks($brain, $request, $savedNeuronsByGrid, $clientIdToGridKey);
     }
