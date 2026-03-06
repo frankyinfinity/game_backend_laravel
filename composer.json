@@ -12,6 +12,7 @@
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
         "laravel/ui": "^4.6",
+        "predis/predis": "2.2",
         "pusher/pusher-php-server": "^7.2",
         "spatie/valuestore": "^1.3",
         "yajra/laravel-datatables-oracle": "^11.1"
