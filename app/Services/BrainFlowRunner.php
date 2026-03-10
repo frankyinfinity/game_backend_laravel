@@ -10,8 +10,10 @@ use App\Models\Entity;
 use App\Models\EntityInformation;
 use App\Models\ElementHasPositionInformation;
 use App\Models\Gene;
+use App\Models\BrainSchedule;
 use App\Models\Neuron;
 use App\Models\NeuronLink;
+use App\Models\Tile;
 use App\Models\Player;
 use App\Models\Genome;
 use App\Custom\Draw\Primitive\Circle;
@@ -52,20 +54,99 @@ class BrainFlowRunner
             throw new \RuntimeException("ElementHasPosition {$elementHasPositionId} non trovato.");
         }
 
-        $orderedFlow = $this->buildOrderedNeuronsWithFromLink($item);
         $this->processedNeuronsById = [];
         $this->queuedDrawBySession = [];
-        foreach ($orderedFlow as &$orderedNeuron) {
-            $this->handleNeuronByType($orderedNeuron, $item);
-            if (isset($orderedNeuron['id'])) {
-                $this->processedNeuronsById[(int) $orderedNeuron['id']] = $orderedNeuron;
+        $terminalReached = false;
+        $processedFlow = [];
+
+        $brain = $item->brain;
+        if ($brain === null) {
+            return [];
+        }
+
+        $neurons = $brain->neurons->values();
+        $neuronsById = $neurons->keyBy('id');
+
+        $incomingCount = [];
+        $incomingById = [];
+        $outgoingById = [];
+        foreach ($neurons as $neuron) {
+            $incomingById[$neuron->id] = $neuron->incomingLinks->sortBy('id')->values();
+            $outgoingById[$neuron->id] = $neuron->outgoingLinks->sortBy('id')->values();
+            $incomingCount[$neuron->id] = (int) $incomingById[$neuron->id]->count();
+        }
+
+        $queue = [];
+        foreach ($neurons as $neuron) {
+            if (($incomingCount[$neuron->id] ?? 0) === 0) {
+                $queue[] = [
+                    'id' => (int) $neuron->id,
+                    'from' => null,
+                ];
             }
         }
-        unset($orderedNeuron);
+
+        if (empty($queue)) {
+            foreach ($neurons as $neuron) {
+                $queue[] = [
+                    'id' => (int) $neuron->id,
+                    'from' => null,
+                ];
+            }
+        }
+
+        $seen = [];
+        while (!empty($queue)) {
+            $entry = array_shift($queue);
+            $currentId = (int) ($entry['id'] ?? 0);
+            if ($currentId <= 0 || isset($seen[$currentId])) {
+                continue;
+            }
+
+            $model = $neuronsById->get($currentId);
+            if ($model === null) {
+                continue;
+            }
+
+            $neuron = $model->attributesToArray();
+            $neuron['neuron_from'] = $entry['from'];
+
+            $this->handleNeuronByType($neuron, $item);
+            $this->processedNeuronsById[$currentId] = $neuron;
+            $processedFlow[] = $neuron;
+            $seen[$currentId] = true;
+
+            $hasActiveOutgoing = false;
+            foreach ($outgoingById[$currentId] ?? [] as $link) {
+                if (!$this->isLinkActiveFromNeuron($neuron, $link)) {
+                    continue;
+                }
+
+                $hasActiveOutgoing = true;
+                $toId = (int) $link->to_element_has_position_neuron_id;
+                if ($toId > 0 && !isset($seen[$toId])) {
+                    $queue[] = [
+                        'id' => $toId,
+                        'from' => [
+                            'id' => (int) $currentId,
+                            'type' => $neuron['type'] ?? null,
+                            'condition' => $link->condition ?? null,
+                        ],
+                    ];
+                }
+            }
+
+            if (($neuron['is_active'] ?? false) === true && !$hasActiveOutgoing) {
+                $terminalReached = true;
+            }
+        }
 
         $this->queueCodeAtEndOfQueuedDraws($this->getEndOfTestBrainCode());
         $this->dispatchQueuedDrawRequests();
-        return $orderedFlow;
+        if ($terminalReached) {
+            $this->markBrainScheduleFinished($this->elementHasPositionId);
+        }
+        return $processedFlow;
     }
 
     private function buildOrderedNeuronsWithFromLink(ElementHasPosition $elementHasPosition): array
@@ -75,20 +156,60 @@ class BrainFlowRunner
             return [];
         }
 
-        $neurons = $brain->neurons
-            ->sortBy(fn (ElementHasPositionNeuron $n) => sprintf('%05d_%05d_%010d', (int) $n->grid_i, (int) $n->grid_j, (int) $n->id))
-            ->values();
-
-        $result = [];
+        $neurons = $brain->neurons->values();
         $neuronsById = $neurons->keyBy('id');
 
+        $sortKey = function (ElementHasPositionNeuron $n): string {
+            return sprintf('%05d_%05d_%010d', (int) $n->grid_i, (int) $n->grid_j, (int) $n->id);
+        };
+
+        $incomingById = [];
+        $outgoingById = [];
+        $indegree = [];
+
         foreach ($neurons as $current) {
+            $incomingById[$current->id] = $current->incomingLinks->sortBy('id')->values();
+            $outgoingById[$current->id] = $current->outgoingLinks->sortBy('id')->values();
+            $indegree[$current->id] = (int) $incomingById[$current->id]->count();
+        }
+
+        $queue = $neurons
+            ->filter(fn (ElementHasPositionNeuron $n) => ($indegree[$n->id] ?? 0) === 0)
+            ->sortBy(fn (ElementHasPositionNeuron $n) => $sortKey($n))
+            ->values()
+            ->all();
+
+        $ordered = [];
+        while (!empty($queue)) {
+            /** @var ElementHasPositionNeuron $node */
+            $node = array_shift($queue);
+            $ordered[] = $node;
+
+            foreach ($outgoingById[$node->id] ?? [] as $link) {
+                $toId = (int) $link->to_element_has_position_neuron_id;
+                if (!isset($indegree[$toId])) {
+                    continue;
+                }
+                $indegree[$toId]--;
+                if ($indegree[$toId] === 0 && isset($neuronsById[$toId])) {
+                    $queue[] = $neuronsById[$toId];
+                    usort($queue, function (ElementHasPositionNeuron $a, ElementHasPositionNeuron $b) use ($sortKey): int {
+                        return $sortKey($a) <=> $sortKey($b);
+                    });
+                }
+            }
+        }
+
+        if (count($ordered) !== $neurons->count()) {
+            $ordered = $neurons->sortBy(fn (ElementHasPositionNeuron $n) => $sortKey($n))->values()->all();
+        }
+
+        $result = [];
+        foreach ($ordered as $current) {
             /** @var ElementHasPositionNeuron $current */
             $neuronFrom = null;
-            foreach ($current->incomingLinks->sortBy('id') as $link) {
-                /** @var ElementHasPositionNeuron|null $toNeuron */
+            foreach ($incomingById[$current->id] ?? [] as $link) {
                 $fromNeuron = $neuronsById->get((int) $link->from_element_has_position_neuron_id);
-
                 if ($fromNeuron !== null) {
                     $neuronFrom = [
                         'id' => (int) $fromNeuron->id,
@@ -117,6 +238,12 @@ class BrainFlowRunner
 
     private function handleNeuronByType(array &$neuron, $elementHasPosition): void
     {
+        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
+            $neuron['is_active'] = false;
+            return;
+        }
+
+        $neuron['is_active'] = true;
         switch ($neuron['type'] ?? null) {
             case Neuron::TYPE_DETECTION:
                 $this->handleDetectionNeuron($neuron);
@@ -138,9 +265,68 @@ class BrainFlowRunner
 
     private function handleMovementNeuron(array $neuron, $elementHasPosition): void
     {
-        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
+        $range = (int) ($neuron['radius'] ?? 0);
+        if ($range <= 0) {
             return;
         }
+
+        $player = Player::query()->with('birthRegion')->find((int) $elementHasPosition->player_id);
+        if ($player === null || $player->birthRegion === null) {
+            return;
+        }
+
+        $birthRegion = $player->birthRegion;
+        $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $solidMap = Helper::getMapSolidTiles($tiles, $birthRegion);
+
+        $centerI = (int) $elementHasPosition->tile_i;
+        $centerJ = (int) $elementHasPosition->tile_j;
+        $candidates = [];
+
+        foreach ($this->buildRangeCoordinates($centerI, $centerJ, $range) as [$tileI, $tileJ]) {
+            if ($tileI === $centerI && $tileJ === $centerJ) {
+                continue;
+            }
+            if ($tileI < 0 || $tileJ < 0 || $tileI >= (int) $birthRegion->height || $tileJ >= (int) $birthRegion->width) {
+                continue;
+            }
+            if (($solidMap[$tileI][$tileJ] ?? 'X') !== '0') {
+                continue;
+            }
+            if (!$this->isLiquidTileAt($tiles, $tileI, $tileJ)) {
+                continue;
+            }
+
+            $hasLiveEntity = Entity::query()
+                ->where('state', Entity::STATE_LIFE)
+                ->where('tile_i', $tileI)
+                ->where('tile_j', $tileJ)
+                ->exists();
+            if ($hasLiveEntity) {
+                continue;
+            }
+
+            $hasElement = ElementHasPosition::query()
+                ->where('id', '!=', (int) $elementHasPosition->id)
+                ->where('tile_i', $tileI)
+                ->where('tile_j', $tileJ)
+                ->exists();
+            if ($hasElement) {
+                continue;
+            }
+
+            $candidates[] = ['i' => $tileI, 'j' => $tileJ];
+        }
+
+        if (empty($candidates)) {
+            return;
+        }
+
+        shuffle($candidates);
+        $target = $candidates[0];
+        $from = ['i' => $centerI, 'j' => $centerJ];
+
+        $this->drawPathForPlayer((int) $elementHasPosition->player_id, $from, $target, $elementHasPosition, false);
     }
 
     private function handleDetectionNeuron(array &$neuron): void
@@ -172,10 +358,6 @@ class BrainFlowRunner
 
     private function handlePathNeuron(array $neuron, $elementHasPosition): void
     {
-        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
-            return;
-        }
-
         $neuronFrom = $neuron['neuron_from'] ?? null;
         if (!is_array($neuronFrom) || !isset($neuronFrom['id'])) {
             return;
@@ -207,10 +389,6 @@ class BrainFlowRunner
 
     private function handleAttackNeuron(array $neuron, ElementHasPosition $elementHasPosition): void
     {
-        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
-            return;
-        }
-
         $resolvedDetectionResult = $this->resolveDetectionResultFromChain($neuron);
         if ($resolvedDetectionResult === null) {
             $neuron['attack_debug'] = 'no_detection_result_in_chain';
@@ -281,6 +459,9 @@ class BrainFlowRunner
         }
 
         $fromNeuron = $this->processedNeuronsById[$fromId];
+        if (($fromNeuron['is_active'] ?? true) === false) {
+            return false;
+        }
         if (($fromNeuron['type'] ?? null) !== Neuron::TYPE_DETECTION) {
             return true;
         }
@@ -293,6 +474,69 @@ class BrainFlowRunner
         }
         if ($condition === NeuronLink::CONDITION_ELSE) {
             return !$hasDetection;
+        }
+
+        return true;
+    }
+
+    private function hasActiveOutgoingLinks(array $neuron, array $outgoingLinks): bool
+    {
+        if (empty($outgoingLinks)) {
+            return false;
+        }
+
+        $type = $neuron['type'] ?? null;
+        $detectionResult = $neuron['detection_result'] ?? null;
+        $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
+
+        foreach ($outgoingLinks as $link) {
+            $condition = $link->condition ?? null;
+            if ($condition === 'found') {
+                $condition = NeuronLink::CONDITION_MAIN;
+            } elseif ($condition === 'not_found') {
+                $condition = NeuronLink::CONDITION_ELSE;
+            }
+
+            if ($type === Neuron::TYPE_DETECTION) {
+                if ($condition === NeuronLink::CONDITION_MAIN && $hasDetection) {
+                    return true;
+                }
+                if ($condition === NeuronLink::CONDITION_ELSE && !$hasDetection) {
+                    return true;
+                }
+                if ($condition === null || $condition === '') {
+                    return true;
+                }
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isLinkActiveFromNeuron(array $neuron, $link): bool
+    {
+        $type = $neuron['type'] ?? null;
+        $detectionResult = $neuron['detection_result'] ?? null;
+        $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
+
+        $condition = $link->condition ?? null;
+        if ($condition === 'found') {
+            $condition = NeuronLink::CONDITION_MAIN;
+        } elseif ($condition === 'not_found') {
+            $condition = NeuronLink::CONDITION_ELSE;
+        }
+
+        if ($type === Neuron::TYPE_DETECTION) {
+            if ($condition === NeuronLink::CONDITION_MAIN) {
+                return $hasDetection;
+            }
+            if ($condition === NeuronLink::CONDITION_ELSE) {
+                return !$hasDetection;
+            }
+            return true;
         }
 
         return true;
@@ -370,12 +614,28 @@ class BrainFlowRunner
         return '(' . $best['i'] . ',' . $best['j'] . ')';
     }
 
+    private function isLiquidTileAt($tiles, int $tileI, int $tileJ): bool
+    {
+        if ($tiles instanceof \Illuminate\Support\Collection) {
+            $tile = $tiles->where('i', $tileI)->where('j', $tileJ)->first();
+            return is_array($tile)
+                && isset($tile['tile']['type'])
+                && $tile['tile']['type'] === Tile::TYPE_LIQUID;
+        }
+
+        return false;
+    }
+
     private function findDetectionTargetAroundElementHasPositionFromDb(
         ElementHasPosition $elementHasPosition,
         int $range,
         string $targetType,
         ?int $targetElementId
     ): ?string {
+        $player = $elementHasPosition->player()->first();
+        $birthRegion = $player?->birthRegion;
+        $tiles = $birthRegion ? Helper::getBirthRegionTiles($birthRegion) : collect();
+
         $minI = max(0, (int) $elementHasPosition->tile_i - $range);
         $maxI = max(0, (int) $elementHasPosition->tile_i + $range);
         $minJ = max(0, (int) $elementHasPosition->tile_j - $range);
@@ -395,6 +655,9 @@ class BrainFlowRunner
             foreach ($entities as $entity) {
                 $tileI = (int) $entity->tile_i;
                 $tileJ = (int) $entity->tile_j;
+                if (!$this->isLiquidTileAt($tiles, $tileI, $tileJ)) {
+                    continue;
+                }
                 $matches[] = [
                     'i' => $tileI,
                     'j' => $tileJ,
@@ -415,6 +678,9 @@ class BrainFlowRunner
             foreach ($elements as $element) {
                 $tileI = (int) $element->tile_i;
                 $tileJ = (int) $element->tile_j;
+                if (!$this->isLiquidTileAt($tiles, $tileI, $tileJ)) {
+                    continue;
+                }
                 $matches[] = [
                     'i' => $tileI,
                     'j' => $tileJ,
@@ -483,6 +749,9 @@ class BrainFlowRunner
 
         $tile = $reply['tile'] ?? null;
         if (!is_array($tile)) {
+            return false;
+        }
+        if (($tile['type'] ?? null) !== Tile::TYPE_LIQUID) {
             return false;
         }
 
@@ -686,7 +955,7 @@ class BrainFlowRunner
         ];
     }
 
-    private function drawPathForPlayer(int $playerId, array $from, array $to, ElementHasPosition $elementHasPosition): void
+    private function drawPathForPlayer(int $playerId, array $from, array $to, ElementHasPosition $elementHasPosition, bool $stopBeforeTarget = true): void
     {
         $player = Player::query()->with('birthRegion')->find($playerId);
         if ($player === null || $player->birthRegion === null || empty($player->actual_session_id)) {
@@ -703,9 +972,11 @@ class BrainFlowRunner
             return;
         }
 
-        // Stop one tile before the detection target.
-        if (count($pathFinding) > 1) {
-            array_pop($pathFinding);
+        if ($stopBeforeTarget) {
+            // Stop one tile before the detection target.
+            if (count($pathFinding) > 1) {
+                array_pop($pathFinding);
+            }
         }
         if (empty($pathFinding)) {
             return;
@@ -1050,6 +1321,9 @@ class BrainFlowRunner
             if (($solidMap[$nextI][$nextJ] ?? 'X') !== '0') {
                 continue;
             }
+            if (!$this->isLiquidTileAt($tiles, $nextI, $nextJ)) {
+                continue;
+            }
 
             $hasLiveEntity = Entity::query()
                 ->where('state', Entity::STATE_LIFE)
@@ -1206,14 +1480,29 @@ class BrainFlowRunner
         try {
             putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
             $docker = Docker::create();
-            $docker->containerStop($container->container_id);
+            try {
+                $docker->containerStop($container->container_id);
+            } catch (\Throwable $e) {
+                Log::warning('Unable to stop container', [
+                    'parent_type' => $parentType,
+                    'parent_id' => $parentId,
+                    'container_id' => $container->container_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            if (method_exists($docker, 'containerDelete')) {
+                $docker->containerDelete($container->container_id, ['force' => true]);
+            }
         } catch (\Throwable $e) {
-            Log::warning('Unable to stop container for dead target', [
+            Log::warning('Unable to stop/delete container for dead target', [
                 'parent_type' => $parentType,
                 'parent_id' => $parentId,
                 'container_id' => $container->container_id,
                 'error' => $e->getMessage(),
             ]);
+        } finally {
+            $container->delete();
         }
     }
 
@@ -1258,6 +1547,18 @@ class BrainFlowRunner
             }
 
         }
+    }
+
+    private function markBrainScheduleFinished(int $elementHasPositionId): void
+    {
+        if ($elementHasPositionId <= 0) {
+            return;
+        }
+
+        BrainSchedule::query()
+            ->where('element_has_position_id', $elementHasPositionId)
+            ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
+            ->update(['state' => BrainSchedule::STATE_FINISH]);
     }
 
     private function queueCodeAtEndOfQueuedDraws(string $code): void

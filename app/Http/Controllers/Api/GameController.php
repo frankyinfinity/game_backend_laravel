@@ -799,10 +799,8 @@ class GameController extends Controller
         }
         
         $tile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
-        if($tile !== null) {
-            if($tile['tile']['type'] === Tile::TYPE_SOLID) {
-                return response()->json(['success' => true]);
-            }
+        if (!is_array($tile) || ($tile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+            return response()->json(['success' => true]);
         }
 
         //Get Path
@@ -1010,6 +1008,10 @@ class GameController extends Controller
         //Get Tile Info for Pathfinding
         $birthRegion = $player->birthRegion;
         $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $targetTile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
+        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+            return response()->json(['success' => false, 'message' => 'Target tile not valid']);
+        }
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
 
         $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
@@ -1423,6 +1425,10 @@ class GameController extends Controller
         // Get Tile Info for Pathfinding
         $birthRegion = $player->birthRegion;
         $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $targetTile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
+        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+            return response()->json(['success' => false, 'message' => 'Target tile not valid']);
+        }
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
 
         $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
