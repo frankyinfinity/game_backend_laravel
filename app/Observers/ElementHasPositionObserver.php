@@ -96,6 +96,7 @@ class ElementHasPositionObserver
                         ElementHasPositionNeuronLink::query()->firstOrCreate([
                             'from_element_has_position_neuron_id' => $fromClonedId,
                             'to_element_has_position_neuron_id' => $toClonedId,
+                            'condition' => $templateLink->condition,
                         ]);
                     }
                 }

@@ -9,23 +9,27 @@ class Neuron extends Model
     public const TYPE_DETECTION = 'detection';
     public const TYPE_PATH = 'path';
     public const TYPE_ATTACK = 'attack';
+    public const TYPE_MOVEMENT = 'movement';
 
     public const TYPES = [
         self::TYPE_DETECTION,
         self::TYPE_PATH,
         self::TYPE_ATTACK,
+        self::TYPE_MOVEMENT,
     ];
 
     public const TYPE_LABELS = [
         self::TYPE_DETECTION => 'Individuazione',
         self::TYPE_PATH => 'Percorso',
         self::TYPE_ATTACK => 'Attacco',
+        self::TYPE_MOVEMENT => 'Movimento',
     ];
 
     public const TYPE_SYMBOLS = [
         self::TYPE_DETECTION => '👁',
         self::TYPE_PATH => '➔',
         self::TYPE_ATTACK => '⚔',
+        self::TYPE_MOVEMENT => '⚔',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
@@ -68,3 +72,10 @@ class Neuron extends Model
         return $this->hasMany(NeuronLink::class, 'to_neuron_id');
     }
 }
+
+
+
+
+
+
+

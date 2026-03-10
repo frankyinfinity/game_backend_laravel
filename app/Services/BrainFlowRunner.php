@@ -11,6 +11,7 @@ use App\Models\EntityInformation;
 use App\Models\ElementHasPositionInformation;
 use App\Models\Gene;
 use App\Models\Neuron;
+use App\Models\NeuronLink;
 use App\Models\Player;
 use App\Models\Genome;
 use App\Custom\Draw\Primitive\Circle;
@@ -92,6 +93,7 @@ class BrainFlowRunner
                     $neuronFrom = [
                         'id' => (int) $fromNeuron->id,
                         'type' => $fromNeuron->type,
+                        'condition' => $link->condition ?? null,
                     ];
                     break;
                 }
@@ -99,6 +101,7 @@ class BrainFlowRunner
                 $neuronFrom = [
                     'id' => (int) $link->from_element_has_position_neuron_id,
                     'type' => null,
+                    'condition' => $link->condition ?? null,
                 ];
                 break;
             }
@@ -124,9 +127,19 @@ class BrainFlowRunner
             case Neuron::TYPE_ATTACK:
                 $this->handleAttackNeuron($neuron, $elementHasPosition);
                 break;
+            case Neuron::TYPE_MOVEMENT:
+                $this->handleMovementNeuron($neuron, $elementHasPosition);
+                break;
             default:
                 $this->handleUnknownNeuron($neuron);
                 break;
+        }
+    }
+
+    private function handleMovementNeuron(array $neuron, $elementHasPosition): void
+    {
+        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
+            return;
         }
     }
 
@@ -159,6 +172,10 @@ class BrainFlowRunner
 
     private function handlePathNeuron(array $neuron, $elementHasPosition): void
     {
+        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
+            return;
+        }
+
         $neuronFrom = $neuron['neuron_from'] ?? null;
         if (!is_array($neuronFrom) || !isset($neuronFrom['id'])) {
             return;
@@ -190,6 +207,10 @@ class BrainFlowRunner
 
     private function handleAttackNeuron(array $neuron, ElementHasPosition $elementHasPosition): void
     {
+        if (!$this->shouldProcessNeuronFromCondition($neuron)) {
+            return;
+        }
+
         $resolvedDetectionResult = $this->resolveDetectionResultFromChain($neuron);
         if ($resolvedDetectionResult === null) {
             $neuron['attack_debug'] = 'no_detection_result_in_chain';
@@ -235,6 +256,46 @@ class BrainFlowRunner
     private function handleUnknownNeuron(array $neuron): void
     {
         
+    }
+
+    private function shouldProcessNeuronFromCondition(array $neuron): bool
+    {
+        $from = $neuron['neuron_from'] ?? null;
+        if (!is_array($from)) {
+            return true;
+        }
+
+        $condition = $from['condition'] ?? null;
+        if ($condition === null || $condition === '') {
+            return true;
+        }
+        if ($condition === 'found') {
+            $condition = NeuronLink::CONDITION_MAIN;
+        } elseif ($condition === 'not_found') {
+            $condition = NeuronLink::CONDITION_ELSE;
+        }
+
+        $fromId = isset($from['id']) ? (int) $from['id'] : 0;
+        if ($fromId <= 0 || !isset($this->processedNeuronsById[$fromId])) {
+            return false;
+        }
+
+        $fromNeuron = $this->processedNeuronsById[$fromId];
+        if (($fromNeuron['type'] ?? null) !== Neuron::TYPE_DETECTION) {
+            return true;
+        }
+
+        $detectionResult = $fromNeuron['detection_result'] ?? null;
+        $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
+
+        if ($condition === NeuronLink::CONDITION_MAIN) {
+            return $hasDetection;
+        }
+        if ($condition === NeuronLink::CONDITION_ELSE) {
+            return !$hasDetection;
+        }
+
+        return true;
     }
 
     private function findDetectionTargetAroundElementHasPosition(

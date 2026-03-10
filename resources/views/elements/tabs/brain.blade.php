@@ -24,6 +24,7 @@
                     'id' => (int) $l->id,
                     'from_neuron_id' => (int) $l->from_neuron_id,
                     'to_neuron_id' => (int) $l->to_neuron_id,
+                    'condition' => $l->condition,
                 ];
             });
         })->unique(function ($l) {
@@ -217,9 +218,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeDetection = @json(\App\Models\Neuron::TYPE_DETECTION);
     const typePath = @json(\App\Models\Neuron::TYPE_PATH);
     const typeAttack = @json(\App\Models\Neuron::TYPE_ATTACK);
+    const typeMovement = @json(\App\Models\Neuron::TYPE_MOVEMENT);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
+    const typeLabels = @json(\App\Models\Neuron::TYPE_LABELS);
+    const linkConditionMain = @json(\App\Models\NeuronLink::CONDITION_MAIN);
+    const linkConditionElse = @json(\App\Models\NeuronLink::CONDITION_ELSE);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
@@ -238,7 +243,10 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentDragPos = null;
     let tempLineGraphics = null;
     let fromNeuronId = null;
+    let fromAnchorCondition = null;
     let currentNeuronId = null;
+    let tooltipText = null;
+    let tooltipBg = null;
 
     try {
         const parsed = JSON.parse(neuronItemsInput.value || '[]');
@@ -307,10 +315,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function resolveLinkCondition(link, fromNeuron) {
+        if (!fromNeuron || fromNeuron.type !== typeDetection) return null;
+        if (!link || !link.condition) return linkConditionMain;
+        if (link.condition === 'found') return linkConditionMain;
+        if (link.condition === 'not_found') return linkConditionElse;
+        return link.condition;
+    }
+
+    function getRightAnchorPoint(neuron, cellSize, condition, overrideTopLeft = null) {
+        if (!neuron) return { x: 0, y: 0 };
+        const topLeftX = overrideTopLeft ? overrideTopLeft.x : (Number(neuron.grid_j) * cellSize);
+        const topLeftY = overrideTopLeft ? overrideTopLeft.y : (Number(neuron.grid_i) * cellSize);
+        const baseX = topLeftX + cellSize;
+
+        if (neuron.type === typeDetection) {
+            const topY = topLeftY + (cellSize * 0.3);
+            const bottomY = topLeftY + (cellSize * 0.7);
+            const useBottom = condition === linkConditionElse;
+            return { x: baseX, y: useBottom ? bottomY : topY };
+        }
+
+        return { x: baseX, y: topLeftY + (cellSize / 2) };
+    }
+
+    function getLeftAnchorPoint(neuron, cellSize, overrideTopLeft = null) {
+        if (!neuron) return { x: 0, y: 0 };
+        const topLeftX = overrideTopLeft ? overrideTopLeft.x : (Number(neuron.grid_j) * cellSize);
+        const topLeftY = overrideTopLeft ? overrideTopLeft.y : (Number(neuron.grid_i) * cellSize);
+        return { x: topLeftX, y: topLeftY + (cellSize / 2) };
+    }
+
     function toggleDetectionFieldsByType() {
         const isDetection = neuronTypeInput.value === typeDetection;
+        const isMovement = neuronTypeInput.value === typeMovement;
         const isAttack = neuronTypeInput.value === typeAttack;
-        neuronRadiusGroup.style.display = isDetection ? '' : 'none';
+        neuronRadiusGroup.style.display = (isDetection || isMovement) ? '' : 'none';
         neuronTargetTypeGroup.style.display = isDetection ? '' : 'none';
         neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
         neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
@@ -362,24 +402,42 @@ document.addEventListener('DOMContentLoaded', function () {
             const toN = findNeuronById(link.to_neuron_id);
             if (!fromN || !toN) continue;
 
-            let x1 = (Number(fromN.grid_j) * cellSize) + cellSize;
-            let y1 = (Number(fromN.grid_i) * cellSize) + (cellSize / 2);
-            let x2 = Number(toN.grid_j) * cellSize;
-            let y2 = (Number(toN.grid_i) * cellSize) + (cellSize / 2);
+            const linkCondition = resolveLinkCondition(link, fromN);
+            let fromPoint = getRightAnchorPoint(fromN, cellSize, linkCondition);
+            let toPoint = getLeftAnchorPoint(toN, cellSize);
+            let x1 = fromPoint.x;
+            let y1 = fromPoint.y;
+            let x2 = toPoint.x;
+            let y2 = toPoint.y;
 
             if (isNeuronDragging && currentDragPos && draggedNeuronId) {
                 if (Number(fromN.id) === Number(draggedNeuronId)) {
-                    x1 = currentDragPos.x + cellSize;
-                    y1 = currentDragPos.y + (cellSize / 2);
+                    const overridePoint = getRightAnchorPoint(
+                        fromN,
+                        cellSize,
+                        linkCondition,
+                        { x: currentDragPos.x, y: currentDragPos.y }
+                    );
+                    x1 = overridePoint.x;
+                    y1 = overridePoint.y;
                 }
                 if (Number(toN.id) === Number(draggedNeuronId)) {
-                    x2 = currentDragPos.x;
-                    y2 = currentDragPos.y + (cellSize / 2);
+                    const overridePoint = getLeftAnchorPoint(
+                        toN,
+                        cellSize,
+                        { x: currentDragPos.x, y: currentDragPos.y }
+                    );
+                    x2 = overridePoint.x;
+                    y2 = overridePoint.y;
                 }
             }
 
+            let lineColor = 0x16a34a; // Green (main)
+            if (linkCondition === linkConditionElse) {
+                lineColor = 0xf97316; // Orange (else)
+            }
             const line = new PIXI.Graphics();
-            line.lineStyle(3, 0x007bff, 1); // Darker blue and thicker
+            line.lineStyle(3, lineColor, 1);
             line.moveTo(x1, y1);
             line.lineTo(x2, y2);
             layer.addChild(line);
@@ -455,6 +513,66 @@ document.addEventListener('DOMContentLoaded', function () {
                 app.view.style.cursor = 'grabbing';
                 renderGrid(); // Redraw immediately to show ghost effect
             });
+            neuronBorder.on('pointerover', () => {
+                if (!tooltipText || !tooltipBg) return;
+                const label = typeLabels[neuron.type] || neuron.type || 'Neurone';
+                const lines = [label];
+                lines.push(`Cella: (${Number(neuron.grid_i)}, ${Number(neuron.grid_j)})`);
+                if (neuron.type === typeDetection) {
+                    const targetLabel = neuron.target_type === targetTypeEntity
+                        ? 'Entity'
+                        : (neuron.target_type === targetTypeElement ? 'Element' : '-');
+                    lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
+                    lines.push(`Target: ${targetLabel}`);
+                    if (neuron.target_type === targetTypeElement) {
+                        lines.push(`Id Element: ${neuron.target_element_id != null ? neuron.target_element_id : '-'}`);
+                    }
+                } else if (neuron.type === typeAttack) {
+                    lines.push(`Gene Vita: ${neuron.gene_life_id != null ? neuron.gene_life_id : '-'}`);
+                    lines.push(`Gene Attacco: ${neuron.gene_attack_id != null ? neuron.gene_attack_id : '-'}`);
+                } else if (neuron.type === typeMovement) {
+                    lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
+                }
+
+                tooltipText.text = lines.join('\n');
+                tooltipText.visible = true;
+                tooltipBg.visible = true;
+                const paddingX = 6;
+                const paddingY = 4;
+                tooltipBg.clear();
+                tooltipBg.lineStyle(1, 0x000000, 1);
+                tooltipBg.beginFill(0xFFFFFF, 1);
+                tooltipBg.drawRect(0, 0, tooltipText.width + (paddingX * 2), tooltipText.height + (paddingY * 2));
+                tooltipBg.endFill();
+                tooltipBg.x = tooltipText.x - paddingX;
+                tooltipBg.y = tooltipText.y - paddingY;
+            });
+            neuronBorder.on('pointerout', () => {
+                if (tooltipText) tooltipText.visible = false;
+                if (tooltipBg) tooltipBg.visible = false;
+            });
+            neuronBorder.on('pointermove', (e) => {
+                if (!tooltipText || !tooltipText.visible || !tooltipBg) return;
+                const paddingX = 6;
+                const paddingY = 4;
+                const offsetX = 12;
+                const offsetY = 12;
+                const rect = app && app.view ? app.view.getBoundingClientRect() : null;
+                const maxX = rect ? rect.width : (app ? app.renderer.width : Infinity);
+                const maxY = rect ? rect.height : (app ? app.renderer.height : Infinity);
+                const tooltipW = tooltipText.width + (paddingX * 2);
+                const tooltipH = tooltipText.height + (paddingY * 2);
+
+                let x = e.global.x + offsetX;
+                let y = e.global.y + offsetY;
+                if (x + tooltipW > maxX) x = Math.max(0, maxX - tooltipW);
+                if (y + tooltipH > maxY) y = Math.max(0, maxY - tooltipH);
+
+                tooltipText.x = x;
+                tooltipText.y = y;
+                tooltipBg.x = tooltipText.x - paddingX;
+                tooltipBg.y = tooltipText.y - paddingY;
+            });
 
             layer.addChild(neuronBorder);
 
@@ -471,12 +589,12 @@ document.addEventListener('DOMContentLoaded', function () {
             text.y = (i * cellSize) + (cellSize / 2) - (text.height / 2);
             layer.addChild(text);
 
-            const hasLeftAnchor = neuron.type === typePath || neuron.type === typeAttack;
+            const hasLeftAnchor = neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement;
             const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath;
 
             if (hasLeftAnchor) {
                 const leftAnchor = new PIXI.Graphics();
-                leftAnchor.beginFill(0x0ea5e9);
+                leftAnchor.beginFill(0x16a34a);
                 leftAnchor.lineStyle(2, 0xffffff, 1);
                 leftAnchor.drawCircle((j * cellSize), (i * cellSize) + (cellSize / 2), 8);
                 leftAnchor.endFill();
@@ -487,25 +605,61 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (hasRightAnchor) {
-                const rightAnchor = new PIXI.Graphics();
-                rightAnchor.beginFill(0x3b82f6);
-                rightAnchor.lineStyle(2, 0xffffff, 1);
-                rightAnchor.drawCircle((j * cellSize) + cellSize, (i * cellSize) + (cellSize / 2), 8);
-                rightAnchor.endFill();
-                rightAnchor.alpha = isDragging ? 0.5 : 1;
-                rightAnchor.eventMode = 'static';
-                rightAnchor.cursor = 'crosshair';
-                
-                rightAnchor.on('pointerdown', (e) => {
-                    e.stopPropagation();
-                    fromNeuronId = neuron.id;
-                    isLinkDragging = true;
-                    if (!tempLineGraphics) {
-                        tempLineGraphics = new PIXI.Graphics();
-                        layer.addChild(tempLineGraphics);
+                const baseX = (j * cellSize) + cellSize;
+                const baseY = i * cellSize;
+
+                if (neuron.type === typeDetection) {
+                    const topAnchorY = baseY + (cellSize * 0.3);
+                    const bottomAnchorY = baseY + (cellSize * 0.7);
+                    const anchorConfigs = [
+                        { y: topAnchorY, condition: linkConditionMain, color: 0x16a34a },
+                        { y: bottomAnchorY, condition: linkConditionElse, color: 0xf97316 },
+                    ];
+
+                    for (const anchorConfig of anchorConfigs) {
+                        const rightAnchor = new PIXI.Graphics();
+                        rightAnchor.beginFill(anchorConfig.color);
+                        rightAnchor.lineStyle(2, 0xffffff, 1);
+                        rightAnchor.drawCircle(baseX, anchorConfig.y, 8);
+                        rightAnchor.endFill();
+                        rightAnchor.alpha = isDragging ? 0.5 : 1;
+                        rightAnchor.eventMode = 'static';
+                        rightAnchor.cursor = 'crosshair';
+
+                        rightAnchor.on('pointerdown', (e) => {
+                            e.stopPropagation();
+                            fromNeuronId = neuron.id;
+                            fromAnchorCondition = anchorConfig.condition;
+                            isLinkDragging = true;
+                            if (!tempLineGraphics) {
+                                tempLineGraphics = new PIXI.Graphics();
+                                layer.addChild(tempLineGraphics);
+                            }
+                        });
+                        layer.addChild(rightAnchor);
                     }
-                });
-                layer.addChild(rightAnchor);
+                } else {
+                    const rightAnchor = new PIXI.Graphics();
+                    rightAnchor.beginFill(0x16a34a);
+                    rightAnchor.lineStyle(2, 0xffffff, 1);
+                    rightAnchor.drawCircle(baseX, baseY + (cellSize / 2), 8);
+                    rightAnchor.endFill();
+                    rightAnchor.alpha = isDragging ? 0.5 : 1;
+                    rightAnchor.eventMode = 'static';
+                    rightAnchor.cursor = 'crosshair';
+
+                    rightAnchor.on('pointerdown', (e) => {
+                        e.stopPropagation();
+                        fromNeuronId = neuron.id;
+                        fromAnchorCondition = null;
+                        isLinkDragging = true;
+                        if (!tempLineGraphics) {
+                            tempLineGraphics = new PIXI.Graphics();
+                            layer.addChild(tempLineGraphics);
+                        }
+                    });
+                    layer.addChild(rightAnchor);
+                }
             }
         }
     }
@@ -577,6 +731,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const symbolsLayer = new PIXI.Container();
         app.stage.addChild(symbolsLayer);
         drawNeuronSymbols(symbolsLayer, cellSize);
+
+        tooltipBg = new PIXI.Graphics();
+        tooltipBg.visible = false;
+        tooltipBg.zIndex = 19999;
+        app.stage.addChild(tooltipBg);
+
+        tooltipText = new PIXI.Text('', {
+            fill: 0x000000,
+            fontSize: 12,
+            fontWeight: 'bold',
+            fontFamily: 'Consolas',
+            align: 'left',
+        });
+        tooltipText.visible = false;
+        tooltipText.zIndex = 20000;
+        app.stage.addChild(tooltipText);
+        app.stage.sortChildren();
     }
 
     async function requestSaveNeuron(payload) {
@@ -668,6 +839,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const parsed = parseInt(neuronTargetElementIdInput.value, 10);
                 targetElementId = Number.isNaN(parsed) ? null : parsed;
             }
+        } else if (type === typeMovement) {
+            radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
         } else if (type === typeAttack) {
             const parsedLife = parseInt(neuronGeneLifeIdInput.value, 10);
             const parsedAttack = parseInt(neuronGeneAttackIdInput.value, 10);
@@ -758,8 +931,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const fromN = findNeuronById(fromNeuronId);
             if (!fromN) return;
 
-            const startX = (Number(fromN.grid_j) * fixedCellSize) + fixedCellSize;
-            const startY = (Number(fromN.grid_i) * fixedCellSize) + (fixedCellSize / 2);
+            const resolvedCondition = resolveLinkCondition({ condition: fromAnchorCondition }, fromN);
+            const startPoint = getRightAnchorPoint(fromN, fixedCellSize, resolvedCondition);
+            const startX = startPoint.x;
+            const startY = startPoint.y;
 
             if (!tempLineGraphics) {
                 tempLineGraphics = new PIXI.Graphics();
@@ -770,14 +945,17 @@ document.addEventListener('DOMContentLoaded', function () {
             
             let endX = x;
             let endY = y;
-            let lineColor = 0x28a745; // Green (default dragging)
+            let lineColor = 0x16a34a; // Green (main)
+            if (resolvedCondition === linkConditionElse) {
+                lineColor = 0xf97316; // Orange (else)
+            }
             let isOverValidTarget = false;
 
             if (hoveredNeuron && Number(hoveredNeuron.id) !== Number(fromNeuronId)) {
-                const hasLeftAnchor = hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack;
+                const hasLeftAnchor = hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack || hoveredNeuron.type === typeMovement;
                 if (hasLeftAnchor) {
                     isOverValidTarget = true;
-                    lineColor = 0x0ea5e9; // Cyan/Blue (valid target)
+                    lineColor = resolvedCondition === linkConditionElse ? 0xf59e0b : 0x22c55e; // Orange/Green (valid target)
                     // Snap to the left anchor of the target neuron
                     endX = Number(hoveredNeuron.grid_j) * fixedCellSize;
                     endY = (Number(hoveredNeuron.grid_i) * fixedCellSize) + (fixedCellSize / 2);
@@ -914,13 +1092,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 const toNeuron = findNeuronAtCell(i, j);
 
                 if (toNeuron && Number(toNeuron.id) !== Number(fromNeuronId)) {
-                    const hasLeftAnchor = toNeuron.type === typePath || toNeuron.type === typeAttack;
+                    const hasLeftAnchor = toNeuron.type === typePath || toNeuron.type === typeAttack || toNeuron.type === typeMovement;
                     if (hasLeftAnchor) {
                         try {
-                            const savedLink = await requestSaveNeuronLink({
+                            const fromNeuron = findNeuronById(fromNeuronId);
+                            const payload = {
                                 from_neuron_id: Number(fromNeuronId),
                                 to_neuron_id: Number(toNeuron.id),
-                            });
+                            };
+                            if (fromNeuron && fromNeuron.type === typeDetection) {
+                                payload.condition = fromAnchorCondition || linkConditionMain;
+                            }
+                            const savedLink = await requestSaveNeuronLink(payload);
                             const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));
                             if (!exists) neuronLinks.push(savedLink);
                             updateNeuronLinksHiddenInput();
@@ -931,6 +1114,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
             fromNeuronId = null;
+            fromAnchorCondition = null;
             renderGrid();
             return;
         }

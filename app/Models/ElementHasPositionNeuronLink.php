@@ -11,6 +11,7 @@ class ElementHasPositionNeuronLink extends Model
     protected $casts = [
         'from_element_has_position_neuron_id' => 'integer',
         'to_element_has_position_neuron_id' => 'integer',
+        'condition' => 'string',
     ];
 
     public function fromNeuron()
@@ -23,4 +24,3 @@ class ElementHasPositionNeuronLink extends Model
         return $this->belongsTo(ElementHasPositionNeuron::class, 'to_element_has_position_neuron_id');
     }
 }
-

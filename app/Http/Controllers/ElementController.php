@@ -389,6 +389,10 @@ class ElementController extends Controller
             }
         }
 
+        if ($type === Neuron::TYPE_MOVEMENT) {
+            $radius = max(1, (int) $request->input('radius', 1));
+        }
+
         if ($type === Neuron::TYPE_ATTACK) {
             $candidateGeneLifeId = (int) $request->input('gene_life_id', 0);
             $candidateGeneAttackId = (int) $request->input('gene_attack_id', 0);
@@ -499,6 +503,7 @@ class ElementController extends Controller
         $request->validate([
             'from_neuron_id' => 'required|integer|min:1',
             'to_neuron_id' => 'required|integer|min:1|different:from_neuron_id',
+            'condition' => 'nullable|string',
         ]);
 
         $fromNeuron = Neuron::query()
@@ -517,10 +522,34 @@ class ElementController extends Controller
             ], 422);
         }
 
-        $link = NeuronLink::query()->firstOrCreate([
-            'from_neuron_id' => $fromNeuron->id,
-            'to_neuron_id' => $toNeuron->id,
-        ]);
+        $condition = null;
+        if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
+            $candidateCondition = (string) $request->input('condition', '');
+            if ($candidateCondition === 'found') {
+                $candidateCondition = NeuronLink::CONDITION_MAIN;
+            } elseif ($candidateCondition === 'not_found') {
+                $candidateCondition = NeuronLink::CONDITION_ELSE;
+            }
+            if (in_array($candidateCondition, NeuronLink::CONDITIONS, true)) {
+                $condition = $candidateCondition;
+            } else {
+                $condition = NeuronLink::CONDITION_MAIN;
+            }
+        }
+
+        $link = NeuronLink::query()->firstOrCreate(
+            [
+                'from_neuron_id' => $fromNeuron->id,
+                'to_neuron_id' => $toNeuron->id,
+            ],
+            [
+                'condition' => $condition,
+            ]
+        );
+
+        if ($link->condition !== $condition) {
+            $link->update(['condition' => $condition]);
+        }
 
         return response()->json([
             'success' => true,
@@ -528,6 +557,7 @@ class ElementController extends Controller
                 'id' => (int) $link->id,
                 'from_neuron_id' => (int) $link->from_neuron_id,
                 'to_neuron_id' => (int) $link->to_neuron_id,
+                'condition' => $link->condition,
             ],
         ]);
     }
@@ -622,7 +652,9 @@ class ElementController extends Controller
             $gridJ = (int) ($item['grid_j'] ?? -1);
             if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ) continue;
 
-            $radius = $type === Neuron::TYPE_DETECTION ? max(1, (int) ($item['radius'] ?? 1)) : null;
+            $radius = ($type === Neuron::TYPE_DETECTION || $type === Neuron::TYPE_MOVEMENT)
+                ? max(1, (int) ($item['radius'] ?? 1))
+                : null;
             $targetType = $type === Neuron::TYPE_DETECTION ? (string) ($item['target_type'] ?? '') : null;
             $targetElementId = ($type === Neuron::TYPE_DETECTION && $targetType === Neuron::TARGET_TYPE_ELEMENT) ? (int) ($item['target_element_id'] ?? 0) : null;
             $geneLifeId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_life_id'] ?? 0) : null;
@@ -719,10 +751,26 @@ class ElementController extends Controller
                 continue;
             }
 
+            $condition = null;
+            if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
+                $candidateCondition = (string) ($link['condition'] ?? '');
+                if ($candidateCondition === 'found') {
+                    $candidateCondition = NeuronLink::CONDITION_MAIN;
+                } elseif ($candidateCondition === 'not_found') {
+                    $candidateCondition = NeuronLink::CONDITION_ELSE;
+                }
+                if (in_array($candidateCondition, NeuronLink::CONDITIONS, true)) {
+                    $condition = $candidateCondition;
+                } else {
+                    $condition = NeuronLink::CONDITION_MAIN;
+                }
+            }
+
             $pairKey = ((int) $fromNeuron->id) . '_' . ((int) $toNeuron->id);
             $validPairs[$pairKey] = [
                 'from_neuron_id' => (int) $fromNeuron->id,
                 'to_neuron_id' => (int) $toNeuron->id,
+                'condition' => $condition,
             ];
         }
 

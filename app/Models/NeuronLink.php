@@ -6,9 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 
 class NeuronLink extends Model
 {
+    public const CONDITION_MAIN = 'main';
+    public const CONDITION_ELSE = 'else';
+
+    public const CONDITIONS = [
+        self::CONDITION_MAIN,
+        self::CONDITION_ELSE,
+    ];
+
     protected $fillable = [
         'from_neuron_id',
         'to_neuron_id',
+        'condition',
     ];
 
     public function fromNeuron()
@@ -21,4 +30,3 @@ class NeuronLink extends Model
         return $this->belongsTo(Neuron::class, 'to_neuron_id');
     }
 }
-
