@@ -59,6 +59,15 @@ class GenerateMapJob implements ShouldQueue
         $birthClimate = $birthRegion->birthClimate;
 
         $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $tilesByCoord = [];
+        foreach ($tiles as $tileRow) {
+            $tileI = (int) ($tileRow['i'] ?? $tileRow->i ?? 0);
+            $tileJ = (int) ($tileRow['j'] ?? $tileRow->j ?? 0);
+            $tileData = $tileRow['tile'] ?? $tileRow->tile ?? null;
+            if ($tileData !== null) {
+                $tilesByCoord[$tileI . ':' . $tileJ] = $tileData;
+            }
+        }
 
         $entities = Entity::query()
             ->where('state', Entity::STATE_LIFE)
@@ -73,13 +82,30 @@ class GenerateMapJob implements ShouldQueue
             ->get();
 
         $ports = [];
+        $containersByParentId = [];
+        foreach ($containers as $container) {
+            $parentId = (int) $container->parent_id;
+            if ($parentId > 0) {
+                $containersByParentId[$parentId] = $container;
+            }
+        }
         foreach ($entities as $entity) {
-            $container = $containers->where('parent_id', $entity->id)->first();
+            $container = $containersByParentId[(int) $entity->id] ?? null;
             if ($container && $container->ws_port) {
                 $ports[$entity->uid] = $container->ws_port;
             }
         }
         $portsJson = json_encode($ports);
+
+        $entitiesByCoord = [];
+        foreach ($entities as $entity) {
+            $entitiesByCoord[(int) $entity->tile_i . ':' . (int) $entity->tile_j] = $entity;
+        }
+
+        $jsPathClickTile = resource_path('js/function/entity/click_tile_ws.blade.php');
+        $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
+        $jsContentClickTileTemplate = file_get_contents($jsPathClickTile);
+        $jsContentPointerTileTemplate = file_get_contents($jsPathPointerTile);
 
         ObjectCache::buffer($player->actual_session_id);
 
@@ -94,23 +120,25 @@ class GenerateMapJob implements ShouldQueue
             for ($j = 0; $j < $birthRegion->width; $j++) {
 
                 $tile = $birthClimate->default_tile;
-                $searchTile = $tiles->where('i', $i)->where('j', $j)->first();
-                if($searchTile !== null) {
-                    $tile = $searchTile['tile'];
+                $searchTile = $tilesByCoord[$i . ':' . $j] ?? null;
+                if ($searchTile !== null) {
+                    $tile = $searchTile;
                 }
 
                 $color = $tile['color'];
-                $hexWithoutHash = ltrim($color, '#');
-                $decimalValue = hexdec($hexWithoutHash);
-                $formattedHexColor = '0x' . strtoupper(dechex($decimalValue));
+                static $colorCache = [];
+                if (!isset($colorCache[$color])) {
+                    $hexWithoutHash = ltrim($color, '#');
+                    $decimalValue = hexdec($hexWithoutHash);
+                    $colorCache[$color] = '0x' . strtoupper(dechex($decimalValue));
+                }
+                $formattedHexColor = $colorCache[$color];
 
                 //Square
                 $squareUid = 'square_'.$i.'_'.$j;
 
                 //Click
-                $jsPathClickTile = resource_path('js/function/entity/click_tile_ws.blade.php');
-                $jsContentClickTile = file_get_contents($jsPathClickTile);
-                $jsContentClickTile = Helper::setCommonJsCode($jsContentClickTile, \Illuminate\Support\Str::random(20));
+                $jsContentClickTile = Helper::setCommonJsCode($jsContentClickTileTemplate, \Illuminate\Support\Str::random(20));
                 $jsContentClickTile = str_replace('__i__', $i, $jsContentClickTile);
                 $jsContentClickTile = str_replace('__j__', $j, $jsContentClickTile);
                 $jsContentClickTile = str_replace('__ports__', $portsJson, $jsContentClickTile);
@@ -119,14 +147,11 @@ class GenerateMapJob implements ShouldQueue
                 $squareColor = $formattedHexColor;
                 $overlaySquareColor = '#FF0000';
 
-                $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
-                $jsContentPointerTile = file_get_contents($jsPathPointerTile);
-
-                $jsContentPointerOverTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
+                $jsContentPointerOverTile = Helper::setCommonJsCode($jsContentPointerTileTemplate, \Illuminate\Support\Str::random(20));
                 $jsContentPointerOverTile = str_replace('__uid__', $squareUid, $jsContentPointerOverTile);
                 $jsContentPointerOverTile = str_replace('__color__', $overlaySquareColor, $jsContentPointerOverTile);
 
-                $jsContentPointerOutTile = Helper::setCommonJsCode($jsContentPointerTile, \Illuminate\Support\Str::random(20));
+                $jsContentPointerOutTile = Helper::setCommonJsCode($jsContentPointerTileTemplate, \Illuminate\Support\Str::random(20));
                 $jsContentPointerOutTile = str_replace('__uid__', $squareUid, $jsContentPointerOutTile);
                 $jsContentPointerOutTile = str_replace('__color__', $squareColor, $jsContentPointerOutTile);
 
@@ -161,7 +186,7 @@ class GenerateMapJob implements ShouldQueue
                 $drawItems[] = $objectDraw->get();
 
                 //Entity
-                $searchEntity = $entities->where('tile_i', $i)->where('tile_j', $j)->first();
+                $searchEntity = $entitiesByCoord[$i . ':' . $j] ?? null;
                 if($searchEntity !== null) {
 
                     $entityDraw = new EntityDraw($searchEntity, $square);
