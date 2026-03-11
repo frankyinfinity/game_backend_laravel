@@ -1173,18 +1173,11 @@ class BrainFlowRunner
             $progressBarUid = $targetType === 'entity'
                 ? ($targetUid . '_progress_bar_' . $lifeGene->key)
                 : ('gene_progress_' . $lifeGene->key . '_element_' . $targetUid);
-            $isPanelRenderable = $this->isTargetPanelRenderable($sessionId, $targetUid);
             try {
                 $progressBar = new ProgressBarDraw($progressBarUid);
                 $operations = $progressBar->updateValue($newLife, $sessionId);
                 foreach ($operations as $operation) {
                     if (($operation['type'] ?? null) === 'update') {
-                        if ($isPanelRenderable === false) {
-                            if (!isset($operation['attributes']) || !is_array($operation['attributes'])) {
-                                $operation['attributes'] = [];
-                            }
-                            $operation['attributes']['renderable'] = false;
-                        }
                         $updateObject = new ObjectUpdate($operation['uid'], $sessionId);
                         foreach (($operation['attributes'] ?? []) as $attribute => $value) {
                             $updateObject->setAttributes($attribute, $value);
@@ -1196,9 +1189,6 @@ class BrainFlowRunner
                     }
 
                     if (($operation['type'] ?? null) === 'draw') {
-                        if ($isPanelRenderable === false) {
-                            continue;
-                        }
                         $drawCommands[] = $this->drawMapGroupObject($operation['object'], $sessionId);
                         continue;
                     }
@@ -1217,15 +1207,8 @@ class BrainFlowRunner
         if ($newLife !== null && $newLife <= 0) {
             if ($targetType === 'entity' && $targetEntity !== null) {
                 $targetEntity->update(['state' => Entity::STATE_DEATH]);
-                $idsToClear = $this->resolveDrawUidsForObject($sessionId, (string) $targetUid, [
-                    (string) $targetUid,
-                    $targetUid . '_panel',
-                    $targetUid . '_text_row_1',
-                    $targetUid . '_text_row_2',
-                    $targetUid . '_button_division',
-                    $targetUid . '_button_division_rect',
-                    $targetUid . '_button_division_text',
-                ]);
+                $fallbackUids = $this->buildEntityClearFallbackUids($targetEntity, (string) $targetUid);
+                $idsToClear = $this->resolveDrawUidsForObject($sessionId, (string) $targetUid, $fallbackUids);
 
                 foreach ($idsToClear as $idToClear) {
                     $clearObject = new ObjectClear($idToClear, $sessionId);
@@ -1239,17 +1222,8 @@ class BrainFlowRunner
             }
 
             if ($targetType === 'element' && $targetElementPosition !== null) {
-                $idsToClear = $this->resolveDrawUidsForObject($sessionId, (string) $targetUid, [
-                    (string) $targetUid,
-                    $targetUid . '_panel',
-                    $targetUid . '_text_name',
-                    $targetUid . '_btn_attack',
-                    $targetUid . '_btn_attack_rect',
-                    $targetUid . '_btn_attack_text',
-                    $targetUid . '_btn_consume',
-                    $targetUid . '_btn_consume_rect',
-                    $targetUid . '_btn_consume_text',
-                ]);
+                $fallbackUids = $this->buildElementClearFallbackUids($targetElementPosition, (string) $targetUid);
+                $idsToClear = $this->resolveDrawUidsForObject($sessionId, (string) $targetUid, $fallbackUids);
                 foreach ($idsToClear as $idToClear) {
                     $clearObject = new ObjectClear($idToClear, $sessionId);
                     $drawCommands[] = $clearObject->get();
@@ -1265,6 +1239,82 @@ class BrainFlowRunner
         ObjectCache::flush($sessionId);
         $this->queueDrawCommands($player, $sessionId, $drawCommands);
         return true;
+    }
+
+    private function buildEntityClearFallbackUids(Entity $targetEntity, string $targetUid): array
+    {
+        $fallback = [
+            $targetUid,
+            $targetUid . '_panel',
+            $targetUid . '_text_row_1',
+            $targetUid . '_text_row_2',
+        ];
+
+        $buttonBases = [
+            $targetUid . '_button_up',
+            $targetUid . '_button_left',
+            $targetUid . '_button_down',
+            $targetUid . '_button_right',
+            $targetUid . '_button_division',
+        ];
+        foreach ($buttonBases as $base) {
+            $fallback[] = $base;
+            $fallback[] = $base . '_rect';
+            $fallback[] = $base . '_text';
+        }
+
+        $genomes = Genome::query()
+            ->where('entity_id', $targetEntity->id)
+            ->with(['gene'])
+            ->get();
+        foreach ($genomes as $genome) {
+            $gene = $genome->gene;
+            if ($gene === null || ($gene->type ?? null) !== Gene::DYNAMIC_MAX) {
+                continue;
+            }
+            $progressUid = $targetUid . '_progress_bar_' . $gene->key;
+            $fallback[] = $progressUid;
+            $fallback[] = $progressUid . '_border';
+            $fallback[] = $progressUid . '_bar';
+            $fallback[] = $progressUid . '_text';
+            $fallback[] = $progressUid . '_range';
+        }
+
+        return array_values(array_unique($fallback));
+    }
+
+    private function buildElementClearFallbackUids(ElementHasPosition $targetElementPosition, string $targetUid): array
+    {
+        $fallback = [
+            $targetUid,
+            $targetUid . '_panel',
+            $targetUid . '_text_name',
+            $targetUid . '_btn_attack',
+            $targetUid . '_btn_attack_rect',
+            $targetUid . '_btn_attack_text',
+            $targetUid . '_btn_consume',
+            $targetUid . '_btn_consume_rect',
+            $targetUid . '_btn_consume_text',
+        ];
+
+        $elementInfos = ElementHasPositionInformation::query()
+            ->where('element_has_position_id', $targetElementPosition->id)
+            ->with(['gene'])
+            ->get();
+        foreach ($elementInfos as $elementInfo) {
+            $gene = $elementInfo->gene;
+            if ($gene === null) {
+                continue;
+            }
+            $progressUid = 'gene_progress_' . $gene->key . '_element_' . $targetUid;
+            $fallback[] = $progressUid;
+            $fallback[] = $progressUid . '_border';
+            $fallback[] = $progressUid . '_bar';
+            $fallback[] = $progressUid . '_text';
+            $fallback[] = $progressUid . '_range';
+        }
+
+        return array_values(array_unique($fallback));
     }
 
     private function moveElementAwayOneTile(int $playerId, ElementHasPosition $elementHasPosition, array $targetTile): bool
@@ -1394,21 +1444,6 @@ class BrainFlowRunner
         $this->queueDrawCommands($player, $sessionId, $drawCommands);
 
         return true;
-    }
-
-    private function isTargetPanelRenderable(string $sessionId, string $targetUid): bool
-    {
-        $panel = ObjectCache::find($sessionId, $targetUid . '_panel');
-        if (!is_array($panel)) {
-            return true;
-        }
-
-        $attributes = $panel['attributes'] ?? null;
-        if (!is_array($attributes)) {
-            return true;
-        }
-
-        return (bool) ($attributes['renderable'] ?? true);
     }
 
     private function resolveDrawUidsForObject(string $sessionId, string $rootUid, array $fallbackUids = []): array

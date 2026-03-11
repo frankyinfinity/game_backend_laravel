@@ -47,35 +47,40 @@ class ProgressBarDraw {
         
         // Load existing properties from cache
         $cachedBorder = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_border');
-        $cachedText = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_text');
-        
-        if (!$cachedBorder || !$cachedText) {
-            throw new \Exception("ProgressBar not found in cache. Make sure to call build() first.");
+        if (!$cachedBorder) {
+            return [];
         }
+        $cachedText = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_text');
         
         // Extract properties from cached objects
         $this->x = $cachedBorder['x'];
         $this->y = $cachedBorder['y'];
         $this->width = $cachedBorder['width'];
         $this->height = $cachedBorder['height'];
-        $this->barColor = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar')['color'] ?? $this->barColor;
+        $cachedBar = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar');
+        if (is_array($cachedBar) && isset($cachedBar['color'])) {
+            $this->barColor = $cachedBar['color'];
+        }
         
         $operations = [];
         
         // 1. Update the label text (name + value)
         // Extract name from cached text (remove the old value part)
-        $cachedTextContent = $cachedText['text'];
-        if (preg_match('/^(.+?)\s*\(\d+\)$/', $cachedTextContent, $matches)) {
-            $this->name = $matches[1];
+        if (is_array($cachedText) && isset($cachedText['text'])) {
+            $cachedTextContent = $cachedText['text'];
+            if (preg_match('/^(.+?)\s*\(\d+\)$/', $cachedTextContent, $matches)) {
+                $this->name = $matches[1];
+            }
+            if ($this->name !== '') {
+                $operations[] = [
+                    'type' => 'update',
+                    'uid' => $this->uid . '_text',
+                    'attributes' => [
+                        'text' => $this->name . " (" . $this->value . ")"
+                    ]
+                ];
+            }
         }
-        
-        $operations[] = [
-            'type' => 'update',
-            'uid' => $this->uid . '_text',
-            'attributes' => [
-                'text' => $this->name . " (" . $this->value . ")"
-            ]
-        ];
         
         // 2. Calculate new bar dimensions
         // We need min/max - try to extract from range text or use defaults
@@ -91,43 +96,21 @@ class ProgressBarDraw {
         $barWidth = ($this->width - 4) * $percent;
         $barHeight = $this->height - 4;
         
-        // Update the existing bar's width instead of clearing and redrawing
-        // This preserves the bar's position as a child of the entity's panel
-        if ($barWidth > 0) {
+        // Update the existing bar's width instead of clearing and redrawing.
+        // Avoid toggling renderable here: the client UI controls visibility.
+        if (is_array($cachedBar)) {
             $operations[] = [
                 'type' => 'update',
                 'uid' => $this->uid . '_bar',
                 'attributes' => [
-                    'width' => $barWidth,
-                    'height' => $barHeight,
-                    'renderable' => true
+                    'width' => max(0, $barWidth),
+                    'height' => $barHeight
                 ]
             ];
-            
-            // Update the cache with the new bar attributes
-            $cachedBar = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar');
-            if ($cachedBar) {
-                $cachedBar['width'] = $barWidth;
-                $cachedBar['height'] = $barHeight;
-                $cachedBar['renderable'] = true;
-                \App\Custom\Manipulation\ObjectCache::put($sessionId, $cachedBar);
-            }
-        } else {
-            // If bar width is 0, hide it
-            $operations[] = [
-                'type' => 'update',
-                'uid' => $this->uid . '_bar',
-                'attributes' => [
-                    'renderable' => false
-                ]
-            ];
-            
-            // Update the cache with the new bar attributes
-            $cachedBar = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_bar');
-            if ($cachedBar) {
-                $cachedBar['renderable'] = false;
-                \App\Custom\Manipulation\ObjectCache::put($sessionId, $cachedBar);
-            }
+
+            $cachedBar['width'] = max(0, $barWidth);
+            $cachedBar['height'] = $barHeight;
+            \App\Custom\Manipulation\ObjectCache::put($sessionId, $cachedBar);
         }
         
         return $operations;
@@ -186,15 +169,13 @@ class ProgressBarDraw {
         $barWidth = ($this->width - 4) * $percent; // Subtracting a bit for padding inside the border
         $barHeight = $this->height - 4;
 
-        if ($barWidth > 0) {
-            $bar = new Primitive\Rectangle($this->uid . '_bar');
-            $bar->setSize($barWidth, $barHeight);
-            $bar->setOrigin($this->x + 2, $this->y + 2);
-            $bar->setColor($this->barColor);
-            $bar->setBorderRadius(0);
-            $bar->setRenderable($this->renderable);
-            $this->drawItems[] = $bar;
-        }
+        $bar = new Primitive\Rectangle($this->uid . '_bar');
+        $bar->setSize(max(0, $barWidth), $barHeight);
+        $bar->setOrigin($this->x + 2, $this->y + 2);
+        $bar->setColor($this->barColor);
+        $bar->setBorderRadius(0);
+        $bar->setRenderable($this->renderable);
+        $this->drawItems[] = $bar;
 
         // 3. The Name (Label)
         if (!empty($this->name)) {

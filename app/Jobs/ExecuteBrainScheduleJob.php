@@ -29,10 +29,6 @@ class ExecuteBrainScheduleJob implements ShouldQueue
             return;
         }
 
-        if ($brainSchedule->state !== BrainSchedule::STATE_CREATE) {
-            return;
-        }
-
         $brainSchedule->update([
             'state' => BrainSchedule::STATE_IN_PROGRESS,
         ]);

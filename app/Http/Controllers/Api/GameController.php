@@ -2193,17 +2193,17 @@ class GameController extends Controller
         ]);
         $elementHasPositionId = $request->element_has_position_id;
 
-        /*$alreadyCreate = BrainSchedule::query()
+        $alreadyCreate = BrainSchedule::query()
             ->where('element_has_position_id', $elementHasPositionId)
             ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
             ->exists();
 
         if (!$alreadyCreate) {
-            BrainSchedule::query()->create([
+            /*BrainSchedule::query()->create([
                 'element_has_position_id' => $elementHasPositionId,
                 'state' => BrainSchedule::STATE_CREATE,
-            ]);
-        }*/
+            ]);*/
+        }
 
         return response()->json([
             'success' => true,
