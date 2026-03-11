@@ -74,9 +74,10 @@
         const config = {
             REVERB_APP_KEY: '{{ config('broadcasting.connections.reverb.key') }}',
             REVERB_HOST: '{{ config('broadcasting.connections.reverb.options.host') }}',
-            REVERB_PORT: {{ config('broadcasting.connections.reverb.options.port') ?? 8080 }},
+            REVERB_PORT: {{ config('broadcasting.connections.reverb.options.port') ?? 8081 }},
             REVERB_SCHEME: '{{ config('broadcasting.connections.reverb.options.scheme') }}',
             REVERB_CLUSTER: 'mt1',
+            DRAW_WS_URL: 'ws://localhost:8080',
             DEBUG_MODE: true
         };
         const testPlayerId = 1; // Use existing player ID
@@ -101,6 +102,85 @@
         let globalDragStart = { x: 0, y: 0 };
         let directionPadTimer = null;
         const DIRECTION_STEP = 60;
+        let drawWs = null;
+        let drawWsReady = false;
+        let drawWsReconnectTimer = null;
+        const drawWsPending = new Map();
+        const drawWsQueue = [];
+
+        function initDrawItemsSocket() {
+            if (!config.DRAW_WS_URL) return;
+            if (drawWs && (drawWs.readyState === WebSocket.OPEN || drawWs.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+            drawWs = new WebSocket(config.DRAW_WS_URL);
+
+            drawWs.onopen = function () {
+                drawWsReady = true;
+                while (drawWsQueue.length > 0) {
+                    const payload = drawWsQueue.shift();
+                    drawWs.send(JSON.stringify(payload));
+                }
+            };
+
+            drawWs.onmessage = function (event) {
+                let response = null;
+                try {
+                    response = JSON.parse(event.data);
+                } catch (error) {
+                    console.error('Invalid draw WS response:', error);
+                    return;
+                }
+
+                const requestId = response.request_id;
+                if (!requestId || !drawWsPending.has(requestId)) {
+                    return;
+                }
+
+                const pending = drawWsPending.get(requestId);
+                drawWsPending.delete(requestId);
+                pending.resolve(response);
+            };
+
+            drawWs.onclose = function () {
+                drawWsReady = false;
+                if (drawWsReconnectTimer) {
+                    clearTimeout(drawWsReconnectTimer);
+                }
+                drawWsReconnectTimer = setTimeout(initDrawItemsSocket, 1000);
+            };
+
+            drawWs.onerror = function (error) {
+                console.error('Draw WS error:', error);
+            };
+        }
+
+        function fetchDrawItemsWs(requestId, playerIdFromEvent) {
+            return new Promise((resolve, reject) => {
+                const payload = {
+                    action: 'get_draw_item',
+                    request_id: requestId,
+                    player_id: playerIdFromEvent,
+                    session_id: sessionId
+                };
+
+                drawWsPending.set(requestId, { resolve, reject });
+
+                if (drawWsReady && drawWs) {
+                    drawWs.send(JSON.stringify(payload));
+                } else {
+                    drawWsQueue.push(payload);
+                    initDrawItemsSocket();
+                }
+
+                setTimeout(() => {
+                    if (drawWsPending.has(requestId)) {
+                        drawWsPending.delete(requestId);
+                        reject(new Error('draw_ws_timeout'));
+                    }
+                }, 10000);
+            });
+        }
 
         function applyGlobalPan() {
             if (!worldLayer) return;
@@ -707,6 +787,8 @@
                 Pusher.logToConsole = true;
             }
 
+            initDrawItemsSocket();
+
             const pusher = new Pusher(config.REVERB_APP_KEY, {
                 cluster: config.REVERB_CLUSTER,
                 wsHost: config.REVERB_HOST,
@@ -748,32 +830,44 @@
                 console.log('Draw interface event received:', data);
                 status('Evento di disegno ricevuto...');
 
-                let items = data['items'];
-
-                if (!items) {
-                    console.warn('draw_interface missing items payload');
+                const requestId = data && data.request_id ? data.request_id : null;
+                const playerIdFromEvent = data && data.player_id ? data.player_id : null;
+                if (!requestId || !playerIdFromEvent) {
+                    console.warn('draw_interface missing request_id/player_id');
                     return;
                 }
-                if (typeof items === 'string' || items instanceof String) {
-                    try {
-                        items = JSON.parse(items);
-                    } catch (error) {
-                        console.error('Error parsing draw items JSON:', error);
-                        items = [];
-                    }
-                }
-                if (!Array.isArray(items)) {
-                    const maybeJson = (items !== null && items !== undefined) ? String(items).trim() : '';
-                    if (maybeJson.startsWith('[') || maybeJson.startsWith('{')) {
-                        try {
-                            items = JSON.parse(maybeJson);
-                        } catch (error) {
-                            console.error('Error parsing draw items JSON:', error);
-                            items = [];
+
+                fetchDrawItemsWs(requestId, playerIdFromEvent)
+                    .then((result) => {
+                        let items = result && result.items ? result.items : null;
+                        if (!items) {
+                            console.warn('draw_interface missing items payload');
+                            return;
                         }
-                    }
-                }
-                processItems(items);
+                        if (typeof items === 'string' || items instanceof String) {
+                            try {
+                                items = JSON.parse(items);
+                            } catch (error) {
+                                console.error('Error parsing draw items JSON:', error);
+                                items = [];
+                            }
+                        }
+                        if (!Array.isArray(items)) {
+                            const maybeJson = (items !== null && items !== undefined) ? String(items).trim() : '';
+                            if (maybeJson.startsWith('[') || maybeJson.startsWith('{')) {
+                                try {
+                                    items = JSON.parse(maybeJson);
+                                } catch (error) {
+                                    console.error('Error parsing draw items JSON:', error);
+                                    items = [];
+                                }
+                            }
+                        }
+                        processItems(items);
+                    })
+                    .catch((error) => {
+                        console.error('draw items ws error:', error);
+                    });
 
                 async function processItems(items) {
                     status('Disegno elementi...');
