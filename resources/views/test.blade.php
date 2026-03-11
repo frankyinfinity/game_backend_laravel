@@ -765,6 +765,25 @@
                         success: async function(result) {
                             if (result.success) {
                                 items = result.items;
+                                if (typeof items === 'string' || items instanceof String) {
+                                    try {
+                                        items = JSON.parse(items);
+                                    } catch (error) {
+                                        console.error('Error parsing draw items JSON:', error);
+                                        items = [];
+                                    }
+                                }
+                                if (!Array.isArray(items)) {
+                                    const maybeJson = (items !== null && items !== undefined) ? String(items).trim() : '';
+                                    if (maybeJson.startsWith('[') || maybeJson.startsWith('{')) {
+                                        try {
+                                            items = JSON.parse(maybeJson);
+                                        } catch (error) {
+                                            console.error('Error parsing draw items JSON:', error);
+                                            items = [];
+                                        }
+                                    }
+                                }
                                 processItems(items);
                             }
                         },
@@ -781,7 +800,19 @@
                 async function processItems(items) {
                     status('Disegno elementi...');
 
+                    if (!Array.isArray(items)) {
+                        console.warn('Draw items is not an array:', items);
+                        items = [];
+                    }
                     for (const item of items) {
+                        if (!item || typeof item !== 'object') {
+                            console.warn('Skipping invalid draw item:', item);
+                            continue;
+                        }
+                        if (item['type'] === undefined || item['type'] === null) {
+                            console.warn('Skipping draw item without type:', item);
+                            continue;
+                        }
                         let itemType = item['type'].toString();
                         if (itemType === 'draw') {
                             let obj = item['object'];

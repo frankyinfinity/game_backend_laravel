@@ -490,7 +490,7 @@ class GameController extends Controller
     public function getDrawItem(Request $request): \Illuminate\Http\JsonResponse
     {
 
-        $items = [];
+        $itemsJson = '[]';
         $drawRequest = DrawRequest::query()
             ->where('session_id', $request->session_id)
             ->where('request_id', $request->request_id)
@@ -498,11 +498,11 @@ class GameController extends Controller
             ->first();
 
         if($drawRequest !== null) {
-            $items = json_decode($drawRequest->items);
+            $itemsJson = (string) ($drawRequest->getRawOriginal('items') ?? '[]');
             $drawRequest->delete();
         }
 
-        return response()->json(['success' => true, 'items' => $items]);
+        return response()->json(['success' => true, 'items' => $itemsJson]);
 
     }
 
