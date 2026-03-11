@@ -792,14 +792,23 @@ class GameController extends Controller
         $player = Player::find($player_id);
         $birthRegion = $player->birthRegion;
         $tiles = Helper::getBirthRegionTiles($birthRegion);
+        $tilesByCoord = [];
+        foreach ($tiles as $tileRow) {
+            $tileI = (int) ($tileRow['i'] ?? $tileRow->i ?? 0);
+            $tileJ = (int) ($tileRow['j'] ?? $tileRow->j ?? 0);
+            $tileData = $tileRow['tile'] ?? $tileRow->tile ?? null;
+            if ($tileData !== null) {
+                $tilesByCoord[$tileI . ':' . $tileJ] = $tileData;
+            }
+        }
         
         //Check
         if($targetTileI < 0 || $targetTileI >= $birthRegion->height || $targetTileJ < 0 || $targetTileJ >= $birthRegion->width) {
             return response()->json(['success' => true]);
         }
         
-        $tile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
-        if (!is_array($tile) || ($tile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+        $tile = $tilesByCoord[$targetTileI . ':' . $targetTileJ] ?? null;
+        if (!is_array($tile) || ($tile['type'] ?? null) !== Tile::TYPE_LIQUID) {
             return response()->json(['success' => true]);
         }
 
@@ -815,6 +824,11 @@ class GameController extends Controller
         $drawCommands = [];
         ObjectCache::buffer($player->actual_session_id);
 
+        $tileSize = Helper::TILE_SIZE;
+        $mapStartX = Helper::MAP_START_X;
+        $mapStartY = Helper::MAP_START_Y;
+        $pathCount = count($pathFinding);
+
         foreach ($pathFinding as $key => $path) {
 
             $pathNodeI = $path[0];
@@ -823,17 +837,10 @@ class GameController extends Controller
             //Update position
             $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
 
-            $tileSize = Helper::TILE_SIZE;
-
-            $originX = ($tileSize*$pathNodeJ) + Helper::MAP_START_X;
-            $originY = ($tileSize*$pathNodeI) + Helper::MAP_START_Y;
-
-            $startSquare = new Square();
-            $startSquare->setOrigin($originX, $originY);
-            $startSquare->setSize($tileSize);
-            $startCenterSquare = $startSquare->getCenter();
-            $xStart = $startCenterSquare['x'];
-            $yStart = $startCenterSquare['y'];
+            $originX = ($tileSize * $pathNodeJ) + $mapStartX;
+            $originY = ($tileSize * $pathNodeI) + $mapStartY;
+            $xStart = $originX + ($tileSize / 2);
+            $yStart = $originY + ($tileSize / 2);
 
             //Clear
             $circleName = 'circle_' . Str::random(20);
@@ -847,20 +854,15 @@ class GameController extends Controller
             //Draw
             $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
-            if((sizeof($pathFinding)-1) !== $key) {
+            if (($pathCount - 1) !== $key) {
 
                 $nextPathNodeI = $pathFinding[$key+1][0];
                 $nextPathNodeJ = $pathFinding[$key+1][1];
 
-                $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
-
-                $endSquare = new Square();
-                $endSquare->setSize($tileSize);
-                $endSquare->setOrigin($originX, $originY);
-                $endCenterSquare = $endSquare->getCenter();
-                $xEnd = $endCenterSquare['x'];
-                $yEnd = $endCenterSquare['y'];
+                $originX = ($tileSize * $nextPathNodeJ) + $mapStartX;
+                $originY = ($tileSize * $nextPathNodeI) + $mapStartY;
+                $xEnd = $originX + ($tileSize / 2);
+                $yEnd = $originY + ($tileSize / 2);
 
                 //Clear
                 $multilineName = 'multiline_' . Str::random(20);
