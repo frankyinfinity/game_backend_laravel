@@ -19,7 +19,25 @@ class DrawRequestObserver
         $playerId = $drawRequest->player_id;
         $player = Player::find($playerId);
 
-        event(new DrawInterfaceEvent($player, $requestId));
+        $rawItems = $drawRequest->getRawOriginal('items');
+        $itemsJson = '[]';
+
+        if (is_string($rawItems) && $rawItems !== '') {
+            $decoded = json_decode($rawItems, true);
+            if (is_string($decoded) && $decoded !== '') {
+                // Raw is a JSON-encoded string containing JSON.
+                $itemsJson = $decoded;
+            } else {
+                $itemsJson = $rawItems;
+            }
+        } elseif (is_array($rawItems)) {
+            $itemsJson = json_encode($rawItems);
+        } else {
+            $castItems = $drawRequest->items ?? [];
+            $itemsJson = json_encode($castItems);
+        }
+
+        event(new DrawInterfaceEvent($player, $requestId, $itemsJson));
 
     }
 

@@ -1,6 +1,6 @@
 # backend
 # php artisan serve --host=0.0.0.0 --port=8085
-# node socketio-server.js
+# php artisan reverb:start
 # php artisan queue:listen
 # far partire il container docker di redis
 

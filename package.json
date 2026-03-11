@@ -4,8 +4,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "socketio": "node socketio-server.js",
-        "dev:all": "concurrently \"npm run dev\" \"npm run socketio\""
+        "dev:all": "concurrently \"npm run dev\""
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",
@@ -21,8 +20,6 @@
     "dependencies": {
         "axios": "^1.13.5",
         "laravel-echo": "^2.2.7",
-        "pusher-js": "^8.4.0",
-        "socket.io": "^4.8.3",
-        "socket.io-client": "^4.8.3"
+        "pusher-js": "^8.4.0"
     }
 }

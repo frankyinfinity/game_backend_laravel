@@ -13,9 +13,6 @@ use App\Models\BrainSchedule;
 use App\Observers\BrainScheduleObserver;
 use App\Models\DrawRequest;
 use App\Observers\DrawRequestObserver;
-use Illuminate\Support\Facades\Broadcast;
-use App\Broadcasting\SocketIoBroadcaster;
-use GuzzleHttp\Client;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -38,12 +35,5 @@ class AppServiceProvider extends ServiceProvider
         BrainSchedule::observe(BrainScheduleObserver::class);
         DrawRequest::observe(DrawRequestObserver::class);
 
-        // Register Socket.io broadcaster
-        Broadcast::extend('socketio', function ($app) {
-            return new SocketIoBroadcaster(
-                new Client(),
-                config('broadcasting.connections.socketio.url')
-            );
-        });
     }
 }

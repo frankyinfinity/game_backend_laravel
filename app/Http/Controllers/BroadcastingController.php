@@ -18,23 +18,9 @@ class BroadcastingController extends Controller
         $socketId = $request->input('socket_id');
         $channelName = $request->input('channel_name');
 
-        // Check if using Socket.io or Pusher
-        $driver = config('broadcasting.default');
-
-        if ($driver === 'socketio') {
-            // Socket.io authorization - return success for public channels
-            // For private/presence channels, you would implement additional logic
-            return response()->json([
-                'auth' => true,
-                'socket_id' => $socketId,
-                'channel_name' => $channelName
-            ]);
-        } else {
-            // Fallback to Pusher
-            $pusher = Broadcast::driver('pusher')->getPusher();
-            $response = $pusher->authorizeChannel($channelName, $socketId);
-            return response($response, 200)->header('Content-Type', 'application/json');
-        }
+        $pusher = Broadcast::driver('reverb')->getPusher();
+        $response = $pusher->authorizeChannel($channelName, $socketId);
+        return response($response, 200)->header('Content-Type', 'application/json');
     }
 
 }

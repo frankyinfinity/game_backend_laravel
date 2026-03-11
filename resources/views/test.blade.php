@@ -66,13 +66,18 @@
 @stop
 
 @section('js')
-    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
     <script>
         const BACK_URL = '{{ url('/') }}';
         window.BACK_URL = BACK_URL;
         const config = {
-            SOCKETIO_URL: '{{ config('broadcasting.connections.socketio.url') }}'
+            REVERB_APP_KEY: '{{ config('broadcasting.connections.reverb.key') }}',
+            REVERB_HOST: '{{ config('broadcasting.connections.reverb.options.host') }}',
+            REVERB_PORT: {{ config('broadcasting.connections.reverb.options.port') ?? 8080 }},
+            REVERB_SCHEME: '{{ config('broadcasting.connections.reverb.options.scheme') }}',
+            REVERB_CLUSTER: 'mt1',
+            DEBUG_MODE: true
         };
         const testPlayerId = 1; // Use existing player ID
         window.playerId = 61;
@@ -681,7 +686,7 @@
 
         $(document).ready(function() {
             initPixi();
-            status('PixiJS Avviato - Connessione a Socket.io...');
+            status('PixiJS Avviato - Connessione a Reverb...');
 
             $(document).on('mousedown touchstart', '.map-dir-btn', function(e) {
                 e.preventDefault();
@@ -697,105 +702,78 @@
                 stopDirectionHold();
             });
 
-            const socket = io(config.SOCKETIO_URL, {
-                transports: ['websocket', 'polling'],
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: Infinity
-            });
-
             const channelName = 'player_' + testPlayerId + '_channel';
+            if (config.DEBUG_MODE) {
+                Pusher.logToConsole = true;
+            }
 
-            socket.on('connect', function() {
-                status('Connesso a Socket.io - Sottoscrizione canale...');
-                console.log('Socket.io connected:', socket.id);
-
-                // Subscribe to channel
-                socket.emit('subscribe', {
-                    channel: channelName,
-                    auth: {
-                        token: localStorage.getItem('auth_token') || null
-                    }
-                });
+            const pusher = new Pusher(config.REVERB_APP_KEY, {
+                cluster: config.REVERB_CLUSTER,
+                wsHost: config.REVERB_HOST,
+                wsPort: config.REVERB_PORT,
+                wssPort: config.REVERB_PORT,
+                forceTLS: config.REVERB_SCHEME === 'https',
+                enabledTransports: ['ws', 'wss'],
+                disableStats: true
             });
 
-            socket.on('subscription_succeeded', function(data) {
-                if (data.channel === channelName) {
-                    status('Connesso a Socket.io - In attesa di eventi di disegno...');
-                    console.log('Test player channel subscribed:', channelName);
-                }
+            pusher.connection.bind('connected', function() {
+                status('Connesso a Reverb - Sottoscrizione canale...');
+                console.log('Reverb connected');
             });
 
-            socket.on('subscription_error', function(data) {
-                status('Errore sottoscrizione canale: ' + data.error);
+            pusher.connection.bind('disconnected', function() {
+                status('Disconnesso da Reverb');
+                console.log('Reverb disconnected');
+            });
+
+            pusher.connection.bind('error', function(error) {
+                status('Errore connessione Reverb');
+                console.error('Reverb connection error:', error);
+            });
+
+            const channel = pusher.subscribe(channelName);
+            channel.bind('pusher:subscription_succeeded', function() {
+                status('Connesso a Reverb - In attesa di eventi di disegno...');
+                console.log('Test player channel subscribed:', channelName);
+            });
+
+            channel.bind('pusher:subscription_error', function(data) {
+                status('Errore sottoscrizione canale: ' + (data?.error || 'unknown'));
                 console.error('Subscription error:', data);
             });
 
-            socket.on('disconnect', function(reason) {
-                status('Disconnesso da Socket.io: ' + reason);
-                console.log('Socket.io disconnected:', reason);
-            });
-
-            socket.on('connect_error', function(error) {
-                status('Errore connessione Socket.io: ' + error.message);
-                console.error('Socket.io connection error:', error);
-            });
-
             // Listen for draw_interface events
-            socket.on('draw_interface', function(data) {
+            channel.bind('draw_interface', function(data) {
                 console.log('Draw interface event received:', data);
                 status('Evento di disegno ricevuto...');
 
                 let items = data['items'];
 
                 if (!items) {
-                    // Fallback: se non ci sono items nell'evento, fai la chiamata AJAX
-                    status('Caricamento dati dal server...');
-                    const request_id = data['request_id'];
-                    const p_id = data['player_id'];
-
-                    $.ajax({
-                        url: `${BACK_URL}/api/game/get_draw_item`,
-                        type: 'POST',
-                        data: {
-                            request_id,
-                            player_id: testPlayerId,
-                            session_id: sessionId
-                        },
-                        success: async function(result) {
-                            if (result.success) {
-                                items = result.items;
-                                if (typeof items === 'string' || items instanceof String) {
-                                    try {
-                                        items = JSON.parse(items);
-                                    } catch (error) {
-                                        console.error('Error parsing draw items JSON:', error);
-                                        items = [];
-                                    }
-                                }
-                                if (!Array.isArray(items)) {
-                                    const maybeJson = (items !== null && items !== undefined) ? String(items).trim() : '';
-                                    if (maybeJson.startsWith('[') || maybeJson.startsWith('{')) {
-                                        try {
-                                            items = JSON.parse(maybeJson);
-                                        } catch (error) {
-                                            console.error('Error parsing draw items JSON:', error);
-                                            items = [];
-                                        }
-                                    }
-                                }
-                                processItems(items);
-                            }
-                        },
-                        error: function(err) {
-                            status('Errore nel caricamento dati');
-                            console.error('Error loading map data:', err);
-                        }
-                    });
-                } else {
-                    // Items ricevuti direttamente nell'evento
-                    processItems(items);
+                    console.warn('draw_interface missing items payload');
+                    return;
                 }
+                if (typeof items === 'string' || items instanceof String) {
+                    try {
+                        items = JSON.parse(items);
+                    } catch (error) {
+                        console.error('Error parsing draw items JSON:', error);
+                        items = [];
+                    }
+                }
+                if (!Array.isArray(items)) {
+                    const maybeJson = (items !== null && items !== undefined) ? String(items).trim() : '';
+                    if (maybeJson.startsWith('[') || maybeJson.startsWith('{')) {
+                        try {
+                            items = JSON.parse(maybeJson);
+                        } catch (error) {
+                            console.error('Error parsing draw items JSON:', error);
+                            items = [];
+                        }
+                    }
+                }
+                processItems(items);
 
                 async function processItems(items) {
                     status('Disegno elementi...');
