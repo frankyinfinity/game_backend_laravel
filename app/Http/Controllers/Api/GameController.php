@@ -38,7 +38,6 @@ use App\Models\PhasePlayer;
 use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Models\PlayerValue;
-use App\Models\BrainSchedule;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -50,9 +49,7 @@ use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\Form\SelectDraw;
 use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\ButtonDraw;
-use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\AppbarDraw;
-use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Custom\Colors;
 use App\Custom\Draw\Complex\Table\TableDraw;
 use App\Custom\Draw\Complex\Table\TableHeadDraw;
@@ -64,10 +61,11 @@ use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
 use App\Jobs\StopPlayerContainersJob;
-use App\Jobs\CheckObjectiveJob;
 use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Complex\EntityDraw;
+use App\Services\BrainScheduleService;
 use App\Services\DockerContainerService;
+use App\Services\ObjectiveService;
 use App\Custom\Draw\Support\ScrollGroup;
 
 class GameController extends Controller
@@ -1217,186 +1215,16 @@ class GameController extends Controller
         ]);
     }
 
-    public function startObjective(Request $request): \Illuminate\Http\JsonResponse
+    public function startObjective(Request $request, ObjectiveService $objectiveService): \Illuminate\Http\JsonResponse
     {
-        $playerId = (int) $request->player_id;
-        $targetPlayerId = (int) $request->target_player_id;
-
-        $alreadyInProgress = TargetPlayer::query()
-            ->where('player_id', $playerId)
-            ->where('state', TargetPlayer::STATE_IN_PROGRESS)
-            ->where('id', '!=', $targetPlayerId)
-            ->exists();
-
-        if ($alreadyInProgress) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Puoi avviare un solo obiettivo alla volta',
-            ], 422);
-        }
-
-        $targetPlayer = TargetPlayer::query()
-            ->where('id', $targetPlayerId)
-            ->where('player_id', $playerId)
-            ->first();
-
-        if (!$targetPlayer) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Obiettivo non trovato',
-            ], 404);
-        }
-
-        if ($targetPlayer->state !== TargetPlayer::STATE_UNLOCKED) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Obiettivo non in stato unlocked',
-            ], 422);
-        }
-
-        $targetPlayer->update([
-            'state' => TargetPlayer::STATE_IN_PROGRESS,
-        ]);
-
-        $player = Player::find($playerId);
-        $objectiveRequestId = null;
-        if ($player) {
-            $sessionId = $this->resolveSessionId($request, $player);
-            $drawPlayerId = (int) $request->input('draw_player_id', $playerId);
-            $drawPlayer = Player::find($drawPlayerId) ?? $player;
-            $objectiveTreeUidPrefix = 'objective_tree_' . $playerId;
-            $objectiveDrawCommands = [];
-
-            if (!empty($sessionId)) {
-                ObjectCache::buffer($sessionId);
-
-                $existingObjects = ObjectCache::all($sessionId);
-                $objectiveRenderable = $this->resolveObjectiveRenderableFromCache($existingObjects, $objectiveTreeUidPrefix);
-                $modalContext = $this->resolveObjectiveModalContext($existingObjects, $objectiveTreeUidPrefix);
-
-                if ($modalContext !== null) {
-                    foreach ($modalContext['uids_to_clear'] as $uid) {
-                        if (!isset($existingObjects[$uid])) {
-                            continue;
-                        }
-                        $objectClear = new ObjectClear($uid, $sessionId);
-                        $objectiveDrawCommands[] = $objectClear->get();
-                        ObjectCache::forget($sessionId, $uid);
-                    }
-
-                    $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
-                    $objectiveTree->setOrigin(0, 0);
-                    $objectiveTree->build();
-
-                    $modal = new ModalDraw($modalContext['modal_uid']);
-                    $modal->setOrigin($modalContext['x'], $modalContext['y']);
-                    $modal->setSize($modalContext['width'], $modalContext['height']);
-                    $modal->setTitle($modalContext['title']);
-                    $modal->setRenderable($modalContext['renderable']);
-
-                    foreach ($objectiveTree->getDrawItems() as $drawItem) {
-                        $json = $drawItem->buildJson();
-                        $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
-                        $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
-                        $modal->addContentItem($drawItem, $offsetX, $offsetY);
-                    }
-
-                    $modal->build();
-
-                    foreach ($modal->getDrawItems() as $drawItem) {
-                        $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-                        $objectiveDrawCommands[] = $objectDraw->get();
-                    }
-                } else {
-                    foreach ($existingObjects as $uid => $object) {
-                        if (\Illuminate\Support\Str::startsWith($uid, $objectiveTreeUidPrefix)) {
-                            $objectClear = new ObjectClear($uid, $sessionId);
-                            $objectiveDrawCommands[] = $objectClear->get();
-                            ObjectCache::forget($sessionId, $uid);
-                        }
-                    }
-
-                    $objectiveTree = new ObjectiveTreeDraw($objectiveTreeUidPrefix, $player->fresh());
-                    $objectiveTree->setOrigin(20, 20);
-                    $objectiveTree->setRenderable($objectiveRenderable);
-                    $objectiveTree->build();
-
-                    foreach ($objectiveTree->getDrawItems() as $drawItem) {
-                        $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-                        $objectiveDrawCommands[] = $objectDraw->get();
-                    }
-                }
-
-                ObjectCache::flush($sessionId);
-
-                if (!empty($objectiveDrawCommands)) {
-                    $objectiveRequestId = Str::random(20);
-                    DrawRequest::query()->create([
-                        'session_id' => $sessionId,
-                        'request_id' => $objectiveRequestId,
-                        'player_id' => $drawPlayerId,
-                        'items' => json_encode($objectiveDrawCommands),
-                    ]);
-                }
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Obiettivo avviato',
-            'target_player_id' => $targetPlayer->id,
-            'state' => $targetPlayer->state,
-            'objective_redraw_request_id' => $objectiveRequestId,
-        ]);
+        $result = $objectiveService->startObjective($request);
+        return response()->json($result['body'], $result['status']);
     }
 
-    public function setObjectiveModalVisibility(Request $request): \Illuminate\Http\JsonResponse
+    public function setObjectiveModalVisibility(Request $request, ObjectiveService $objectiveService): \Illuminate\Http\JsonResponse
     {
-        $playerId = (int) $request->input('player_id');
-        $player = Player::find($playerId);
-        if (!$player) {
-            return response()->json(['success' => false, 'message' => 'Player non trovato'], 404);
-        }
-
-        $sessionId = $this->resolveSessionId($request, $player);
-        $modalUid = (string) $request->input('modal_uid', 'objective_modal_' . $playerId);
-        $renderable = filter_var($request->input('renderable', true), FILTER_VALIDATE_BOOL);
-
-        ObjectCache::buffer($sessionId);
-        $existingObjects = ObjectCache::all($sessionId);
-
-        $viewportUid = $modalUid . '_content_viewport';
-        $childUids = [];
-        if (isset($existingObjects[$viewportUid]) && isset($existingObjects[$viewportUid]['attributes']['scroll_child_uids']) && is_array($existingObjects[$viewportUid]['attributes']['scroll_child_uids'])) {
-            $childUids = $existingObjects[$viewportUid]['attributes']['scroll_child_uids'];
-        }
-
-        foreach ($existingObjects as $uid => $object) {
-            if (!is_string($uid) || !Str::startsWith($uid, $modalUid . '_')) {
-                continue;
-            }
-            if (!isset($object['attributes']) || !is_array($object['attributes'])) {
-                $object['attributes'] = [];
-            }
-            $object['attributes']['renderable'] = $renderable;
-            ObjectCache::put($sessionId, $object);
-        }
-
-        foreach ($childUids as $childUid) {
-            if (!isset($existingObjects[$childUid])) {
-                continue;
-            }
-            $object = $existingObjects[$childUid];
-            if (!isset($object['attributes']) || !is_array($object['attributes'])) {
-                $object['attributes'] = [];
-            }
-            $object['attributes']['renderable'] = $renderable;
-            ObjectCache::put($sessionId, $object);
-        }
-
-        ObjectCache::flush($sessionId);
-
-        return response()->json(['success' => true]);
+        $result = $objectiveService->setObjectiveModalVisibility($request);
+        return response()->json($result['body'], $result['status']);
     }
 
     public function attack(Request $request) {
@@ -2169,190 +1997,30 @@ class GameController extends Controller
         }
     }
 
-    public function checkObjective(Request $request): \Illuminate\Http\JsonResponse
+    public function checkObjective(Request $request, ObjectiveService $objectiveService): \Illuminate\Http\JsonResponse
     {
-        $playerId = (int) $request->input('player_id');
-        $drawPlayerIdInput = $request->input('draw_player_id');
-        $drawPlayerId = (is_numeric($drawPlayerIdInput) && (int) $drawPlayerIdInput > 0)
-            ? (int) $drawPlayerIdInput
-            : $playerId;
-
-        CheckObjectiveJob::dispatch([
-            'player_id' => $playerId,
-            'session_id' => $request->input('session_id'),
-            'draw_player_id' => $drawPlayerId,
-        ]);
-
-        return response()->json([
-            'success' => true,
-        ]);
+        $result = $objectiveService->dispatchObjectiveCheck($request);
+        return response()->json($result['body'], $result['status']);
     }
 
-    public function brain(Request $request) {
+    public function brain(Request $request, BrainScheduleService $brainScheduleService) {
 
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        $elementHasPositionId = $request->element_has_position_id;
-
-        $alreadyCreate = BrainSchedule::query()
-            ->where('element_has_position_id', $elementHasPositionId)
-            ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
-            ->exists();
-
-        if (!$alreadyCreate) {
-            /*BrainSchedule::query()->create([
-                'element_has_position_id' => $elementHasPositionId,
-                'state' => BrainSchedule::STATE_CREATE,
-            ]);*/
-        }
-
-        return response()->json([
-            'success' => true,
-        ]); 
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
 
     }
 
-    public function finishBrainSchedule(Request $request): \Illuminate\Http\JsonResponse
+    public function finishBrainSchedule(Request $request, BrainScheduleService $brainScheduleService): \Illuminate\Http\JsonResponse
     {
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
 
-        $elementHasPositionId = (int) $validated['element_has_position_id'];
-
-        $brainSchedule = BrainSchedule::query()
-            ->where('element_has_position_id', $elementHasPositionId)
-            ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
-            ->orderByDesc('id')
-            ->first();
-
-        if ($brainSchedule === null) {
-            return response()->json([
-                'success' => true,
-                'updated' => false,
-                'message' => 'BrainSchedule non trovato',
-            ]);
-        }
-
-        $brainSchedule->update([
-            'state' => BrainSchedule::STATE_FINISH,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'updated' => true,
-            'brain_schedule_id' => (int) $brainSchedule->id,
-        ]);
-    }
-
-    /**
-     * Keep objective redraw aligned with current modal visibility.
-     * If objectives are rendered inside a modal viewport, use viewport renderable.
-     */
-    private function resolveObjectiveRenderableFromCache(array $existingObjects, string $objectiveTreeUidPrefix): bool
-    {
-        foreach ($existingObjects as $object) {
-            $attributes = $object['attributes'] ?? null;
-            if (!is_array($attributes)) {
-                continue;
-            }
-
-            $scrollChildUids = $attributes['scroll_child_uids'] ?? null;
-            if (!is_array($scrollChildUids) || empty($scrollChildUids)) {
-                continue;
-            }
-
-            foreach ($scrollChildUids as $childUid) {
-                if (is_string($childUid) && Str::startsWith($childUid, $objectiveTreeUidPrefix)) {
-                    return (bool) ($attributes['renderable'] ?? true);
-                }
-            }
-        }
-
-        foreach ($existingObjects as $uid => $object) {
-            if (is_string($uid) && Str::startsWith($uid, $objectiveTreeUidPrefix)) {
-                return (bool) (($object['attributes']['renderable'] ?? true));
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Detect if the objective tree is rendered inside a modal viewport and
-     * return enough info to rebuild the whole modal on objective refresh.
-     */
-    private function resolveObjectiveModalContext(array $existingObjects, string $objectiveTreeUidPrefix): ?array
-    {
-        foreach ($existingObjects as $uid => $object) {
-            $attributes = $object['attributes'] ?? null;
-            if (!is_array($attributes)) {
-                continue;
-            }
-
-            $scrollChildUids = $attributes['scroll_child_uids'] ?? null;
-            if (!is_array($scrollChildUids) || empty($scrollChildUids)) {
-                continue;
-            }
-
-            $containsObjective = false;
-            foreach ($scrollChildUids as $childUid) {
-                if (is_string($childUid) && Str::startsWith($childUid, $objectiveTreeUidPrefix)) {
-                    $containsObjective = true;
-                    break;
-                }
-            }
-            if (!$containsObjective) {
-                continue;
-            }
-
-            $modalUid = $attributes['modal_uid'] ?? null;
-            if (!is_string($modalUid) || $modalUid === '') {
-                if (is_string($uid) && Str::endsWith($uid, '_content_viewport')) {
-                    $modalUid = substr($uid, 0, -strlen('_content_viewport'));
-                } else {
-                    continue;
-                }
-            }
-
-            $bodyUid = $modalUid . '_body';
-            $titleUid = $modalUid . '_title';
-            $body = $existingObjects[$bodyUid] ?? null;
-            $title = $existingObjects[$titleUid] ?? null;
-
-            $x = isset($body['x']) ? (int) $body['x'] : 0;
-            $y = isset($body['y']) ? (int) $body['y'] : 0;
-            $width = isset($body['width']) ? (int) $body['width'] : 760;
-            $height = isset($body['height']) ? (int) $body['height'] : 560;
-            $renderable = (bool) (($body['attributes']['renderable'] ?? ($attributes['renderable'] ?? true)));
-            $titleText = is_array($title) && isset($title['text']) ? (string) $title['text'] : 'Obiettivi';
-
-            $uidsToClear = [];
-            foreach ($existingObjects as $existingUid => $_) {
-                if (is_string($existingUid) && Str::startsWith($existingUid, $modalUid . '_')) {
-                    $uidsToClear[] = $existingUid;
-                }
-            }
-            foreach ($scrollChildUids as $childUid) {
-                if (is_string($childUid)) {
-                    $uidsToClear[] = $childUid;
-                }
-            }
-
-            return [
-                'modal_uid' => $modalUid,
-                'x' => $x,
-                'y' => $y,
-                'width' => $width,
-                'height' => $height,
-                'title' => $titleText,
-                'renderable' => $renderable,
-                'uids_to_clear' => array_values(array_unique($uidsToClear)),
-            ];
-        }
-
-        return null;
+        $result = $brainScheduleService->finishLatest((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
     }
 
     private function resolveDrawUidsForObject(string $sessionId, string $rootUid, array $fallbackUids = []): array
