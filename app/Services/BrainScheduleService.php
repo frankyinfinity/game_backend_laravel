@@ -20,10 +20,10 @@ class BrainScheduleService
             ];
         }
 
-        /*$brainSchedule = BrainSchedule::query()->create([
+        $brainSchedule = BrainSchedule::query()->create([
             'element_has_position_id' => $elementHasPositionId,
             'state' => BrainSchedule::STATE_CREATE,
-        ]);*/
+        ]);
 
         return [
             'status' => 200,
