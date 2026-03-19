@@ -3,6 +3,7 @@
 namespace App\Custom\Manipulation;
 
 use Illuminate\Support\Facades\Cache;
+use InvalidArgumentException;
 
 class ObjectCache
 {
@@ -14,7 +15,7 @@ class ObjectCache
     public static function buffer(string $sessionId): void
     {
         if (!isset(self::$buffers[$sessionId])) {
-            self::$buffers[$sessionId] = Cache::get("objects:{$sessionId}", []);
+            self::$buffers[$sessionId] = self::read($sessionId);
         }
     }
 
@@ -24,7 +25,7 @@ class ObjectCache
     public static function flush(string $sessionId): void
     {
         if (isset(self::$buffers[$sessionId])) {
-            Cache::put("objects:{$sessionId}", self::$buffers[$sessionId]);
+            Cache::put(self::key($sessionId), self::$buffers[$sessionId]);
             unset(self::$buffers[$sessionId]);
         }
     }
@@ -37,7 +38,8 @@ class ObjectCache
         if (isset(self::$buffers[$sessionId])) {
             return self::$buffers[$sessionId];
         }
-        return Cache::get("objects:{$sessionId}", []);
+
+        return self::read($sessionId);
     }
 
     /**
@@ -54,15 +56,16 @@ class ObjectCache
      */
     public static function put(string $sessionId, array $object): void
     {
+        $uid = self::extractUid($object);
         $buffered = isset(self::$buffers[$sessionId]);
-        $data = $buffered ? self::$buffers[$sessionId] : Cache::get("objects:{$sessionId}", []);
+        $data = $buffered ? self::$buffers[$sessionId] : self::read($sessionId);
 
-        $data[$object['uid']] = $object;
+        $data[$uid] = $object;
 
         if ($buffered) {
             self::$buffers[$sessionId] = $data;
         } else {
-            Cache::put("objects:{$sessionId}", $data);
+            Cache::put(self::key($sessionId), $data);
         }
     }
 
@@ -72,7 +75,7 @@ class ObjectCache
     public static function update(string $sessionId, string $uid, array $attributes): void
     {
         $buffered = isset(self::$buffers[$sessionId]);
-        $data = $buffered ? self::$buffers[$sessionId] : Cache::get("objects:{$sessionId}", []);
+        $data = $buffered ? self::$buffers[$sessionId] : self::read($sessionId);
 
         if (array_key_exists($uid, $data)) {
             foreach ($attributes as $key => $value) {
@@ -83,7 +86,7 @@ class ObjectCache
         if ($buffered) {
             self::$buffers[$sessionId] = $data;
         } else {
-            Cache::put("objects:{$sessionId}", $data);
+            Cache::put(self::key($sessionId), $data);
         }
     }
 
@@ -93,14 +96,14 @@ class ObjectCache
     public static function forget(string $sessionId, string $uid): void
     {
         $buffered = isset(self::$buffers[$sessionId]);
-        $data = $buffered ? self::$buffers[$sessionId] : Cache::get("objects:{$sessionId}", []);
+        $data = $buffered ? self::$buffers[$sessionId] : self::read($sessionId);
 
         unset($data[$uid]);
 
         if ($buffered) {
             self::$buffers[$sessionId] = $data;
         } else {
-            Cache::put("objects:{$sessionId}", $data);
+            Cache::put(self::key($sessionId), $data);
         }
     }
 
@@ -112,6 +115,28 @@ class ObjectCache
         if (isset(self::$buffers[$sessionId])) {
             unset(self::$buffers[$sessionId]);
         }
-        Cache::forget("objects:{$sessionId}");
+        Cache::forget(self::key($sessionId));
+    }
+
+    private static function key(string $sessionId): string
+    {
+        return "objects:{$sessionId}";
+    }
+
+    private static function read(string $sessionId): array
+    {
+        $data = Cache::get(self::key($sessionId), []);
+
+        return is_array($data) ? $data : [];
+    }
+
+    private static function extractUid(array $object): string
+    {
+        $uid = $object['uid'] ?? null;
+        if (!is_string($uid) || $uid === '') {
+            throw new InvalidArgumentException('Object cache entries require a non-empty uid.');
+        }
+
+        return $uid;
     }
 }

@@ -2,25 +2,27 @@
 
 namespace App\Custom\Manipulation;
 
-use App\Helper\Helper;
+use App\Custom\Manipulation\Contracts\ManipulationCommand;
+use App\Custom\Manipulation\Payload\CodePayload;
 
-class ObjectCode
+class ObjectCode implements ManipulationCommand
 {
     private string $code;
     private int $sleep;
 
     public function __construct(string $code, int $sleep = 0)
     {
-        $this->code = $code;
+        $this->code = trim($code);
         $this->sleep = $sleep;
+    }
+
+    public function apply(): array
+    {
+        return (new CodePayload($this->code, $this->sleep))->toArray();
     }
 
     public function get(): array
     {
-        return [
-            'type' => Helper::DRAW_REQUEST_TYPE_CODE,
-            'code' => $this->code,
-            'sleep' => $this->sleep,
-        ];
+        return $this->apply();
     }
 }
