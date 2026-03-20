@@ -174,8 +174,8 @@ class BrainFlowRunner
         }
 
         $queue = $neurons
-            ->filter(fn (ElementHasPositionNeuron $n) => ($indegree[$n->id] ?? 0) === 0)
-            ->sortBy(fn (ElementHasPositionNeuron $n) => $sortKey($n))
+            ->filter(fn(ElementHasPositionNeuron $n) => ($indegree[$n->id] ?? 0) === 0)
+            ->sortBy(fn(ElementHasPositionNeuron $n) => $sortKey($n))
             ->values()
             ->all();
 
@@ -201,7 +201,7 @@ class BrainFlowRunner
         }
 
         if (count($ordered) !== $neurons->count()) {
-            $ordered = $neurons->sortBy(fn (ElementHasPositionNeuron $n) => $sortKey($n))->values()->all();
+            $ordered = $neurons->sortBy(fn(ElementHasPositionNeuron $n) => $sortKey($n))->values()->all();
         }
 
         $result = [];
@@ -433,7 +433,7 @@ class BrainFlowRunner
 
     private function handleUnknownNeuron(array $neuron): void
     {
-        
+
     }
 
     private function shouldProcessNeuronFromCondition(array $neuron): bool
@@ -927,6 +927,8 @@ class BrainFlowRunner
             return null;
         }
 
+        Log::info('payload');
+        Log::info($payload);
         return $payload;
     }
 
@@ -1569,7 +1571,7 @@ class BrainFlowRunner
             }
 
             $playerId = (int) ($payload['player_id'] ?? 0);
-            if($playerId > 0) {
+            if ($playerId > 0) {
 
                 $requestId = Str::random(20);
                 DrawRequest::query()->create([

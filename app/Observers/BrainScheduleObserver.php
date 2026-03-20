@@ -9,6 +9,6 @@ class BrainScheduleObserver
 {
     public function created(BrainSchedule $brainSchedule): void
     {
-        ExecuteBrainScheduleJob::dispatch((int) $brainSchedule->id)->onQueue('brain');
+        ExecuteBrainScheduleJob::dispatch((int) $brainSchedule->id);
     }
 }

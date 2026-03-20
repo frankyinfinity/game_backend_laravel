@@ -70,8 +70,9 @@ use App\Custom\Draw\Support\ScrollGroup;
 
 class GameController extends Controller
 {
-    
-    public function login(Request $request) {
+
+    public function login(Request $request)
+    {
 
         $playerId = $request->player_id;
         $player = Player::find($playerId);
@@ -108,7 +109,7 @@ class GameController extends Controller
         $inputEmail->setBackgroundColor(Colors::WHITE);
         $inputEmail->setBoxIconColor(Colors::LIGHT_GRAY);
         $inputEmail->setBoxIconTextColor(Colors::BLACK);
-        $inputEmail->build();   
+        $inputEmail->build();
 
         //Input Password
         $y += 100;
@@ -130,7 +131,7 @@ class GameController extends Controller
         //Button
         $y += 100;
 
-        $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
+        $submitButton = new ButtonDraw(Str::random(20) . '_submit_button');
         $submitButton->setSize($widthInput, $heightInput);
         $submitButton->setOrigin($x, $y);
         $submitButton->setString('Accedi');
@@ -149,33 +150,33 @@ class GameController extends Controller
 
         //Get all
         $listItems = $inputEmail->getDrawItems();
-        foreach($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }    
-        
-        $listItems = $inputPassword->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
-        $listItems = $submitButton->getDrawItems(); 
-        foreach($listItems as $listItem) {
+        $listItems = $inputPassword->getDrawItems();
+        foreach ($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        $listItems = $submitButton->getDrawItems();
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $y += 75;
 
-        $registerButton = new ButtonDraw(Str::random(20).'_register_button');
+        $registerButton = new ButtonDraw(Str::random(20) . '_register_button');
         $registerButton->setSize($widthInput, $heightInput);
         $registerButton->setOrigin($x, $y);
         $registerButton->setString('Registrazione');
         $registerButton->setColorButton(Colors::RED);
         $registerButton->setColorString(Colors::WHITE);
         $registerButton->setTextFontSize(22);
-    
+
         $jsPathOnClickRegister = resource_path('js/function/login/on_click_register.blade.php');
         $jsContentOnClickRegister = file_get_contents($jsPathOnClickRegister);
         $jsContentOnClickRegister = Helper::setCommonJsCode($jsContentOnClickRegister, Str::random(20));
@@ -184,8 +185,8 @@ class GameController extends Controller
         $registerButton->build();
 
         //Get all
-        $listItems = $registerButton->getDrawItems(); 
-        foreach($listItems as $listItem) {
+        $listItems = $registerButton->getDrawItems();
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
@@ -205,7 +206,8 @@ class GameController extends Controller
 
     }
 
-    public function register(Request $request) {
+    public function register(Request $request)
+    {
 
         $playerId = $request->player_id;
         $player = Player::find($playerId);
@@ -250,10 +252,10 @@ class GameController extends Controller
         $inputName->setBackgroundColor(Colors::WHITE);
         $inputName->setBoxIconColor(Colors::LIGHT_GRAY);
         $inputName->setBoxIconTextColor(Colors::BLACK);
-        $inputName->build();   
+        $inputName->build();
 
         //Input Email
-        $x += $widthInput + ($widthInput/10);
+        $x += $widthInput + ($widthInput / 10);
         $inputEmail = new InputDraw(Str::random(20), $sessionId);
         $inputEmail->setName('email');
         $inputEmail->setRequired(true);
@@ -269,7 +271,7 @@ class GameController extends Controller
         $inputEmail->build();
 
         //Input Password
-        $x += $widthInput + ($widthInput/10);
+        $x += $widthInput + ($widthInput / 10);
         $inputPassword = new InputDraw(Str::random(20), $sessionId);
         $inputPassword->setName('password');
         $inputPassword->setRequired(true);
@@ -302,7 +304,7 @@ class GameController extends Controller
         $inputNameSpecie->build();
 
         //Input Tile I
-        $x += $widthInput + ($widthInput/10);
+        $x += $widthInput + ($widthInput / 10);
         $inputTileI = new InputDraw(Str::random(20), $sessionId);
         $inputTileI->setName('tile_i');
         $inputTileI->setRequired(true);
@@ -319,7 +321,7 @@ class GameController extends Controller
         $inputTileI->build();
 
         //Input Tile J
-        $x += $widthInput + ($widthInput/10);
+        $x += $widthInput + ($widthInput / 10);
         $inputTileJ = new InputDraw(Str::random(20), $sessionId);
         $inputTileJ->setName('tile_j');
         $inputTileJ->setRequired(true);
@@ -370,57 +372,57 @@ class GameController extends Controller
         $selectPlanet->build();
 
         $listItems = $inputName->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $inputEmail->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $inputPassword->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $inputNameSpecie->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $inputTileI->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $inputTileJ->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $selectPlanet->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $y += 125;
 
-        $loginButton = new ButtonDraw(Str::random(20).'_login_button');
+        $loginButton = new ButtonDraw(Str::random(20) . '_login_button');
         $loginButton->setSize($widthInput, $heightInput);
         $loginButton->setOrigin($x, $y);
         $loginButton->setString('Torna al Login');
         $loginButton->setColorButton(Colors::RED);
         $loginButton->setColorString(Colors::WHITE);
         $loginButton->setTextFontSize(22);
-    
+
         $jsPathOnClickLogin = resource_path('js/function/login/on_click_login.blade.php');
         $jsContentOnClickLogin = file_get_contents($jsPathOnClickLogin);
         $jsContentOnClickLogin = Helper::setCommonJsCode($jsContentOnClickLogin, Str::random(20));
@@ -429,8 +431,8 @@ class GameController extends Controller
         $loginButton->build();
 
         //Get all
-        $listItems = $loginButton->getDrawItems(); 
-        foreach($listItems as $listItem) {
+        $listItems = $loginButton->getDrawItems();
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
@@ -450,7 +452,8 @@ class GameController extends Controller
 
     }
 
-    public function clearLogin(Request $request) {
+    public function clearLogin(Request $request)
+    {
 
         $playerId = $request->player_id;
         $player = Player::find($playerId);
@@ -477,10 +480,11 @@ class GameController extends Controller
         $newSessionId = Helper::generateSessionIdPlayer($newPlayer);
 
         return response()->json(['success' => true, 'session_id' => $newSessionId]);
-        
+
     }
 
-    public function home(Request $request) {
+    public function home(Request $request)
+    {
         GenerateMapJob::dispatch($request->all());
         return response()->json(['success' => true]);
     }
@@ -495,7 +499,7 @@ class GameController extends Controller
             ->where('player_id', $request->player_id)
             ->first();
 
-        if($drawRequest !== null) {
+        if ($drawRequest !== null) {
             $itemsJson = (string) ($drawRequest->getRawOriginal('items') ?? '[]');
             $drawRequest->delete();
         }
@@ -507,7 +511,7 @@ class GameController extends Controller
     public function close(Request $request)
     {
         $player_id = $request->input('player_id');
-        
+
         \Log::info("Player connection closed", [
             'player_id' => $player_id,
             'timestamp' => now(),
@@ -545,7 +549,7 @@ class GameController extends Controller
     {
         $playerId = $request->input('player_id');
         $sessionId = $request->input('session_id');
-        
+
         Log::info("Clearing screen for player", [
             'player_id' => $playerId,
             'session_id' => $sessionId,
@@ -567,7 +571,8 @@ class GameController extends Controller
         return response()->json(['success' => true, 'items' => $drawItems]);
     }
 
-    public function setElementInMap(Request $request) {
+    public function setElementInMap(Request $request)
+    {
 
         $birth_region_id = $request->birth_region_id;
         $birthRegion = BirthRegion::find($birth_region_id);
@@ -770,7 +775,7 @@ class GameController extends Controller
         $targetTileI = $entity->tile_i;
         $targetTileJ = $entity->tile_j;
 
-        if($request->has('action')) {
+        if ($request->has('action')) {
             $action = $request->action;
             if ($action === 'up') {
                 $targetTileI--;
@@ -781,7 +786,7 @@ class GameController extends Controller
             } else if ($action === 'right') {
                 $targetTileJ++;
             }
-        } else if($request->has('target_i') && $request->has('target_j')) {
+        } else if ($request->has('target_i') && $request->has('target_j')) {
             $targetTileI = intval($request->target_i);
             $targetTileJ = intval($request->target_j);
         }
@@ -799,12 +804,12 @@ class GameController extends Controller
                 $tilesByCoord[$tileI . ':' . $tileJ] = $tileData;
             }
         }
-        
+
         //Check
-        if($targetTileI < 0 || $targetTileI >= $birthRegion->height || $targetTileJ < 0 || $targetTileJ >= $birthRegion->width) {
+        if ($targetTileI < 0 || $targetTileI >= $birthRegion->height || $targetTileJ < 0 || $targetTileJ >= $birthRegion->width) {
             return response()->json(['success' => true]);
         }
-        
+
         $tile = $tilesByCoord[$targetTileI . ':' . $targetTileJ] ?? null;
         if (!is_array($tile) || ($tile['type'] ?? null) !== Tile::TYPE_LIQUID) {
             return response()->json(['success' => true]);
@@ -854,8 +859,8 @@ class GameController extends Controller
 
             if (($pathCount - 1) !== $key) {
 
-                $nextPathNodeI = $pathFinding[$key+1][0];
-                $nextPathNodeJ = $pathFinding[$key+1][1];
+                $nextPathNodeI = $pathFinding[$key + 1][0];
+                $nextPathNodeJ = $pathFinding[$key + 1][1];
 
                 $originX = ($tileSize * $nextPathNodeJ) + $mapStartX;
                 $originY = ($tileSize * $nextPathNodeI) + $mapStartY;
@@ -897,8 +902,8 @@ class GameController extends Controller
 
                 //Update Panel
                 $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
-                $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
+                $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
                 $updateObject->setAttributes('zIndex', 100);
 
                 $updateData = $updateObject->get();
@@ -910,7 +915,8 @@ class GameController extends Controller
 
         }
 
-        foreach ($updateCommands as $update) $drawCommands[] = $update;
+        foreach ($updateCommands as $update)
+            $drawCommands[] = $update;
         foreach ($idsToClear as $idToClear) {
             //Clear
             $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
@@ -926,7 +932,7 @@ class GameController extends Controller
             'player_id' => $player_id,
             'items' => json_encode($drawCommands),
         ]);
-        
+
         try {
             $entityContainer = Container::query()
                 ->where('parent_type', Container::PARENT_TYPE_ENTITY)
@@ -947,7 +953,7 @@ class GameController extends Controller
         } catch (\Throwable $e) {
             \Log::error("Errore notifica WS movimento entity {$entityUid}: " . $e->getMessage());
         }
-        
+
         return response()->json(['success' => true]);
     }
 
@@ -1012,10 +1018,12 @@ class GameController extends Controller
         Log::info("Starting consume process for Entity: {$entityUid} on Element: {$elementUid}");
 
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
-        if (!$entity) return response()->json(['success' => false, 'message' => 'Entity not found']);
+        if (!$entity)
+            return response()->json(['success' => false, 'message' => 'Entity not found']);
 
         $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
-        if (!$elementPosition) return response()->json(['success' => false, 'message' => 'Element not found']);
+        if (!$elementPosition)
+            return response()->json(['success' => false, 'message' => 'Element not found']);
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
@@ -1042,7 +1050,7 @@ class GameController extends Controller
         Log::info("Pathfinding for consume found " . count($pathFinding) . " steps.");
 
         if (count($pathFinding) <= 1 && ($currentTileI != $targetTileI || $currentTileJ != $targetTileJ)) {
-             return response()->json(['success' => false, 'message' => 'Path not found']);
+            return response()->json(['success' => false, 'message' => 'Path not found']);
         }
 
         $updateCommands = [];
@@ -1060,8 +1068,8 @@ class GameController extends Controller
 
             $tileSize = Helper::TILE_SIZE;
 
-            $originX = ($tileSize*$pathNodeJ) + Helper::MAP_START_X;
-            $originY = ($tileSize*$pathNodeI) + Helper::MAP_START_Y;
+            $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
+            $originY = ($tileSize * $pathNodeI) + Helper::MAP_START_Y;
 
             $startSquare = new Square();
             $startSquare->setOrigin($originX, $originY);
@@ -1082,13 +1090,13 @@ class GameController extends Controller
             //Draw
             $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
-            if((sizeof($pathFinding)-1) !== $key) {
+            if ((sizeof($pathFinding) - 1) !== $key) {
 
-                $nextPathNodeI = $pathFinding[$key+1][0];
-                $nextPathNodeJ = $pathFinding[$key+1][1];
+                $nextPathNodeI = $pathFinding[$key + 1][0];
+                $nextPathNodeJ = $pathFinding[$key + 1][1];
 
-                $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
+                $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
+                $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
 
                 $endSquare = new Square();
                 $endSquare->setSize($tileSize);
@@ -1116,24 +1124,27 @@ class GameController extends Controller
                 $updateObject->setAttributes('y', $yEnd);
                 $updateObject->setAttributes('zIndex', 100);
 
-                foreach ($updateObject->get() as $data) $updateCommands[] = $data;
+                foreach ($updateObject->get() as $data)
+                    $updateCommands[] = $data;
 
                 //Update Text
                 $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
                 $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-                foreach ($updateObject->get() as $data) $updateCommands[] = $data;
+                foreach ($updateObject->get() as $data)
+                    $updateCommands[] = $data;
 
                 //Update Panel
                 $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
-                $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
+                $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
                 $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data) $updateCommands[] = $data;
+                foreach ($updateObject->get() as $data)
+                    $updateCommands[] = $data;
             }
         }
 
         // --- END OF MOVEMENT ---
-        
+
         // Clear Element from UI by using all draw UIDs attached to the root object.
         $idsToClear = array_merge($idsToClear, $this->resolveDrawUidsForObject(
             $player->actual_session_id,
@@ -1150,7 +1161,7 @@ class GameController extends Controller
                 $elementUid . '_btn_consume_text',
             ]
         ));
-        
+
         // Actual removal from DB
         $elementId = $elementPosition->element_id;
         $elementPosition->delete();
@@ -1159,7 +1170,8 @@ class GameController extends Controller
         $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
         foreach ($elementEffects as $effect) {
             $gene = Gene::find($effect->gene_id);
-            if (!$gene) continue;
+            if (!$gene)
+                continue;
 
             // Find genome of the entity for this gene
             $genome = Genome::query()
@@ -1172,10 +1184,10 @@ class GameController extends Controller
                 if ($entityInfo) {
                     $oldValue = $entityInfo->value;
                     $newValue = $oldValue + $effect->effect;
-                    
+
                     // Clamp value
                     $newValue = max($genome->min, min($genome->max, $newValue));
-                    
+
                     if ($newValue !== $oldValue) {
                         $entityInfo->update(['value' => $newValue]);
 
@@ -1191,7 +1203,8 @@ class GameController extends Controller
                                         foreach ($op['attributes'] as $attr => $val) {
                                             $updateObj->setAttributes($attr, $val);
                                         }
-                                        foreach ($updateObj->get() as $data) $drawCommands[] = $data;
+                                        foreach ($updateObj->get() as $data)
+                                            $drawCommands[] = $data;
                                     } elseif ($op['type'] === 'draw') {
                                         $drawCommands[] = $this->drawMapGroupObject($op['object'], $player->actual_session_id);
                                     } elseif ($op['type'] === 'clear') {
@@ -1210,14 +1223,15 @@ class GameController extends Controller
         }
         // --------------------------
 
-        foreach ($updateCommands as $update) $drawCommands[] = $update;
+        foreach ($updateCommands as $update)
+            $drawCommands[] = $update;
         foreach ($idsToClear as $idToClear) {
             $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
             $drawCommands[] = $clearObject->get();
             ObjectCache::forget($player->actual_session_id, $idToClear);
         }
         $drawCommands[] = (new ObjectCode($this->buildPlayerValuesResetCode($player_id, PlayerValue::KEY_CONSUME), 1000))->get();
-        
+
         ObjectCache::flush($player->actual_session_id);
 
         $request_id = Str::random(20);
@@ -1266,17 +1280,20 @@ class GameController extends Controller
         return response()->json($result['body'], $result['status']);
     }
 
-    public function attack(Request $request) {
+    public function attack(Request $request)
+    {
         $entityUid = $request->entity_uid;
         $elementUid = $request->element_uid;
 
         Log::info("Starting attack process for Entity: {$entityUid} on Element: {$elementUid}");
 
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
-        if (!$entity) return response()->json(['success' => false, 'message' => 'Entity not found']);
+        if (!$entity)
+            return response()->json(['success' => false, 'message' => 'Entity not found']);
 
         $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
-        if (!$elementPosition) return response()->json(['success' => false, 'message' => 'Element not found']);
+        if (!$elementPosition)
+            return response()->json(['success' => false, 'message' => 'Element not found']);
 
         $player = Player::find($entity->specie->player_id);
         $player_id = $player->id;
@@ -1331,8 +1348,8 @@ class GameController extends Controller
 
             $tileSize = Helper::TILE_SIZE;
 
-            $originX = ($tileSize*$pathNodeJ) + Helper::MAP_START_X;
-            $originY = ($tileSize*$pathNodeI) + Helper::MAP_START_Y;
+            $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
+            $originY = ($tileSize * $pathNodeI) + Helper::MAP_START_Y;
 
             $startSquare = new Square();
             $startSquare->setOrigin($originX, $originY);
@@ -1352,12 +1369,12 @@ class GameController extends Controller
 
             $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
-            if((sizeof($pathFinding)-1) !== $key) {
-                $nextPathNodeI = $pathFinding[$key+1][0];
-                $nextPathNodeJ = $pathFinding[$key+1][1];
+            if ((sizeof($pathFinding) - 1) !== $key) {
+                $nextPathNodeI = $pathFinding[$key + 1][0];
+                $nextPathNodeJ = $pathFinding[$key + 1][1];
 
-                $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
+                $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
+                $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
 
                 $endSquare = new Square();
                 $endSquare->setSize($tileSize);
@@ -1389,12 +1406,12 @@ class GameController extends Controller
 
             $tileSize = Helper::TILE_SIZE;
 
-            if((sizeof($pathFinding)-1) !== $key) {
-                $nextPathNodeI = $pathFinding[$key+1][0];
-                $nextPathNodeJ = $pathFinding[$key+1][1];
+            if ((sizeof($pathFinding) - 1) !== $key) {
+                $nextPathNodeI = $pathFinding[$key + 1][0];
+                $nextPathNodeJ = $pathFinding[$key + 1][1];
 
-                $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
+                $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
+                $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
 
                 $endSquare = new Square();
                 $endSquare->setSize($tileSize);
@@ -1408,19 +1425,22 @@ class GameController extends Controller
                 $updateObject->setAttributes('x', $xEnd);
                 $updateObject->setAttributes('y', $yEnd);
                 $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                foreach ($updateObject->get() as $data)
+                    $drawCommands[] = $data;
 
                 // Update Text
                 $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
                 $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-                foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                foreach ($updateObject->get() as $data)
+                    $drawCommands[] = $data;
 
                 // Update Panel
                 $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
-                $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
+                $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
                 $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                foreach ($updateObject->get() as $data)
+                    $drawCommands[] = $data;
             }
         }
 
@@ -1435,7 +1455,7 @@ class GameController extends Controller
         // Get entity attack from gene
         $attackGenome = Genome::query()
             ->where('entity_id', $entity->id)
-            ->whereHas('gene', function($q) {
+            ->whereHas('gene', function ($q) {
                 $q->where('key', Gene::KEY_ATTACK);
             })
             ->with(['gene'])
@@ -1445,7 +1465,7 @@ class GameController extends Controller
         if ($attackGenome) {
             $attackInfo = EntityInformation::query()->where('genome_id', $attackGenome->id)->first();
             if ($attackInfo) {
-                $damage = (int)$attackInfo->value;
+                $damage = (int) $attackInfo->value;
             }
         }
 
@@ -1454,7 +1474,7 @@ class GameController extends Controller
         // Get element health
         $elementLifeInfo = ElementHasPositionInformation::query()
             ->where('element_has_position_id', $elementPosition->id)
-            ->whereHas('gene', function($q) {
+            ->whereHas('gene', function ($q) {
                 $q->where('key', Gene::KEY_LIFEPOINT);
             })
             ->with(['gene', 'elementHasPosition'])
@@ -1473,7 +1493,8 @@ class GameController extends Controller
             $progressBarUid = 'gene_progress_' . $elementLifeInfo->gene->key . '_element_' . $elementLifeInfo->elementHasPosition->uid;
             $progressBar = new ProgressBarDraw($progressBarUid);
             $progressBarUpdate = $progressBar->updateValue($newHealth, $player->actual_session_id);
-            foreach ($progressBarUpdate as $data) $drawCommands[] = $data;
+            foreach ($progressBarUpdate as $data)
+                $drawCommands[] = $data;
 
             if ($newHealth <= 0) {
                 $elementDied = true;
@@ -1500,7 +1521,7 @@ class GameController extends Controller
                 foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
                     $gene = $elementHasPositionInformation->gene;
                     $progressBarUid = 'gene_progress_' . $gene->key . '_element_' . $elementUid;
-                    
+
                     // Clear all progress bar components
                     $fallbackElementUids[] = $progressBarUid . '_border';
                     $fallbackElementUids[] = $progressBarUid . '_bar';
@@ -1520,20 +1541,20 @@ class GameController extends Controller
                     ->where('element_has_position_id', $elementPosition->id)
                     ->with(['score'])
                     ->get();
-                
+
                 // Delete from DB after getting scores
                 $elementPosition->delete();
-                
+
                 foreach ($elementHasPositionScores as $elementHasPositionScore) {
                     $score = $elementHasPositionScore->score;
                     $amount = $elementHasPositionScore->amount;
-                    
+
                     // Find or create player's score record
                     $playerHasScore = PlayerHasScore::query()
                         ->where('player_id', $player->id)
                         ->where('score_id', $score->id)
                         ->first();
-                    
+
                     if ($playerHasScore) {
                         $playerHasScore->increment('value', $amount);
                         $newValue = $playerHasScore->value;
@@ -1545,15 +1566,16 @@ class GameController extends Controller
                         ]);
                         $newValue = $amount;
                     }
-                    
+
                     Log::info("Awarded {$amount} {$score->name} to player {$player->id} for killing element at position");
-                    
+
                     // Update ScoreDraw in UI
                     $scoreDrawUid = 'player_' . $player->id . '_score_' . $score->id;
                     $scoreDraw = new ScoreDraw($scoreDrawUid);
                     $scoreDrawUpdate = $scoreDraw->updateValue($newValue, $player->actual_session_id);
-                    foreach ($scoreDrawUpdate as $data) $drawCommands[] = $data;
-                    
+                    foreach ($scoreDrawUpdate as $data)
+                        $drawCommands[] = $data;
+
                 }
             }
         } else {
@@ -1585,8 +1607,8 @@ class GameController extends Controller
 
                 $tileSize = Helper::TILE_SIZE;
 
-                $originX = ($tileSize*$pathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize*$pathNodeI) + Helper::MAP_START_Y;
+                $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
+                $originY = ($tileSize * $pathNodeI) + Helper::MAP_START_Y;
 
                 $startSquare = new Square();
                 $startSquare->setOrigin($originX, $originY);
@@ -1606,12 +1628,12 @@ class GameController extends Controller
 
                 $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
 
-                if((sizeof($pathBack)-1) !== $key) {
-                    $nextPathNodeI = $pathBack[$key+1][0];
-                    $nextPathNodeJ = $pathBack[$key+1][1];
+                if ((sizeof($pathBack) - 1) !== $key) {
+                    $nextPathNodeI = $pathBack[$key + 1][0];
+                    $nextPathNodeJ = $pathBack[$key + 1][1];
 
-                    $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
-                    $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
+                    $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
+                    $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
 
                     $endSquare = new Square();
                     $endSquare->setSize($tileSize);
@@ -1643,12 +1665,12 @@ class GameController extends Controller
 
                 $tileSize = Helper::TILE_SIZE;
 
-                if((sizeof($pathBack)-1) !== $key) {
-                    $nextPathNodeI = $pathBack[$key+1][0];
-                    $nextPathNodeJ = $pathBack[$key+1][1];
+                if ((sizeof($pathBack) - 1) !== $key) {
+                    $nextPathNodeI = $pathBack[$key + 1][0];
+                    $nextPathNodeJ = $pathBack[$key + 1][1];
 
-                    $originX = ($tileSize*$nextPathNodeJ) + Helper::MAP_START_X;
-                    $originY = ($tileSize*$nextPathNodeI) + Helper::MAP_START_Y;
+                    $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
+                    $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
 
                     $endSquare = new Square();
                     $endSquare->setSize($tileSize);
@@ -1662,19 +1684,22 @@ class GameController extends Controller
                     $updateObject->setAttributes('x', $xEnd);
                     $updateObject->setAttributes('y', $yEnd);
                     $updateObject->setAttributes('zIndex', 100);
-                    foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                    foreach ($updateObject->get() as $data)
+                        $drawCommands[] = $data;
 
                     // Update Text
                     $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
                     $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-                    foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                    foreach ($updateObject->get() as $data)
+                        $drawCommands[] = $data;
 
                     // Update Panel
                     $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                    $updateObject->setAttributes('x', $xEnd + ($tileSize/3));
-                    $updateObject->setAttributes('y', $yEnd + ($tileSize/3));
+                    $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
+                    $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
                     $updateObject->setAttributes('zIndex', 100);
-                    foreach ($updateObject->get() as $data) $drawCommands[] = $data;
+                    foreach ($updateObject->get() as $data)
+                        $drawCommands[] = $data;
                 }
             }
 
@@ -1733,7 +1758,8 @@ class GameController extends Controller
         ]);
     }
 
-    public function division(Request $request) {
+    public function division(Request $request)
+    {
         $entityUid = (string) $request->input('entity_uid');
         if ($entityUid === '') {
             return response()->json([
@@ -2085,14 +2111,15 @@ class GameController extends Controller
         return response()->json($result['body'], $result['status']);
     }
 
-    public function brain(Request $request, BrainScheduleService $brainScheduleService) {
+    public function brain(Request $request, BrainScheduleService $brainScheduleService)
+    {
 
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 
