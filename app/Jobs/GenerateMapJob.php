@@ -105,6 +105,7 @@ class GenerateMapJob implements ShouldQueue
         $jsPathClickTile = resource_path('js/function/entity/click_tile_ws.blade.php');
         $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
         $jsContentClickTileTemplate = file_get_contents($jsPathClickTile);
+        $jsContentClickTileTemplate = str_replace('__host__', env('DOCKER_HOST_IP', '84.8.249.14'), $jsContentClickTileTemplate);
         $jsContentPointerTileTemplate = file_get_contents($jsPathPointerTile);
 
         ObjectCache::buffer($player->actual_session_id);

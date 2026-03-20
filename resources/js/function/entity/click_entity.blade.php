@@ -67,7 +67,7 @@
 
         // Quando apri il pannello entity, richiede player values al docker player via WS.
         if (show && playerPort) {
-            let wsUrl = 'ws://' + window.location.hostname + ':' + playerPort;
+            let wsUrl = 'ws://' + '__host__' + ':' + playerPort;
 
             window.gameWebSockets = window.gameWebSockets || {};
             let wsKey = 'player_' + playerPort;

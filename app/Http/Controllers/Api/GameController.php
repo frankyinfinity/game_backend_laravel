@@ -927,6 +927,27 @@ class GameController extends Controller
             'items' => json_encode($drawCommands),
         ]);
         
+        try {
+            $entityContainer = Container::query()
+                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                ->where('parent_id', $entity->id)
+                ->first();
+
+            if ($entityContainer) {
+                $payload = [
+                    'event' => 'movement',
+                    'entity_uid' => $entityUid,
+                    'current_tile_i' => $currentTileI,
+                    'current_tile_j' => $currentTileJ,
+                    'target_tile_i' => $targetTileI,
+                    'target_tile_j' => $targetTileJ,
+                ];
+                app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
+            }
+        } catch (\Throwable $e) {
+            \Log::error("Errore notifica WS movimento entity {$entityUid}: " . $e->getMessage());
+        }
+        
         return response()->json(['success' => true]);
     }
 
@@ -1208,6 +1229,24 @@ class GameController extends Controller
         ]);
 
         Log::info("Consume process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Cleared IDs: " . implode(', ', $idsToClear));
+
+        try {
+            $entityContainer = Container::query()
+                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                ->where('parent_id', $entity->id)
+                ->first();
+
+            if ($entityContainer) {
+                $payload = [
+                    'event' => 'consume',
+                    'entity_uid' => $entityUid,
+                    'element_uid' => $elementUid,
+                ];
+                app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
+            }
+        } catch (\Throwable $e) {
+            \Log::error("Errore notifica WS consume entity {$entityUid}: " . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -1667,6 +1706,26 @@ class GameController extends Controller
 
         Log::info("Attack process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Element died: " . ($elementDied ? 'YES' : 'NO'));
 
+        try {
+            $entityContainer = Container::query()
+                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                ->where('parent_id', $entity->id)
+                ->first();
+
+            if ($entityContainer) {
+                $payload = [
+                    'event' => 'attack',
+                    'entity_uid' => $entityUid,
+                    'element_uid' => $elementUid,
+                    'damage' => $damage,
+                    'element_died' => $elementDied
+                ];
+                app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
+            }
+        } catch (\Throwable $e) {
+            \Log::error("Errore notifica WS attack entity {$entityUid}: " . $e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => $elementDied ? 'Attacco completato - nemico sconfitto!' : 'Attacco completato!',
@@ -1816,6 +1875,24 @@ class GameController extends Controller
             $this->dispatchEntityLifepointProgressBarUpdate($request, $player, $entityUid, $updatedTargetLife);
             // Disegna subito la nuova entity spawnata
             $this->dispatchNewEntitySpawnDraw($request, $player, $newEntity);
+
+            try {
+                $entityContainer = Container::query()
+                    ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                    ->where('parent_id', $entity->id)
+                    ->first();
+
+                if ($entityContainer) {
+                    $payload = [
+                        'event' => 'division',
+                        'entity_uid' => $entityUid,
+                        'new_entity_uid' => $newEntity->uid,
+                    ];
+                    app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
+                }
+            } catch (\Throwable $e) {
+                \Log::error("Errore notifica WS division entity {$entityUid}: " . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
@@ -2022,6 +2099,79 @@ class GameController extends Controller
 
         $result = $brainScheduleService->finishLatest((int) $validated['element_has_position_id']);
         return response()->json($result['body'], $result['status']);
+    }
+
+    public function websocketInfo(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $playerId = (int) $validated['player_id'];
+        $player = Player::find($playerId);
+
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        $entityIds = Entity::query()
+            ->whereHas('specie', function ($query) use ($player) {
+                $query->where('player_id', $player->id);
+            })
+            ->pluck('id')
+            ->toArray();
+
+        $elementHasPositionIds = ElementHasPosition::query()
+            ->where('player_id', $player->id)
+            ->pluck('id')
+            ->toArray();
+
+        $birthRegionId = (int) ($player->birth_region_id ?? 0);
+
+        $containers = Container::query()
+            ->whereNotNull('ws_port')
+            ->where(function ($q) use ($entityIds, $birthRegionId, $player, $elementHasPositionIds) {
+                if (!empty($entityIds)) {
+                    $q->orWhere(function ($sq2) use ($entityIds) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                            ->whereIn('parent_id', $entityIds);
+                    });
+                }
+                if ($birthRegionId > 0) {
+                    $q->orWhere(function ($sq2) use ($birthRegionId) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_MAP)
+                            ->where('parent_id', $birthRegionId);
+                    });
+                }
+                $q->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)
+                        ->where('parent_id', $player->id);
+                })->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_PLAYER)
+                        ->where('parent_id', $player->id);
+                });
+                if (!empty($elementHasPositionIds)) {
+                    $q->orWhere(function ($sq2) use ($elementHasPositionIds) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+                            ->whereIn('parent_id', $elementHasPositionIds);
+                    });
+                }
+            })
+            ->get();
+
+        $websocketHost = env('DOCKER_HOST_IP', '84.8.249.14');
+
+        $containersData = $containers->map(function ($container) use ($websocketHost) {
+            return [
+                'name' => $container->name,
+                'type' => $container->parent_type,
+                'id' => $container->parent_id,
+                'ws_port' => $container->ws_port,
+                'ws_url' => 'ws://' . $websocketHost . ':' . $container->ws_port
+            ];
+        });
+
+        return response()->json(['success' => true, 'host' => $websocketHost, 'containers' => $containersData]);
     }
 
     private function resolveDrawUidsForObject(string $sessionId, string $rootUid, array $fallbackUids = []): array

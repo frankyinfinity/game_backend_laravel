@@ -90,6 +90,7 @@ class EntityDraw
 
         $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
         $jsContentClickEntity = file_get_contents($jsPathClickEntity);
+        $jsContentClickEntity = str_replace('__host__', env('DOCKER_HOST_IP', '84.8.249.14'), $jsContentClickEntity);
         $playerContainer = Container::query()
             ->where('parent_type', Container::PARENT_TYPE_PLAYER)
             ->where('parent_id', $dbEntity->specie->player_id)
@@ -149,6 +150,7 @@ class EntityDraw
 
             $jsPathMov = resource_path('js/function/entity/movement_ws.blade.php');
             $jsContentMov = file_get_contents($jsPathMov);
+            $jsContentMov = str_replace('__host__', env('DOCKER_HOST_IP', '84.8.249.14'), $jsContentMov);
             $jsContentMov = Helper::setCommonJsCode($jsContentMov, Str::random(20));
 
             $jsContentMov = str_replace('__port__', $wsPort, $jsContentMov);

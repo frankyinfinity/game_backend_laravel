@@ -10,6 +10,7 @@ use App\Models\Player;
 use RuntimeException;
 use InvalidArgumentException;
 use Symfony\Component\Process\Process;
+use WebSocket\Client;
 
 class DockerContainerService
 {
@@ -89,7 +90,7 @@ class DockerContainerService
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
-            'WS_PORT=8080',
+            'WS_PORT=' . $wsPort,
         ];
 
         $labels = $this->playerGroupingLabels($playerId, 'entity');
@@ -117,7 +118,7 @@ class DockerContainerService
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'BIRTH_REGION_ID=' . $birthRegion->id,
-            'WS_PORT=8080',
+            'WS_PORT=' . $wsPort,
         ];
 
         $labels = $this->playerGroupingLabels($playerId, 'map');
@@ -145,7 +146,7 @@ class DockerContainerService
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'PLAYER_ID=' . $player->id,
-            'WS_PORT=8080',
+            'WS_PORT=' . $wsPort,
         ];
         $labels = $this->playerGroupingLabels($player->id, 'player');
 
@@ -260,7 +261,8 @@ class DockerContainerService
         $backendHost = $parsedUrl['host'] ?? 'localhost';
 
         if ($backendHost === 'localhost' || $backendHost === '127.0.0.1') {
-            $backendHost = 'host.docker.internal';
+            // Con network host e tunnel SSH, localhost/127.0.0.1 del container è l'host stesso.
+            $backendHost = '127.0.0.1';
         }
 
         return $scheme . '://' . $backendHost . ':' . $backendPort;
@@ -276,6 +278,16 @@ class DockerContainerService
         $args[] = $name;
         $args[] = '--hostname';
         $args[] = $name;
+        // Permette ai container di raggiungere l'host remoto (e quindi il tunnel SSH) tramite host.docker.internal
+        $args[] = '--add-host';
+        $args[] = 'host.docker.internal:host-gateway';
+
+        $args[] = '--add-host';
+        $args[] = 'host.docker.internal:host-gateway';
+
+        // Usiamo network host per poter raggiungere il tunnel SSH su localhost:8085
+        $args[] = '--network';
+        $args[] = 'host';
 
         foreach ($env as $e) {
             $args[] = '-e';
@@ -287,12 +299,8 @@ class DockerContainerService
             $args[] = "$k=$v";
         }
 
-        if ($wsPort) {
-            $args[] = '-p';
-            $args[] = "$wsPort:8080";
-        }
-
         $args[] = $imageName;
+
 
         // Ritorniamo l'ID container (l'output di `docker run -d` o `docker create` è per l'appunto l'ID del container)
         // Rimuovendo i ritorni a capo per evitare bug nel salvataggio.
@@ -458,5 +466,30 @@ class DockerContainerService
         }
 
         throw new InvalidArgumentException('stopContainer accetta Player o Container');
+    }
+
+    public function sendMessageToContainer(Container $container, array $payloadData): bool
+    {
+        if (!$container->ws_port) {
+            \Log::warning("Il container {$container->name} non ha una ws_port assegnata.");
+            return false;
+        }
+
+        $host = env('DOCKER_HOST_IP', '84.8.249.14');
+        $wsUrl = "ws://{$host}:{$container->ws_port}";
+
+        try {
+            $client = new Client($wsUrl, [
+                'timeout' => 5,
+            ]);
+
+            $client->text(json_encode($payloadData));
+            $client->close();
+
+            return true;
+        } catch (\Throwable $e) {
+            \Log::error("Impossibile connettersi al Websocket remoto {$wsUrl}: " . $e->getMessage());
+            return false;
+        }
     }
 }
