@@ -112,7 +112,7 @@ class DockerContainerService
         $this->ensureImageExists($imageName);
 
         $wsPort = $this->nextWsPort();
-        $name = 'map_' . $birthRegion->uid;
+        $name = 'map_' . $birthRegion->id;
         $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
@@ -217,7 +217,7 @@ class DockerContainerService
     private function executeRemoteDockerCommand(array $dockerArgs): string
     {
         $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
-        
+
         $fullCommand = sprintf(
             'ssh -i "%s" %s %s',
             $this->sshKeyPath,
