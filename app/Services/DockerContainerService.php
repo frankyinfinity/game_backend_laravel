@@ -14,11 +14,13 @@ use WebSocket\Client;
 
 class DockerContainerService
 {
+    private string $sshBinaryPath;
     private string $sshKeyPath;
     private string $sshUserHost;
 
     public function __construct()
     {
+        $this->sshBinaryPath = (string) config('remote_docker.ssh_binary_path');
         $this->sshKeyPath = (string) config('remote_docker.ssh_key_path');
         $this->sshUserHost = (string) config('remote_docker.ssh_user_host');
     }
@@ -224,14 +226,13 @@ class DockerContainerService
     {
         $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
 
-        $fullCommand = sprintf(
-            'ssh -i "%s" %s %s',
+        $process = new Process([
+            $this->sshBinaryPath,
+            '-i',
             $this->sshKeyPath,
             $this->sshUserHost,
-            escapeshellarg($dockerCmd)
-        );
-
-        $process = Process::fromShellCommandline($fullCommand);
+            $dockerCmd,
+        ]);
         $process->setTimeout(300); // 5 minuti max per operazione
         $process->run();
 
@@ -474,6 +475,17 @@ class DockerContainerService
         throw new InvalidArgumentException('stopContainer accetta Player o Container');
     }
 
+    /**
+     * Restart a container or all containers of a player using a single docker CLI operation sequence.
+     *
+     * @param Container|Player $target
+     */
+    public function restartContainer($target): void
+    {
+        $this->stopContainer($target);
+        $this->startContainer($target);
+    }
+
     public function deleteContainer(Container $container, bool $force = true): void
     {
         $containerId = (string) $container->container_id;
@@ -489,6 +501,60 @@ class DockerContainerService
         } catch (\Exception $e) {
             throw new RuntimeException("Errore durante docker rm per il container {$containerId}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Return the current Docker status for the given containers.
+     *
+     * @param array<int, string> $containerIds
+     * @return array<string, string>
+     */
+    public function getContainerStatuses(array $containerIds): array
+    {
+        $containerIds = array_values(array_unique(array_filter(array_map('strval', $containerIds))));
+        if (empty($containerIds)) {
+            return [];
+        }
+
+        try {
+            $args = array_merge(['inspect', '--format={{.Id}}::{{.State.Status}}'], $containerIds);
+            $output = $this->executeRemoteDockerCommand($args);
+
+            $statuses = [];
+            foreach (preg_split('/\\r\\n|\\r|\\n/', trim($output)) as $line) {
+                if ($line === '') {
+                    continue;
+                }
+
+                [$id, $status] = array_pad(explode('::', $line, 2), 2, 'unknown');
+                $statuses[$id] = $status !== '' ? $status : 'unknown';
+            }
+
+            return $statuses;
+        } catch (\Throwable $e) {
+            \Log::warning('Bulk docker status fetch failed, falling back to per-container inspect', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $statuses = [];
+        foreach ($containerIds as $containerId) {
+            try {
+                $output = $this->executeRemoteDockerCommand(['inspect', '--format={{.Id}}::{{.State.Status}}', $containerId]);
+                $line = trim($output);
+                if ($line === '') {
+                    $statuses[$containerId] = 'unknown';
+                    continue;
+                }
+
+                [$id, $status] = array_pad(explode('::', $line, 2), 2, 'unknown');
+                $statuses[$id !== '' ? $id : $containerId] = $status !== '' ? $status : 'unknown';
+            } catch (\Throwable $e) {
+                $statuses[$containerId] = 'unknown';
+            }
+        }
+
+        return $statuses;
     }
 
     public function sendMessageToContainer(Container $container, array $payloadData): bool

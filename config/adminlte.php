@@ -345,6 +345,11 @@ return [
             'text'    => 'Gestione Giocatori',
             'icon'    => 'fas fa-gamepad',
             'submenu' => [
+                [
+                    'text' => 'Container',
+                    'url'  => '/containers',
+                    'icon' => 'fas fa-boxes',
+                ]
             ]
         ],
         [

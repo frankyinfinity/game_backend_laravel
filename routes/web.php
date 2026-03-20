@@ -31,6 +31,17 @@ Route::group(['middleware' => ['auth']], function (){
     //Broadcasting
     Route::post('/broadcasting/auth', [App\Http\Controllers\BroadcastingController::class, 'auth']);
 
+    //Container
+    Route::get('/containers', [App\Http\Controllers\ContainerController::class, 'index'])->name('containers.index');
+    Route::post('/containers/list/table', [App\Http\Controllers\ContainerController::class, 'listPlayersDataTable'])->name('containers.players.datatable');
+    Route::get('/containers/{player}', [App\Http\Controllers\ContainerController::class, 'show'])->name('containers.show')->whereNumber('player');
+    Route::get('/containers/{player}/snapshot', [App\Http\Controllers\ContainerController::class, 'snapshot'])->name('containers.snapshot')->whereNumber('player');
+    Route::post('/containers/{player}/list/table', [App\Http\Controllers\ContainerController::class, 'listDataTable'])->name('containers.datatable')->whereNumber('player');
+    Route::post('/containers/{container}/start', [App\Http\Controllers\ContainerController::class, 'start'])->name('containers.start')->whereNumber('container');
+    Route::post('/containers/{container}/stop', [App\Http\Controllers\ContainerController::class, 'stop'])->name('containers.stop')->whereNumber('container');
+    Route::post('/containers/{container}/restart', [App\Http\Controllers\ContainerController::class, 'restart'])->name('containers.restart')->whereNumber('container');
+    Route::post('/containers/delete', [App\Http\Controllers\ContainerController::class, 'delete'])->name('containers.delete');
+
     //User
     Route::resource('users', App\Http\Controllers\UserController::class);
     Route::post('/users/list/table', [App\Http\Controllers\UserController::class, 'listDataTable'])->name('users.datatable');
