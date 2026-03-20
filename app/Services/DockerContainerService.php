@@ -504,6 +504,46 @@ class DockerContainerService
     }
 
     /**
+     * Return the last lines of the container logs.
+     */
+    public function getContainerLogs(Container $container, int $tail = 200): string
+    {
+        $containerId = (string) $container->container_id;
+        if ($containerId === '') {
+            throw new RuntimeException('Container senza container_id, impossibile leggere i log');
+        }
+
+        return $this->executeRemoteDockerCommand([
+            'logs',
+            '--tail',
+            (string) max(1, $tail),
+            $containerId,
+        ]);
+    }
+
+    /**
+     * Return the raw docker inspect payload for a container.
+     *
+     * @return array<mixed>
+     */
+    public function inspectContainer(Container $container): array
+    {
+        $containerId = (string) $container->container_id;
+        if ($containerId === '') {
+            throw new RuntimeException('Container senza container_id, impossibile ispezionare');
+        }
+
+        $output = $this->executeRemoteDockerCommand(['inspect', $containerId]);
+        $decoded = json_decode($output, true);
+
+        if (!is_array($decoded) || empty($decoded[0]) || !is_array($decoded[0])) {
+            throw new RuntimeException('Risposta inspect non valida per il container ' . $containerId);
+        }
+
+        return $decoded[0];
+    }
+
+    /**
      * Return the current Docker status for the given containers.
      *
      * @param array<int, string> $containerIds

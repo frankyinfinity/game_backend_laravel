@@ -53,6 +53,39 @@
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
     }
 
+    .player-summary-bar {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        padding: 12px 16px;
+        margin-bottom: 16px;
+    }
+
+    .player-summary-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .player-summary-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #eef2f7;
+        color: #0f172a;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .player-summary-item strong {
+        color: #334155;
+        font-weight: 700;
+    }
+
     .container-pill {
         display: inline-flex;
         align-items: center;
@@ -129,33 +162,19 @@
     }
 </style>
 
+<div class="player-summary-bar">
+    <div class="player-summary-row">
+        <span class="player-summary-item">Player <strong>#{{ $player->id }}</strong></span>
+        <span class="player-summary-item">Utente <strong>{{ optional($player->user)->name ?? '-' }}</strong></span>
+        <span class="player-summary-item">Birth Region <strong>{{ optional($player->birthRegion)->name ?? $player->birth_region_id ?? '-' }}</strong></span>
+        <a href="{{ route('containers.index') }}" class="btn btn-danger btn-sm ml-auto">
+            <i class="fa fa-backward"></i> Indietro
+        </a>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-12 col-xl-4 mb-3 mb-xl-0">
-        <div class="card container-info-panel">
-            <div class="card-header pb-0">
-                <h4 class="mb-0">Player</h4>
-            </div>
-            <div class="card-body">
-                <div class="form-group">
-                    <label>ID</label>
-                    <div class="form-control">{{ $player->id }}</div>
-                </div>
-                <div class="form-group">
-                    <label>Utente</label>
-                    <div class="form-control">{{ optional($player->user)->name ?? '-' }}</div>
-                </div>
-                <div class="form-group">
-                    <label>Birth Region</label>
-                    <div class="form-control">{{ optional($player->birthRegion)->name ?? $player->birth_region_id ?? '-' }}</div>
-                </div>
-                <a href="{{ route('containers.index') }}">
-                    <button type="button" class="btn btn-danger btn-block btn-sm">
-                        <i class="fa fa-backward"></i> Indietro
-                    </button>
-                </a>
-            </div>
-        </div>
-
         <div class="card container-info-panel mt-3">
             <div class="card-header pb-0">
                 <h4 class="mb-0">Container selezionato</h4>
@@ -174,6 +193,16 @@
                 </div>
 
                 <div class="row">
+                    <div class="col-6 mb-2">
+                        <button type="button" class="btn btn-secondary btn-block btn-sm js-selected-logs" disabled>
+                            <i class="fa fa-list"></i> Logs
+                        </button>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <button type="button" class="btn btn-dark btn-block btn-sm js-selected-inspect" disabled>
+                            <i class="fa fa-search"></i> Inspect
+                        </button>
+                    </div>
                     <div class="col-4">
                         <button type="button" class="btn btn-success btn-block btn-sm js-selected-action" data-action="start" disabled>
                             <i class="fa fa-play"></i> Start
@@ -243,14 +272,25 @@
         let cardRegistry = [];
         let resizeTimer = null;
         let refreshTimer = null;
+        let logsRefreshTimer = null;
         let containersState = INITIAL_CONTAINERS.slice();
         let lastUpdatedText = null;
         let emptyText = null;
+        let logsModalContainerId = null;
 
         function shortId(value) {
             if (!value) return '-';
             const text = String(value);
             return text.length > 14 ? text.slice(0, 11) + '...' : text;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
         }
 
         function typeLabel(type) {
@@ -363,7 +403,7 @@
                 fields.status.textContent = '-';
                 fields.statusChip.className = 'status-chip is-unknown mb-2';
                 fields.statusDot.style.background = '#64748b';
-                document.querySelectorAll('.js-selected-action, .js-selected-delete').forEach((btn) => btn.disabled = true);
+                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect').forEach((btn) => btn.disabled = true);
                 return;
             }
 
@@ -375,7 +415,7 @@
             fields.status.textContent = container.status_label || 'Unknown';
             fields.statusChip.className = 'status-chip is-' + String(container.status || 'unknown').toLowerCase() + ' mb-2';
             fields.statusDot.style.background = container.status_color || '#64748b';
-            document.querySelectorAll('.js-selected-action, .js-selected-delete').forEach((btn) => btn.disabled = false);
+            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect').forEach((btn) => btn.disabled = false);
         }
 
         function drawCard(container, x, y, idx) {
@@ -553,6 +593,75 @@
             });
         }
 
+        function openTextModal(title, content, width) {
+            Swal.fire({
+                title: title,
+                html: '<textarea readonly class="form-control" style="min-height: 420px; font-family: monospace; white-space: pre; overflow: auto;">' + escapeHtml(content) + '</textarea>',
+                width: width || 900,
+                confirmButtonText: 'Chiudi',
+                confirmButtonClass: 'btn btn-primary',
+            });
+        }
+
+        function stopLogsRefresh() {
+            if (logsRefreshTimer) {
+                clearInterval(logsRefreshTimer);
+                logsRefreshTimer = null;
+            }
+            logsModalContainerId = null;
+        }
+
+        function updateLogsModal(content, title) {
+            const popup = Swal.getPopup ? Swal.getPopup() : null;
+            if (!popup) {
+                return;
+            }
+
+            const textarea = popup.querySelector('#container-logs-content');
+            const titleNode = popup.querySelector('#container-logs-title');
+            if (textarea) {
+                textarea.value = content || '(nessun log)';
+                textarea.scrollTop = textarea.scrollHeight;
+            }
+            if (titleNode && title) {
+                titleNode.textContent = title;
+            }
+        }
+
+        function fetchLogsContent(containerId) {
+            return $.ajax({
+                url: "{{ route('containers.logs', ['container' => '_id_']) }}".replace('_id_', containerId),
+                type: 'GET',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+            });
+        }
+
+        function startLogsPolling(containerId) {
+            stopLogsRefresh();
+            logsModalContainerId = containerId;
+
+            const loadLogs = function () {
+                if (logsModalContainerId !== containerId) {
+                    return;
+                }
+
+                fetchLogsContent(containerId)
+                    .done(function (response) {
+                        if (response && response.success) {
+                            updateLogsModal(response.logs || '(nessun log)', 'Logs: ' + (response.name || selectedContainer.name || 'Container'));
+                        }
+                    })
+                    .fail(function () {
+                        updateLogsModal('Impossibile leggere i log del container.', 'Logs: ' + (selectedContainer.name || 'Container'));
+                    });
+            };
+
+            loadLogs();
+            logsRefreshTimer = setInterval(loadLogs, 4000);
+        }
+
         function ajaxAction(url, confirmText) {
             return new Promise((resolve) => {
                 Swal.fire({
@@ -651,6 +760,65 @@
             });
         }
 
+        function fetchLogs() {
+            if (!selectedContainer) return;
+
+            const containerId = selectedContainer.id;
+            logsModalContainerId = containerId;
+
+            Swal.fire({
+                title: '<span id="container-logs-title">Logs: ' + escapeHtml(selectedContainer.name || 'Container') + '</span>',
+                html: '<textarea id="container-logs-content" readonly class="form-control" style="min-height: 420px; font-family: monospace; white-space: pre; overflow: auto;">Caricamento logs...</textarea>',
+                width: 1100,
+                showConfirmButton: true,
+                confirmButtonText: 'Chiudi',
+                confirmButtonClass: 'btn btn-primary',
+                didOpen: function () {
+                    startLogsPolling(containerId);
+                },
+                onOpen: function () {
+                    startLogsPolling(containerId);
+                },
+                willClose: function () {
+                    stopLogsRefresh();
+                },
+                onClose: function () {
+                    stopLogsRefresh();
+                }
+            }).then(function () {
+                stopLogsRefresh();
+            });
+        }
+
+        function fetchInspect() {
+            if (!selectedContainer) return;
+
+            $.ajax({
+                url: "{{ route('containers.inspect', ['container' => '_id_']) }}".replace('_id_', selectedContainer.id),
+                type: 'GET',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function (response) {
+                    if (response && response.success) {
+                        openTextModal(
+                            'Inspect: ' + (response.name || selectedContainer.name || 'Container'),
+                            JSON.stringify(response.inspect || {}, null, 2),
+                            1100
+                        );
+                    }
+                },
+                error: function () {
+                    Swal.fire({
+                        title: 'Ops!',
+                        text: 'Impossibile leggere i dettagli del container.',
+                        type: 'danger',
+                        confirmButtonClass: 'btn btn-info'
+                    });
+                }
+            });
+        }
+
         $(document).ready(function () {
             if (typeof PIXI === 'undefined') {
                 console.error('PIXI.js is not loaded.');
@@ -713,6 +881,14 @@
                 selectedAction('delete');
             });
 
+            $(document).on('click', '.js-selected-logs', function () {
+                fetchLogs();
+            });
+
+            $(document).on('click', '.js-selected-inspect', function () {
+                fetchInspect();
+            });
+
             refreshTimer = setInterval(function () {
                 refreshContainers(true);
             }, 10000);
@@ -721,6 +897,7 @@
                 if (refreshTimer) {
                     clearInterval(refreshTimer);
                 }
+                stopLogsRefresh();
             });
         });
     </script>

@@ -86,6 +86,26 @@ class ContainerController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function logs(DockerContainer $container, DockerContainerService $containerService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'container_id' => $container->id,
+            'name' => $container->name,
+            'logs' => $containerService->getContainerLogs($container),
+        ]);
+    }
+
+    public function inspect(DockerContainer $container, DockerContainerService $containerService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'container_id' => $container->id,
+            'name' => $container->name,
+            'inspect' => $containerService->inspectContainer($container),
+        ]);
+    }
+
     public function delete(Request $request, DockerContainerService $containerService)
     {
         foreach ((array) $request->input('ids', []) as $id) {
