@@ -190,6 +190,68 @@
         margin-bottom: 12px;
     }
 
+    .container-actions-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #ffffff;
+    }
+
+    .container-actions-bar .form-control,
+    .container-actions-bar .custom-select {
+        min-width: 160px;
+    }
+
+    .container-actions-bar .btn {
+        white-space: nowrap;
+    }
+
+    .inspect-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .inspect-summary-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f8fafc;
+        padding: 10px 12px;
+    }
+
+    .inspect-summary-item .label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        margin-bottom: 4px;
+    }
+
+    .inspect-summary-item .value {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        word-break: break-word;
+    }
+
+    .logs-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .logs-toolbar .btn.active {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.15);
+    }
+
     @media (max-width: 991.98px) {
         #container-pixi {
             height: clamp(460px, 62vh, 760px);
@@ -230,6 +292,17 @@
                     <div class="status-chip is-unknown mb-2" id="selected-container-status-chip">
                         <span class="status-dot" id="selected-container-status-dot" style="background: #64748b;"></span>
                         <span id="selected-container-status">-</span>
+                    </div>
+                    <div class="d-flex flex-wrap" style="gap: 8px;">
+                        <button type="button" class="btn btn-light btn-sm js-copy-field" data-target="selected-container-id" data-label="Container ID" disabled>
+                            <i class="fa fa-copy"></i> ID
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm js-copy-field" data-target="selected-container-port" data-label="WS Port" disabled>
+                            <i class="fa fa-copy"></i> Port
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm js-copy-exec" disabled>
+                            <i class="fa fa-copy"></i> Exec cmd
+                        </button>
                     </div>
                 </div>
 
@@ -283,6 +356,43 @@
                     </div>
                 </div>
             </div>
+            <div class="container-actions-bar">
+                <input type="text" class="form-control form-control-sm" id="container-search" placeholder="Cerca nome, ID, porta">
+                <select class="custom-select custom-select-sm" id="filter-status" style="max-width: 160px;">
+                    <option value="all">Tutti gli stati</option>
+                    <option value="running">Running</option>
+                    <option value="exited">Exited</option>
+                    <option value="paused">Paused</option>
+                    <option value="created">Created</option>
+                    <option value="unknown">Unknown</option>
+                </select>
+                <select class="custom-select custom-select-sm" id="filter-type" style="max-width: 180px;">
+                    <option value="all">Tutti i tipi</option>
+                    <option value="Player">Player</option>
+                    <option value="Map">Map</option>
+                    <option value="Objective">Objective</option>
+                    <option value="Entity">Entity</option>
+                    <option value="ElementHasPosition">Element</option>
+                </select>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="clear-filters">
+                    <i class="fa fa-eraser"></i> Reset filtri
+                </button>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-success" id="bulk-start-visible">
+                        <i class="fa fa-play"></i> Start visibili
+                    </button>
+                    <button type="button" class="btn btn-warning" id="bulk-stop-visible">
+                        <i class="fa fa-stop"></i> Stop visibili
+                    </button>
+                    <button type="button" class="btn btn-info" id="bulk-restart-visible">
+                        <i class="fa fa-sync"></i> Restart visibili
+                    </button>
+                    <button type="button" class="btn btn-danger" id="bulk-delete-visible">
+                        <i class="fa fa-trash"></i> Delete visibili
+                    </button>
+                </div>
+                <span class="ml-auto text-muted small" id="visible-count">0 visibili</span>
+            </div>
             <div class="card-body">
                 <div id="container-pixi"></div>
             </div>
@@ -301,6 +411,7 @@
             stop: "{{ route('containers.stop', ['_id_']) }}",
             restart: "{{ route('containers.restart', ['_id_']) }}",
             delete: "{{ route('containers.delete') }}",
+            bulk: "{{ route('containers.bulk-action') }}",
         };
         const SNAPSHOT_URL = "{{ route('containers.snapshot', $player) }}";
 
@@ -313,9 +424,15 @@
         let refreshTimer = null;
         let logsRefreshTimer = null;
         let containersState = INITIAL_CONTAINERS.slice();
+        let filters = {
+            query: '',
+            status: 'all',
+            type: 'all',
+        };
         let lastUpdatedText = null;
         let emptyText = null;
         let logsModalContainerId = null;
+        let logsTail = 200;
 
         function shortId(value) {
             if (!value) return '-';
@@ -341,6 +458,31 @@
                 'ElementHasPosition': 'Element',
             };
             return labels[type] || type;
+        }
+
+        function normalizeValue(value) {
+            return String(value || '').toLowerCase();
+        }
+
+        function getVisibleContainers() {
+            return containersState.filter(function (container) {
+                const matchesQuery = !filters.query || [
+                    container.name,
+                    container.container_id,
+                    container.ws_port,
+                    container.scope,
+                    container.parent_type,
+                    container.status,
+                    container.status_label
+                ].some(function (value) {
+                    return normalizeValue(value).includes(filters.query);
+                });
+
+                const matchesStatus = filters.status === 'all' || normalizeValue(container.status) === normalizeValue(filters.status);
+                const matchesType = filters.type === 'all' || container.parent_type === filters.type;
+
+                return matchesQuery && matchesStatus && matchesType;
+            });
         }
 
         function getCardLayout() {
@@ -442,7 +584,7 @@
                 fields.status.textContent = '-';
                 fields.statusChip.className = 'status-chip is-unknown mb-2';
                 fields.statusDot.style.background = '#64748b';
-                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec').forEach((btn) => btn.disabled = true);
+                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = true);
                 return;
             }
 
@@ -454,7 +596,7 @@
             fields.status.textContent = container.status_label || 'Unknown';
             fields.statusChip.className = 'status-chip is-' + String(container.status || 'unknown').toLowerCase() + ' mb-2';
             fields.statusDot.style.background = container.status_color || '#64748b';
-            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec').forEach((btn) => btn.disabled = false);
+            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = false);
         }
 
         function drawCard(container, x, y, idx) {
@@ -574,11 +716,13 @@
             if (!app) return;
             clearStage();
 
+            const visibleContainers = getVisibleContainers();
+
             const { cardWidth: width, cardHeight: height, gapX, gapY, columns } = getCardLayout();
             const startX = 12;
             const startY = 12;
 
-            containersState.forEach((container, index) => {
+            visibleContainers.forEach((container, index) => {
                 const col = index % columns;
                 const row = Math.floor(index / columns);
                 const x = startX + col * (width + gapX);
@@ -586,13 +730,13 @@
                 drawCard(container, x, y, index);
             });
 
-            const rows = Math.max(1, Math.ceil(containersState.length / columns));
+            const rows = Math.max(1, Math.ceil(visibleContainers.length / columns));
             const contentHeight = startY + rows * (height + gapY) + 20;
             resizeCanvas(contentHeight);
             app.stage.hitArea = new PIXI.Rectangle(0, 0, app.renderer.width, contentHeight);
 
-            if (!selectedContainer && containersState.length > 0) {
-                selectedContainer = containersState[0];
+            if (!selectedContainer && visibleContainers.length > 0) {
+                selectedContainer = visibleContainers[0];
             }
 
             const selectedCard = selectedContainer
@@ -609,11 +753,12 @@
             }
 
             if (emptyText) {
-                emptyText.text = containersState.length === 0 ? 'Nessun container trovato' : (containerHost.clientWidth < 700 ? 'Tocca un container' : 'Seleziona un container');
+                emptyText.text = visibleContainers.length === 0 ? 'Nessun container trovato' : (containerHost.clientWidth < 700 ? 'Tocca un container' : 'Seleziona un container');
                 centerEmptyText(emptyText);
             }
 
             updateSelectedDetails(selectedContainer);
+            updateVisibleCount(visibleContainers.length);
         }
 
         function setLastUpdated(text) {
@@ -621,6 +766,13 @@
             const node = document.getElementById('container-last-updated');
             if (node) {
                 node.textContent = text;
+            }
+        }
+
+        function updateVisibleCount(count) {
+            const node = document.getElementById('visible-count');
+            if (node) {
+                node.textContent = count + ' visibili';
             }
         }
 
@@ -667,6 +819,50 @@
             });
         }
 
+        function copyText(text) {
+            const value = String(text || '');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(value);
+            }
+
+            const fallback = document.createElement('textarea');
+            fallback.value = value;
+            fallback.setAttribute('readonly', 'true');
+            fallback.style.position = 'absolute';
+            fallback.style.left = '-9999px';
+            document.body.appendChild(fallback);
+            fallback.select();
+            document.execCommand('copy');
+            document.body.removeChild(fallback);
+            return Promise.resolve();
+        }
+
+        function buildInspectSummary(inspect) {
+            const state = inspect && inspect.State ? inspect.State : {};
+            const config = inspect && inspect.Config ? inspect.Config : {};
+            const networkSettings = inspect && inspect.NetworkSettings ? inspect.NetworkSettings : {};
+            const hostConfig = inspect && inspect.HostConfig ? inspect.HostConfig : {};
+            const health = state && state.Health ? state.Health : null;
+            const mounts = Array.isArray(inspect && inspect.Mounts) ? inspect.Mounts : [];
+            const env = Array.isArray(config.Env) ? config.Env : [];
+            const healthValue = health && health.Status
+                ? String(health.Status).charAt(0).toUpperCase() + String(health.Status).slice(1)
+                : 'No healthcheck defined';
+
+            return [
+                { label: 'Image', value: config.Image || '-' },
+                { label: 'Status', value: state.Status || '-' },
+                { label: 'Healthcheck', value: healthValue, muted: !health },
+                { label: 'Created', value: inspect.Created || '-' },
+                { label: 'Path', value: inspect.Path || '-' },
+                { label: 'Args', value: Array.isArray(inspect.Args) ? inspect.Args.join(' ') : '-' },
+                { label: 'Network', value: hostConfig.NetworkMode || '-' },
+                { label: 'Mounts', value: String(mounts.length) },
+                { label: 'Env', value: String(env.length) },
+                { label: 'IP', value: networkSettings.IPAddress || '-' },
+            ];
+        }
+
         function renderExecPresetButtons(containerName) {
             const presets = [
                 { label: 'ps aux', command: 'ps aux' },
@@ -709,9 +905,9 @@
             }
         }
 
-        function fetchLogsContent(containerId) {
+        function fetchLogsContent(containerId, tail) {
             return $.ajax({
-                url: "{{ route('containers.logs', ['container' => '_id_']) }}".replace('_id_', containerId),
+                url: "{{ route('containers.logs', ['container' => '_id_']) }}".replace('_id_', containerId) + '?tail=' + encodeURIComponent(tail || logsTail || 200),
                 type: 'GET',
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -728,10 +924,10 @@
                     return;
                 }
 
-                fetchLogsContent(containerId)
+                fetchLogsContent(containerId, logsTail)
                     .done(function (response) {
                         if (response && response.success) {
-                            updateLogsModal(response.logs || '(nessun log)', 'Logs: ' + (response.name || selectedContainer.name || 'Container'));
+                            updateLogsModal(response.logs || '(nessun log)', 'Logs: ' + (response.name || selectedContainer.name || 'Container') + ' - tail ' + (response.tail || logsTail));
                         }
                     })
                     .fail(function () {
@@ -784,6 +980,109 @@
                             resolve(false);
                         }
                     });
+                });
+            });
+        }
+
+        function postContainerAction(containerId, action) {
+            const url = ACTION_URLS[action].replace('_id_', containerId);
+            return $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+            });
+        }
+
+        function bulkOperateVisible(action) {
+            const visibleContainers = getVisibleContainers();
+            if (visibleContainers.length === 0) {
+                Swal.fire({
+                    title: 'Ops!',
+                    text: 'Nessun container visibile da gestire.',
+                    type: 'warning',
+                    confirmButtonClass: 'btn btn-info'
+                });
+                return;
+            }
+
+            const ids = visibleContainers.map(function (item) { return item.id; });
+            const confirmText = action === 'delete'
+                ? 'Eliminare tutti i container visibili?'
+                : (action === 'start' ? 'Avviare tutti i container visibili?' : action === 'stop' ? 'Fermare tutti i container visibili?' : 'Riavviare tutti i container visibili?');
+
+            Swal.fire({
+                title: 'Attenzione',
+                text: confirmText + ' (' + ids.length + ')',
+                type: 'warning',
+                showCancelButton: true,
+                buttonsStyling: false,
+                confirmButtonClass: action === 'delete' ? 'btn btn-danger' : 'btn btn-primary',
+                cancelButtonClass: 'btn btn-default',
+                confirmButtonText: 'Conferma',
+                cancelButtonText: 'Annulla'
+            }).then(function (result) {
+                if (!result.value) {
+                    return;
+                }
+
+                if (action === 'delete') {
+                    $.ajax({
+                        url: ACTION_URLS.delete,
+                        type: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        data: { ids: ids },
+                        success: function (response) {
+                            if (response && response.success) {
+                                refreshContainers(true);
+                            }
+                        },
+                        error: function () {
+                            Swal.fire({
+                                title: 'Ops!',
+                                text: 'Impossibile eliminare i container visibili.',
+                                type: 'danger',
+                                confirmButtonClass: 'btn btn-info'
+                            });
+                        }
+                    });
+                    return;
+                }
+
+                $.ajax({
+                    url: ACTION_URLS.bulk,
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    data: {
+                        action: action,
+                        ids: ids
+                    },
+                    success: function (response) {
+                        if (response && response.success) {
+                            refreshContainers(true);
+                        } else {
+                            Swal.fire({
+                                title: 'Ops!',
+                                text: 'L’operazione bulk non è andata a buon fine.',
+                                type: 'danger',
+                                confirmButtonClass: 'btn btn-info'
+                            });
+                        }
+                    },
+                    error: function (xhr) {
+                        const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'L’operazione bulk non è andata a buon fine.';
+                        Swal.fire({
+                            title: 'Ops!',
+                            text: message,
+                            type: 'danger',
+                            confirmButtonClass: 'btn btn-info'
+                        });
+                    }
                 });
             });
         }
@@ -849,13 +1148,48 @@
 
             Swal.fire({
                 title: '<span id="container-logs-title">Logs: ' + escapeHtml(selectedContainer.name || 'Container') + '</span>',
-                html: '<textarea id="container-logs-content" readonly class="form-control" style="min-height: 420px; font-family: monospace; white-space: pre; overflow: auto;">Caricamento logs...</textarea>',
+                html: [
+                    '<div class="logs-toolbar">',
+                    '  <button type="button" class="btn btn-light btn-sm js-log-tail" data-tail="50">50</button>',
+                    '  <button type="button" class="btn btn-light btn-sm js-log-tail active" data-tail="200">200</button>',
+                    '  <button type="button" class="btn btn-light btn-sm js-log-tail" data-tail="1000">1000</button>',
+                    '  <button type="button" class="btn btn-outline-primary btn-sm ml-auto" id="copy-logs-output">',
+                    '    <i class="fa fa-copy"></i> Copy output',
+                    '  </button>',
+                    '</div>',
+                    '<textarea id="container-logs-content" readonly class="form-control" style="min-height: 420px; font-family: monospace; white-space: pre; overflow: auto;">Caricamento logs...</textarea>'
+                ].join(''),
                 width: 1100,
                 showConfirmButton: true,
                 confirmButtonText: 'Chiudi',
                 confirmButtonClass: 'btn btn-primary',
                 didOpen: function () {
                     startLogsPolling(containerId);
+                    const popup = Swal.getPopup ? Swal.getPopup() : null;
+                    if (!popup) return;
+
+                    popup.querySelectorAll('.js-log-tail').forEach(function (item) {
+                        item.classList.toggle('active', parseInt(item.getAttribute('data-tail') || '0', 10) === logsTail);
+                    });
+
+                    popup.querySelectorAll('.js-log-tail').forEach(function (button) {
+                        button.addEventListener('click', function () {
+                            logsTail = parseInt(button.getAttribute('data-tail') || '200', 10) || 200;
+                            popup.querySelectorAll('.js-log-tail').forEach(function (item) {
+                                item.classList.remove('active');
+                            });
+                            button.classList.add('active');
+                            startLogsPolling(containerId);
+                        });
+                    });
+
+                    const copyButton = popup.querySelector('#copy-logs-output');
+                    const textarea = popup.querySelector('#container-logs-content');
+                    if (copyButton && textarea) {
+                        copyButton.addEventListener('click', function () {
+                            copyText(textarea.value || '');
+                        });
+                    }
                 },
                 onOpen: function () {
                     startLogsPolling(containerId);
@@ -882,11 +1216,23 @@
                 },
                 success: function (response) {
                     if (response && response.success) {
-                        openTextModal(
-                            'Inspect: ' + (response.name || selectedContainer.name || 'Container'),
-                            JSON.stringify(response.inspect || {}, null, 2),
-                            1100
-                        );
+                        const summary = buildInspectSummary(response.inspect || {});
+                        const summaryHtml = [
+                            '<div class="inspect-summary">',
+                            summary.map(function (item) {
+                                return '<div class="inspect-summary-item"><span class="label">' + escapeHtml(item.label) + '</span><span class="value' + (item.muted ? ' text-muted' : '') + '">' + escapeHtml(item.value) + '</span></div>';
+                            }).join(''),
+                            '</div>',
+                            '<textarea readonly class="form-control" style="min-height: 360px; font-family: monospace; white-space: pre; overflow: auto;">' + escapeHtml(JSON.stringify(response.inspect || {}, null, 2)) + '</textarea>'
+                        ].join('');
+
+                        Swal.fire({
+                            title: 'Inspect: ' + (response.name || selectedContainer.name || 'Container'),
+                            html: summaryHtml,
+                            width: 1200,
+                            confirmButtonText: 'Chiudi',
+                            confirmButtonClass: 'btn btn-primary',
+                        });
                     }
                 },
                 error: function () {
@@ -977,23 +1323,17 @@
                                 width: 1100,
                                 confirmButtonText: 'Chiudi',
                                 confirmButtonClass: 'btn btn-primary',
-                                didOpen: function () {
-                                    const copyButton = document.getElementById('copy-exec-output');
-                                    const textarea = document.getElementById('container-exec-output');
-                                    if (copyButton && textarea) {
-                                        copyButton.addEventListener('click', function () {
-                                            const text = textarea.value || '';
-                                            if (navigator.clipboard && navigator.clipboard.writeText) {
-                                                navigator.clipboard.writeText(text);
-                                            } else {
-                                                textarea.select();
-                                                document.execCommand('copy');
-                                            }
-                                        });
+                                    didOpen: function () {
+                                        const copyButton = document.getElementById('copy-exec-output');
+                                        const textarea = document.getElementById('container-exec-output');
+                                        if (copyButton && textarea) {
+                                            copyButton.addEventListener('click', function () {
+                                                copyText(textarea.value || '');
+                                            });
+                                        }
                                     }
-                                }
-                            });
-                        }
+                                });
+                            }
                     },
                     error: function (xhr) {
                         const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Impossibile eseguire il comando nel container.';
@@ -1062,6 +1402,45 @@
                 refreshContainers(false);
             });
 
+            $('#container-search').on('input', function () {
+                filters.query = normalizeValue($(this).val().trim());
+                layoutCards();
+            });
+
+            $('#filter-status').on('change', function () {
+                filters.status = $(this).val();
+                layoutCards();
+            });
+
+            $('#filter-type').on('change', function () {
+                filters.type = $(this).val();
+                layoutCards();
+            });
+
+            $('#clear-filters').on('click', function () {
+                filters = { query: '', status: 'all', type: 'all' };
+                $('#container-search').val('');
+                $('#filter-status').val('all');
+                $('#filter-type').val('all');
+                layoutCards();
+            });
+
+            $('#bulk-start-visible').on('click', function () {
+                bulkOperateVisible('start');
+            });
+
+            $('#bulk-stop-visible').on('click', function () {
+                bulkOperateVisible('stop');
+            });
+
+            $('#bulk-restart-visible').on('click', function () {
+                bulkOperateVisible('restart');
+            });
+
+            $('#bulk-delete-visible').on('click', function () {
+                bulkOperateVisible('delete');
+            });
+
             $(document).on('click', '.js-selected-action', function () {
                 selectedAction($(this).data('action'));
             });
@@ -1080,6 +1459,36 @@
 
             $(document).on('click', '.js-selected-exec', function () {
                 promptExecCommand();
+            });
+
+            $(document).on('click', '.js-copy-field', function () {
+                const target = $(this).data('target');
+                const label = $(this).data('label') || 'Valore';
+                const field = document.getElementById(target);
+                if (!field) return;
+
+                copyText(field.textContent || field.innerText || '').then(function () {
+                    Swal.fire({
+                        title: 'Copiato',
+                        text: label + ' copiato negli appunti.',
+                        type: 'success',
+                        timer: 1200,
+                        showConfirmButton: false,
+                    });
+                });
+            });
+
+            $(document).on('click', '.js-copy-exec', function () {
+                const value = selectedContainer ? ('docker exec ' + selectedContainer.container_id + ' sh -lc "<command>"') : '';
+                copyText(value).then(function () {
+                    Swal.fire({
+                        title: 'Copiato',
+                        text: 'Comando exec copiato negli appunti.',
+                        type: 'success',
+                        timer: 1200,
+                        showConfirmButton: false,
+                    });
+                });
             });
 
             refreshTimer = setInterval(function () {

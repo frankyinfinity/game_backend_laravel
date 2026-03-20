@@ -86,13 +86,16 @@ class ContainerController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function logs(DockerContainer $container, DockerContainerService $containerService): JsonResponse
+    public function logs(DockerContainer $container, Request $request, DockerContainerService $containerService): JsonResponse
     {
+        $tail = (int) $request->input('tail', 200);
+
         return response()->json([
             'success' => true,
             'container_id' => $container->id,
             'name' => $container->name,
-            'logs' => $containerService->getContainerLogs($container),
+            'tail' => max(1, $tail),
+            'logs' => $containerService->getContainerLogs($container, max(1, $tail)),
         ]);
     }
 
@@ -116,6 +119,40 @@ class ContainerController extends Controller
             'name' => $container->name,
             'command' => $command,
             'output' => $containerService->execContainerCommand($container, $command),
+        ]);
+    }
+
+    public function bulkAction(Request $request, DockerContainerService $containerService): JsonResponse
+    {
+        $action = (string) $request->input('action', '');
+        $ids = collect((array) $request->input('ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $containers = DockerContainer::query()
+            ->whereIn('id', $ids->all())
+            ->get();
+
+        try {
+            match ($action) {
+                'start' => $containerService->startContainers($containers->all()),
+                'stop' => $containerService->stopContainers($containers->all()),
+                'restart' => $containerService->restartContainers($containers->all()),
+                default => throw new \InvalidArgumentException('Azione bulk non valida'),
+            };
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => $action,
+            'count' => $containers->count(),
         ]);
     }
 
@@ -245,6 +282,8 @@ class ContainerController extends Controller
             'exited' => 'Exited',
             'paused' => 'Paused',
             'created' => 'Created',
+            'restarting' => 'Restarting',
+            'dead' => 'Dead',
             default => 'Unknown',
         };
     }
@@ -256,6 +295,8 @@ class ContainerController extends Controller
             'exited' => '#dc2626',
             'paused' => '#d97706',
             'created' => '#2563eb',
+            'restarting' => '#7c3aed',
+            'dead' => '#475569',
             default => '#64748b',
         };
     }

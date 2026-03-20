@@ -476,6 +476,71 @@ class DockerContainerService
     }
 
     /**
+     * Start many containers with a single remote docker call.
+     *
+     * @param array<int, Container> $containers
+     */
+    public function startContainers(array $containers): void
+    {
+        $containerIds = [];
+        foreach ($containers as $container) {
+            if (!$container instanceof Container) {
+                continue;
+            }
+
+            $containerId = (string) $container->container_id;
+            if ($containerId !== '') {
+                $containerIds[] = $containerId;
+            }
+        }
+
+        $containerIds = array_values(array_unique(array_filter($containerIds)));
+        if (empty($containerIds)) {
+            return;
+        }
+
+        $this->executeRemoteDockerCommand(array_merge(['start'], $containerIds));
+    }
+
+    /**
+     * Stop many containers with a single remote docker call.
+     *
+     * @param array<int, Container> $containers
+     */
+    public function stopContainers(array $containers): void
+    {
+        $containerIds = [];
+        foreach ($containers as $container) {
+            if (!$container instanceof Container) {
+                continue;
+            }
+
+            $containerId = (string) $container->container_id;
+            if ($containerId !== '') {
+                $containerIds[] = $containerId;
+            }
+        }
+
+        $containerIds = array_values(array_unique(array_filter($containerIds)));
+        if (empty($containerIds)) {
+            return;
+        }
+
+        $this->executeRemoteDockerCommand(array_merge(['stop'], $containerIds));
+    }
+
+    /**
+     * Restart many containers with a single stop/start sequence.
+     *
+     * @param array<int, Container> $containers
+     */
+    public function restartContainers(array $containers): void
+    {
+        $this->stopContainers($containers);
+        $this->startContainers($containers);
+    }
+
+    /**
      * Restart a container or all containers of a player using a single docker CLI operation sequence.
      *
      * @param Container|Player $target
