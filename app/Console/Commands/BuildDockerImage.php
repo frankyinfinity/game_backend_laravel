@@ -66,8 +66,8 @@ class BuildDockerImage extends Command
                 return 1;
             }
 
-            $sshKeyPath = 'C:\chiave_vm\ssh-key-2026-03-19.key';
-            $sshUserHost = 'opc@84.8.249.14';
+            $sshKeyPath = (string) config('remote_docker.ssh_key_path');
+            $sshUserHost = (string) config('remote_docker.ssh_user_host');
 
             // Esegue un 'tar' della cartella corrente per inviare i file tramite stdIN a SSH,
             // e ordina a docker sul server remoto di buildare dall'input standard '-'

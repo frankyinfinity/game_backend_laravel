@@ -35,12 +35,12 @@ class BrainFlowRunner
     private array $processedNeuronsById = [];
     private array $queuedDrawBySession = [];
     private int $elementHasPositionId = 0;
-    private string $wsHost = '84.8.249.14';
+    private string $wsHost = '';
 
     public function run(int $elementHasPositionId, string $wsHost = ''): array
     {
         $this->elementHasPositionId = $elementHasPositionId;
-        $this->wsHost = $wsHost !== '' ? $wsHost : env('DOCKER_HOST_IP', '84.8.249.14');
+        $this->wsHost = $wsHost !== '' ? $wsHost : (string) config('remote_docker.docker_host_ip');
 
         $item = ElementHasPosition::query()
             ->with([
@@ -926,8 +926,6 @@ class BrainFlowRunner
             return null;
         }
 
-        Log::info('payload');
-        Log::info($payload);
         return $payload;
     }
 

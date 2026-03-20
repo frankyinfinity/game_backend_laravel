@@ -2206,7 +2206,7 @@ class GameController extends Controller
             })
             ->get();
 
-        $websocketHost = env('DOCKER_HOST_IP', '84.8.249.14');
+        $websocketHost = (string) config('remote_docker.docker_host_ip');
 
         $containersData = $containers->map(function ($container) use ($websocketHost, $entityUidsById) {
             $uid = null;

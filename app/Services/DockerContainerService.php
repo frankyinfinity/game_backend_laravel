@@ -14,8 +14,14 @@ use WebSocket\Client;
 
 class DockerContainerService
 {
-    private string $sshKeyPath = 'C:\chiave_vm\ssh-key-2026-03-19.key';
-    private string $sshUserHost = 'opc@84.8.249.14';
+    private string $sshKeyPath;
+    private string $sshUserHost;
+
+    public function __construct()
+    {
+        $this->sshKeyPath = (string) config('remote_docker.ssh_key_path');
+        $this->sshUserHost = (string) config('remote_docker.ssh_user_host');
+    }
 
     public function createContainersForPlayer(Player $player): void
     {
@@ -492,7 +498,7 @@ class DockerContainerService
             return false;
         }
 
-        $host = env('DOCKER_HOST_IP', '84.8.249.14');
+        $host = (string) config('remote_docker.docker_host_ip');
         $wsUrl = "ws://{$host}:{$container->ws_port}";
 
         try {

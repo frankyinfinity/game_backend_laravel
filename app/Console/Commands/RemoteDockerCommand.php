@@ -33,9 +33,8 @@ class RemoteDockerCommand extends Command
             return 1;
         }
 
-        // Credenziali specificate
-        $sshKeyPath = 'C:\chiave_vm\ssh-key-2026-03-19.key';
-        $sshUserHost = 'opc@84.8.249.14';
+        $sshKeyPath = (string) config('remote_docker.ssh_key_path');
+        $sshUserHost = (string) config('remote_docker.ssh_user_host');
 
         $dockerCommand = 'docker ' . $dockerCmdAction;
 
