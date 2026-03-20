@@ -2119,7 +2119,6 @@ class GameController extends Controller
         ]);
         $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
         return response()->json($result['body'], $result['status']);
-        //return response()->json(['success' => true]);
 
     }
 

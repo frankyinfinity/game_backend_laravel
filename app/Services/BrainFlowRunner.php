@@ -36,12 +36,12 @@ class BrainFlowRunner
     private array $processedNeuronsById = [];
     private array $queuedDrawBySession = [];
     private int $elementHasPositionId = 0;
-    private string $wsHost = '127.0.0.1';
+    private string $wsHost = '84.8.249.14';
 
-    public function run(int $elementHasPositionId, string $wsHost = '127.0.0.1'): array
+    public function run(int $elementHasPositionId, string $wsHost = ''): array
     {
         $this->elementHasPositionId = $elementHasPositionId;
-        $this->wsHost = $wsHost;
+        $this->wsHost = $wsHost !== '' ? $wsHost : env('DOCKER_HOST_IP', '84.8.249.14');
 
         $item = ElementHasPosition::query()
             ->with([
