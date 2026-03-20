@@ -7,16 +7,15 @@ use App\Models\Container;
 use App\Models\Entity;
 use App\Models\ElementHasPosition;
 use App\Models\Player;
-use Docker\API\Model\ContainersCreatePostBody;
-use Docker\API\Model\HostConfig;
-use Docker\API\Model\PortBinding;
-use Docker\Docker;
 use RuntimeException;
 use InvalidArgumentException;
 use Symfony\Component\Process\Process;
 
 class DockerContainerService
 {
+    private string $sshKeyPath = 'C:\chiave_vm\ssh-key-2026-03-19.key';
+    private string $sshUserHost = 'opc@84.8.249.14';
+
     public function createContainersForPlayer(Player $player): void
     {
         $entities = Entity::query()
@@ -60,7 +59,6 @@ class DockerContainerService
             return;
         }
 
-        $docker = $this->docker();
         $containers = Container::query()
             ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
             ->whereIn('parent_id', array_map('strval', $elementHasPositionIds))
@@ -68,7 +66,7 @@ class DockerContainerService
 
         foreach ($containers as $containerRecord) {
             try {
-                $docker->containerStop($containerRecord->container_id);
+                $this->executeRemoteDockerCommand(['stop', $containerRecord->container_id]);
                 \Log::info("Container {$containerRecord->container_id} terminato per ElementHasPosition {$containerRecord->parent_id}");
             } catch (\Throwable $e) {
                 \Log::error("Errore nella terminazione del container {$containerRecord->container_id}: " . $e->getMessage());
@@ -78,15 +76,12 @@ class DockerContainerService
 
     public function createEntityContainer(Entity $entity, int $playerId, bool $start = false): Container
     {
-        $docker = $this->docker();
         $imageName = 'entity:latest';
-        $this->ensureImageExists($docker, $imageName);
+        $this->ensureImageExists($imageName);
 
         $wsPort = $this->nextWsPort();
-        $containerConfig = new ContainersCreatePostBody();
-        $containerConfig->setImage($imageName);
-        $containerConfig->setHostname('entity_' . $entity->uid);
-        $containerConfig->setEnv([
+        $name = 'entity_' . $entity->uid;
+        $env = [
             'ENTITY_UID=' . $entity->uid,
             'ENTITY_TILE_I=' . $entity->tile_i,
             'ENTITY_TILE_J=' . $entity->tile_j,
@@ -95,15 +90,15 @@ class DockerContainerService
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'WS_PORT=8080',
-        ]);
-        $containerConfig->setLabels($this->playerGroupingLabels($playerId, 'entity'));
-        $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
+        ];
 
-        $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
+        $labels = $this->playerGroupingLabels($playerId, 'entity');
+
+        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, $wsPort, $start);
 
         return Container::query()->create([
             'container_id' => $containerId,
-            'name' => 'entity_' . $entity->uid,
+            'name' => $name,
             'parent_type' => Container::PARENT_TYPE_ENTITY,
             'parent_id' => $entity->id,
             'ws_port' => $wsPort,
@@ -112,29 +107,26 @@ class DockerContainerService
 
     public function createMapContainer(BirthRegion $birthRegion, int $playerId, bool $start = false): Container
     {
-        $docker = $this->docker();
         $imageName = 'map:latest';
-        $this->ensureImageExists($docker, $imageName);
+        $this->ensureImageExists($imageName);
 
         $wsPort = $this->nextWsPort();
-        $containerConfig = new ContainersCreatePostBody();
-        $containerConfig->setImage($imageName);
-        $containerConfig->setHostname('map_' . $birthRegion->uid);
-        $containerConfig->setEnv([
+        $name = 'map_' . $birthRegion->uid;
+        $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'BIRTH_REGION_ID=' . $birthRegion->id,
             'WS_PORT=8080',
-        ]);
-        $containerConfig->setLabels($this->playerGroupingLabels($playerId, 'map'));
-        $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
+        ];
 
-        $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
+        $labels = $this->playerGroupingLabels($playerId, 'map');
+
+        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, $wsPort, $start);
 
         return Container::query()->create([
             'container_id' => $containerId,
-            'name' => 'map_' . $birthRegion->uid,
+            'name' => $name,
             'parent_type' => Container::PARENT_TYPE_MAP,
             'parent_id' => $birthRegion->id,
             'ws_port' => $wsPort,
@@ -143,29 +135,25 @@ class DockerContainerService
 
     public function createPlayerContainer(Player $player, bool $start = false): Container
     {
-        $docker = $this->docker();
         $imageName = 'player:latest';
-        $this->ensureImageExists($docker, $imageName);
+        $this->ensureImageExists($imageName);
 
         $wsPort = $this->nextWsPort();
-        $containerConfig = new ContainersCreatePostBody();
-        $containerConfig->setImage($imageName);
-        $containerConfig->setHostname('player_' . $player->id);
-        $containerConfig->setEnv([
+        $name = 'player_' . $player->id;
+        $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'PLAYER_ID=' . $player->id,
             'WS_PORT=8080',
-        ]);
-        $containerConfig->setLabels($this->playerGroupingLabels($player->id, 'player'));
-        $containerConfig->setHostConfig($this->wsHostConfig($wsPort));
+        ];
+        $labels = $this->playerGroupingLabels($player->id, 'player');
 
-        $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
+        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, $wsPort, $start);
 
         return Container::query()->create([
             'container_id' => $containerId,
-            'name' => 'player_' . $player->id,
+            'name' => $name,
             'parent_type' => Container::PARENT_TYPE_PLAYER,
             'parent_id' => $player->id,
             'ws_port' => $wsPort,
@@ -174,26 +162,23 @@ class DockerContainerService
 
     public function createObjectiveContainer(Player $player, bool $start = false): Container
     {
-        $docker = $this->docker();
         $imageName = 'objective:latest';
-        $this->ensureImageExists($docker, $imageName);
+        $this->ensureImageExists($imageName);
 
-        $containerConfig = new ContainersCreatePostBody();
-        $containerConfig->setImage($imageName);
-        $containerConfig->setHostname('objective_' . $player->id);
-        $containerConfig->setEnv([
+        $name = 'objective_' . $player->id;
+        $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'PLAYER_ID=' . $player->id,
-        ]);
-        $containerConfig->setLabels($this->playerGroupingLabels($player->id, 'objective'));
+        ];
+        $labels = $this->playerGroupingLabels($player->id, 'objective');
 
-        $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
+        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, null, $start);
 
         return Container::query()->create([
             'container_id' => $containerId,
-            'name' => 'objective_' . $player->id,
+            'name' => $name,
             'parent_type' => Container::PARENT_TYPE_OBJECTIVE,
             'parent_id' => $player->id,
             'ws_port' => null,
@@ -202,68 +187,61 @@ class DockerContainerService
 
     public function createElementHasPositionContainer(ElementHasPosition $elementHasPosition, bool $start = false): Container
     {
-        $docker = $this->docker();
         $imageName = 'element:latest';
-        $this->ensureImageExists($docker, $imageName);
+        $this->ensureImageExists($imageName);
 
-        $containerConfig = new ContainersCreatePostBody();
-        $containerConfig->setImage($imageName);
-        $containerConfig->setHostname('element_' . $elementHasPosition->uid);
-        $containerConfig->setEnv([
+        $name = 'element_' . $elementHasPosition->uid;
+        $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'ELEMENT_HAS_POSITION_ID=' . $elementHasPosition->id,
-        ]);
-        $containerConfig->setLabels($this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element'));
+        ];
+        $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
 
-        $containerId = $this->createAndMaybeStart($docker, $containerConfig, $start);
+        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, null, $start);
 
         return Container::query()->create([
             'container_id' => $containerId,
-            'name' => 'element_' . $elementHasPosition->uid,
+            'name' => $name,
             'parent_type' => Container::PARENT_TYPE_ELEMENT_HAS_POSITION,
             'parent_id' => $elementHasPosition->id,
             'ws_port' => null,
         ]);
     }
 
-    private function docker(): Docker
+    /**
+     * Esegue comandi docker passando per il server remoto SSH.
+     */
+    private function executeRemoteDockerCommand(array $dockerArgs): string
     {
-        putenv('DOCKER_HOST=' . $this->dockerHost());
-        return Docker::create();
-    }
+        $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
+        
+        $fullCommand = sprintf(
+            'ssh -i "%s" %s %s',
+            $this->sshKeyPath,
+            $this->sshUserHost,
+            escapeshellarg($dockerCmd)
+        );
 
-    private function dockerHost(): string
-    {
-        return (string) (env('DOCKER_HOST') ?: 'tcp://127.0.0.1:2375');
-    }
+        $process = Process::fromShellCommandline($fullCommand);
+        $process->setTimeout(300); // 5 minuti max per operazione
+        $process->run();
 
-    private function dockerCliEnv(): array
-    {
-        $env = [
-            'DOCKER_HOST' => $this->dockerHost(),
-        ];
-
-        $dockerTlsVerify = env('DOCKER_TLS_VERIFY');
-        if ($dockerTlsVerify !== null && $dockerTlsVerify !== '') {
-            $env['DOCKER_TLS_VERIFY'] = (string) $dockerTlsVerify;
+        if (!$process->isSuccessful()) {
+            throw new RuntimeException("Comando Docker remoto fallito ($dockerCmd): " . trim($process->getErrorOutput() ?: $process->getOutput()));
         }
 
-        $dockerCertPath = env('DOCKER_CERT_PATH');
-        if ($dockerCertPath !== null && $dockerCertPath !== '') {
-            $env['DOCKER_CERT_PATH'] = (string) $dockerCertPath;
-        }
-
-        return $env;
+        return trim($process->getOutput());
     }
 
-    private function ensureImageExists(Docker $docker, string $imageName): void
+    private function ensureImageExists(string $imageName): void
     {
-        $images = $docker->imageList();
-        $exists = collect($images)->contains(fn ($img) => in_array($imageName, $img->getRepoTags() ?? []));
-        if (!$exists) {
-            throw new RuntimeException("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build");
+        try {
+            // docker image inspect restituira' codice 0 se esiste, altrimenti dardi l'errore
+            $this->executeRemoteDockerCommand(['image', 'inspect', $imageName]);
+        } catch (\Exception $e) {
+            throw new RuntimeException("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build. Detto errore: " . $e->getMessage());
         }
     }
 
@@ -288,27 +266,37 @@ class DockerContainerService
         return $scheme . '://' . $backendHost . ':' . $backendPort;
     }
 
-    private function wsHostConfig(int $wsPort): HostConfig
+    private function createAndMaybeStartCLI(string $name, string $imageName, array $env, array $labels, ?int $wsPort, bool $start): string
     {
-        $portBinding = new PortBinding();
-        $portBinding->setHostPort((string) $wsPort);
-
-        $hostConfig = new HostConfig();
-        $hostConfig->setPortBindings([
-            '8080/tcp' => [$portBinding],
-        ]);
-
-        return $hostConfig;
-    }
-
-    private function createAndMaybeStart(Docker $docker, ContainersCreatePostBody $config, bool $start): string
-    {
-        $container = $docker->containerCreate($config);
-        $containerId = $container->getId();
+        $args = [$start ? 'run' : 'create'];
         if ($start) {
-            $docker->containerStart($containerId);
+            $args[] = '-d';
         }
-        return $containerId;
+        $args[] = '--name';
+        $args[] = $name;
+        $args[] = '--hostname';
+        $args[] = $name;
+
+        foreach ($env as $e) {
+            $args[] = '-e';
+            $args[] = $e;
+        }
+
+        foreach ($labels as $k => $v) {
+            $args[] = '-l';
+            $args[] = "$k=$v";
+        }
+
+        if ($wsPort) {
+            $args[] = '-p';
+            $args[] = "$wsPort:8080";
+        }
+
+        $args[] = $imageName;
+
+        // Ritorniamo l'ID container (l'output di `docker run -d` o `docker create` è per l'appunto l'ID del container)
+        // Rimuovendo i ritorni a capo per evitare bug nel salvataggio.
+        return $this->executeRemoteDockerCommand($args);
     }
 
     private function playerGroupingLabels(int $playerId, string $service): array
@@ -372,47 +360,14 @@ class DockerContainerService
     private function runComposeOperationForPlayer(Player $player, string $operation): bool
     {
         $project = 'player_' . $player->id;
-        $process = new Process(['docker', 'compose', '-p', $project, $operation], base_path(), $this->dockerCliEnv());
-        $process->run();
-
-        if ($process->isSuccessful()) {
+        try {
+            $this->executeRemoteDockerCommand(['compose', '-p', $project, $operation]);
             \Log::info("Operazione docker compose {$operation} completata per stack {$project}");
             return true;
+        } catch (\Exception $e) {
+            \Log::warning("docker compose {$operation} fallito per stack {$project}: " . $e->getMessage());
+            return false;
         }
-
-        \Log::warning(
-            "docker compose {$operation} fallito per stack {$project}: " .
-            trim($process->getErrorOutput() ?: $process->getOutput())
-        );
-
-        return false;
-    }
-
-    private function runSingleCliOperationForPlayerContainers(Player $player, string $operation): void
-    {
-        $containers = $this->resolvePlayerContainers($player);
-        $containerIds = $containers
-            ->pluck('container_id')
-            ->filter()
-            ->values()
-            ->all();
-
-        if (empty($containerIds)) {
-            \Log::info("Nessun container trovato per il player {$player->id} durante {$operation}");
-            return;
-        }
-
-        $process = new Process(array_merge(['docker', $operation], $containerIds), base_path(), $this->dockerCliEnv());
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            throw new RuntimeException(
-                "Errore durante docker {$operation} per il player {$player->id}: " .
-                trim($process->getErrorOutput() ?: $process->getOutput())
-            );
-        }
-
-        \Log::info("docker {$operation} eseguito in una singola operazione per il player {$player->id}");
     }
 
     /**
@@ -431,17 +386,13 @@ class DockerContainerService
                 return;
             }
 
-            $process = new Process(array_merge(['docker', 'start'], $containerIds), base_path(), $this->dockerCliEnv());
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                throw new RuntimeException(
-                    "Errore durante docker start per il player {$target->id}: " .
-                    trim($process->getErrorOutput() ?: $process->getOutput())
-                );
+            try {
+                $args = array_merge(['start'], $containerIds);
+                $this->executeRemoteDockerCommand($args);
+                \Log::info("docker start eseguito in una singola operazione per il player {$target->id}");
+            } catch (\Exception $e) {
+                throw new RuntimeException("Errore durante docker start per il player {$target->id}: " . $e->getMessage());
             }
-
-            \Log::info("docker start eseguito in una singola operazione per il player {$target->id}");
             return;
         }
 
@@ -452,17 +403,12 @@ class DockerContainerService
                 return;
             }
 
-            $process = new Process(['docker', 'start', $containerId], base_path(), $this->dockerCliEnv());
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                throw new RuntimeException(
-                    "Errore durante docker start per il container {$containerId}: " .
-                    trim($process->getErrorOutput() ?: $process->getOutput())
-                );
+            try {
+                $this->executeRemoteDockerCommand(['start', $containerId]);
+                \Log::info("docker start eseguito per il container {$containerId}");
+            } catch (\Exception $e) {
+                throw new RuntimeException("Errore durante docker start per il container {$containerId}: " . $e->getMessage());
             }
-
-            \Log::info("docker start eseguito per il container {$containerId}");
             return;
         }
 
@@ -485,17 +431,13 @@ class DockerContainerService
                 return;
             }
 
-            $process = new Process(array_merge(['docker', 'stop'], $containerIds), base_path(), $this->dockerCliEnv());
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                throw new RuntimeException(
-                    "Errore durante docker stop per il player {$target->id}: " .
-                    trim($process->getErrorOutput() ?: $process->getOutput())
-                );
+            try {
+                $args = array_merge(['stop'], $containerIds);
+                $this->executeRemoteDockerCommand($args);
+                \Log::info("docker stop eseguito in una singola operazione per il player {$target->id}");
+            } catch (\Exception $e) {
+                throw new RuntimeException("Errore durante docker stop per il player {$target->id}: " . $e->getMessage());
             }
-
-            \Log::info("docker stop eseguito in una singola operazione per il player {$target->id}");
             return;
         }
 
@@ -506,17 +448,12 @@ class DockerContainerService
                 return;
             }
 
-            $process = new Process(['docker', 'stop', $containerId], base_path(), $this->dockerCliEnv());
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                throw new RuntimeException(
-                    "Errore durante docker stop per il container {$containerId}: " .
-                    trim($process->getErrorOutput() ?: $process->getOutput())
-                );
+            try {
+                $this->executeRemoteDockerCommand(['stop', $containerId]);
+                \Log::info("docker stop eseguito per il container {$containerId}");
+            } catch (\Exception $e) {
+                throw new RuntimeException("Errore durante docker stop per il container {$containerId}: " . $e->getMessage());
             }
-
-            \Log::info("docker stop eseguito per il container {$containerId}");
             return;
         }
 

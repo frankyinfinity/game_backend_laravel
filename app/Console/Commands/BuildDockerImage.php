@@ -66,17 +66,20 @@ class BuildDockerImage extends Command
                 return 1;
             }
 
-            // Imposta la connessione a Docker su TCP
-            putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
+            $sshKeyPath = 'C:\chiave_vm\ssh-key-2026-03-19.key';
+            $sshUserHost = 'opc@84.8.249.14';
 
-            // Usa il comando docker build via shell
+            // Esegue un 'tar' della cartella corrente per inviare i file tramite stdIN a SSH,
+            // e ordina a docker sul server remoto di buildare dall'input standard '-'
             $command = sprintf(
-                'docker build -t %s "%s"',
-                escapeshellarg($imageName),
-                $buildPath
+                'cd /d %s && tar -cf - . | ssh -i "%s" %s docker build -t %s -',
+                escapeshellarg($buildPath),
+                $sshKeyPath,
+                $sshUserHost,
+                escapeshellarg($imageName)
             );
 
-            $this->info("Eseguo: $command");
+            $this->info("Eseguo su server remoto tramite streaming: $command");
             $this->line('');
 
             exec($command, $output, $returnCode);
