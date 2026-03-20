@@ -468,6 +468,23 @@ class DockerContainerService
         throw new InvalidArgumentException('stopContainer accetta Player o Container');
     }
 
+    public function deleteContainer(Container $container, bool $force = true): void
+    {
+        $containerId = (string) $container->container_id;
+        if ($containerId === '') {
+            \Log::warning('Container senza container_id, skip delete', ['container_db_id' => $container->id]);
+            return;
+        }
+
+        try {
+            $args = $force ? ['rm', '-f', $containerId] : ['rm', $containerId];
+            $this->executeRemoteDockerCommand($args);
+            \Log::info("docker rm eseguito per il container {$containerId}");
+        } catch (\Exception $e) {
+            throw new RuntimeException("Errore durante docker rm per il container {$containerId}: " . $e->getMessage());
+        }
+    }
+
     public function sendMessageToContainer(Container $container, array $payloadData): bool
     {
         if (!$container->ws_port) {

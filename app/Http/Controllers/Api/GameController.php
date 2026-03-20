@@ -822,6 +822,10 @@ class GameController extends Controller
         $mapSolidTiles[$targetTileI][$targetTileJ] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
 
+        if ($pathFinding === null) {
+            return response()->json(['success' => true]);
+        }
+
         $updateCommands = [];
         $idsToClear = [];
         $drawCommands = [];
@@ -1046,6 +1050,11 @@ class GameController extends Controller
         $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
         $mapSolidTiles[$targetTileI][$targetTileJ] = 'B';
         $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
+
+        if ($pathFinding === null) {
+            Log::error("Pathfinding failed - no path found");
+            return response()->json(['success' => false, 'message' => 'Path not found']);
+        }
 
         Log::info("Pathfinding for consume found " . count($pathFinding) . " steps.");
 

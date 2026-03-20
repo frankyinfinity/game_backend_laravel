@@ -24,8 +24,8 @@ class ElementHasPositionObserver
      */
     public function created(ElementHasPosition $elementHasPosition): void
     {
-        if($elementHasPosition->element->isInteractive()) {
-            
+        if ($elementHasPosition->element->isInteractive()) {
+
             $element = $elementHasPosition->element;
 
             //Information
@@ -116,87 +116,58 @@ class ElementHasPositionObserver
     }
 
     /**
-     * Handle the ElementHasPosition "deleting" event.
-     */
-    public function deleting(ElementHasPosition $elementHasPosition): void
-    {
-        // Force-cleanup of the full DB tree for this element instance.
-        ElementHasPositionInformation::query()
-            ->where('element_has_position_id', $elementHasPosition->id)
-            ->delete();
-
-        ElementHasPositionScore::query()
-            ->where('element_has_position_id', $elementHasPosition->id)
-            ->delete();
-
-        $brainIds = ElementHasPositionBrain::query()
-            ->where('element_has_position_id', $elementHasPosition->id)
-            ->pluck('id')
-            ->toArray();
-
-        if (!empty($brainIds)) {
-            $neuronIds = ElementHasPositionNeuron::query()
-                ->whereIn('element_has_position_brain_id', $brainIds)
-                ->pluck('id')
-                ->toArray();
-
-            if (!empty($neuronIds)) {
-                ElementHasPositionNeuronLink::query()
-                    ->whereIn('from_element_has_position_neuron_id', $neuronIds)
-                    ->orWhereIn('to_element_has_position_neuron_id', $neuronIds)
-                    ->delete();
-
-                ElementHasPositionNeuron::query()
-                    ->whereIn('id', $neuronIds)
-                    ->delete();
-            }
-
-            ElementHasPositionBrain::query()
-                ->whereIn('id', $brainIds)
-                ->delete();
-        }
-    }
-
-    /**
      * Handle the ElementHasPosition "deleted" event.
      */
     public function deleted(ElementHasPosition $elementHasPosition): void
     {
+        $this->cleanupContainer($elementHasPosition);
+    }
+
+    /**
+     * Handle the ElementHasPosition "force deleted" event.
+     */
+    public function forceDeleted(ElementHasPosition $elementHasPosition): void
+    {
+        $this->cleanupContainer($elementHasPosition);
+    }
+
+    private function cleanupContainer(ElementHasPosition $elementHasPosition): void
+    {
         $container = Container::query()
             ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
             ->where('parent_id', $elementHasPosition->id)
+            ->orderByDesc('id')
             ->first();
 
         if ($container === null) {
+            Log::info('No container found for deleted element_has_position', [
+                'element_has_position_id' => $elementHasPosition->id,
+                'element_has_position_uid' => $elementHasPosition->uid,
+            ]);
             return;
         }
 
         try {
-            putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
-            $docker = Docker::create();
-
-            try {
-                $docker->containerStop($container->container_id);
-            } catch (\Throwable $e) {
-                Log::warning('Unable to stop element container before delete', [
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'container_id' => $container->container_id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            if (method_exists($docker, 'containerDelete')) {
-                $docker->containerDelete($container->container_id, ['force' => true]);
-            }
+            app(DockerContainerService::class)->stopContainer($container);
         } catch (\Throwable $e) {
-            Log::error('Unable to delete element container', [
+            Log::warning('Unable to stop element container during delete', [
                 'element_has_position_id' => $elementHasPosition->id,
                 'container_id' => $container->container_id,
                 'error' => $e->getMessage(),
             ]);
-        } finally {
-            $container->delete();
         }
+
+        try {
+            app(DockerContainerService::class)->deleteContainer($container, true);
+        } catch (\Throwable $e) {
+            Log::warning('Unable to delete element container during delete', [
+                'element_has_position_id' => $elementHasPosition->id,
+                'container_id' => $container->container_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $container->delete();
     }
-    
+
 }

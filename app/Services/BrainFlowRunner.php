@@ -29,7 +29,6 @@ use App\Custom\Draw\Support\ScrollGroup;
 use App\Helper\Helper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Docker\Docker;
 
 class BrainFlowRunner
 {
@@ -1515,10 +1514,8 @@ class BrainFlowRunner
         }
 
         try {
-            putenv('DOCKER_HOST=tcp://127.0.0.1:2375');
-            $docker = Docker::create();
             try {
-                $docker->containerStop($container->container_id);
+                app(DockerContainerService::class)->stopContainer($container);
             } catch (\Throwable $e) {
                 Log::warning('Unable to stop container', [
                     'parent_type' => $parentType,
@@ -1528,8 +1525,15 @@ class BrainFlowRunner
                 ]);
             }
 
-            if (method_exists($docker, 'containerDelete')) {
-                $docker->containerDelete($container->container_id, ['force' => true]);
+            try {
+                app(DockerContainerService::class)->deleteContainer($container, true);
+            } catch (\Throwable $e) {
+                Log::warning('Unable to delete container', [
+                    'parent_type' => $parentType,
+                    'parent_id' => $parentId,
+                    'container_id' => $container->container_id,
+                    'error' => $e->getMessage(),
+                ]);
             }
         } catch (\Throwable $e) {
             Log::warning('Unable to stop/delete container for dead target', [
