@@ -2053,6 +2053,11 @@ class GameController extends Controller
                 $drawCommands[] = $this->drawMapGroupObject($entityDrawItem, $sessionId);
             }
 
+            $refreshPortsCode = $this->buildRefreshRemoteWebSocketsCode($player->id);
+            if ($refreshPortsCode !== '') {
+                $drawCommands[] = (new ObjectCode($refreshPortsCode, 1500))->get();
+            }
+
             ObjectCache::flush($sessionId);
 
             if (!empty($drawCommands)) {
@@ -2120,6 +2125,13 @@ class GameController extends Controller
             })
             ->pluck('id')
             ->toArray();
+        $entityUidsById = Entity::query()
+            ->whereIn('id', $entityIds)
+            ->pluck('uid', 'id')
+            ->mapWithKeys(function ($uid, $id) {
+                return [(string) $id => (string) $uid];
+            })
+            ->all();
 
         $elementHasPositionIds = ElementHasPosition::query()
             ->where('player_id', $player->id)
@@ -2161,11 +2173,17 @@ class GameController extends Controller
 
         $websocketHost = env('DOCKER_HOST_IP', '84.8.249.14');
 
-        $containersData = $containers->map(function ($container) use ($websocketHost) {
+        $containersData = $containers->map(function ($container) use ($websocketHost, $entityUidsById) {
+            $uid = null;
+            if ($container->parent_type === Container::PARENT_TYPE_ENTITY) {
+                $uid = $entityUidsById[(string) $container->parent_id] ?? null;
+            }
+
             return [
                 'name' => $container->name,
                 'type' => $container->parent_type,
                 'id' => $container->parent_id,
+                'uid' => $uid,
                 'ws_port' => $container->ws_port,
                 'ws_url' => 'ws://' . $websocketHost . ':' . $container->ws_port
             ];
@@ -2219,6 +2237,21 @@ class GameController extends Controller
         }
 
         return '';
+    }
+
+    private function buildRefreshRemoteWebSocketsCode(int $playerId): string
+    {
+        $safePlayerId = max(0, $playerId);
+        $jsPath = resource_path('js/function/entity/refresh_websocket_ports.blade.php');
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__PLAYER_ID__', (string) $safePlayerId, $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return "if (typeof fetchAndConnectRemoteSockets === 'function') { fetchAndConnectRemoteSockets($safePlayerId); }";
     }
 
     private function drawMapGroupObject($objectOrArray, string $sessionId): array
