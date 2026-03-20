@@ -544,6 +544,30 @@ class DockerContainerService
     }
 
     /**
+     * Execute a shell command inside the container.
+     */
+    public function execContainerCommand(Container $container, string $command): string
+    {
+        $containerId = (string) $container->container_id;
+        if ($containerId === '') {
+            throw new RuntimeException('Container senza container_id, impossibile eseguire comandi');
+        }
+
+        $command = trim($command);
+        if ($command === '') {
+            throw new InvalidArgumentException('Comando exec vuoto');
+        }
+
+        return $this->executeRemoteDockerCommand([
+            'exec',
+            $containerId,
+            'sh',
+            '-lc',
+            $command,
+        ]);
+    }
+
+    /**
      * Return the current Docker status for the given containers.
      *
      * @param array<int, string> $containerIds
@@ -557,8 +581,7 @@ class DockerContainerService
         }
 
         try {
-            $args = array_merge(['inspect', '--format={{.Id}}::{{.State.Status}}'], $containerIds);
-            $output = $this->executeRemoteDockerCommand($args);
+            $output = $this->executeRemoteDockerCommand(['ps', '-a', '--format={{.ID}}::{{.State}}']);
 
             $statuses = [];
             foreach (preg_split('/\\r\\n|\\r|\\n/', trim($output)) as $line) {
@@ -567,12 +590,24 @@ class DockerContainerService
                 }
 
                 [$id, $status] = array_pad(explode('::', $line, 2), 2, 'unknown');
+                $id = strtolower(trim($id));
+                $status = strtolower(trim($status));
+                if ($id === '') {
+                    continue;
+                }
+
                 $statuses[$id] = $status !== '' ? $status : 'unknown';
             }
 
-            return $statuses;
+            $resolved = [];
+            foreach ($containerIds as $containerId) {
+                $prefix = strtolower(substr($containerId, 0, 12));
+                $resolved[$containerId] = $statuses[$prefix] ?? 'unknown';
+            }
+
+            return $resolved;
         } catch (\Throwable $e) {
-            \Log::warning('Bulk docker status fetch failed, falling back to per-container inspect', [
+            \Log::warning('Bulk docker status fetch failed, falling back to per-container ps lookup', [
                 'error' => $e->getMessage(),
             ]);
         }
@@ -580,7 +615,7 @@ class DockerContainerService
         $statuses = [];
         foreach ($containerIds as $containerId) {
             try {
-                $output = $this->executeRemoteDockerCommand(['inspect', '--format={{.Id}}::{{.State.Status}}', $containerId]);
+                $output = $this->executeRemoteDockerCommand(['ps', '-a', '--filter', 'id=' . $containerId, '--format={{.ID}}::{{.State}}']);
                 $line = trim($output);
                 if ($line === '') {
                     $statuses[$containerId] = 'unknown';
@@ -588,13 +623,21 @@ class DockerContainerService
                 }
 
                 [$id, $status] = array_pad(explode('::', $line, 2), 2, 'unknown');
-                $statuses[$id !== '' ? $id : $containerId] = $status !== '' ? $status : 'unknown';
+                $id = strtolower(trim($id));
+                $status = strtolower(trim($status));
+                $statuses[$id !== '' ? $id : strtolower(substr($containerId, 0, 12))] = $status !== '' ? $status : 'unknown';
             } catch (\Throwable $e) {
                 $statuses[$containerId] = 'unknown';
             }
         }
 
-        return $statuses;
+        $resolved = [];
+        foreach ($containerIds as $containerId) {
+            $prefix = strtolower(substr($containerId, 0, 12));
+            $resolved[$containerId] = $statuses[$prefix] ?? $statuses[$containerId] ?? 'unknown';
+        }
+
+        return $resolved;
     }
 
     public function sendMessageToContainer(Container $container, array $payloadData): bool

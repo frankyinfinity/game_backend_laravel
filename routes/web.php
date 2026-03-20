@@ -42,6 +42,7 @@ Route::group(['middleware' => ['auth']], function (){
     Route::post('/containers/{container}/restart', [App\Http\Controllers\ContainerController::class, 'restart'])->name('containers.restart')->whereNumber('container');
     Route::get('/containers/{container}/logs', [App\Http\Controllers\ContainerController::class, 'logs'])->name('containers.logs')->whereNumber('container');
     Route::get('/containers/{container}/inspect', [App\Http\Controllers\ContainerController::class, 'inspect'])->name('containers.inspect')->whereNumber('container');
+    Route::post('/containers/{container}/exec', [App\Http\Controllers\ContainerController::class, 'exec'])->name('containers.exec')->whereNumber('container');
     Route::post('/containers/delete', [App\Http\Controllers\ContainerController::class, 'delete'])->name('containers.delete');
 
     //User

@@ -106,6 +106,19 @@ class ContainerController extends Controller
         ]);
     }
 
+    public function exec(DockerContainer $container, Request $request, DockerContainerService $containerService): JsonResponse
+    {
+        $command = (string) $request->input('command', '');
+
+        return response()->json([
+            'success' => true,
+            'container_id' => $container->id,
+            'name' => $container->name,
+            'command' => $command,
+            'output' => $containerService->execContainerCommand($container, $command),
+        ]);
+    }
+
     public function delete(Request $request, DockerContainerService $containerService)
     {
         foreach ((array) $request->input('ids', []) as $id) {

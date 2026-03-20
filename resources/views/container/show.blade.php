@@ -149,6 +149,47 @@
         border-color: rgba(100, 116, 139, 0.24);
     }
 
+    .container-toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .container-toolbar-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        background: #f8fafc;
+    }
+
+    .container-toolbar-group-title {
+        width: 100%;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 2px;
+    }
+
+    .container-toolbar-group .btn {
+        min-width: 94px;
+    }
+
+    .container-toolbar-group .btn.flex-grow {
+        flex: 1 1 120px;
+    }
+
+    .exec-preset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
     @media (max-width: 991.98px) {
         #container-pixi {
             height: clamp(460px, 62vh, 760px);
@@ -192,34 +233,32 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-6 mb-2">
-                        <button type="button" class="btn btn-secondary btn-block btn-sm js-selected-logs" disabled>
+                <div class="container-toolbar">
+                    <div class="container-toolbar-group">
+                        <div class="container-toolbar-group-title">Debug</div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm js-selected-exec flex-grow" disabled>
+                            <i class="fa fa-terminal"></i> Exec
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm js-selected-logs flex-grow" disabled>
                             <i class="fa fa-list"></i> Logs
                         </button>
-                    </div>
-                    <div class="col-6 mb-2">
-                        <button type="button" class="btn btn-dark btn-block btn-sm js-selected-inspect" disabled>
+                        <button type="button" class="btn btn-dark btn-sm js-selected-inspect flex-grow" disabled>
                             <i class="fa fa-search"></i> Inspect
                         </button>
                     </div>
-                    <div class="col-4">
-                        <button type="button" class="btn btn-success btn-block btn-sm js-selected-action" data-action="start" disabled>
+
+                    <div class="container-toolbar-group">
+                        <div class="container-toolbar-group-title">Actions</div>
+                        <button type="button" class="btn btn-success btn-sm js-selected-action flex-grow" data-action="start" disabled>
                             <i class="fa fa-play"></i> Start
                         </button>
-                    </div>
-                    <div class="col-4">
-                        <button type="button" class="btn btn-warning btn-block btn-sm js-selected-action" data-action="stop" disabled>
+                        <button type="button" class="btn btn-warning btn-sm js-selected-action flex-grow" data-action="stop" disabled>
                             <i class="fa fa-stop"></i> Stop
                         </button>
-                    </div>
-                    <div class="col-4">
-                        <button type="button" class="btn btn-info btn-block btn-sm js-selected-action" data-action="restart" disabled>
+                        <button type="button" class="btn btn-info btn-sm js-selected-action flex-grow" data-action="restart" disabled>
                             <i class="fa fa-sync"></i> Restart
                         </button>
-                    </div>
-                    <div class="col-12 mt-2">
-                        <button type="button" class="btn btn-danger btn-block btn-sm js-selected-delete" disabled>
+                        <button type="button" class="btn btn-danger btn-sm js-selected-delete flex-grow" disabled>
                             <i class="fa fa-trash"></i> Delete
                         </button>
                     </div>
@@ -403,7 +442,7 @@
                 fields.status.textContent = '-';
                 fields.statusChip.className = 'status-chip is-unknown mb-2';
                 fields.statusDot.style.background = '#64748b';
-                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect').forEach((btn) => btn.disabled = true);
+                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec').forEach((btn) => btn.disabled = true);
                 return;
             }
 
@@ -415,7 +454,7 @@
             fields.status.textContent = container.status_label || 'Unknown';
             fields.statusChip.className = 'status-chip is-' + String(container.status || 'unknown').toLowerCase() + ' mb-2';
             fields.statusDot.style.background = container.status_color || '#64748b';
-            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect').forEach((btn) => btn.disabled = false);
+            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec').forEach((btn) => btn.disabled = false);
         }
 
         function drawCard(container, x, y, idx) {
@@ -445,17 +484,42 @@
                 fontFamily: 'Arial',
                 fontSize: compact ? 10 : 11,
                 fontWeight: '700',
-                fill: 0xffffff,
+                fill: container.color || 0x64748b,
             });
             const badgeBg = new PIXI.Graphics();
             const badgeWidth = Math.max(78, badge.width + 18);
-            badgeBg.beginFill(container.color || 0x64748b, 1);
-            badgeBg.drawRoundedRect(width - badgeWidth - 14, 12, badgeWidth, 24, 999);
-            badgeBg.endFill();
+            badgeBg.lineStyle(2, container.color || 0x64748b, 1);
+            badgeBg.drawRoundedRect(24, 12, badgeWidth, 24, 999);
             card.addChild(badgeBg);
-            badge.x = width - badgeWidth - 14 + 9;
+            badge.x = 24 + 9;
             badge.y = 18;
             card.addChild(badge);
+
+            const statusValue = container.status_label || 'Unknown';
+            const statusBg = new PIXI.Graphics();
+            const statusText = new PIXI.Text(statusValue, {
+                fontFamily: 'Arial',
+                fontSize: compact ? 9 : 10,
+                fontWeight: '700',
+                fill: 0xffffff,
+            });
+            const statusWidth = Math.max(82, statusText.width + 24);
+            statusBg.beginFill(container.status_color || 0x64748b, 1);
+            statusBg.drawRoundedRect(width - statusWidth - 14, 12, statusWidth, 24, 999);
+            statusBg.endFill();
+            card.addChild(statusBg);
+
+            const statusDot = new PIXI.Graphics();
+            statusDot.beginFill(0xffffff, 1);
+            statusDot.drawCircle(5, 5, 4);
+            statusDot.endFill();
+            statusDot.x = width - statusWidth - 14 + 9;
+            statusDot.y = 18;
+            card.addChild(statusDot);
+
+            statusText.x = width - statusWidth - 14 + 21;
+            statusText.y = 18;
+            card.addChild(statusText);
 
             const meta = new PIXI.Text(
                 [
@@ -470,7 +534,7 @@
                 }
             );
             meta.x = 24;
-            meta.y = 16;
+            meta.y = 46;
             card.addChild(meta);
 
             if (!compact) {
@@ -601,6 +665,23 @@
                 confirmButtonText: 'Chiudi',
                 confirmButtonClass: 'btn btn-primary',
             });
+        }
+
+        function renderExecPresetButtons(containerName) {
+            const presets = [
+                { label: 'ps aux', command: 'ps aux' },
+                { label: 'env', command: 'env | sort' },
+                { label: 'ports', command: 'netstat -tulpn 2>/dev/null || ss -tulpn' },
+            ];
+
+            return [
+                '<div class="exec-preset-row">',
+                '<div class="w-100 text-muted small mb-1">Preset rapidi</div>',
+                presets.map(function (preset) {
+                    return '<button type="button" class="btn btn-light btn-sm js-exec-preset-modal" data-command="' + escapeHtml(preset.command) + '">' + escapeHtml(preset.label) + '</button>';
+                }).join(''),
+                '</div>'
+            ].join('');
         }
 
         function stopLogsRefresh() {
@@ -819,6 +900,114 @@
             });
         }
 
+        function promptExecCommand(initialCommand) {
+            if (!selectedContainer) return;
+
+            Swal.fire({
+                title: 'Exec su ' + (selectedContainer.name || 'container'),
+                showCancelButton: true,
+                buttonsStyling: false,
+                confirmButtonText: 'Esegui',
+                cancelButtonText: 'Annulla',
+                confirmButtonClass: 'btn btn-primary',
+                cancelButtonClass: 'btn btn-default',
+                width: 900,
+                html: [
+                    renderExecPresetButtons(),
+                    '<textarea id="exec-command-input" class="form-control" style="min-height: 160px; font-family: monospace; white-space: pre;" placeholder="Esempio: ps aux | head -n 20">',
+                    escapeHtml(initialCommand || 'ps aux'),
+                    '</textarea>'
+                ].join(''),
+                didOpen: function () {
+                    const popup = Swal.getPopup ? Swal.getPopup() : null;
+                    if (!popup) return;
+
+                    popup.querySelectorAll('.js-exec-preset-modal').forEach(function (button) {
+                        button.addEventListener('click', function () {
+                            const input = popup.querySelector('#exec-command-input');
+                            if (input) {
+                                input.value = button.getAttribute('data-command') || '';
+                                input.focus();
+                            }
+                        });
+                    });
+                    const input = popup.querySelector('#exec-command-input');
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                },
+                preConfirm: function () {
+                    const popup = Swal.getPopup ? Swal.getPopup() : null;
+                    const input = popup ? popup.querySelector('#exec-command-input') : null;
+                    const command = input ? (input.value || '').trim() : '';
+                    if (!command) {
+                        Swal.showValidationMessage('Inserisci un comando');
+                        return false;
+                    }
+                    return command;
+                }
+            }).then(function (result) {
+                if (!result.value) {
+                    return;
+                }
+
+                const command = result.value;
+
+                $.ajax({
+                    url: "{{ route('containers.exec', ['container' => '_id_']) }}".replace('_id_', selectedContainer.id),
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    data: { command: command },
+                    success: function (response) {
+                        if (response && response.success) {
+                            const output = '$ ' + (response.command || '') + '\n\n' + (response.output || '(nessun output)');
+                            Swal.fire({
+                                title: 'Exec: ' + (response.name || selectedContainer.name || 'Container'),
+                                html: [
+                                    '<div class="d-flex justify-content-end mb-2">',
+                                    '  <button type="button" class="btn btn-outline-primary btn-sm" id="copy-exec-output">',
+                                    '    <i class="fa fa-copy"></i> Copy output',
+                                    '  </button>',
+                                    '</div>',
+                                    '<textarea id="container-exec-output" readonly class="form-control" style="min-height: 420px; font-family: monospace; white-space: pre; overflow: auto;">' + escapeHtml(output) + '</textarea>'
+                                ].join(''),
+                                width: 1100,
+                                confirmButtonText: 'Chiudi',
+                                confirmButtonClass: 'btn btn-primary',
+                                didOpen: function () {
+                                    const copyButton = document.getElementById('copy-exec-output');
+                                    const textarea = document.getElementById('container-exec-output');
+                                    if (copyButton && textarea) {
+                                        copyButton.addEventListener('click', function () {
+                                            const text = textarea.value || '';
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                navigator.clipboard.writeText(text);
+                                            } else {
+                                                textarea.select();
+                                                document.execCommand('copy');
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    },
+                    error: function (xhr) {
+                        const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Impossibile eseguire il comando nel container.';
+                        Swal.fire({
+                            title: 'Ops!',
+                            text: message,
+                            type: 'danger',
+                            confirmButtonClass: 'btn btn-info'
+                        });
+                    }
+                });
+            });
+        }
+
         $(document).ready(function () {
             if (typeof PIXI === 'undefined') {
                 console.error('PIXI.js is not loaded.');
@@ -887,6 +1076,10 @@
 
             $(document).on('click', '.js-selected-inspect', function () {
                 fetchInspect();
+            });
+
+            $(document).on('click', '.js-selected-exec', function () {
+                promptExecCommand();
             });
 
             refreshTimer = setInterval(function () {
