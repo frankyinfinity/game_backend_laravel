@@ -18,8 +18,8 @@ class ObjectiveService
 {
     public function startObjective(Request $request): array
     {
-        $playerId = (int) $request->input('player_id');
-        $targetPlayerId = (int) $request->input('target_player_id');
+        $playerId = (int)$request->input('player_id');
+        $targetPlayerId = (int)$request->input('target_player_id');
 
         $alreadyInProgress = TargetPlayer::query()
             ->where('player_id', $playerId)
@@ -71,7 +71,7 @@ class ObjectiveService
 
         if ($player) {
             $sessionId = $this->resolveSessionId($request, $player);
-            $drawPlayerId = (int) $request->input('draw_player_id', $playerId);
+            $drawPlayerId = (int)$request->input('draw_player_id', $playerId);
             $drawPlayer = Player::query()->find($drawPlayerId) ?? $player;
             $objectiveTreeUidPrefix = 'objective_tree_' . $playerId;
             $objectiveDrawCommands = [];
@@ -106,8 +106,8 @@ class ObjectiveService
 
                     foreach ($objectiveTree->getDrawItems() as $drawItem) {
                         $json = $drawItem->buildJson();
-                        $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
-                        $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+                        $offsetX = isset($json['x']) ? (int)$json['x'] : 0;
+                        $offsetY = isset($json['y']) ? (int)$json['y'] : 0;
                         $modal->addContentItem($drawItem, $offsetX, $offsetY);
                     }
 
@@ -117,7 +117,8 @@ class ObjectiveService
                         $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
                         $objectiveDrawCommands[] = $objectDraw->get();
                     }
-                } else {
+                }
+                else {
                     foreach ($existingObjects as $uid => $object) {
                         if (!is_string($uid) || !Str::startsWith($uid, $objectiveTreeUidPrefix)) {
                             continue;
@@ -146,7 +147,7 @@ class ObjectiveService
                     DrawRequest::query()->create([
                         'session_id' => $sessionId,
                         'request_id' => $objectiveRequestId,
-                        'player_id' => (int) $drawPlayer->id,
+                        'player_id' => (int)$drawPlayer->id,
                         'items' => json_encode($objectiveDrawCommands),
                     ]);
                 }
@@ -167,7 +168,7 @@ class ObjectiveService
 
     public function setObjectiveModalVisibility(Request $request): array
     {
-        $playerId = (int) $request->input('player_id');
+        $playerId = (int)$request->input('player_id');
         $player = Player::query()->find($playerId);
 
         if (!$player) {
@@ -181,7 +182,7 @@ class ObjectiveService
         }
 
         $sessionId = $this->resolveSessionId($request, $player);
-        $modalUid = (string) $request->input('modal_uid', 'objective_modal_' . $playerId);
+        $modalUid = (string)$request->input('modal_uid', 'objective_modal_' . $playerId);
         $renderable = filter_var($request->input('renderable', true), FILTER_VALIDATE_BOOL);
 
         ObjectCache::buffer($sessionId);
@@ -190,8 +191,8 @@ class ObjectiveService
         $viewportUid = $modalUid . '_content_viewport';
         $childUids = [];
         if (
-            isset($existingObjects[$viewportUid]['attributes']['scroll_child_uids'])
-            && is_array($existingObjects[$viewportUid]['attributes']['scroll_child_uids'])
+        isset($existingObjects[$viewportUid]['attributes']['scroll_child_uids'])
+        && is_array($existingObjects[$viewportUid]['attributes']['scroll_child_uids'])
         ) {
             $childUids = $existingObjects[$viewportUid]['attributes']['scroll_child_uids'];
         }
@@ -233,17 +234,17 @@ class ObjectiveService
 
     public function dispatchObjectiveCheck(Request $request): array
     {
-        $playerId = (int) $request->input('player_id');
+        $playerId = (int)$request->input('player_id');
         $drawPlayerIdInput = $request->input('draw_player_id');
-        $drawPlayerId = (is_numeric($drawPlayerIdInput) && (int) $drawPlayerIdInput > 0)
-            ? (int) $drawPlayerIdInput
+        $drawPlayerId = (is_numeric($drawPlayerIdInput) && (int)$drawPlayerIdInput > 0)
+            ? (int)$drawPlayerIdInput
             : $playerId;
 
         CheckObjectiveJob::dispatch([
             'player_id' => $playerId,
             'session_id' => $request->input('session_id'),
             'draw_player_id' => $drawPlayerId,
-        ])->onQueue('check_objective');
+        ]);
 
         return [
             'status' => 200,
@@ -266,14 +267,14 @@ class ObjectiveService
 
             foreach ($scrollChildUids as $childUid) {
                 if (is_string($childUid) && Str::startsWith($childUid, $objectiveTreeUidPrefix)) {
-                    return (bool) ($attributes['renderable'] ?? true);
+                    return (bool)($attributes['renderable'] ?? true);
                 }
             }
         }
 
         foreach ($existingObjects as $uid => $object) {
             if (is_string($uid) && Str::startsWith($uid, $objectiveTreeUidPrefix)) {
-                return (bool) ($object['attributes']['renderable'] ?? true);
+                return (bool)($object['attributes']['renderable'] ?? true);
             }
         }
 
@@ -309,7 +310,8 @@ class ObjectiveService
             if (!is_string($modalUid) || $modalUid === '') {
                 if (is_string($uid) && Str::endsWith($uid, '_content_viewport')) {
                     $modalUid = substr($uid, 0, -strlen('_content_viewport'));
-                } else {
+                }
+                else {
                     continue;
                 }
             }
@@ -319,12 +321,12 @@ class ObjectiveService
             $body = $existingObjects[$bodyUid] ?? null;
             $title = $existingObjects[$titleUid] ?? null;
 
-            $x = isset($body['x']) ? (int) $body['x'] : 0;
-            $y = isset($body['y']) ? (int) $body['y'] : 0;
-            $width = isset($body['width']) ? (int) $body['width'] : 760;
-            $height = isset($body['height']) ? (int) $body['height'] : 560;
-            $renderable = (bool) ($body['attributes']['renderable'] ?? $attributes['renderable'] ?? true);
-            $titleText = is_array($title) && isset($title['text']) ? (string) $title['text'] : 'Obiettivi';
+            $x = isset($body['x']) ? (int)$body['x'] : 0;
+            $y = isset($body['y']) ? (int)$body['y'] : 0;
+            $width = isset($body['width']) ? (int)$body['width'] : 760;
+            $height = isset($body['height']) ? (int)$body['height'] : 560;
+            $renderable = (bool)($body['attributes']['renderable'] ?? $attributes['renderable'] ?? true);
+            $titleText = is_array($title) && isset($title['text']) ? (string)$title['text'] : 'Obiettivi';
 
             $uidsToClear = [];
             foreach ($existingObjects as $existingUid => $_) {
@@ -362,7 +364,7 @@ class ObjectiveService
         }
 
         if (!empty($player->actual_session_id)) {
-            return (string) $player->actual_session_id;
+            return (string)$player->actual_session_id;
         }
 
         return 'init_session_id';
