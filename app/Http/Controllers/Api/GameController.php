@@ -895,26 +895,6 @@ class GameController extends Controller
                     $updateCommands[] = $data;
                 }
 
-                //Update Text
-                $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
-                $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-
-                $updateData = $updateObject->get();
-                foreach ($updateData as $data) {
-                    $updateCommands[] = $data;
-                }
-
-                //Update Panel
-                $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
-                $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
-                $updateObject->setAttributes('zIndex', 100);
-
-                $updateData = $updateObject->get();
-                foreach ($updateData as $data) {
-                    $updateCommands[] = $data;
-                }
-
             }
 
         }
@@ -1136,19 +1116,6 @@ class GameController extends Controller
                 foreach ($updateObject->get() as $data)
                     $updateCommands[] = $data;
 
-                //Update Text
-                $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
-                $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-                foreach ($updateObject->get() as $data)
-                    $updateCommands[] = $data;
-
-                //Update Panel
-                $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
-                $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
-                $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data)
-                    $updateCommands[] = $data;
             }
         }
 
@@ -1437,19 +1404,6 @@ class GameController extends Controller
                 foreach ($updateObject->get() as $data)
                     $drawCommands[] = $data;
 
-                // Update Text
-                $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
-                $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-                foreach ($updateObject->get() as $data)
-                    $drawCommands[] = $data;
-
-                // Update Panel
-                $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
-                $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
-                $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data)
-                    $drawCommands[] = $data;
             }
         }
 
@@ -1696,19 +1650,6 @@ class GameController extends Controller
                     foreach ($updateObject->get() as $data)
                         $drawCommands[] = $data;
 
-                    // Update Text
-                    $updateObject = new ObjectUpdate($entityUid . '_text_row_2', $player->actual_session_id);
-                    $updateObject->setAttributes('text', 'I: ' . $nextPathNodeI . ' - J: ' . $nextPathNodeJ);
-                    foreach ($updateObject->get() as $data)
-                        $drawCommands[] = $data;
-
-                    // Update Panel
-                    $updateObject = new ObjectUpdate($entityUid . '_panel', $player->actual_session_id);
-                    $updateObject->setAttributes('x', $xEnd + ($tileSize / 3));
-                    $updateObject->setAttributes('y', $yEnd + ($tileSize / 3));
-                    $updateObject->setAttributes('zIndex', 100);
-                    foreach ($updateObject->get() as $data)
-                        $drawCommands[] = $data;
                 }
             }
 
@@ -2126,9 +2067,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 

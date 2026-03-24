@@ -31,7 +31,7 @@ window['__name__'] = function() {
 
         const shiftUid = function(uid, dx, dy) {
             if (!uid || (dx === 0 && dy === 0)) return;
-            const isMultiLine = !!(objects[uid] && objects[uid].type === 'multi_line');
+            const isMultiLine = !!(objects[uid] && (objects[uid].type === 'multi_line' || objects[uid].type === 'line'));
             if (objects[uid]) {
                 if (typeof objects[uid].x === 'number') objects[uid].x += dx;
                 if (typeof objects[uid].y === 'number') objects[uid].y += dy;

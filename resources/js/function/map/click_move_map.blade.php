@@ -35,16 +35,24 @@
                         if (!object || !shape) return;
                         if (!this.isInGroup(uid, object, groupName)) return;
 
-                        if (object.type === 'multi_line' && Array.isArray(object.points)) {
+                        if ((object.type === 'multi_line' || object.type === 'line') && Array.isArray(object.points)) {
                             object.points = object.points.map((point) => ({
                                 x: point.x + dx,
                                 y: point.y + dy
                             }));
 
                             if (typeof shape.clear === 'function') {
+                                let lineColor = 0xFFFFFF;
+                                const rawColor = object.color;
+                                if (typeof rawColor === 'number') lineColor = rawColor;
+                                else if (typeof rawColor === 'string') {
+                                    const c = rawColor.trim();
+                                    if (c.startsWith('#')) lineColor = parseInt(c.slice(1), 16) || 0xFFFFFF;
+                                    else if (/^0x[0-9a-f]+$/i.test(c)) lineColor = parseInt(c, 16) || 0xFFFFFF;
+                                    else if (/^[0-9a-f]{6}$/i.test(c)) lineColor = parseInt(c, 16) || 0xFFFFFF;
+                                }
                                 shape.clear();
-                                shape.lineStyle(object.thickness || 1, 0xFFFFFF);
-                                shape.tint = object.color;
+                                shape.lineStyle(object.thickness || 1, lineColor);
                                 if (object.points.length > 0) {
                                     shape.moveTo(object.points[0].x, object.points[0].y);
                                     for (let i = 1; i < object.points.length; i++) {

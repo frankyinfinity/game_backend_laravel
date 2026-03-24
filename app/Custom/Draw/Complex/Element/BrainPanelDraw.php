@@ -3,6 +3,7 @@
 namespace App\Custom\Draw\Complex\Element;
 
 use App\Custom\Colors;
+use App\Custom\Draw\Primitive\Line;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
@@ -106,7 +107,7 @@ class BrainPanelDraw
         $bottom = $top + ($gridHeight * $this->cellSize);
 
         for ($x = $left + $this->cellSize; $x < $right; $x += $this->cellSize) {
-            $line = new MultiLine($this->uid . '_grid_v_' . $x);
+            $line = new Line($this->uid . '_grid_v_' . $x);
             $line->setPoint($x, $top);
             $line->setPoint($x, $bottom);
             $line->setColor(0xD1D5DB);
@@ -117,7 +118,7 @@ class BrainPanelDraw
         }
 
         for ($y = $top + $this->cellSize; $y < $bottom; $y += $this->cellSize) {
-            $line = new MultiLine($this->uid . '_grid_h_' . $y);
+            $line = new Line($this->uid . '_grid_h_' . $y);
             $line->setPoint($left, $y);
             $line->setPoint($right, $y);
             $line->setColor(0xD1D5DB);
@@ -189,6 +190,7 @@ class BrainPanelDraw
             $node->addAttributes('neuron_type', $neuron->type);
             $node->addAttributes('grid_i', (int) $neuron->grid_i);
             $node->addAttributes('grid_j', (int) $neuron->grid_j);
+            $node->addAttributes('tooltip_text', $this->buildNeuronTooltip($neuron));
             $this->drawItems[] = $node;
 
             $icon = new Text($this->uid . '_node_icon_' . $index);
@@ -252,5 +254,38 @@ class BrainPanelDraw
             'main' => 0x16A34A,
             default => 0x16A34A,
         };
+    }
+
+    private function buildNeuronTooltip(ElementHasPositionNeuron $neuron): string
+    {
+        $label = match ((string) $neuron->type) {
+            'detection' => 'Individuazione',
+            'path' => 'Percorso',
+            'attack' => 'Attacco',
+            'movement' => 'Movimento',
+            default => ucfirst((string) $neuron->type),
+        };
+
+        $lines = [];
+        $lines[] = $label;
+        $lines[] = 'Cella: (' . (int) $neuron->grid_i . ', ' . (int) $neuron->grid_j . ')';
+
+        if ((string) $neuron->type === 'detection') {
+            $targetLabel = $neuron->target_type === 'entity'
+                ? 'Entity'
+                : ($neuron->target_type === 'element' ? 'Element' : '-');
+            $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
+            $lines[] = 'Target: ' . $targetLabel;
+            if ($neuron->target_type === 'element') {
+                $lines[] = 'Id Element: ' . ($neuron->target_element_id !== null ? (int) $neuron->target_element_id : '-');
+            }
+        } elseif ((string) $neuron->type === 'attack') {
+            $lines[] = 'Gene Vita: ' . ($neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : '-');
+            $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');
+        } elseif ((string) $neuron->type === 'movement') {
+            $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
+        }
+
+        return implode("\n", $lines);
     }
 }

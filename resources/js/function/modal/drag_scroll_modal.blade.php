@@ -61,7 +61,7 @@ window['__name__'] = function() {
     let currentContentBottom = null;
     childUids.forEach(function(uid) {
         const obj = objects[uid];
-        const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
+        const isMultiLine = obj && (obj.type === 'multi_line' || obj.type === 'line') && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
         const isPanelItem = typeof uid === 'string' && uid.indexOf('_container_panel') !== -1;
         const initiallyVisible = initialRenderables[uid] === undefined ? true : !!initialRenderables[uid];
         const currentlyVisible = !!(obj && obj.attributes && obj.attributes.renderable);
@@ -163,7 +163,7 @@ window['__name__'] = function() {
             const baseX = state.basePositionsX[uid];
             const baseY = state.basePositionsY[uid];
             const obj = objects[uid];
-            const isMultiLine = obj && obj.type === 'multi_line' && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
+            const isMultiLine = obj && (obj.type === 'multi_line' || obj.type === 'line') && Array.isArray(basePointsMap[uid]) && basePointsMap[uid].length > 0;
             const isPanelItem = typeof uid === 'string' && uid.indexOf('_container_panel') !== -1;
             const intendedVisible = !!(obj && obj.attributes && obj.attributes.renderable);
             if (typeof baseX !== 'number' || typeof baseY !== 'number') {

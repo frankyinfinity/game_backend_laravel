@@ -107,6 +107,7 @@ class ElementDraw
         $panel->setSize(240, 200);
         $panel->setColor(0xFFFFFF);
         $panel->setRenderable(false);
+        $image->addChild($panel);
 
         // Text (Name)
         $text = new Text($uid . '_text_name');

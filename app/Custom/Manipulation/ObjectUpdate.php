@@ -68,20 +68,18 @@ class ObjectUpdate implements ManipulationCommand
             $xAfter = array_key_exists('x', $attributes) ? $attributes['x'] : $xBefore;
             $yAfter = array_key_exists('y', $attributes) ? $attributes['y'] : $yBefore;
 
-            if ($xAfter === null || $yAfter === null) {
-                return $items;
-            }
+            if ($xAfter !== null && $yAfter !== null) {
+                $dx = ((float) $xAfter) - ((float) ($xBefore ?? $xAfter));
+                $dy = ((float) $yAfter) - ((float) ($yBefore ?? $yAfter));
 
-            $dx = ((float) $xAfter) - ((float) ($xBefore ?? $xAfter));
-            $dy = ((float) $yAfter) - ((float) ($yBefore ?? $yAfter));
-            if ($dx === 0.0 && $dy === 0.0) {
-                return $items;
+                if ($dx !== 0.0 || $dy !== 0.0) {
+                    $items = array_merge(
+                        $items,
+                        // Children should follow immediately, even if the root movement is delayed.
+                        $this->sceneGraphMover->moveChildren($uid, $dx, $dy, 0)
+                    );
+                }
             }
-
-            $items = array_merge(
-                $items,
-                $this->sceneGraphMover->moveChildren($uid, $dx, $dy, $this->sleep)
-            );
         }
 
         return $items;

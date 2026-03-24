@@ -1052,22 +1052,6 @@ class BrainFlowRunner
                 $updateCommands[] = $data;
             }
 
-            $panelX = $endX + ($tileSize / 2);
-            $panelY = $endY + ($tileSize / 2);
-            $updateObject = new ObjectUpdate($elementUid . '_panel', $sessionId);
-            $updateObject->setAttributes('x', $panelX);
-            $updateObject->setAttributes('y', $panelY);
-            $updateObject->setAttributes('zIndex', 100);
-            foreach ($updateObject->get() as $data) {
-                $updateCommands[] = $data;
-            }
-
-            $updateObject = new ObjectUpdate($elementUid . '_text_name', $sessionId);
-            $updateObject->setAttributes('x', $panelX + 10);
-            $updateObject->setAttributes('y', $panelY + 10);
-            foreach ($updateObject->get() as $data) {
-                $updateCommands[] = $data;
-            }
         }
 
         foreach ($updateCommands as $update) {
@@ -1418,25 +1402,11 @@ class BrainFlowRunner
         ObjectCache::buffer($sessionId);
         $drawCommands = [];
 
-        $updateObject = new ObjectUpdate($elementUid, $sessionId, 250);
+        // Panel movement must be immediate.
+        $updateObject = new ObjectUpdate($elementUid, $sessionId, 0);
         $updateObject->setAttributes('x', $endX);
         $updateObject->setAttributes('y', $endY);
         $updateObject->setAttributes('zIndex', 100);
-        foreach ($updateObject->get() as $data) {
-            $drawCommands[] = $data;
-        }
-
-        $updateObject = new ObjectUpdate($elementUid . '_panel', $sessionId);
-        $updateObject->setAttributes('x', $panelX);
-        $updateObject->setAttributes('y', $panelY);
-        $updateObject->setAttributes('zIndex', 100);
-        foreach ($updateObject->get() as $data) {
-            $drawCommands[] = $data;
-        }
-
-        $updateObject = new ObjectUpdate($elementUid . '_text_name', $sessionId);
-        $updateObject->setAttributes('x', $panelX + 10);
-        $updateObject->setAttributes('y', $panelY + 10);
         foreach ($updateObject->get() as $data) {
             $drawCommands[] = $data;
         }
@@ -1639,3 +1609,5 @@ class BrainFlowRunner
         return $drawObject->get();
     }
 }
+
+

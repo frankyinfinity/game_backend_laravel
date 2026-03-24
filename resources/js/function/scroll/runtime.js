@@ -63,7 +63,7 @@
         const offsetY = offset.y;
         if (!offsetX && !offsetY) return obj;
 
-        if (obj.type === 'multi_line' && Array.isArray(obj.points)) {
+        if ((obj.type === 'multi_line' || obj.type === 'line') && Array.isArray(obj.points)) {
             obj.points = obj.points.map((point) => ({
                 x: point.x + offsetX,
                 y: point.y + offsetY
