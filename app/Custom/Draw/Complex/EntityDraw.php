@@ -267,6 +267,7 @@ class EntityDraw
         }
 
         //Set Children (Panel)
+        $circle->addChild($panel);
         $panel->addChild($text1);
         $panel->addChild($text2);
         foreach ($upButton->getDrawItems() as $item) {$panel->addChild($item);}
