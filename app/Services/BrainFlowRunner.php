@@ -36,11 +36,13 @@ class BrainFlowRunner
     private array $queuedDrawBySession = [];
     private int $elementHasPositionId = 0;
     private string $wsHost = '';
+    private int $websocketGatewayPort = 9001;
 
     public function run(int $elementHasPositionId, string $wsHost = ''): array
     {
         $this->elementHasPositionId = $elementHasPositionId;
         $this->wsHost = $wsHost !== '' ? $wsHost : (string) config('remote_docker.docker_host_ip');
+        $this->websocketGatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
 
         $item = ElementHasPosition::query()
             ->with([
@@ -781,21 +783,21 @@ class BrainFlowRunner
         return false;
     }
 
-    private function openMapWebSocket(string $host, int $port)
+    private function openMapWebSocket(string $host, int $targetPort)
     {
         $socket = @stream_socket_client(
-            "tcp://{$host}:{$port}",
+            "tcp://{$host}:{$this->websocketGatewayPort}",
             $errno,
             $errstr,
             5
         );
 
         if ($socket === false) {
-            throw new \RuntimeException("Connessione websocket fallita ({$errno}): {$errstr}");
+            throw new \RuntimeException("Connessione websocket al gateway fallita ({$errno}): {$errstr}");
         }
 
         stream_set_timeout($socket, 5);
-        $this->performWebSocketHandshake($socket, $host, $port);
+        $this->performWebSocketHandshake($socket, $host, $this->websocketGatewayPort, $targetPort);
 
         return $socket;
     }
@@ -824,11 +826,11 @@ class BrainFlowRunner
         return $reply;
     }
 
-    private function performWebSocketHandshake($socket, string $host, int $port): void
+    private function performWebSocketHandshake($socket, string $host, int $gatewayPort, int $targetPort): void
     {
         $key = base64_encode(random_bytes(16));
-        $headers = "GET / HTTP/1.1\r\n";
-        $headers .= "Host: {$host}:{$port}\r\n";
+        $headers = "GET /?port={$targetPort} HTTP/1.1\r\n";
+        $headers .= "Host: {$host}:{$gatewayPort}\r\n";
         $headers .= "Upgrade: websocket\r\n";
         $headers .= "Connection: Upgrade\r\n";
         $headers .= "Sec-WebSocket-Key: {$key}\r\n";
