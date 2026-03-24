@@ -10,6 +10,7 @@ use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Complex\Element\BrainPanelDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Support\ScrollGroup;
@@ -75,6 +76,13 @@ class ElementDraw
             // Keep draw uid aligned with existing DB uid.
             $uid = (string) $elementHasPosition->uid;
         }
+
+        if ($elementHasPosition) {
+            $elementHasPosition->loadMissing([
+                'brain.neurons.outgoingLinks.toNeuron',
+                'brain.neurons.incomingLinks',
+            ]);
+        }
         
         $x = ($this->tileJ * Helper::TILE_SIZE) + Helper::MAP_START_X;
         $y = ($this->tileI * Helper::TILE_SIZE) + Helper::MAP_START_Y;
@@ -96,7 +104,7 @@ class ElementDraw
 
         $panel = new Rectangle($uid . '_panel');
         $panel->setOrigin($panelX, $panelY);
-        $panel->setSize(200, 50);
+        $panel->setSize(240, 200);
         $panel->setColor(0xFFFFFF);
         $panel->setRenderable(false);
 
@@ -109,6 +117,24 @@ class ElementDraw
 
         $panel->addChild($text);
 
+        // Brain panel
+        $brainPanelItems = [];
+        $positionBrain = $elementHasPosition ? $elementHasPosition->brain : null;
+        if ($positionBrain) {
+            $brainPanel = new BrainPanelDraw($uid . '_brain_panel');
+            $brainPanel->setBrain($positionBrain);
+            $brainPanel->setOrigin($panelX + 10, $panelY + 34);
+            $brainPanel->setRenderable(false);
+            $brainPanel->build();
+
+            $panel->setSize(max(240, $brainPanel->getWidth() + 20), max(200, $brainPanel->getHeight() + 60));
+
+            foreach ($brainPanel->getDrawItems() as $item) {
+                $panel->addChild($item);
+                $brainPanelItems[] = $item->buildJson();
+            }
+        }
+
         // Progress Bars for Genes (only for interactive elements)
         $geneProgressBarItems = [];
         $geneProgressBarCount = 0;
@@ -118,7 +144,7 @@ class ElementDraw
         }
 
         // Attack Button position (after gene progress bars)
-        $attackBtnY = $panelY + 70 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
+        $attackBtnY = $panelY + 170 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
         
         // Consumable Button (encapsulated in function)
         $btnItems = [];
@@ -140,6 +166,9 @@ class ElementDraw
         $this->drawItems[] = $image->buildJson();
         $this->drawItems[] = $panel->buildJson();
         $this->drawItems[] = $text->buildJson();
+        foreach ($brainPanelItems as $item) {
+            $this->drawItems[] = $item;
+        }
         
         foreach ($btnItems as $item) {
             $this->drawItems[] = $item->buildJson();
@@ -203,9 +232,9 @@ class ElementDraw
         
         if ($informationCount > 0) {
             // Increase panel height to accommodate progress bars
-            $panel->setSize(200, 60 + ($informationCount * 105));
+            $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), max(200, ($informationCount * 105) + 200));
             
-            $progressBarY = $panelY + 60; // Start below the name text
+            $progressBarY = $panelY + 170; // Start below the brain panel
             
             foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
 
@@ -245,10 +274,10 @@ class ElementDraw
      */
     private function addConsumableButton(Rectangle $panel, $panelX, $panelY, $uid): array
     {
-        $panel->setSize(200, 120); // Increase height for button
+        $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), 300); // Increase height for brain panel + button
         
         $btnX = $panelX + 10;
-        $btnY = $panelY + 50;
+        $btnY = $panelY + 170;
         
         $jsPathConsume = resource_path('js/function/element/consume.blade.php');
         $jsContentConsume = file_get_contents($jsPathConsume);
@@ -282,7 +311,7 @@ class ElementDraw
     {
         // Ensure enough room for the button after all progress bars.
         $panelHeight = max(220, ($attackBtnY + 95) - $panelY);
-        $panel->setSize(200, $panelHeight);
+        $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), $panelHeight);
         
         $btnX = $panelX + 10;
         $btnY = $attackBtnY;
