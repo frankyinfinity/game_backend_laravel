@@ -10,7 +10,7 @@
             return;
         }
 
-        let wsUrl = 'ws://' + '__host__' + ':' + port;
+        let wsUrl = '__gateway_base__' + port;
         
         // Global cache
         window.gameWebSockets = window.gameWebSockets || {};

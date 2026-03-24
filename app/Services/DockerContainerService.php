@@ -17,12 +17,18 @@ class DockerContainerService
     private string $sshBinaryPath;
     private string $sshKeyPath;
     private string $sshUserHost;
+    private string $websocketGatewayContainer;
+    private string $websocketGatewayImage;
+    private int $websocketGatewayPort;
 
     public function __construct()
     {
         $this->sshBinaryPath = (string) config('remote_docker.ssh_binary_path');
         $this->sshKeyPath = (string) config('remote_docker.ssh_key_path');
         $this->sshUserHost = (string) config('remote_docker.ssh_user_host');
+        $this->websocketGatewayContainer = (string) config('remote_docker.websocket_gateway_container');
+        $this->websocketGatewayImage = (string) config('remote_docker.websocket_gateway_image');
+        $this->websocketGatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
     }
 
     public function createContainersForPlayer(Player $player): void
@@ -257,6 +263,70 @@ class DockerContainerService
     {
         $maxPort = Container::query()->whereNotNull('ws_port')->max('ws_port') ?? 9000;
         return $maxPort + 1;
+    }
+
+    public function ensureWebSocketGatewayRunning(): void
+    {
+        $containerName = $this->websocketGatewayContainer;
+        $gatewayPort = $this->websocketGatewayPort;
+
+        if ($containerName === '' || $gatewayPort <= 0) {
+            throw new RuntimeException('Configurazione gateway websocket non valida.');
+        }
+
+        try {
+            $status = strtolower(trim($this->executeRemoteDockerCommand([
+                'inspect',
+                '--format={{.State.Status}}',
+                $containerName,
+            ])));
+
+            if ($status === 'running') {
+                return;
+            }
+
+            if ($status !== '') {
+                $this->executeRemoteDockerCommand(['start', $containerName]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Container assente: proviamo a crearlo.
+        }
+
+        $this->ensureImageExists($this->websocketGatewayImage);
+
+        $args = [
+            'run',
+            '-d',
+            '--restart',
+            'unless-stopped',
+            '--name',
+            $containerName,
+            '--network',
+            'host',
+            '-e',
+            'GATEWAY_PORT=' . $gatewayPort,
+            '-e',
+            'GATEWAY_TARGET_HOST=127.0.0.1',
+            $this->websocketGatewayImage,
+        ];
+
+        $this->executeRemoteDockerCommand($args);
+        \Log::info("WebSocket gateway remoto avviato", [
+            'container' => $containerName,
+            'port' => $gatewayPort,
+        ]);
+    }
+
+    public function websocketGatewayUrlForPort(int $port): string
+    {
+        $host = (string) config('remote_docker.docker_host_ip');
+        $gatewayPort = $this->websocketGatewayPort;
+        if ($host === '' || $gatewayPort <= 0) {
+            throw new RuntimeException('Configurazione gateway websocket non valida.');
+        }
+
+        return "ws://{$host}:{$gatewayPort}/?port=" . max(1, $port);
     }
 
     private function backendUrl(): string

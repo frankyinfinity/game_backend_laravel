@@ -15,7 +15,7 @@
             let port = ports[actual_focus_uid_entity];
 
             const connectAndSend = (resolvedPort) => {
-                let wsUrl = 'ws://' + '__host__' + ':' + resolvedPort;
+                let wsUrl = '__gateway_base__' + resolvedPort;
                 
                 // Global cache for WebSockets
                 window.gameWebSockets = window.gameWebSockets || {};
@@ -65,10 +65,10 @@
                                 : (window.entityWsPorts || {});
                             const refreshedPort = resolvedPorts[actual_focus_uid_entity];
                             if (!refreshedPort) {
-                                console.error('WebSocket port not found for entity ' + actual_focus_uid_entity);
-                                return;
-                            }
-                            connectAndSend(refreshedPort);
+                            console.error('WebSocket port not found for entity ' + actual_focus_uid_entity);
+                            return;
+                        }
+                        connectAndSend(refreshedPort);
                         })
                         .catch(function (error) {
                             console.error('Failed to refresh websocket ports:', error);

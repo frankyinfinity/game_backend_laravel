@@ -47,6 +47,10 @@ class BuildDockerImage extends Command
                 'name' => 'element:latest',
                 'path' => base_path('docker/element')
             ],
+            [
+                'name' => 'ws-gateway:latest',
+                'path' => base_path('docker/ws-gateway')
+            ],
         ];
 
         foreach ($images as $image) {

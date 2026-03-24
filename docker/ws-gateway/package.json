@@ -1,0 +1,10 @@
+{
+  "name": "ws-gateway",
+  "version": "1.0.0",
+  "description": "WebSocket gateway that routes browser connections to remote container ports",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

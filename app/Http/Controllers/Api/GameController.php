@@ -2141,7 +2141,7 @@ class GameController extends Controller
         return response()->json($result['body'], $result['status']);
     }
 
-    public function websocketInfo(Request $request): \Illuminate\Http\JsonResponse
+    public function websocketInfo(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
     {
         $validated = $request->validate([
             'player_id' => ['required', 'integer'],
@@ -2153,6 +2153,8 @@ class GameController extends Controller
         if (!$player) {
             return response()->json(['success' => false, 'message' => 'Player not found'], 404);
         }
+
+        $containerService->ensureWebSocketGatewayRunning();
 
         $entityIds = Entity::query()
             ->whereHas('specie', function ($query) use ($player) {
@@ -2208,11 +2210,15 @@ class GameController extends Controller
 
         $websocketHost = (string) config('remote_docker.docker_host_ip');
 
-        $containersData = $containers->map(function ($container) use ($websocketHost, $entityUidsById) {
+        $gatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
+
+        $containersData = $containers->map(function ($container) use ($websocketHost, $entityUidsById, $gatewayPort) {
             $uid = null;
             if ($container->parent_type === Container::PARENT_TYPE_ENTITY) {
                 $uid = $entityUidsById[(string) $container->parent_id] ?? null;
             }
+
+            $wsGatewayUrl = 'ws://' . $websocketHost . ':' . $gatewayPort . '/?port=' . $container->ws_port;
 
             return [
                 'name' => $container->name,
@@ -2220,7 +2226,8 @@ class GameController extends Controller
                 'id' => $container->parent_id,
                 'uid' => $uid,
                 'ws_port' => $container->ws_port,
-                'ws_url' => 'ws://' . $websocketHost . ':' . $container->ws_port
+                'ws_url' => $wsGatewayUrl,
+                'ws_gateway_url' => $wsGatewayUrl,
             ];
         });
 

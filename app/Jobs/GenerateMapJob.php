@@ -105,7 +105,8 @@ class GenerateMapJob implements ShouldQueue
         $jsPathClickTile = resource_path('js/function/entity/click_tile_ws.blade.php');
         $jsPathPointerTile = resource_path('js/function/entity/pointer_tile.blade.php');
         $jsContentClickTileTemplate = file_get_contents($jsPathClickTile);
-        $jsContentClickTileTemplate = str_replace('__host__', (string) config('remote_docker.docker_host_ip'), $jsContentClickTileTemplate);
+        $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $jsContentClickTileTemplate = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentClickTileTemplate);
         $jsContentClickTileTemplate = str_replace('__PLAYER_ID__', (string) $player->id, $jsContentClickTileTemplate);
         $jsContentPointerTileTemplate = file_get_contents($jsPathPointerTile);
 
