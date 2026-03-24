@@ -86,6 +86,76 @@
         font-weight: 700;
     }
 
+    .container-stat-strip {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .container-stat-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+        padding: 12px 14px;
+        min-height: 72px;
+    }
+
+    .container-stat-card .label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 6px;
+    }
+
+    .container-stat-card .value {
+        display: block;
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1;
+    }
+
+    .container-stat-card .hint {
+        display: block;
+        font-size: 12px;
+        margin-top: 6px;
+        color: #64748b;
+    }
+
+    .container-card-footer {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.14);
+        color: #475569;
+        letter-spacing: 0.02em;
+    }
+
+    .container-section-divider {
+        margin: 14px 0 10px;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 10px;
+    }
+
+    .container-section-divider .title {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #334155;
+    }
+
+    .container-section-divider .meta {
+        font-size: 12px;
+        color: #64748b;
+    }
+
     .container-pill {
         display: inline-flex;
         align-items: center;
@@ -209,6 +279,21 @@
         white-space: nowrap;
     }
 
+    .container-issue-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 8px;
+        min-height: 32px;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        background: #fff;
+        color: #0f172a;
+        font-size: 12px;
+        font-weight: 700;
+        user-select: none;
+    }
+
     .inspect-summary {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -253,12 +338,20 @@
     }
 
     @media (max-width: 991.98px) {
+        .container-stat-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         #container-pixi {
             height: clamp(460px, 62vh, 760px);
         }
     }
 
     @media (max-width: 767.98px) {
+        .container-stat-strip {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+
         #container-pixi {
             height: clamp(420px, 56vh, 680px);
         }
@@ -273,6 +366,34 @@
         <a href="{{ route('containers.index') }}" class="btn btn-danger btn-sm ml-auto">
             <i class="fa fa-backward"></i> Indietro
         </a>
+    </div>
+</div>
+
+<div class="container-stat-strip">
+    <div class="container-stat-card">
+        <span class="label">Container visibili</span>
+        <span class="value" id="stat-visible-count">0</span>
+        <span class="hint">Filtrati nella vista corrente</span>
+    </div>
+    <div class="container-stat-card">
+        <span class="label">Running</span>
+        <span class="value" id="stat-running-count">0</span>
+        <span class="hint">Container attivi</span>
+    </div>
+    <div class="container-stat-card">
+        <span class="label">Stopped</span>
+        <span class="value" id="stat-stopped-count">0</span>
+        <span class="hint">Exited / Paused / Created</span>
+    </div>
+    <div class="container-stat-card">
+        <span class="label">Problemi</span>
+        <span class="value" id="stat-issue-count">0</span>
+        <span class="hint">Stato non running</span>
+    </div>
+    <div class="container-stat-card">
+        <span class="label">Ultimo refresh</span>
+        <span class="value" id="stat-refresh-age">-</span>
+        <span class="hint" id="stat-refresh-label">In attesa</span>
     </div>
 </div>
 
@@ -374,6 +495,10 @@
                     <option value="Entity">Entity</option>
                     <option value="ElementHasPosition">Element</option>
                 </select>
+                <label class="container-issue-toggle mb-0">
+                    <input type="checkbox" id="filter-issues-only">
+                    Solo problemi
+                </label>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="clear-filters">
                     <i class="fa fa-eraser"></i> Reset filtri
                 </button>
@@ -414,6 +539,7 @@
             bulk: "{{ route('containers.bulk-action') }}",
         };
         const SNAPSHOT_URL = "{{ route('containers.snapshot', $player) }}";
+        const TYPE_ORDER = ['Player', 'Map', 'Objective', 'Entity', 'ElementHasPosition'];
 
         const containerHost = document.getElementById('container-pixi');
         let app = null;
@@ -423,11 +549,14 @@
         let resizeTimer = null;
         let refreshTimer = null;
         let logsRefreshTimer = null;
+        let refreshInFlight = false;
+        let lastRefreshAt = null;
         let containersState = INITIAL_CONTAINERS.slice();
         let filters = {
             query: '',
             status: 'all',
             type: 'all',
+            issuesOnly: false,
         };
         let lastUpdatedText = null;
         let emptyText = null;
@@ -460,8 +589,92 @@
             return labels[type] || type;
         }
 
+        function typeOrder(type) {
+            const index = TYPE_ORDER.indexOf(type);
+            return index === -1 ? TYPE_ORDER.length : index;
+        }
+
+        function isProblematic(container) {
+            const status = normalizeValue(container && container.status);
+            return status !== 'running';
+        }
+
         function normalizeValue(value) {
             return String(value || '').toLowerCase();
+        }
+
+        function getStatusCounters(containers) {
+            return containers.reduce(function (acc, container) {
+                const status = normalizeValue(container.status);
+                if (status === 'running') {
+                    acc.running += 1;
+                } else {
+                    acc.stopped += 1;
+                }
+                if (status !== 'running') {
+                    acc.issues += 1;
+                }
+                return acc;
+            }, { running: 0, stopped: 0, issues: 0 });
+        }
+
+        function updateStatsPanel(visibleContainers) {
+            const counters = getStatusCounters(visibleContainers);
+            const total = visibleContainers.length;
+            const ageSeconds = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt.getTime()) / 1000)) : null;
+
+            const setNode = function (id, value) {
+                const node = document.getElementById(id);
+                if (node) {
+                    node.textContent = value;
+                }
+            };
+
+            setNode('stat-visible-count', String(total));
+            setNode('stat-running-count', String(counters.running));
+            setNode('stat-stopped-count', String(counters.stopped));
+            setNode('stat-issue-count', String(counters.issues));
+            setNode('stat-refresh-age', ageSeconds === null ? '-' : (ageSeconds + 's'));
+            setNode('stat-refresh-label', lastRefreshAt ? 'Aggiornato ora' : 'In attesa');
+        }
+
+        function groupContainers(containers) {
+            const groups = TYPE_ORDER.map(function (type) {
+                return {
+                    type: type,
+                    label: typeLabel(type),
+                    items: [],
+                };
+            });
+
+            containers.forEach(function (container) {
+                const group = groups.find(function (item) {
+                    return item.type === container.parent_type;
+                }) || null;
+
+                if (group) {
+                    group.items.push(container);
+                } else {
+                    groups.push({
+                        type: container.parent_type || 'unknown',
+                        label: typeLabel(container.parent_type || 'unknown'),
+                        items: [container],
+                    });
+                }
+            });
+
+            return groups.filter(function (group) {
+                return group.items.length > 0;
+            }).map(function (group) {
+                group.items.sort(function (a, b) {
+                    const aScore = normalizeValue(a.scope || a.name || '');
+                    const bScore = normalizeValue(b.scope || b.name || '');
+                    if (aScore < bScore) return -1;
+                    if (aScore > bScore) return 1;
+                    return (a.id || 0) - (b.id || 0);
+                });
+                return group;
+            });
         }
 
         function getVisibleContainers() {
@@ -480,8 +693,9 @@
 
                 const matchesStatus = filters.status === 'all' || normalizeValue(container.status) === normalizeValue(filters.status);
                 const matchesType = filters.type === 'all' || container.parent_type === filters.type;
+                const matchesIssues = !filters.issuesOnly || isProblematic(container);
 
-                return matchesQuery && matchesStatus && matchesType;
+                return matchesQuery && matchesStatus && matchesType && matchesIssues;
             });
         }
 
@@ -511,6 +725,13 @@
 
         function clearStage() {
             if (!app) return;
+            const keep = emptyText ? [emptyText] : [];
+            app.stage.children.slice().forEach((child) => {
+                if (keep.includes(child)) {
+                    return;
+                }
+                app.stage.removeChild(child);
+            });
             cardRegistry.forEach(({ card }) => {
                 if (card && card.parent) {
                     card.parent.removeChild(card);
@@ -560,7 +781,7 @@
             }
 
             textObject.x = app.renderer.width / 2;
-            textObject.y = 34;
+            textObject.y = 36;
         }
 
         function updateSelectedDetails(container) {
@@ -607,29 +828,33 @@
             card.y = y;
             card.eventMode = 'static';
             card.cursor = 'pointer';
+            const cardRadius = 18;
+            const accentInset = 2;
+            const accentRadius = 10;
 
             const bg = new PIXI.Graphics();
             bg.beginFill(0xffffff, 0.95);
-            bg.drawRoundedRect(0, 0, width, height, 18);
+            bg.drawRoundedRect(0, 0, width, height, cardRadius);
             bg.endFill();
             bg.lineStyle(2, 0xdbe4f0, 1);
-            bg.drawRoundedRect(0, 0, width, height, 18);
+            bg.drawRoundedRect(0, 0, width, height, cardRadius);
             card.addChild(bg);
 
             const accent = new PIXI.Graphics();
             accent.beginFill(container.color || 0x64748b, 1);
-            accent.drawRoundedRect(0, 0, 12, height, 18);
+            accent.drawRoundedRect(accentInset, accentInset, 12 - (accentInset * 2), height - (accentInset * 2), accentRadius);
             accent.endFill();
             card.addChild(accent);
 
-            const badge = new PIXI.Text(typeLabel(container.parent_type), {
+            const badgeLabel = (container.type_label || typeLabel(container.parent_type)) + ': #' + (container.parent_id || container.id || '-');
+            const badge = new PIXI.Text(badgeLabel, {
                 fontFamily: 'Arial',
                 fontSize: compact ? 10 : 11,
                 fontWeight: '700',
                 fill: container.color || 0x64748b,
             });
             const badgeBg = new PIXI.Graphics();
-            const badgeWidth = Math.max(78, badge.width + 18);
+            const badgeWidth = Math.max(86, Math.min(140, badge.width + 18));
             badgeBg.lineStyle(2, container.color || 0x64748b, 1);
             badgeBg.drawRoundedRect(24, 12, badgeWidth, 24, 999);
             card.addChild(badgeBg);
@@ -645,7 +870,7 @@
                 fontWeight: '700',
                 fill: 0xffffff,
             });
-            const statusWidth = Math.max(82, statusText.width + 24);
+            const statusWidth = Math.max(82, Math.min(width - 160, statusText.width + 24));
             statusBg.beginFill(container.status_color || 0x64748b, 1);
             statusBg.drawRoundedRect(width - statusWidth - 14, 12, statusWidth, 24, 999);
             statusBg.endFill();
@@ -666,7 +891,6 @@
             const meta = new PIXI.Text(
                 [
                     'WS: ' + (container.ws_port || '-'),
-                    'ID: ' + shortId(container.container_id),
                 ].join('\n'),
                 {
                     fontFamily: 'Arial',
@@ -676,24 +900,36 @@
                 }
             );
             meta.x = 24;
-            meta.y = 46;
+            meta.y = 44;
             card.addChild(meta);
 
             if (!compact) {
                 const footer = new PIXI.Text('Clicca per gestire', {
                     fontFamily: 'Arial',
-                    fontSize: 11,
-                    fill: 0x94a3b8,
-                    fontStyle: 'italic',
+                    fontSize: 10,
+                    fontWeight: '700',
+                    fill: 0x475569,
                 });
-                footer.x = 24;
-                footer.y = height - 22;
+                footer.anchor.set(0.5, 0.5);
+                footer.x = 18 + ((footer.width + 18) / 2);
+                footer.y = height - 17;
                 card.addChild(footer);
+
+                const footerBg = new PIXI.Graphics();
+                footerBg.beginFill(0xe2e8f0, 1);
+                footerBg.drawRoundedRect(0, 0, footer.width + 18, 22, 999);
+                footerBg.endFill();
+                footerBg.x = 18;
+                footerBg.y = height - 28;
+                card.addChild(footerBg);
+                footer.zIndex = footerBg.zIndex + 1;
+                card.setChildIndex(footerBg, card.children.length - 2);
+                card.setChildIndex(footer, card.children.length - 1);
             }
 
             const selectedStroke = new PIXI.Graphics();
             selectedStroke.lineStyle(0, 0x2563eb, 0);
-            selectedStroke.drawRoundedRect(0, 0, width, height, 18);
+            selectedStroke.drawRoundedRect(0, 0, width, height, cardRadius);
             card.addChild(selectedStroke);
 
             card.on('pointertap', () => {
@@ -702,14 +938,63 @@
                     const active = data.id === container.id;
                     stroke.clear();
                     stroke.lineStyle(active ? 4 : 0, active ? 0x2563eb : 0x000000, 1);
-                    stroke.drawRoundedRect(0, 0, width, height, 18);
+                    stroke.drawRoundedRect(0, 0, width, height, cardRadius);
                     otherCard.scale.set(active ? 1.02 : 1);
                 });
                 updateSelectedDetails(container);
+                scheduleRefresh();
             });
 
             cardRegistry.push({ card, selectedStroke, data: container });
             app.stage.addChild(card);
+        }
+
+        function drawSectionHeader(group, x, y, width, issueCount) {
+            const container = new PIXI.Container();
+            container.x = x;
+            container.y = y;
+
+            const background = new PIXI.Graphics();
+            background.beginFill(0xffffff, 0.82);
+            background.drawRoundedRect(0, 0, width, 34, 12);
+            background.endFill();
+            background.lineStyle(1, 0xdbe4f0, 1);
+            background.drawRoundedRect(0, 0, width, 34, 12);
+            container.addChild(background);
+
+            const title = new PIXI.Text(group.label, {
+                fontFamily: 'Arial',
+                fontSize: 13,
+                fontWeight: '800',
+                fill: 0x0f172a,
+            });
+            title.x = 14;
+            title.y = 9;
+            container.addChild(title);
+
+            const counter = new PIXI.Text(String(group.items.length) + ' container', {
+                fontFamily: 'Arial',
+                fontSize: 11,
+                fill: 0x64748b,
+            });
+            counter.x = width - counter.width - 14;
+            counter.y = 11;
+            container.addChild(counter);
+
+            if (issueCount > 0) {
+                const issue = new PIXI.Text(String(issueCount) + ' issue', {
+                    fontFamily: 'Arial',
+                    fontSize: 11,
+                    fontWeight: '700',
+                    fill: 0xdc2626,
+                });
+                issue.x = Math.max(120, width - counter.width - issue.width - 24);
+                issue.y = 11;
+                container.addChild(issue);
+            }
+
+            app.stage.addChild(container);
+            return 42;
         }
 
         function layoutCards() {
@@ -717,23 +1002,38 @@
             clearStage();
 
             const visibleContainers = getVisibleContainers();
-
+            const groupedContainers = groupContainers(visibleContainers);
             const { cardWidth: width, cardHeight: height, gapX, gapY, columns } = getCardLayout();
             const startX = 12;
             const startY = 12;
+            const availableWidth = Math.max(containerHost.clientWidth - 24, 320);
+            let cursorY = startY;
 
-            visibleContainers.forEach((container, index) => {
-                const col = index % columns;
-                const row = Math.floor(index / columns);
-                const x = startX + col * (width + gapX);
-                const y = startY + row * (height + gapY);
-                drawCard(container, x, y, index);
+            groupedContainers.forEach(function (group) {
+                const issueCount = group.items.filter(isProblematic).length;
+                cursorY += drawSectionHeader(group, startX, cursorY, availableWidth, issueCount);
+
+                group.items.forEach(function (container, index) {
+                    const col = index % columns;
+                    const row = Math.floor(index / columns);
+                    const x = startX + col * (width + gapX);
+                    const y = cursorY + row * (height + gapY);
+                    drawCard(container, x, y, index);
+                });
+
+                const rows = Math.max(1, Math.ceil(group.items.length / columns));
+                cursorY += rows * (height + gapY) + 14;
             });
 
-            const rows = Math.max(1, Math.ceil(visibleContainers.length / columns));
-            const contentHeight = startY + rows * (height + gapY) + 20;
+            const contentHeight = Math.max(cursorY + 20, 320);
             resizeCanvas(contentHeight);
             app.stage.hitArea = new PIXI.Rectangle(0, 0, app.renderer.width, contentHeight);
+
+            if (selectedContainer && !visibleContainers.some(function (container) {
+                return container.id === selectedContainer.id;
+            })) {
+                selectedContainer = visibleContainers[0] || null;
+            }
 
             if (!selectedContainer && visibleContainers.length > 0) {
                 selectedContainer = visibleContainers[0];
@@ -759,14 +1059,19 @@
 
             updateSelectedDetails(selectedContainer);
             updateVisibleCount(visibleContainers.length);
+            updateStatsPanel(visibleContainers);
         }
 
-        function setLastUpdated(text) {
+        function setLastUpdated(text, markTimestamp = true) {
             lastUpdatedText = text;
+            if (markTimestamp) {
+                lastRefreshAt = new Date();
+            }
             const node = document.getElementById('container-last-updated');
             if (node) {
                 node.textContent = text;
             }
+            updateStatsPanel(getVisibleContainers());
         }
 
         function updateVisibleCount(count) {
@@ -781,9 +1086,15 @@
             containersState = Array.isArray(newContainers) ? newContainers : [];
             selectedContainer = selectedId ? containersState.find((item) => item.id === selectedId) || null : (containersState[0] || null);
             layoutCards();
+            scheduleRefresh();
         }
 
         function refreshContainers(silent) {
+            if (refreshInFlight) {
+                return Promise.resolve(false);
+            }
+
+            refreshInFlight = true;
             return $.ajax({
                 url: SNAPSHOT_URL,
                 type: 'GET',
@@ -805,8 +1116,22 @@
                             confirmButtonClass: 'btn btn-info'
                         });
                     }
+                },
+                complete: function () {
+                    refreshInFlight = false;
                 }
             });
+        }
+
+        function scheduleRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+
+            const intervalMs = selectedContainer ? 6000 : 12000;
+            refreshTimer = setInterval(function () {
+                refreshContainers(true);
+            }, intervalMs);
         }
 
         function openTextModal(title, content, width) {
@@ -1380,12 +1705,14 @@
                 resizeCanvas(containerHost.clientHeight);
                 centerEmptyText(emptyText);
                 updateSelectedDetails(null);
-                setLastUpdated('Nessun container disponibile');
+                setLastUpdated('Nessun container disponibile', false);
             } else {
                 layoutCards();
-                setLastUpdated('Caricamento stato...');
+                setLastUpdated('Caricamento stato...', false);
                 refreshContainers(true);
             }
+
+            scheduleRefresh();
 
             window.addEventListener('resize', function () {
                 if (resizeTimer) {
@@ -1417,11 +1744,17 @@
                 layoutCards();
             });
 
+            $('#filter-issues-only').on('change', function () {
+                filters.issuesOnly = $(this).is(':checked');
+                layoutCards();
+            });
+
             $('#clear-filters').on('click', function () {
-                filters = { query: '', status: 'all', type: 'all' };
+                filters = { query: '', status: 'all', type: 'all', issuesOnly: false };
                 $('#container-search').val('');
                 $('#filter-status').val('all');
                 $('#filter-type').val('all');
+                $('#filter-issues-only').prop('checked', false);
                 layoutCards();
             });
 
@@ -1491,9 +1824,7 @@
                 });
             });
 
-            refreshTimer = setInterval(function () {
-                refreshContainers(true);
-            }, 10000);
+            scheduleRefresh();
 
             window.addEventListener('beforeunload', function () {
                 if (refreshTimer) {

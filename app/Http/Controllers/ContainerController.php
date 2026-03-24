@@ -193,23 +193,35 @@ class ContainerController extends Controller
             );
         }
 
-        return $containers->map(function (DockerContainer $container) use ($player, $statuses) {
-            $status = $statuses[$container->container_id] ?? 'unknown';
+        return $containers
+            ->sortBy(function (DockerContainer $container) {
+                return sprintf(
+                    '%02d_%s_%s_%06d',
+                    $this->containerTypeOrder($container->parent_type),
+                    strtolower((string) ($container->scope ?? '')),
+                    strtolower((string) ($container->name ?? '')),
+                    (int) $container->id
+                );
+            })
+            ->values()
+            ->map(function (DockerContainer $container) use ($player, $statuses) {
+                $status = $statuses[$container->container_id] ?? 'unknown';
 
-            return [
-                'id' => $container->id,
-                'name' => $container->name,
-                'parent_type' => $container->parent_type,
-                'parent_id' => $container->parent_id,
-                'container_id' => $container->container_id,
-                'ws_port' => $container->ws_port,
-                'scope' => $this->describeContainerScope($container, $player),
-                'color' => $this->containerTypeColor($container->parent_type),
-                'status' => $status,
-                'status_label' => $this->statusLabel($status),
-                'status_color' => $this->statusColor($status),
-            ];
-        })->values();
+                return [
+                    'id' => $container->id,
+                    'name' => $container->name,
+                    'parent_type' => $container->parent_type,
+                    'type_label' => $this->containerTypeLabel($container->parent_type),
+                    'parent_id' => $container->parent_id,
+                    'container_id' => $container->container_id,
+                    'ws_port' => $container->ws_port,
+                    'scope' => $this->describeContainerScope($container, $player),
+                    'color' => $this->containerTypeColor($container->parent_type),
+                    'status' => $status,
+                    'status_label' => $this->statusLabel($status),
+                    'status_color' => $this->statusColor($status),
+                ];
+            })->values();
     }
 
     private function playerContainersQuery(Player $player)
@@ -272,6 +284,30 @@ class ContainerController extends Controller
             DockerContainer::PARENT_TYPE_ENTITY => '#f59e0b',
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => '#ef4444',
             default => '#64748b',
+        };
+    }
+
+    private function containerTypeLabel(string $type): string
+    {
+        return match ($type) {
+            DockerContainer::PARENT_TYPE_PLAYER => 'Player',
+            DockerContainer::PARENT_TYPE_MAP => 'Map',
+            DockerContainer::PARENT_TYPE_OBJECTIVE => 'Objective',
+            DockerContainer::PARENT_TYPE_ENTITY => 'Entity',
+            DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element',
+            default => (string) $type,
+        };
+    }
+
+    private function containerTypeOrder(string $type): int
+    {
+        return match ($type) {
+            DockerContainer::PARENT_TYPE_PLAYER => 0,
+            DockerContainer::PARENT_TYPE_MAP => 1,
+            DockerContainer::PARENT_TYPE_OBJECTIVE => 2,
+            DockerContainer::PARENT_TYPE_ENTITY => 3,
+            DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 4,
+            default => 9,
         };
     }
 
