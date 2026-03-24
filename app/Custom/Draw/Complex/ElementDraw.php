@@ -119,6 +119,7 @@ class ElementDraw
 
         // Brain panel
         $brainPanelItems = [];
+        $brainPanelBottomY = $panelY + 34;
         $positionBrain = $elementHasPosition ? $elementHasPosition->brain : null;
         if ($positionBrain) {
             $brainPanel = new BrainPanelDraw($uid . '_brain_panel');
@@ -128,6 +129,7 @@ class ElementDraw
             $brainPanel->build();
 
             $panel->setSize(max(240, $brainPanel->getWidth() + 20), max(200, $brainPanel->getHeight() + 60));
+            $brainPanelBottomY = $panelY + 34 + $brainPanel->getHeight();
 
             foreach ($brainPanel->getDrawItems() as $item) {
                 $panel->addChild($item);
@@ -139,17 +141,17 @@ class ElementDraw
         $geneProgressBarItems = [];
         $geneProgressBarCount = 0;
         if ($this->element->isInteractive()) {
-            $geneProgressBarItems = $this->addGeneProgressBars($panel, $panelX, $panelY, $elementHasPosition);
+            $geneProgressBarItems = $this->addGeneProgressBars($panel, $panelX, $brainPanelBottomY + 24, $elementHasPosition);
             $geneProgressBarCount = count($geneProgressBarItems) / 3; // Each progress bar has ~3 draw items
         }
 
         // Attack Button position (after gene progress bars)
-        $attackBtnY = $panelY + 170 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
+        $attackBtnY = $brainPanelBottomY + 24 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
         
         // Consumable Button (encapsulated in function)
         $btnItems = [];
         if ($this->element->isConsumable()) {
-            $btnItems = $this->addConsumableButton($panel, $panelX, $panelY, $uid);
+            $btnItems = $this->addConsumableButton($panel, $panelX, $brainPanelBottomY + 24, $uid);
         }
         
         // Attack Button (for interactive elements, below progress bars)
@@ -220,7 +222,7 @@ class ElementDraw
      * 
      * @return array Array of progress bar draw items
      */
-    private function addGeneProgressBars(Rectangle $panel, $panelX, $panelY, $elementHasPosition): array
+    private function addGeneProgressBars(Rectangle $panel, $panelX, $startY, $elementHasPosition): array
     {
         $geneProgressBarItems = [];
         
@@ -234,7 +236,7 @@ class ElementDraw
             // Increase panel height to accommodate progress bars
             $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), max(200, ($informationCount * 105) + 200));
             
-            $progressBarY = $panelY + 170; // Start below the brain panel
+            $progressBarY = $startY; // Start below the brain panel
             
             foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
 
@@ -272,12 +274,12 @@ class ElementDraw
      * 
      * @return array Array of draw items from the button
      */
-    private function addConsumableButton(Rectangle $panel, $panelX, $panelY, $uid): array
+    private function addConsumableButton(Rectangle $panel, $panelX, $startY, $uid): array
     {
         $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), 300); // Increase height for brain panel + button
         
         $btnX = $panelX + 10;
-        $btnY = $panelY + 170;
+        $btnY = $startY;
         
         $jsPathConsume = resource_path('js/function/element/consume.blade.php');
         $jsContentConsume = file_get_contents($jsPathConsume);

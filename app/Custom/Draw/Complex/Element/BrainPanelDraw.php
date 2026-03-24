@@ -5,7 +5,7 @@ namespace App\Custom\Draw\Complex\Element;
 use App\Custom\Colors;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Rectangle;
-use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Primitive\Text;
 use App\Models\ElementHasPositionBrain;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\ElementHasPositionNeuronLink;
@@ -21,8 +21,8 @@ class BrainPanelDraw
     private int $width = 220;
     private int $height = 120;
     private bool $renderable = true;
-    private int $cellSize = 18;
-    private int $padding = 10;
+    private int $cellSize = 20;
+    private int $padding = 12;
 
     public function __construct(string $uid)
     {
@@ -150,7 +150,7 @@ class BrainPanelDraw
                 $line = new MultiLine($this->uid . '_link_' . $neuron->id . '_' . $link->id . '_' . $linkIndex);
                 $line->setPoint($start['x'], $start['y']);
                 $line->setPoint($end['x'], $end['y']);
-                $line->setColor(0x6B7280);
+                $line->setColor($this->getLinkColor((string) $link->condition));
                 $line->setThickness(2);
                 $line->setRenderable($this->renderable);
                 $line->addAttributes('z_index', 20008);
@@ -177,16 +177,29 @@ class BrainPanelDraw
                 continue;
             }
 
-            $node = new Square($this->uid . '_node_' . $index);
+            $node = new Rectangle($this->uid . '_node_' . $index);
             $node->setOrigin($position['x'], $position['y']);
-            $node->setSize($this->cellSize);
-            $node->setColor($this->getNeuronColor((string) $neuron->type));
+            $node->setSize($this->cellSize, $this->cellSize);
+            $node->setColor(Colors::WHITE);
+            $node->setBorderColor(Colors::BLACK);
+            $node->setThickness(2);
+            $node->setBorderRadius(0);
             $node->setRenderable($this->renderable);
             $node->addAttributes('z_index', 20009);
             $node->addAttributes('neuron_type', $neuron->type);
             $node->addAttributes('grid_i', (int) $neuron->grid_i);
             $node->addAttributes('grid_j', (int) $neuron->grid_j);
             $this->drawItems[] = $node;
+
+            $icon = new Text($this->uid . '_node_icon_' . $index);
+            $icon->setOrigin($position['x'] + (int) floor($this->cellSize / 2), $position['y'] + (int) floor($this->cellSize / 2) - 1);
+            $icon->setCenterAnchor(true);
+            $icon->setText($this->getNeuronIcon((string) $neuron->type));
+            $icon->setFontSize(12);
+            $icon->setColor(Colors::BLACK);
+            $icon->setRenderable($this->renderable);
+            $icon->addAttributes('z_index', 20010);
+            $this->drawItems[] = $icon;
         }
     }
 
@@ -221,14 +234,23 @@ class BrainPanelDraw
         ];
     }
 
-    private function getNeuronColor(string $type): int
+    private function getNeuronIcon(string $type): string
     {
         return match ($type) {
-            'detection' => 0x2563EB,
-            'path' => 0x16A34A,
-            'attack' => 0xDC2626,
-            'movement' => 0xD97706,
-            default => 0x111111,
+            'detection' => '◉',
+            'path' => '➜',
+            'attack' => '⚔',
+            'movement' => '↕',
+            default => '•',
+        };
+    }
+
+    private function getLinkColor(string $condition): int
+    {
+        return match ($condition) {
+            'else' => 0xF97316,
+            'main' => 0x16A34A,
+            default => 0x16A34A,
         };
     }
 }
