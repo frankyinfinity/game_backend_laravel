@@ -18,7 +18,7 @@ class ElementUpdateNeuronCommand extends Command
      */
     protected $signature = 'element:update-neuron 
                             {element_has_position_id : ID dell\'elemento da usare per individuare il container websocket}
-                            {neuron_uid : UID del neurone da aggiornare}';
+                            {neuron_id : ID del neurone da aggiornare}';
 
     /**
      * The console command description.
@@ -33,7 +33,7 @@ class ElementUpdateNeuronCommand extends Command
     public function handle(DockerContainerService $dockerContainerService)
     {
         $id = $this->argument('element_has_position_id');
-        $neuronUid = $this->argument('neuron_uid');
+        $neuronId = $this->argument('neuron_id');
 
         $elementPosition = ElementHasPosition::find($id);
         if (!$elementPosition) {
@@ -72,7 +72,7 @@ class ElementUpdateNeuronCommand extends Command
         $relativePath = ObjectCache::sessionVolumePath($sessionId);
 
         $this->info("Invio comando update_neuron via GATEWAY al container {$container->name} (ws_port={$container->ws_port})...");
-        
+
         $wsUrl = $dockerContainerService->websocketGatewayUrlForPort($container->ws_port);
         $payload = [
             'command' => 'update_neuron',
@@ -80,7 +80,7 @@ class ElementUpdateNeuronCommand extends Command
                 'path' => $relativePath,
                 'player_id' => $player->id,
                 'session_id' => $sessionId,
-                'neuron_uid' => $neuronUid,
+                'neuron_id' => $neuronId,
             ],
         ];
 
@@ -90,10 +90,10 @@ class ElementUpdateNeuronCommand extends Command
                 'timeout' => 10,
             ]);
             $client->text(json_encode($payload));
-            
+
             $response = $client->receive();
             $this->info("Risposta dal container: " . $response);
-            
+
             $client->close();
             $ok = true;
         } catch (\Throwable $e) {

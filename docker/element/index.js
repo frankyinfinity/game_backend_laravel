@@ -176,7 +176,7 @@ function safeVolumePath(relativePath) {
  */
 function updateNeuron(params, ws) {
   const relativePath = params ? params.path : null;
-  const neuronUid = params ? params.neuron_uid : null;
+  const neuronId = params ? params.neuron_id : null;
 
   if (!relativePath) {
     console.error(`[Element ${elementHasPositionId}] Missing path for update_neuron`);
@@ -199,13 +199,13 @@ function updateNeuron(params, ws) {
     }
 
     const content = fs.readFileSync(absolutePath, 'utf8');
-    console.log(`[Element ${elementHasPositionId}] update_neuron: ${neuronUid} via file: ${relativePath}`);
+    console.log(`[Element ${elementHasPositionId}] update_neuron: ${neuronId} via file: ${relativePath}`);
     //console.log(content);
 
     ws.send(JSON.stringify({
       success: true,
       command: 'update_neuron',
-      neuron_uid: neuronUid,
+      neuron_id: neuronId,
       path: relativePath,
       bytes: Buffer.byteLength(content, 'utf8'),
     }));
