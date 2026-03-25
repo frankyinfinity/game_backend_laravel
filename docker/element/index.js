@@ -207,6 +207,65 @@ function fetchNeuronBorderUid(neuronId) {
   });
 }
 
+/**
+ * Invia i dati del neurone al backend per il broadcast via Pusher
+ */
+function broadcastNeuronUpdate(borderUid, fileData, playerId) {
+  return new Promise((resolve, reject) => {
+    if (!sessionCookie) {
+      return reject(new Error('No session cookie'));
+    }
+
+    const path = '/neurons/broadcast-update';
+    const postData = JSON.stringify({
+      border_uid: borderUid,
+      file_data: fileData,
+      player_id: playerId,
+    });
+
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        Accept: 'application/json',
+        Cookie: sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken,
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = data ? JSON.parse(data) : {};
+          if (response.success) {
+            console.log(`[Element ${elementHasPositionId}] Neuron update broadcasted: border_uid=${borderUid}`);
+            resolve(true);
+          } else {
+            console.error(`[Element ${elementHasPositionId}] broadcastNeuronUpdate API error:`, response);
+            resolve(false);
+          }
+        } catch (e) {
+          console.error(`[Element ${elementHasPositionId}] broadcastNeuronUpdate parse error:`, e.message);
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      console.error(`[Element ${elementHasPositionId}] broadcastNeuronUpdate request error:`, e.message);
+      resolve(false);
+    });
+    req.write(postData);
+    req.end();
+  });
+}
+
 function safeVolumePath(relativePath) {
   const normalized = path.normalize(String(relativePath || '')).replace(/^([.][.][/\\])+/, '');
   const absolutePath = path.resolve('/data', normalized);
@@ -223,6 +282,7 @@ function safeVolumePath(relativePath) {
 async function updateNeuron(params, ws) {
   const relativePath = params ? params.path : null;
   const neuronId = params ? params.neuron_id : null;
+  const playerId = params ? params.player_id : null;
 
   if (!relativePath) {
     console.error(`[Element ${elementHasPositionId}] Missing path for update_neuron`);
@@ -264,6 +324,11 @@ async function updateNeuron(params, ws) {
       fileData = content;
     }
     console.log(`[Element ${elementHasPositionId}] neuron data (node ${borderUid}):`, fileData);
+
+    // Broadcast the neuron update to the frontend via Pusher
+    if (borderUid && playerId) {
+      await broadcastNeuronUpdate(borderUid, fileData, playerId);
+    }
 
     ws.send(JSON.stringify({
       success: true,

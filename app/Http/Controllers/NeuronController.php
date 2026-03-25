@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\UpdateDrawEvent;
 use App\Models\ElementHasPositionNeuron;
 use Illuminate\Http\Request;
 
@@ -28,7 +29,7 @@ class NeuronController extends Controller
             ->orderBy('grid_j')
             ->get();
 
-        $index = $neurons->search(fn($n) => (int)$n->id === (int)$neuron->id);
+        $index = $neurons->search(fn($n) => (int) $n->id === (int) $neuron->id);
 
         if ($index === false) {
             return response()->json(['success' => false, 'message' => 'Neurone non trovato nella griglia del brain'], 404);
@@ -42,5 +43,28 @@ class NeuronController extends Controller
             'neuron_id' => $neuron->id,
             'border_uid' => $borderUid,
         ]);
+    }
+
+    /**
+     * Broadcast neuron update to the frontend via Pusher.
+     */
+    public function broadcastNeuronUpdate(Request $request)
+    {
+        $borderUid = $request->input('border_uid');
+        $fileData = $request->input('file_data');
+        $playerId = $request->input('player_id');
+
+        if (!$borderUid || $playerId === null) {
+            return response()->json(['success' => false, 'message' => 'border_uid and player_id are required'], 422);
+        }
+
+        $player = \App\Models\Player::find($playerId);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        event(new UpdateDrawEvent($player, $borderUid, $fileData));
+
+        return response()->json(['success' => true]);
     }
 }
