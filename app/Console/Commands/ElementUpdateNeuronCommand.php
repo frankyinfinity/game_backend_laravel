@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Custom\Colors;
 use App\Models\Container;
 use App\Models\ElementHasPosition;
+use App\Models\ElementHasPositionNeuron;
 use App\Services\DockerContainerService;
 use Illuminate\Console\Command;
 use WebSocket\Client;
@@ -71,6 +73,18 @@ class ElementUpdateNeuronCommand extends Command
 
         $relativePath = ObjectCache::sessionVolumePath($sessionId);
 
+        // Ottenere il brain dell'elemento per determinare il colore in base allo stato active dei neuroni
+        $brain = $elementPosition->brain;
+        $color = null;
+        if ($brain) {
+            $neurons = $brain->neurons()->get();
+            $hasActiveNeuron = $neurons->contains('active', true);
+            // Colore: GREEN se c'è almeno un neurone attivo, GRAY altrimenti
+            // Il colore viene passato al container dell'element senza usare UpdateDraw
+            $color = $hasActiveNeuron ? '0x' . dechex(Colors::GREEN) : '0x' . dechex(Colors::GRAY);
+            $this->info("Stato neuroni - Attivi presenti: " . ($hasActiveNeuron ? 'true' : 'false') . " - Colore: {$color}");
+        }
+
         $this->info("Invio comando update_neuron via GATEWAY al container {$container->name} (ws_port={$container->ws_port})...");
 
         $wsUrl = $dockerContainerService->websocketGatewayUrlForPort($container->ws_port);
@@ -81,6 +95,7 @@ class ElementUpdateNeuronCommand extends Command
                 'player_id' => $player->id,
                 'session_id' => $sessionId,
                 'neuron_id' => $neuronId,
+                'color' => $color,
             ],
         ];
 

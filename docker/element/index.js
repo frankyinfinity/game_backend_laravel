@@ -283,6 +283,7 @@ async function updateNeuron(params, ws) {
   const relativePath = params ? params.path : null;
   const neuronId = params ? params.neuron_id : null;
   const playerId = params ? params.player_id : null;
+  const color = params ? params.color : null;
 
   if (!relativePath) {
     console.error(`[Element ${elementHasPositionId}] Missing path for update_neuron`);
@@ -325,6 +326,11 @@ async function updateNeuron(params, ws) {
     }
     console.log(`[Element ${elementHasPositionId}] neuron data (node ${borderUid}):`, fileData);
 
+    //Gestione Colore
+    if (color) {
+      console.log('Colore: ', color);
+    }
+
     // Broadcast the neuron update to the frontend via Pusher
     if (borderUid && playerId) {
       await broadcastNeuronUpdate(borderUid, fileData, playerId);
@@ -338,7 +344,9 @@ async function updateNeuron(params, ws) {
       data: fileData,
       path: relativePath,
       bytes: Buffer.byteLength(content, 'utf8'),
+      color: color,
     }));
+
   } catch (error) {
     console.error(`[Element ${elementHasPositionId}] Error logging volume file ${relativePath}: ${error.message}`);
     ws.send(JSON.stringify({
