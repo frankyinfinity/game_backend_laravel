@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Custom\Manipulation\ObjectCache;
 use App\Jobs\StopPlayerContainersJob;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -77,6 +78,10 @@ class AuthController extends Controller
         $player = Player::find($playerId);
 
         if ($player) {
+            if (!empty($player->actual_session_id)) {
+                ObjectCache::clear($player->actual_session_id);
+            }
+
             StopPlayerContainersJob::dispatch($player);
         }
 
