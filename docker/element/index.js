@@ -171,12 +171,19 @@ function safeVolumePath(relativePath) {
   return absolutePath;
 }
 
-function logVolumeFile(params, ws) {
-  const relativePath = params && typeof params.path === 'string' ? params.path.trim() : '';
+/**
+ * Aggiorna lo stato di un neurone leggendo il file dal volume (storicamente logVolumeFile)
+ */
+function updateNeuron(params, ws) {
+  const relativePath = params ? params.path : null;
+  const neuronUid = params ? params.neuron_uid : null;
+
   if (!relativePath) {
+    console.error(`[Element ${elementHasPositionId}] Missing path for update_neuron`);
     ws.send(JSON.stringify({
       success: false,
-      error: 'Missing volume file path',
+      command: 'update_neuron',
+      error: 'Missing path',
     }));
     return;
   }
@@ -192,12 +199,13 @@ function logVolumeFile(params, ws) {
     }
 
     const content = fs.readFileSync(absolutePath, 'utf8');
-    console.log(`[Element ${elementHasPositionId}] console.log volume file: ${relativePath}`);
+    console.log(`[Element ${elementHasPositionId}] update_neuron: ${neuronUid} via file: ${relativePath}`);
     console.log(content);
 
     ws.send(JSON.stringify({
       success: true,
-      command: 'log_volume_file',
+      command: 'update_neuron',
+      neuron_uid: neuronUid,
       path: relativePath,
       bytes: Buffer.byteLength(content, 'utf8'),
     }));
@@ -226,8 +234,8 @@ if (wsPort > 0) {
         const params = data && data.params ? data.params : {};
 
         switch (command) {
-          case 'log_volume_file':
-            logVolumeFile(params, ws);
+          case 'update_neuron':
+            updateNeuron(data.params, ws);
             break;
           default:
             ws.send(JSON.stringify({
