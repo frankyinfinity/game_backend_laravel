@@ -251,11 +251,26 @@ async function updateNeuron(params, ws) {
     const borderUid = neuronId ? await fetchNeuronBorderUid(neuronId) : null;
     console.log(`[Element ${elementHasPositionId}] border_uid for node: ${borderUid}`);
 
+    let fileData = null;
+    try {
+      const parsed = JSON.parse(content);
+      // Se borderUid è definito, cerchiamo quel nodo specifico nel contenuto
+      if (borderUid && parsed && typeof parsed === 'object') {
+        fileData = parsed[borderUid] !== undefined ? parsed[borderUid] : parsed;
+      } else {
+        fileData = parsed;
+      }
+    } catch (e) {
+      fileData = content;
+    }
+    console.log(`[Element ${elementHasPositionId}] neuron data (node ${borderUid}):`, fileData);
+
     ws.send(JSON.stringify({
       success: true,
       command: 'update_neuron',
       neuron_id: neuronId,
       border_uid: borderUid,
+      data: fileData,
       path: relativePath,
       bytes: Buffer.byteLength(content, 'utf8'),
     }));
