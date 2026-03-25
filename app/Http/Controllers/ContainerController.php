@@ -55,6 +55,42 @@ class ContainerController extends Controller
         ]);
     }
 
+    public function volumeFile(Player $player, DockerContainerService $containerService): JsonResponse
+    {
+        $sessionId = trim((string) ($player->actual_session_id ?? ''));
+        if ($sessionId === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Il player non ha una sessione attiva.',
+            ], 422);
+        }
+
+        $path = ObjectCache::sessionVolumePath($sessionId);
+        $content = $containerService->readPlayerVolumeFile($player, $path);
+
+        if ($content === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File non trovato nel volume del player.',
+                'path' => $path,
+            ], 404);
+        }
+
+        $pretty = $content;
+        $decoded = json_decode($content, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $pretty = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: $content;
+        }
+
+        return response()->json([
+            'success' => true,
+            'path' => $path,
+            'content' => $pretty,
+            'raw_content' => $content,
+            'size' => strlen($content),
+        ]);
+    }
+
     public function listDataTable(Player $player, Request $request)
     {
         $query = $this->playerContainersQuery($player)

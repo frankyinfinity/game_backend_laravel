@@ -316,6 +316,16 @@
         border-bottom: 0;
     }
 
+    .volume-file-item.is-clickable {
+        cursor: pointer;
+        transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .volume-file-item.is-clickable:hover {
+        background: #f8fafc;
+        transform: translateY(-1px);
+    }
+
     .volume-file-path {
         font-family: monospace;
         color: #0f172a;
@@ -646,6 +656,7 @@
             bulk: "{{ route('containers.bulk-action') }}",
         };
         const SNAPSHOT_URL = "{{ route('containers.snapshot', $player) }}";
+        const VOLUME_FILE_URL = "{{ route('containers.volume-file', $player) }}";
         const TYPE_ORDER = ['Player', 'Map', 'Objective', 'Entity', 'ElementHasPosition'];
 
         const containerHost = document.getElementById('container-pixi');
@@ -957,12 +968,80 @@
             listNode.innerHTML = files.map(function (file) {
                 const size = Number(file.size || 0);
                 return [
-                    '<div class="volume-file-item">',
+                    '<div class="volume-file-item is-clickable js-volume-file" data-path="' + escapeHtml(file.path || '') + '">',
                     '  <div class="volume-file-path">' + escapeHtml(file.path || '-') + '</div>',
                     '  <div class="volume-file-size">' + escapeHtml(size.toLocaleString('it-IT')) + ' B</div>',
                     '</div>'
                 ].join('');
             }).join('');
+        }
+
+        function loadVolumeFile() {
+            Swal.fire({
+                title: 'Volume player',
+                html: [
+                    '<div class="d-flex justify-content-between align-items-center mb-2">',
+                    '  <small class="text-muted" id="volume-file-meta">Caricamento contenuto in corso...</small>',
+                    '  <button type="button" class="btn btn-outline-primary btn-sm" id="copy-volume-file" disabled>',
+                    '    <i class="fa fa-copy"></i> Copy',
+                    '  </button>',
+                    '</div>',
+                    '<textarea id="volume-file-content" readonly class="form-control" style="min-height: 520px; font-family: monospace; white-space: pre; overflow: auto;">Caricamento...</textarea>'
+                ].join(''),
+                width: 1200,
+                showConfirmButton: true,
+                confirmButtonText: 'Chiudi',
+                confirmButtonClass: 'btn btn-primary',
+                didOpen: function () {
+                    const popup = Swal.getPopup ? Swal.getPopup() : null;
+                    if (!popup) return;
+
+                    $.ajax({
+                        url: VOLUME_FILE_URL,
+                        type: 'GET',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function (response) {
+                            if (!response || !response.success) {
+                                return;
+                            }
+
+                            const textarea = popup.querySelector('#volume-file-content');
+                            const copyButton = popup.querySelector('#copy-volume-file');
+                            const titleNode = popup.querySelector('.swal2-title');
+                            const metaNode = popup.querySelector('#volume-file-meta');
+
+                            if (titleNode && response.path) {
+                                titleNode.textContent = 'Volume file: ' + response.path;
+                            }
+                            if (metaNode) {
+                                metaNode.textContent = 'Size: ' + Number(response.size || 0).toLocaleString('it-IT') + ' B';
+                            }
+                            if (textarea) {
+                                textarea.value = response.content || '(file vuoto)';
+                            }
+                            if (copyButton && textarea) {
+                                copyButton.disabled = false;
+                                copyButton.addEventListener('click', function () {
+                                    copyText(textarea.value || '');
+                                });
+                            }
+                        },
+                        error: function (xhr) {
+                            const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Impossibile leggere il file del volume.';
+                            const textarea = popup.querySelector('#volume-file-content');
+                            const metaNode = popup.querySelector('#volume-file-meta');
+                            if (textarea) {
+                                textarea.value = message;
+                            }
+                            if (metaNode) {
+                                metaNode.textContent = 'Errore di lettura';
+                            }
+                        }
+                    });
+                }
+            });
         }
 
         function refreshVolume() {
@@ -1887,6 +1966,10 @@
                     refreshVolume();
                 });
             }
+
+            $(document).on('click', '.js-volume-file', function () {
+                loadVolumeFile();
+            });
 
             $('#container-search').on('input', function () {
                 filters.query = normalizeValue($(this).val().trim());
