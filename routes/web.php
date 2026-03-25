@@ -139,5 +139,7 @@ Route::group(['middleware' => ['auth']], function (){
         Route::get('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-links/{targetLink}', [App\Http\Controllers\TargetLinkController::class, 'show'])->name('ages.phases.columns.targets.target-links.show');
         Route::delete('/ages/{age}/phases/{phase}/columns/{phaseColumn}/targets/{target}/target-links/{targetLink}', [App\Http\Controllers\TargetLinkController::class, 'destroy'])->name('ages.phases.columns.targets.target-links.destroy');
 
+        // Neurons
+        Route::get('/neurons/{neuron}/border-uid', [App\Http\Controllers\NeuronController::class, 'getBorderUid'])->name('neurons.border-uid');
 
 });

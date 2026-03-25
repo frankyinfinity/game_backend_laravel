@@ -161,6 +161,52 @@ function scheduleNextCycle() {
   }, SECOND_TIMEOUT * 1000);
 }
 
+function fetchNeuronBorderUid(neuronId) {
+  return new Promise((resolve, reject) => {
+    if (!sessionCookie) {
+      return reject(new Error('No session cookie'));
+    }
+
+    const path = `/neurons/${neuronId}/border-uid`;
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path,
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Cookie: sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken,
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = data ? JSON.parse(data) : {};
+          if (response.success) {
+            resolve(response.border_uid);
+          } else {
+            console.error(`[Element ${elementHasPositionId}] fetchNeuronBorderUid API error:`, response);
+            resolve(null);
+          }
+        } catch (e) {
+          console.error(`[Element ${elementHasPositionId}] fetchNeuronBorderUid parse error:`, e.message);
+          resolve(null);
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      console.error(`[Element ${elementHasPositionId}] fetchNeuronBorderUid request error:`, e.message);
+      resolve(null);
+    });
+    req.end();
+  });
+}
+
 function safeVolumePath(relativePath) {
   const normalized = path.normalize(String(relativePath || '')).replace(/^([.][.][/\\])+/, '');
   const absolutePath = path.resolve('/data', normalized);
@@ -174,7 +220,7 @@ function safeVolumePath(relativePath) {
 /**
  * Aggiorna lo stato di un neurone leggendo il file dal volume (storicamente logVolumeFile)
  */
-function updateNeuron(params, ws) {
+async function updateNeuron(params, ws) {
   const relativePath = params ? params.path : null;
   const neuronId = params ? params.neuron_id : null;
 
@@ -202,10 +248,14 @@ function updateNeuron(params, ws) {
     console.log(`[Element ${elementHasPositionId}] update_neuron: ${neuronId} via file: ${relativePath}`);
     //console.log(content);
 
+    const borderUid = neuronId ? await fetchNeuronBorderUid(neuronId) : null;
+    console.log(`[Element ${elementHasPositionId}] border_uid for node: ${borderUid}`);
+
     ws.send(JSON.stringify({
       success: true,
       command: 'update_neuron',
       neuron_id: neuronId,
+      border_uid: borderUid,
       path: relativePath,
       bytes: Buffer.byteLength(content, 'utf8'),
     }));
