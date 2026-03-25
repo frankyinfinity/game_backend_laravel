@@ -894,6 +894,10 @@ class GameController extends Controller
                 foreach ($updateData as $data) {
                     $updateCommands[] = $data;
                 }
+                $updateCommands = array_merge(
+                    $updateCommands,
+                    $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
+                );
 
             }
 
@@ -1115,6 +1119,10 @@ class GameController extends Controller
 
                 foreach ($updateObject->get() as $data)
                     $updateCommands[] = $data;
+                $updateCommands = array_merge(
+                    $updateCommands,
+                    $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
+                );
 
             }
         }
@@ -1403,6 +1411,10 @@ class GameController extends Controller
                 $updateObject->setAttributes('zIndex', 100);
                 foreach ($updateObject->get() as $data)
                     $drawCommands[] = $data;
+                $drawCommands = array_merge(
+                    $drawCommands,
+                    $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
+                );
 
             }
         }
@@ -1642,16 +1654,20 @@ class GameController extends Controller
                     $xEnd = $endCenterSquare['x'];
                     $yEnd = $endCenterSquare['y'];
 
-                    // Update Entity
-                    $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
-                    $updateObject->setAttributes('x', $xEnd);
-                    $updateObject->setAttributes('y', $yEnd);
-                    $updateObject->setAttributes('zIndex', 100);
-                    foreach ($updateObject->get() as $data)
-                        $drawCommands[] = $data;
+                // Update Entity
+                $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
+                $updateObject->setAttributes('x', $xEnd);
+                $updateObject->setAttributes('y', $yEnd);
+                $updateObject->setAttributes('zIndex', 100);
+                foreach ($updateObject->get() as $data)
+                    $drawCommands[] = $data;
+                $drawCommands = array_merge(
+                    $drawCommands,
+                    $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
+                );
 
-                }
             }
+        }
 
             // === PHASE 6: CLEAR SECOND PATH ===
             foreach ($secondPathIds as $idToClear) {
@@ -2245,6 +2261,15 @@ class GameController extends Controller
 
         $drawObject = new ObjectDraw($objectArray, $sessionId);
         return $drawObject->get();
+    }
+
+    private function buildEntityCoordinatesTextUpdate(string $entityUid, string $sessionId, int $tileI, int $tileJ, int $sleep = 0): array
+    {
+        $textUid = $entityUid . '_text_row_2';
+        $updateObject = new ObjectUpdate($textUid, $sessionId, $sleep);
+        $updateObject->setAttributes('text', 'I: ' . $tileI . ' - J: ' . $tileJ);
+
+        return $updateObject->get();
     }
 
     private function resolveSessionId(Request $request, Player $player): string
