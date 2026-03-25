@@ -8,9 +8,9 @@
 <style>
     #container-pixi {
         width: 100%;
-        height: clamp(520px, 72vh, 860px);
+        height: clamp(460px, 64vh, 780px);
         border: 1px solid #d8e0ea;
-        border-radius: 16px;
+        border-radius: 14px;
         overflow-x: hidden;
         overflow-y: auto;
         background:
@@ -48,24 +48,24 @@
 
     .container-info-panel {
         border: 1px solid #e5e7eb;
-        border-radius: 16px;
+        border-radius: 14px;
         background: #fff;
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
     }
 
     .player-summary-bar {
         border: 1px solid #e5e7eb;
-        border-radius: 16px;
+        border-radius: 14px;
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-        padding: 12px 16px;
-        margin-bottom: 16px;
+        padding: 10px 14px;
+        margin-bottom: 12px;
     }
 
     .player-summary-row {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
         flex-wrap: wrap;
     }
 
@@ -73,11 +73,11 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 10px;
+        padding: 5px 9px;
         border-radius: 999px;
         background: #eef2f7;
         color: #0f172a;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
     }
 
@@ -89,31 +89,31 @@
     .container-stat-strip {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 16px;
+        gap: 8px;
+        margin-bottom: 12px;
     }
 
     .container-stat-card {
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
+        border-radius: 12px;
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-        padding: 12px 14px;
-        min-height: 72px;
+        padding: 10px 12px;
+        min-height: 64px;
     }
 
     .container-stat-card .label {
         display: block;
-        font-size: 11px;
+        font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: #64748b;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
 
     .container-stat-card .value {
         display: block;
-        font-size: 22px;
+        font-size: 19px;
         font-weight: 800;
         color: #0f172a;
         line-height: 1;
@@ -121,8 +121,8 @@
 
     .container-stat-card .hint {
         display: block;
-        font-size: 12px;
-        margin-top: 6px;
+        font-size: 11px;
+        margin-top: 4px;
         color: #64748b;
     }
 
@@ -130,7 +130,7 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 5px 10px;
+        padding: 4px 9px;
         border-radius: 999px;
         background: rgba(148, 163, 184, 0.14);
         color: #475569;
@@ -138,9 +138,9 @@
     }
 
     .container-section-divider {
-        margin: 14px 0 10px;
+        margin: 12px 0 8px;
         border-top: 1px solid #e5e7eb;
-        padding-top: 10px;
+        padding-top: 8px;
     }
 
     .container-section-divider .title {
@@ -160,9 +160,9 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 10px;
+        padding: 5px 9px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         background: #e2e8f0;
         color: #334155;
@@ -176,9 +176,9 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
+        padding: 7px 11px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
         background: #f1f5f9;
         color: #0f172a;
@@ -222,22 +222,22 @@
     .container-toolbar {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
     }
 
     .container-toolbar-group {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        padding: 12px;
+        gap: 6px;
+        padding: 10px;
         border: 1px solid #e5e7eb;
-        border-radius: 14px;
+        border-radius: 12px;
         background: #f8fafc;
     }
 
     .container-toolbar-group-title {
         width: 100%;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -246,11 +246,87 @@
     }
 
     .container-toolbar-group .btn {
-        min-width: 94px;
+        min-width: 86px;
     }
 
     .container-toolbar-group .btn.flex-grow {
-        flex: 1 1 120px;
+        flex: 1 1 108px;
+    }
+
+    .volume-panel {
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        overflow: hidden;
+    }
+
+    .volume-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #e5e7eb;
+        background: rgba(255, 255, 255, 0.85);
+    }
+
+    .volume-panel-title {
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .volume-panel-meta {
+        font-size: 11px;
+        color: #64748b;
+    }
+
+    .btn-volume-refresh {
+        padding: 0.18rem 0.45rem;
+        line-height: 1;
+    }
+
+    .volume-panel-body {
+        padding: 10px 12px;
+    }
+
+    .volume-file-list {
+        max-height: 220px;
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+    }
+
+    .volume-file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-bottom: 1px solid #edf2f7;
+        font-size: 11px;
+    }
+
+    .volume-file-item:last-child {
+        border-bottom: 0;
+    }
+
+    .volume-file-path {
+        font-family: monospace;
+        color: #0f172a;
+        word-break: break-all;
+    }
+
+    .volume-file-size {
+        flex: 0 0 auto;
+        color: #64748b;
+        font-weight: 700;
+        white-space: nowrap;
     }
 
     .exec-preset-row {
@@ -343,7 +419,7 @@
         }
 
         #container-pixi {
-            height: clamp(460px, 62vh, 760px);
+            height: clamp(420px, 58vh, 700px);
         }
     }
 
@@ -353,7 +429,7 @@
         }
 
         #container-pixi {
-            height: clamp(420px, 56vh, 680px);
+            height: clamp(380px, 52vh, 620px);
         }
     }
 </style>
@@ -398,13 +474,13 @@
 </div>
 
 <div class="row">
-    <div class="col-12 col-xl-4 mb-3 mb-xl-0">
+    <div class="col-12 col-xl-3 mb-3 mb-xl-0">
         <div class="card container-info-panel mt-3">
             <div class="card-header pb-0">
-                <h4 class="mb-0">Container selezionato</h4>
+                <h4 class="mb-0" style="font-size: 1rem;">Container selezionato</h4>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
+            <div class="card-body p-3">
+                <div class="mb-2">
                     <div class="container-pill mb-2">Nome: <strong id="selected-container-name">-</strong></div>
                     <div class="container-pill mb-2">Tipo: <strong id="selected-container-type">-</strong></div>
                     <div class="container-pill mb-2">Scope: <strong id="selected-container-scope">-</strong></div>
@@ -457,16 +533,47 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="volume-panel mt-2">
+                    <div class="volume-panel-header">
+                        <div>
+                            <h5 class="volume-panel-title mb-1">Volume player</h5>
+                            <div class="volume-panel-meta" id="player-volume-name">{{ $volume['name'] ?? '-' }}</div>
+                        </div>
+                        <div class="d-flex align-items-center" style="gap: 8px;">
+                            <div class="volume-panel-meta">
+                                <span id="player-volume-count">{{ $volume['file_count'] ?? 0 }}</span> file
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm btn-volume-refresh" id="refresh-volume" title="Aggiorna volume">
+                                <i class="fa fa-redo"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="volume-panel-body">
+                        <div class="volume-file-list" id="player-volume-files">
+                            @forelse(($volume['files'] ?? []) as $file)
+                                <div class="volume-file-item">
+                                    <div class="volume-file-path">{{ $file['path'] }}</div>
+                                    <div class="volume-file-size">{{ number_format((int) $file['size']) }} B</div>
+                                </div>
+                            @empty
+                                <div class="p-3 text-muted small" id="player-volume-empty">
+                                    Nessun file nel volume del player.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-12 col-xl-8">
-        <div class="card container-info-panel">
+    <div class="col-12 col-xl-9">
+        <div class="card container-info-panel mt-3">
             <div class="card-header pb-0">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h4 class="mb-0">Container Docker</h4>
+                        <h4 class="mb-0" style="font-size: 1rem;">Container Docker</h4>
                         <small class="text-muted">{{ count($containers) }} container caricati</small>
                     </div>
                     <div class="d-flex align-items-center" style="gap: 10px;">
@@ -477,7 +584,7 @@
                     </div>
                 </div>
             </div>
-            <div class="container-actions-bar">
+            <div class="container-actions-bar" style="padding: 10px;">
                 <input type="text" class="form-control form-control-sm" id="container-search" placeholder="Cerca nome, ID, porta">
                 <select class="custom-select custom-select-sm" id="filter-status" style="max-width: 160px;">
                     <option value="all">Tutti gli stati</option>
@@ -518,7 +625,7 @@
                 </div>
                 <span class="ml-auto text-muted small" id="visible-count">0 visibili</span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-2">
                 <div id="container-pixi"></div>
             </div>
         </div>
@@ -562,6 +669,8 @@
         let emptyText = null;
         let logsModalContainerId = null;
         let logsTail = 200;
+        let playerVolumeState = @json($volume);
+        const refreshVolumeButton = document.getElementById('refresh-volume');
 
         function shortId(value) {
             if (!value) return '-';
@@ -818,6 +927,49 @@
             fields.statusChip.className = 'status-chip is-' + String(container.status || 'unknown').toLowerCase() + ' mb-2';
             fields.statusDot.style.background = container.status_color || '#64748b';
             document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = false);
+        }
+
+        function updatePlayerVolume(volume) {
+            playerVolumeState = volume || { name: '-', files: [], file_count: 0 };
+
+            const nameNode = document.getElementById('player-volume-name');
+            const countNode = document.getElementById('player-volume-count');
+            const listNode = document.getElementById('player-volume-files');
+
+            if (nameNode) {
+                nameNode.textContent = playerVolumeState.name || '-';
+            }
+
+            if (countNode) {
+                countNode.textContent = String(playerVolumeState.file_count || 0);
+            }
+
+            if (!listNode) {
+                return;
+            }
+
+            const files = Array.isArray(playerVolumeState.files) ? playerVolumeState.files : [];
+            if (files.length === 0) {
+                listNode.innerHTML = '<div class="p-3 text-muted small" id="player-volume-empty">Nessun file nel volume del player.</div>';
+                return;
+            }
+
+            listNode.innerHTML = files.map(function (file) {
+                const size = Number(file.size || 0);
+                return [
+                    '<div class="volume-file-item">',
+                    '  <div class="volume-file-path">' + escapeHtml(file.path || '-') + '</div>',
+                    '  <div class="volume-file-size">' + escapeHtml(size.toLocaleString('it-IT')) + ' B</div>',
+                    '</div>'
+                ].join('');
+            }).join('');
+        }
+
+        function refreshVolume() {
+            if (refreshInFlight) {
+                return;
+            }
+            refreshContainers(false);
         }
 
         function drawCard(container, x, y, idx) {
@@ -1104,6 +1256,7 @@
                 success: function (response) {
                     if (response && response.success) {
                         refreshCards(response.containers || []);
+                        updatePlayerVolume(response.volume || playerVolumeState);
                         setLastUpdated(response.updated_at ? ('Aggiornato: ' + response.updated_at) : 'Aggiornato');
                     }
                 },
@@ -1728,6 +1881,12 @@
             $('#refresh-pixi').on('click', function () {
                 refreshContainers(false);
             });
+
+            if (refreshVolumeButton) {
+                refreshVolumeButton.addEventListener('click', function () {
+                    refreshVolume();
+                });
+            }
 
             $('#container-search').on('input', function () {
                 filters.query = normalizeValue($(this).val().trim());

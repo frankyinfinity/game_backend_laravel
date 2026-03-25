@@ -33,6 +33,11 @@ class ObjectCache
         if (isset(self::$buffers[$sessionId])) {
             $player = self::resolvePlayer($sessionId);
             if ($player !== null && (self::$dirty[$sessionId] ?? false)) {
+                \Log::info('ObjectCache flush verso volume player', [
+                    'session_id' => $sessionId,
+                    'player_id' => $player->id,
+                    'entries' => count(self::$buffers[$sessionId]),
+                ]);
                 self::writeToPlayerStorage($player, $sessionId, self::$buffers[$sessionId]);
             }
 
@@ -150,6 +155,12 @@ class ObjectCache
             ->where('actual_session_id', $sessionId)
             ->first();
 
+        if (self::$resolvedPlayers[$sessionId] === null) {
+            \Log::warning('ObjectCache sessione non associata a player', [
+                'session_id' => $sessionId,
+            ]);
+        }
+
         return self::$resolvedPlayers[$sessionId];
     }
 
@@ -171,27 +182,45 @@ class ObjectCache
 
     private static function volumeCachePath(string $sessionId): string
     {
+        return 'object-cache/' . self::sessionFileName($sessionId);
+    }
+
+    public static function sessionVolumePath(string $sessionId): string
+    {
+        return self::volumeCachePath($sessionId);
+    }
+
+    private static function legacyVolumeCachePath(string $sessionId): string
+    {
         return 'object-cache/' . sha1($sessionId) . '.json';
+    }
+
+    private static function sessionFileName(string $sessionId): string
+    {
+        $sessionId = trim($sessionId);
+        if ($sessionId === '') {
+            throw new InvalidArgumentException('Il session_id non può essere vuoto.');
+        }
+
+        $safeSessionId = preg_replace('/[^A-Za-z0-9._-]/', '_', $sessionId);
+        return $safeSessionId . '.json';
     }
 
     private static function readFromPlayerStorage(Player $player, string $sessionId): array
     {
-        $json = app(DockerContainerService::class)->readPlayerVolumeFile(
-            $player,
-            self::volumeCachePath($sessionId)
-        );
+        $service = app(DockerContainerService::class);
+        $json = $service->readPlayerVolumeFile($player, self::volumeCachePath($sessionId));
 
         if ($json === null || trim($json) === '') {
+            $legacyJson = $service->readPlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
+            if ($legacyJson !== null && trim($legacyJson) !== '') {
+                return self::decodePlayerStorage($legacyJson);
+            }
+
             return [];
         }
 
-        try {
-            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new RuntimeException('Impossibile leggere ObjectCache dal volume del player: ' . $e->getMessage(), 0, $e);
-        }
-
-        return is_array($decoded) ? $decoded : [];
+        return self::decodePlayerStorage($json);
     }
 
     private static function writeToPlayerStorage(Player $player, string $sessionId, array $data): void
@@ -202,19 +231,40 @@ class ObjectCache
             throw new RuntimeException('Impossibile serializzare ObjectCache per il volume del player: ' . $e->getMessage(), 0, $e);
         }
 
-        app(DockerContainerService::class)->writePlayerVolumeFile(
-            $player,
-            self::volumeCachePath($sessionId),
-            $json
-        );
+        $service = app(DockerContainerService::class);
+        $service->writePlayerVolumeFile($player, self::volumeCachePath($sessionId), $json);
+        $service->deletePlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
+
+        \Log::info('ObjectCache salvato nel volume player', [
+            'session_id' => $sessionId,
+            'player_id' => $player->id,
+            'path' => self::volumeCachePath($sessionId),
+            'entries' => count($data),
+        ]);
     }
 
     private static function deletePlayerStorage(Player $player, string $sessionId): void
     {
-        app(DockerContainerService::class)->deletePlayerVolumeFile(
-            $player,
-            self::volumeCachePath($sessionId)
-        );
+        $service = app(DockerContainerService::class);
+        $service->deletePlayerVolumeFile($player, self::volumeCachePath($sessionId));
+        $service->deletePlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
+
+        \Log::info('ObjectCache rimosso dal volume player', [
+            'session_id' => $sessionId,
+            'player_id' => $player->id,
+            'path' => self::volumeCachePath($sessionId),
+        ]);
+    }
+
+    private static function decodePlayerStorage(string $json): array
+    {
+        try {
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new RuntimeException('Impossibile leggere ObjectCache dal volume del player: ' . $e->getMessage(), 0, $e);
+        }
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     private static function extractUid(array $object): string

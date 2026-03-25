@@ -6,6 +6,7 @@ use App\Models\Container as DockerContainer;
 use App\Models\ElementHasPosition;
 use App\Models\Entity;
 use App\Models\Player;
+use App\Custom\Manipulation\ObjectCache;
 use App\Services\DockerContainerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -39,8 +40,9 @@ class ContainerController extends Controller
     {
         $player->load(['user', 'birthRegion']);
         $containers = $this->buildContainerPayloads($player, $containerService);
+        $volume = $this->buildPlayerVolumePayload($player, $containerService);
 
-        return view('container.show', compact('player', 'containers'));
+        return view('container.show', compact('player', 'containers', 'volume'));
     }
 
     public function snapshot(Player $player, DockerContainerService $containerService): JsonResponse
@@ -48,6 +50,7 @@ class ContainerController extends Controller
         return response()->json([
             'success' => true,
             'containers' => $this->buildContainerPayloads($player, $containerService),
+            'volume' => $this->buildPlayerVolumePayload($player, $containerService),
             'updated_at' => now()->toIso8601String(),
         ]);
     }
@@ -222,6 +225,41 @@ class ContainerController extends Controller
                     'status_color' => $this->statusColor($status),
                 ];
             })->values();
+    }
+
+    private function buildPlayerVolumePayload(Player $player, DockerContainerService $containerService): array
+    {
+        $volumeName = trim((string) ($player->docker_volume_name ?? ''));
+        if ($volumeName === '') {
+            $volumeName = 'player_' . $player->id . '_data';
+        }
+
+        $files = [];
+        $sessionId = trim((string) ($player->actual_session_id ?? ''));
+        if ($sessionId !== '') {
+            try {
+                $fileInfo = $containerService->getPlayerVolumeFileInfo(
+                    $player,
+                    ObjectCache::sessionVolumePath($sessionId)
+                );
+                if ($fileInfo !== null) {
+                    $files[] = $fileInfo;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Unable to inspect player volume file', [
+                    'player_id' => $player->id,
+                    'volume_name' => $volumeName,
+                    'session_id' => $sessionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'name' => $volumeName,
+            'files' => $files,
+            'file_count' => count($files),
+        ];
     }
 
     private function playerContainersQuery(Player $player)

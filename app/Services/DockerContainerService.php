@@ -908,6 +908,13 @@ class DockerContainerService
 
         $command = $mkdirCommand . 'cat > /data/' . $filePath;
 
+        \Log::info('Scrittura file nel volume player', [
+            'player_id' => $player->id,
+            'volume_name' => $this->resolvePlayerVolumeName($player),
+            'path' => $filePath,
+            'bytes' => strlen($contents),
+        ]);
+
         $this->executeRemoteDockerCommandWithInput([
             'run',
             '--rm',
@@ -928,6 +935,11 @@ class DockerContainerService
         $this->ensureImageExists('player:latest');
 
         $filePath = $this->normalizeVolumeRelativePath($relativePath);
+        \Log::info('Lettura file dal volume player', [
+            'player_id' => $player->id,
+            'volume_name' => $this->resolvePlayerVolumeName($player),
+            'path' => $filePath,
+        ]);
 
         try {
             $output = $this->executeRemoteDockerCommand([
@@ -959,6 +971,11 @@ class DockerContainerService
         $this->ensureImageExists('player:latest');
 
         $filePath = $this->normalizeVolumeRelativePath($relativePath);
+        \Log::info('Cancellazione file dal volume player', [
+            'player_id' => $player->id,
+            'volume_name' => $this->resolvePlayerVolumeName($player),
+            'path' => $filePath,
+        ]);
 
         $this->executeRemoteDockerCommand([
             'run',
@@ -971,6 +988,85 @@ class DockerContainerService
             '-lc',
             'rm -f /data/' . $filePath,
         ]);
+    }
+
+    /**
+     * Return a flat list of files stored in the player's Docker volume.
+     *
+     * @return array<int, array{path:string,size:int}>
+     */
+    public function listPlayerVolumeFiles(Player $player, int $maxDepth = 4): array
+    {
+        $this->ensurePlayerVolume($player);
+        $this->ensureImageExists('player:latest');
+
+        \Log::info('Listing file del volume player', [
+            'player_id' => $player->id,
+            'volume_name' => $this->resolvePlayerVolumeName($player),
+            'max_depth' => max(1, $maxDepth),
+        ]);
+
+        $output = $this->executeRemoteDockerCommand([
+            'run',
+            '--rm',
+            '--entrypoint',
+            'sh',
+            '-v',
+            $this->resolvePlayerVolumeName($player) . ':/data',
+            'player:latest',
+            '-lc',
+            'dir="/data/object-cache"; if [ -d "$dir" ]; then for file in "$dir"/*; do [ -f "$file" ] || continue; rel="${file#/data/}"; size=$(wc -c < "$file"); echo "$rel::$size"; done; fi | sort',
+        ]);
+
+        $files = [];
+        foreach (preg_split('/\\r\\n|\\r|\\n/', trim($output)) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            [$path, $size] = array_pad(explode('::', $line, 2), 2, '0');
+            $files[] = [
+                'path' => $path,
+                'size' => (int) $size,
+            ];
+        }
+
+        \Log::info('Listing file del volume player completato', [
+            'player_id' => $player->id,
+            'volume_name' => $this->resolvePlayerVolumeName($player),
+            'count' => count($files),
+        ]);
+
+        return $files;
+    }
+
+    public function getPlayerVolumeFileInfo(Player $player, string $relativePath): ?array
+    {
+        $this->ensurePlayerVolume($player);
+        $this->ensureImageExists('player:latest');
+
+        $filePath = $this->normalizeVolumeRelativePath($relativePath);
+
+        try {
+            $content = $this->readPlayerVolumeFile($player, $filePath);
+        } catch (\Throwable $e) {
+            \Log::warning('Impossibile leggere metadata del file del volume player', [
+                'player_id' => $player->id,
+                'path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+
+        if ($content === null) {
+            return null;
+        }
+
+        return [
+            'path' => $filePath,
+            'size' => strlen($content),
+        ];
     }
 
     private function executeRemoteDockerCommandWithInput(array $dockerArgs, ?string $stdin = null): string
