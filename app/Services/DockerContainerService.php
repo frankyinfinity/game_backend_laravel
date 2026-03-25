@@ -896,4 +896,123 @@ class DockerContainerService
             return false;
         }
     }
+
+    public function writePlayerVolumeFile(Player $player, string $relativePath, string $contents): void
+    {
+        $this->ensurePlayerVolume($player);
+        $this->ensureImageExists('player:latest');
+
+        $filePath = $this->normalizeVolumeRelativePath($relativePath);
+        $directory = dirname($filePath);
+        $mkdirCommand = $directory === '.' ? '' : 'mkdir -p /data/' . $directory . ' && ';
+
+        $command = $mkdirCommand . 'cat > /data/' . $filePath;
+
+        $this->executeRemoteDockerCommandWithInput([
+            'run',
+            '--rm',
+            '-i',
+            '--entrypoint',
+            'sh',
+            '-v',
+            $this->resolvePlayerVolumeName($player) . ':/data',
+            'player:latest',
+            '-lc',
+            $command,
+        ], $contents);
+    }
+
+    public function readPlayerVolumeFile(Player $player, string $relativePath): ?string
+    {
+        $this->ensurePlayerVolume($player);
+        $this->ensureImageExists('player:latest');
+
+        $filePath = $this->normalizeVolumeRelativePath($relativePath);
+
+        try {
+            $output = $this->executeRemoteDockerCommand([
+                'run',
+                '--rm',
+                '--entrypoint',
+                'sh',
+                '-v',
+                $this->resolvePlayerVolumeName($player) . ':/data',
+                'player:latest',
+                '-lc',
+                '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('Impossibile leggere il file del volume player', [
+                'player_id' => $player->id,
+                'path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+
+        return $output === '' ? null : $output;
+    }
+
+    public function deletePlayerVolumeFile(Player $player, string $relativePath): void
+    {
+        $this->ensurePlayerVolume($player);
+        $this->ensureImageExists('player:latest');
+
+        $filePath = $this->normalizeVolumeRelativePath($relativePath);
+
+        $this->executeRemoteDockerCommand([
+            'run',
+            '--rm',
+            '--entrypoint',
+            'sh',
+            '-v',
+            $this->resolvePlayerVolumeName($player) . ':/data',
+            'player:latest',
+            '-lc',
+            'rm -f /data/' . $filePath,
+        ]);
+    }
+
+    private function executeRemoteDockerCommandWithInput(array $dockerArgs, ?string $stdin = null): string
+    {
+        $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
+
+        $process = new Process([
+            $this->sshBinaryPath,
+            '-i',
+            $this->sshKeyPath,
+            $this->sshUserHost,
+            $dockerCmd,
+        ]);
+        $process->setTimeout(300); // 5 minuti max per operazione
+        if ($stdin !== null) {
+            $process->setInput($stdin);
+        }
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            throw new RuntimeException("Comando Docker remoto fallito ($dockerCmd): " . trim($process->getErrorOutput() ?: $process->getOutput()));
+        }
+
+        return trim($process->getOutput());
+    }
+
+    private function normalizeVolumeRelativePath(string $relativePath): string
+    {
+        $relativePath = str_replace('\\', '/', trim($relativePath));
+        $relativePath = ltrim($relativePath, '/');
+
+        if ($relativePath === '') {
+            throw new InvalidArgumentException('Il path del volume non può essere vuoto.');
+        }
+
+        $segments = explode('/', $relativePath);
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
+                throw new InvalidArgumentException('Il path del volume non è valido.');
+            }
+        }
+
+        return implode('/', $segments);
+    }
 }

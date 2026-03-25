@@ -2,31 +2,42 @@
 
 namespace App\Custom\Manipulation;
 
-use Illuminate\Support\Facades\Cache;
+use App\Models\Player;
+use App\Services\DockerContainerService;
 use InvalidArgumentException;
+use RuntimeException;
 
 class ObjectCache
 {
     private static array $buffers = [];
+    private static array $dirty = [];
+    private static array $resolvedPlayers = [];
 
     /**
-     * Start buffering for a session. Loads current cache into memory.
+     * Start buffering for a session. Loads current state into memory.
      */
     public static function buffer(string $sessionId): void
     {
         if (!isset(self::$buffers[$sessionId])) {
             self::$buffers[$sessionId] = self::read($sessionId);
         }
+
+        self::$dirty[$sessionId] = false;
     }
 
     /**
-     * Persist the buffer to the cache store and clear memory.
+     * Persist the buffer to the player volume and clear memory.
      */
     public static function flush(string $sessionId): void
     {
         if (isset(self::$buffers[$sessionId])) {
-            Cache::put(self::key($sessionId), self::$buffers[$sessionId]);
+            $player = self::resolvePlayer($sessionId);
+            if ($player !== null && (self::$dirty[$sessionId] ?? false)) {
+                self::writeToPlayerStorage($player, $sessionId, self::$buffers[$sessionId]);
+            }
+
             unset(self::$buffers[$sessionId]);
+            unset(self::$dirty[$sessionId]);
         }
     }
 
@@ -62,11 +73,7 @@ class ObjectCache
 
         $data[$uid] = $object;
 
-        if ($buffered) {
-            self::$buffers[$sessionId] = $data;
-        } else {
-            Cache::put(self::key($sessionId), $data);
-        }
+        self::store($sessionId, $data, $buffered);
     }
 
     /**
@@ -83,11 +90,7 @@ class ObjectCache
             }
         }
 
-        if ($buffered) {
-            self::$buffers[$sessionId] = $data;
-        } else {
-            Cache::put(self::key($sessionId), $data);
-        }
+        self::store($sessionId, $data, $buffered);
     }
 
     /**
@@ -100,11 +103,7 @@ class ObjectCache
 
         unset($data[$uid]);
 
-        if ($buffered) {
-            self::$buffers[$sessionId] = $data;
-        } else {
-            Cache::put(self::key($sessionId), $data);
-        }
+        self::store($sessionId, $data, $buffered);
     }
 
     /**
@@ -115,19 +114,107 @@ class ObjectCache
         if (isset(self::$buffers[$sessionId])) {
             unset(self::$buffers[$sessionId]);
         }
-        Cache::forget(self::key($sessionId));
-    }
+        unset(self::$dirty[$sessionId]);
 
-    private static function key(string $sessionId): string
-    {
-        return "objects:{$sessionId}";
+        $player = self::resolvePlayer($sessionId);
+        if ($player !== null) {
+            self::deletePlayerStorage($player, $sessionId);
+        }
     }
 
     private static function read(string $sessionId): array
     {
-        $data = Cache::get(self::key($sessionId), []);
+        if (isset(self::$buffers[$sessionId])) {
+            return self::$buffers[$sessionId];
+        }
 
-        return is_array($data) ? $data : [];
+        $player = self::resolvePlayer($sessionId);
+        if ($player !== null) {
+            return self::readFromPlayerStorage($player, $sessionId);
+        }
+
+        return [];
+    }
+
+    private static function resolvePlayer(string $sessionId): ?Player
+    {
+        if ($sessionId === '') {
+            return null;
+        }
+
+        if (array_key_exists($sessionId, self::$resolvedPlayers)) {
+            return self::$resolvedPlayers[$sessionId];
+        }
+
+        self::$resolvedPlayers[$sessionId] = Player::query()
+            ->where('actual_session_id', $sessionId)
+            ->first();
+
+        return self::$resolvedPlayers[$sessionId];
+    }
+
+    private static function store(string $sessionId, array $data, bool $buffered): void
+    {
+        self::$buffers[$sessionId] = $data;
+        self::$dirty[$sessionId] = true;
+
+        if ($buffered) {
+            return;
+        }
+
+        $player = self::resolvePlayer($sessionId);
+        if ($player !== null) {
+            self::writeToPlayerStorage($player, $sessionId, $data);
+            self::$dirty[$sessionId] = false;
+        }
+    }
+
+    private static function volumeCachePath(string $sessionId): string
+    {
+        return 'object-cache/' . sha1($sessionId) . '.json';
+    }
+
+    private static function readFromPlayerStorage(Player $player, string $sessionId): array
+    {
+        $json = app(DockerContainerService::class)->readPlayerVolumeFile(
+            $player,
+            self::volumeCachePath($sessionId)
+        );
+
+        if ($json === null || trim($json) === '') {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new RuntimeException('Impossibile leggere ObjectCache dal volume del player: ' . $e->getMessage(), 0, $e);
+        }
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private static function writeToPlayerStorage(Player $player, string $sessionId, array $data): void
+    {
+        try {
+            $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new RuntimeException('Impossibile serializzare ObjectCache per il volume del player: ' . $e->getMessage(), 0, $e);
+        }
+
+        app(DockerContainerService::class)->writePlayerVolumeFile(
+            $player,
+            self::volumeCachePath($sessionId),
+            $json
+        );
+    }
+
+    private static function deletePlayerStorage(Player $player, string $sessionId): void
+    {
+        app(DockerContainerService::class)->deletePlayerVolumeFile(
+            $player,
+            self::volumeCachePath($sessionId)
+        );
     }
 
     private static function extractUid(array $object): string
