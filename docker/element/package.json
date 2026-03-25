@@ -2,5 +2,8 @@
   "name": "element-service",
   "version": "1.0.0",
   "description": "Element Docker service",
-  "main": "index.js"
+  "main": "index.js",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
 }

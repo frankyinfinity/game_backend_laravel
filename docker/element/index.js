@@ -1,9 +1,13 @@
+const fs = require('fs');
 const http = require('http');
+const path = require('path');
+const WebSocket = require('ws');
 
 const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
 const elementHasPositionId = process.env.ELEMENT_HAS_POSITION_ID;
+const wsPort = Number(process.env.WS_PORT || 0);
 
 console.log('Element service started.');
 console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
@@ -155,6 +159,105 @@ function scheduleNextCycle() {
   setTimeout(() => {
     callGameBrain();
   }, SECOND_TIMEOUT * 1000);
+}
+
+function safeVolumePath(relativePath) {
+  const normalized = path.normalize(String(relativePath || '')).replace(/^([.][.][/\\])+/, '');
+  const absolutePath = path.resolve('/data', normalized);
+  if (!absolutePath.startsWith('/data' + path.sep) && absolutePath !== '/data') {
+    throw new Error('Invalid volume path');
+  }
+
+  return absolutePath;
+}
+
+function logVolumeFile(params, ws) {
+  const relativePath = params && typeof params.path === 'string' ? params.path.trim() : '';
+  if (!relativePath) {
+    ws.send(JSON.stringify({
+      success: false,
+      error: 'Missing volume file path',
+    }));
+    return;
+  }
+
+  try {
+    const absolutePath = safeVolumePath(relativePath);
+    if (!fs.existsSync(absolutePath)) {
+      ws.send(JSON.stringify({
+        success: false,
+        error: `File not found: ${relativePath}`,
+      }));
+      return;
+    }
+
+    const content = fs.readFileSync(absolutePath, 'utf8');
+    console.log(`[Element ${elementHasPositionId}] console.log volume file: ${relativePath}`);
+    console.log(content);
+
+    ws.send(JSON.stringify({
+      success: true,
+      command: 'log_volume_file',
+      path: relativePath,
+      bytes: Buffer.byteLength(content, 'utf8'),
+    }));
+  } catch (error) {
+    console.error(`[Element ${elementHasPositionId}] Error logging volume file ${relativePath}: ${error.message}`);
+    ws.send(JSON.stringify({
+      success: false,
+      error: error.message,
+    }));
+  }
+}
+
+if (wsPort > 0) {
+  const wss = new WebSocket.Server({ port: wsPort });
+  console.log(`WebSocket server listening on port ${wsPort}`);
+
+  wss.on('connection', (ws) => {
+    console.log(`[WebSocket] Client connected to element ${elementHasPositionId}`);
+
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message);
+        console.log(`[WebSocket] Received command:`, data);
+
+        const command = data && data.command ? data.command : null;
+        const params = data && data.params ? data.params : {};
+
+        switch (command) {
+          case 'log_volume_file':
+            logVolumeFile(params, ws);
+            break;
+          default:
+            ws.send(JSON.stringify({
+              success: false,
+              error: `Unknown command: ${command}`,
+            }));
+            break;
+        }
+      } catch (error) {
+        console.error(`[WebSocket] Error parsing message:`, error.message);
+        ws.send(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+      }
+    });
+
+    ws.on('close', () => {
+      console.log(`[WebSocket] Client disconnected`);
+    });
+
+    ws.on('error', (error) => {
+      console.error(`[WebSocket] Error:`, error.message);
+    });
+
+    ws.send(JSON.stringify({
+      success: true,
+      message: 'Connected to element',
+      element_has_position_id: elementHasPositionId,
+    }));
+  });
+} else {
+  console.log('WS_PORT missing or invalid, websocket server disabled for element.');
 }
 
 performLogin();

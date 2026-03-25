@@ -241,12 +241,14 @@ class DockerContainerService
         $imageName = 'element:latest';
         $this->ensureImageExists($imageName);
 
+        $wsPort = $this->nextWsPort();
         $name = 'element_' . $elementHasPosition->uid;
         $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'ELEMENT_HAS_POSITION_ID=' . $elementHasPosition->id,
+            'WS_PORT=' . $wsPort,
         ];
         $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
 
@@ -255,7 +257,7 @@ class DockerContainerService
             $imageName,
             $env,
             $labels,
-            null,
+            $wsPort,
             $start,
             $this->playerVolumeMountByPlayerId((int) $elementHasPosition->player_id)
         );
@@ -265,7 +267,7 @@ class DockerContainerService
             'name' => $name,
             'parent_type' => Container::PARENT_TYPE_ELEMENT_HAS_POSITION,
             'parent_id' => $elementHasPosition->id,
-            'ws_port' => null,
+            'ws_port' => $wsPort,
         ]);
     }
 

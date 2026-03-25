@@ -4,6 +4,7 @@ namespace App\Custom\Manipulation;
 
 use App\Models\Player;
 use App\Services\DockerContainerService;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -32,7 +33,12 @@ class ObjectCache
     {
         if (isset(self::$buffers[$sessionId])) {
             $player = self::resolvePlayer($sessionId);
-            if ($player !== null && (self::$dirty[$sessionId] ?? false)) {
+            
+            if ($player === null || $player->id == 1) {
+                if (self::$dirty[$sessionId] ?? false) {
+                    Cache::put('object_cache_' . $sessionId, self::$buffers[$sessionId], now()->addHours(24));
+                }
+            } elseif (self::$dirty[$sessionId] ?? false) {
                 \Log::info('ObjectCache flush verso volume player', [
                     'session_id' => $sessionId,
                     'player_id' => $player->id,
@@ -122,6 +128,12 @@ class ObjectCache
         unset(self::$dirty[$sessionId]);
 
         $player = self::resolvePlayer($sessionId);
+        
+        // Se non c'è un player associato o è il player 1, pulisci la Cache
+        if ($player === null || $player->id == 1) {
+            Cache::forget('object_cache_' . $sessionId);
+        }
+
         if ($player !== null) {
             self::deletePlayerStorage($player, $sessionId);
         }
@@ -134,11 +146,13 @@ class ObjectCache
         }
 
         $player = self::resolvePlayer($sessionId);
-        if ($player !== null) {
-            return self::readFromPlayerStorage($player, $sessionId);
+        
+        // Se è il player 1 o non c'è un player associato alla sessione (es. init_session_id), usa la Cache di Laravel
+        if ($player === null || $player->id == 1) {
+            return Cache::get('object_cache_' . $sessionId) ?? [];
         }
 
-        return [];
+        return self::readFromPlayerStorage($player, $sessionId);
     }
 
     private static function resolvePlayer(string $sessionId): ?Player
@@ -174,10 +188,16 @@ class ObjectCache
         }
 
         $player = self::resolvePlayer($sessionId);
-        if ($player !== null) {
-            self::writeToPlayerStorage($player, $sessionId, $data);
+        
+        // Se è il player 1 o non c'è un player associato alla sessione, usa la Cache
+        if ($player === null || $player->id == 1) {
+            Cache::put('object_cache_' . $sessionId, $data, now()->addHours(24));
             self::$dirty[$sessionId] = false;
+            return;
         }
+
+        self::writeToPlayerStorage($player, $sessionId, $data);
+        self::$dirty[$sessionId] = false;
     }
 
     private static function volumeCachePath(string $sessionId): string
@@ -225,6 +245,12 @@ class ObjectCache
 
     private static function writeToPlayerStorage(Player $player, string $sessionId, array $data): void
     {
+        // Se è il player 1, salva in Cache invece che nel volume
+        if ($player->id == 1) {
+            Cache::put('object_cache_' . $sessionId, $data, now()->addHours(24));
+            return;
+        }
+
         try {
             $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -245,6 +271,12 @@ class ObjectCache
 
     private static function deletePlayerStorage(Player $player, string $sessionId): void
     {
+        // Se è il player 1, rimuovi dalla Cache
+        if ($player->id == 1) {
+            Cache::forget('object_cache_' . $sessionId);
+            return;
+        }
+
         $service = app(DockerContainerService::class);
         $service->deletePlayerVolumeFile($player, self::volumeCachePath($sessionId));
         $service->deletePlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
