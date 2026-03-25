@@ -2,6 +2,9 @@
 
 namespace App\Custom\Draw\Complex\Table;
 
+use App\Custom\Colors;
+use App\Custom\Draw\Primitive\MultiLine;
+
 class TableDraw {
 
     const ALIGN_LEFT = 'left';
@@ -17,6 +20,8 @@ class TableDraw {
     private array $rows = [];
     private array $drawItems = [];
     private int $bottomY = 0;
+    private int $borderColor = Colors::BLACK;
+    private int $borderThickness = 2;
 
     public function __construct(string $uid) {
         $this->uid = $uid;
@@ -33,6 +38,14 @@ class TableDraw {
 
     public function setRowHeight(int $height) {
         $this->rowHeight = $height;
+    }
+
+    public function setBorderColor(int $color) {
+        $this->borderColor = $color;
+    }
+
+    public function setBorderThickness(int $thickness) {
+        $this->borderThickness = $thickness;
     }
 
     public function addHead(TableHeadDraw $head) {
@@ -110,5 +123,18 @@ class TableDraw {
             $currentY += max($maxRowHeight, $this->rowHeight);
         }
         $this->bottomY = $currentY;
+
+        if ($this->width > 0 && $this->bottomY > $this->y) {
+            $outerBorder = new MultiLine($this->uid . '_outer_border');
+            $outerBorder->setPoint($this->x, $this->y);
+            $outerBorder->setPoint($this->x + $this->width, $this->y);
+            $outerBorder->setPoint($this->x + $this->width, $this->bottomY);
+            $outerBorder->setPoint($this->x, $this->bottomY);
+            $outerBorder->setPoint($this->x, $this->y);
+            $outerBorder->setThickness($this->borderThickness);
+            $outerBorder->setColor($this->borderColor);
+            $outerBorder->setRenderable(true);
+            $this->drawItems[] = $outerBorder->buildJson();
+        }
     }
 }

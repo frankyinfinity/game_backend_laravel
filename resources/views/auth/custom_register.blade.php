@@ -3,6 +3,29 @@
 @section('adminlte_css')
     @stack('css')
     @yield('css')
+    <style>
+        #genes-container {
+            border: 1px solid #d8e0ea;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        #genes-container .genes-header {
+            background: #f8fafc;
+            border-bottom: 1px solid #d8e0ea;
+            padding: 0.75rem 0.9rem;
+        }
+
+        #genes-container .genes-row {
+            padding: 0.75rem 0.9rem;
+            border-bottom: 1px solid #e5eaf1;
+        }
+
+        #genes-container .genes-row:last-child {
+            border-bottom: 0;
+        }
+    </style>
 @stop
 
 @section('classes_body', 'layout-top-nav')
@@ -314,7 +337,7 @@
                 .then(data => {
                     if (data.success && data.genes) {
                         genesContainer.innerHTML = `
-                            <div class="row font-weight-bold small text-muted mb-2 border-bottom pb-1">
+                            <div class="row genes-header font-weight-bold small text-muted">
                                 <div class="col-md-3">Nome Gene</div>
                                 <div class="col-md-1 text-center">Min</div>
                                 <div class="col-md-3 text-center">Range Max (Da-A)</div>
@@ -331,7 +354,7 @@
                             const defaultValue = (!isMaxDefinitive && gene.max_from !== null) ? gene.max_from : (gene.min || 0);
                             
                             const geneRow = document.createElement('div');
-                            geneRow.className = 'row mb-1 py-1 border-bottom align-items-center bg-white';
+                            geneRow.className = 'row genes-row align-items-center bg-white';
                             
                             let rangeHtml = '';
                             if (!isMaxDefinitive) {

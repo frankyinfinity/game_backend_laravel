@@ -9,6 +9,7 @@ use App\Models\ElementHasPosition;
 use App\Models\Player;
 use RuntimeException;
 use InvalidArgumentException;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Process\Process;
 use WebSocket\Client;
 
@@ -33,6 +34,8 @@ class DockerContainerService
 
     public function createContainersForPlayer(Player $player): void
     {
+        $this->ensurePlayerVolume($player);
+
         $entities = Entity::query()
             ->whereHas('specie', function ($query) use ($player) {
                 $query->where('player_id', $player->id);
@@ -109,7 +112,15 @@ class DockerContainerService
 
         $labels = $this->playerGroupingLabels($playerId, 'entity');
 
-        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, $wsPort, $start);
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            $wsPort,
+            $start,
+            $this->playerVolumeMountByPlayerId($playerId)
+        );
 
         return Container::query()->create([
             'container_id' => $containerId,
@@ -137,7 +148,15 @@ class DockerContainerService
 
         $labels = $this->playerGroupingLabels($playerId, 'map');
 
-        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, $wsPort, $start);
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            $wsPort,
+            $start,
+            $this->playerVolumeMountByPlayerId($playerId)
+        );
 
         return Container::query()->create([
             'container_id' => $containerId,
@@ -152,6 +171,7 @@ class DockerContainerService
     {
         $imageName = 'player:latest';
         $this->ensureImageExists($imageName);
+        $this->ensurePlayerVolume($player);
 
         $wsPort = $this->nextWsPort();
         $name = 'player_' . $player->id;
@@ -164,7 +184,15 @@ class DockerContainerService
         ];
         $labels = $this->playerGroupingLabels($player->id, 'player');
 
-        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, $wsPort, $start);
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            $wsPort,
+            $start,
+            $this->playerVolumeMount($player)
+        );
 
         return Container::query()->create([
             'container_id' => $containerId,
@@ -189,7 +217,15 @@ class DockerContainerService
         ];
         $labels = $this->playerGroupingLabels($player->id, 'objective');
 
-        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, null, $start);
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            null,
+            $start,
+            $this->playerVolumeMount($player)
+        );
 
         return Container::query()->create([
             'container_id' => $containerId,
@@ -214,7 +250,15 @@ class DockerContainerService
         ];
         $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
 
-        $containerId = $this->createAndMaybeStartCLI($name, $imageName, $env, $labels, null, $start);
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            null,
+            $start,
+            $this->playerVolumeMountByPlayerId((int) $elementHasPosition->player_id)
+        );
 
         return Container::query()->create([
             'container_id' => $containerId,
@@ -345,7 +389,45 @@ class DockerContainerService
         return $scheme . '://' . $backendHost . ':' . $backendPort;
     }
 
-    private function createAndMaybeStartCLI(string $name, string $imageName, array $env, array $labels, ?int $wsPort, bool $start): string
+    public function ensurePlayerVolume(Player $player): string
+    {
+        $volumeName = $this->resolvePlayerVolumeName($player);
+        $this->executeRemoteDockerCommand(['volume', 'create', $volumeName]);
+
+        if (Schema::hasColumn('players', 'docker_volume_name') && (($player->docker_volume_name ?? null) !== $volumeName)) {
+            $player->forceFill(['docker_volume_name' => $volumeName])->saveQuietly();
+        } elseif (!Schema::hasColumn('players', 'docker_volume_name')) {
+            \Log::warning('Colonna players.docker_volume_name non presente: volume creato ma nome non salvato su DB', [
+                'player_id' => $player->id,
+                'volume_name' => $volumeName,
+            ]);
+        }
+
+        return $volumeName;
+    }
+
+    private function playerVolumeMount(Player $player): array
+    {
+        return [
+            'source' => $this->resolvePlayerVolumeName($player),
+            'target' => '/data',
+        ];
+    }
+
+    private function playerVolumeMountByPlayerId(int $playerId): array
+    {
+        $player = Player::query()->find($playerId);
+        if ($player) {
+            return $this->playerVolumeMount($player);
+        }
+
+        return [
+            'source' => 'player_' . $playerId . '_data',
+            'target' => '/data',
+        ];
+    }
+
+    private function createAndMaybeStartCLI(string $name, string $imageName, array $env, array $labels, ?int $wsPort, bool $start, ?array $volume = null): string
     {
         $args = [$start ? 'run' : 'create'];
         if ($start) {
@@ -376,6 +458,11 @@ class DockerContainerService
             $args[] = "$k=$v";
         }
 
+        if (is_array($volume) && !empty($volume['source']) && !empty($volume['target'])) {
+            $args[] = '-v';
+            $args[] = $volume['source'] . ':' . $volume['target'];
+        }
+
         $args[] = $imageName;
 
 
@@ -393,6 +480,16 @@ class DockerContainerService
             'com.docker.compose.service' => $service,
             'game.player.group' => $project,
         ];
+    }
+
+    private function resolvePlayerVolumeName(Player $player): string
+    {
+        $existingVolume = trim((string) ($player->docker_volume_name ?? ''));
+        if ($existingVolume !== '') {
+            return $existingVolume;
+        }
+
+        return 'player_' . $player->id . '_data';
     }
 
     private function resolvePlayerContainers(Player $player)

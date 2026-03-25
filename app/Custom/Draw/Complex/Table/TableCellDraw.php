@@ -56,6 +56,10 @@ class TableCellDraw {
         $this->borderColor = $color;
     }
 
+    public function setBorderThickness(int $thickness) {
+        $this->borderThickness = $thickness;
+    }
+
     public function setAlign(string $align) {
         $this->align = $align;
     }

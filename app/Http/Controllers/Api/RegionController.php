@@ -91,25 +91,35 @@ class RegionController extends Controller
         $table->setOrigin($x, $y);
         $table->setWidth(1380);
         $table->setRowHeight(50);
+        $table->setBorderThickness(2);
+        $table->setBorderColor(Colors::DARK_GRAY);
 
         $head1 = new TableHeadDraw(Str::random(20));
         $head1->setText('Nome Gene');
         $head1->setSize(250, 50);
+        $head1->setBorderThickness(2);
+        $head1->setBorderColor(Colors::DARK_GRAY);
         $table->addHead($head1);
 
         $head2 = new TableHeadDraw(Str::random(20));
         $head2->setText('Min');
         $head2->setSize(100, 50);
+        $head2->setBorderThickness(2);
+        $head2->setBorderColor(Colors::DARK_GRAY);
         $table->addHead($head2);
 
         $head3 = new TableHeadDraw(Str::random(20));
         $head3->setText('Range Max (Da-A)');
         $head3->setSize(250, 50);
+        $head3->setBorderThickness(2);
+        $head3->setBorderColor(Colors::DARK_GRAY);
         $table->addHead($head3);
 
         $head4 = new TableHeadDraw(Str::random(20));
         $head4->setText('Iniziale');
         $head4->setSize(150, 50);
+        $head4->setBorderThickness(2);
+        $head4->setBorderColor(Colors::DARK_GRAY);
         $table->addHead($head4);
 
         $tableInputs = [];
@@ -120,15 +130,21 @@ class RegionController extends Controller
             // Col 1: Nome Gene
             $cell1 = new TableCellDraw(Str::random(20));
             $cell1->setContent($gene['name']);
+            $cell1->setBorderThickness(1);
+            $cell1->setBorderColor(Colors::DARK_GRAY);
             $row[] = $cell1;
 
             // Col 2
             $cell2 = new TableCellDraw(Str::random(20));
             $cell2->setContent($gene['min']);
+            $cell2->setBorderThickness(1);
+            $cell2->setBorderColor(Colors::DARK_GRAY);
             $row[] = $cell2;
 
             // Col 3
             $cell3 = new TableCellDraw(Str::random(20));
+            $cell3->setBorderThickness(1);
+            $cell3->setBorderColor(Colors::DARK_GRAY);
             if($gene['max'] !== null) {
                 $cell3->setContent('Fisso: ' . $gene['max']);
             } else {
@@ -139,6 +155,8 @@ class RegionController extends Controller
             // Col 4
             $cell4 = new TableCellDraw(Str::random(20));
             $cell4->setSize(150, 50);
+            $cell4->setBorderThickness(1);
+            $cell4->setBorderColor(Colors::DARK_GRAY);
             $inputGene = new InputDraw(Str::random(20), $sessionId);
             $inputGene->setName('gene_value_' . $gene['id']);
             $inputGene->setTitle('');

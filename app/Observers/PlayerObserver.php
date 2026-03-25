@@ -17,6 +17,7 @@ use App\Models\TargetHasScorePlayer;
 use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
 use App\Models\PlayerValue;
+use App\Services\DockerContainerService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -30,6 +31,10 @@ class PlayerObserver
         PlayerValue::ensureDefaultsForPlayer($player->id);
         PlayerValue::setValue($player->id, PlayerValue::KEY_DIVISION_COST, 50, PlayerValue::TYPE_INTEGER);
         PlayerValue::setValue($player->id, PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY, 40, PlayerValue::TYPE_INTEGER);
+
+        /** @var DockerContainerService $containerService */
+        $containerService = app(DockerContainerService::class);
+        $containerService->ensurePlayerVolume($player);
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
