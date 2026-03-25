@@ -179,6 +179,7 @@ class ContainerController extends Controller
                 'start' => $containerService->startContainers($containers->all()),
                 'stop' => $containerService->stopContainers($containers->all()),
                 'restart' => $containerService->restartContainers($containers->all()),
+                'recreate' => $containers->each(fn($c) => $containerService->recreateContainer($c)),
                 default => throw new \InvalidArgumentException('Azione bulk non valida'),
             };
         } catch (\Throwable $e) {

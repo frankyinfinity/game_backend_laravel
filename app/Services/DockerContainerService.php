@@ -10,6 +10,7 @@ use App\Models\Player;
 use RuntimeException;
 use InvalidArgumentException;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use WebSocket\Client;
 
@@ -47,6 +48,7 @@ class DockerContainerService
         }
 
         foreach ($entities as $entity) {
+            /** @var Entity $entity */
             $this->createEntityContainer($entity, $player->id, false);
         }
 
@@ -733,8 +735,96 @@ class DockerContainerService
             $this->executeRemoteDockerCommand($args);
             \Log::info("docker rm eseguito per il container {$containerId}");
         } catch (\Exception $e) {
-            throw new RuntimeException("Errore durante docker rm per il container {$containerId}: " . $e->getMessage());
+            \Log::error("Errore durante docker rm per il container {$containerId}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Recreate a container from its DB record by deleting it and running the appropriate creation method.
+     */
+    public function recreateContainer(Container $containerRecord, bool $start = false): ?Container
+    {
+        $parentType = $containerRecord->parent_type;
+        $parentId = $containerRecord->parent_id;
+
+        // 1. Elimina il vecchio container in Docker
+        try {
+            $this->deleteContainer($containerRecord, true);
+        } catch (\Throwable $e) {
+            \Log::warning("Errore eliminazione container durante recreation: " . $e->getMessage());
+        }
+
+        // 2. Elimina il vecchio record DB
+        $containerRecord->delete();
+
+        // 3. Ricrea basandosi sul parent
+        return DB::transaction(function() use ($parentType, $parentId, $start) {
+            switch ($parentType) {
+                case Container::PARENT_TYPE_PLAYER:
+                    $player = Player::find($parentId);
+                    return $player ? $this->createPlayerContainer($player, $start) : null;
+
+                case Container::PARENT_TYPE_MAP:
+                    $birthRegion = BirthRegion::find($parentId);
+                    // Cerchiamo un player associato a questa regione per il playerId richiesto nella creazione
+                    $player = Player::where('birth_region_id', $parentId)->first();
+                    return ($birthRegion && $player) ? $this->createMapContainer($birthRegion, $player->id, $start) : null;
+
+                case Container::PARENT_TYPE_OBJECTIVE:
+                    $player = Player::find($parentId);
+                    return $player ? $this->createObjectiveContainer($player, $start) : null;
+
+                case Container::PARENT_TYPE_ENTITY:
+                    $entity = Entity::find($parentId);
+                    if ($entity && $entity->specie) {
+                        return $this->createEntityContainer($entity, (int) $entity->specie->player_id, $start);
+                    }
+                    return null;
+
+                case Container::PARENT_TYPE_ELEMENT_HAS_POSITION:
+                    $element = ElementHasPosition::find($parentId);
+                    return $element ? $this->createElementHasPositionContainer($element, $start) : null;
+
+                default:
+                    return null;
+            }
+        });
+    }
+
+    /**
+     * Recreates all containers for a given player.
+     */
+    public function recreateAllPlayerContainers(Player $player, bool $start = false): array
+    {
+        $entities = Entity::whereHas('specie', fn($q) => $q->where('player_id', $player->id))->pluck('id');
+        $elements = ElementHasPosition::where('player_id', $player->id)->pluck('id');
+
+        $records = Container::query()
+            ->where(function ($query) use ($player, $entities, $elements) {
+                $query->where(function($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_PLAYER)->where('parent_id', $player->id);
+                })->orWhere(function($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_MAP)->where('parent_id', $player->birth_region_id);
+                })->orWhere(function($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)->where('parent_id', $player->id);
+                })->orWhere(function($sq) use ($entities) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_ENTITY)->whereIn('parent_id', $entities);
+                })->orWhere(function($sq) use ($elements) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)->whereIn('parent_id', $elements);
+                });
+            })
+            ->get();
+
+        $newContainers = [];
+        foreach ($records as $record) {
+            /** @var Container $record */
+            $new = $this->recreateContainer($record, $start);
+            if ($new) {
+                $newContainers[] = $new;
+            }
+        }
+
+        return $newContainers;
     }
 
     /**

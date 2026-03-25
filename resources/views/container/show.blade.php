@@ -633,6 +633,9 @@
                         <i class="fa fa-trash"></i> Delete visibili
                     </button>
                 </div>
+                <button type="button" class="btn btn-primary btn-sm ml-2" id="bulk-recreate-all">
+                    <i class="fa fa-sync"></i> Ricrea tutti
+                </button>
                 <span class="ml-auto text-muted small" id="visible-count">0 visibili</span>
             </div>
             <div class="card-body p-2">
@@ -1644,6 +1647,65 @@
             });
         }
 
+        function bulkRecreateAll() {
+            const confirmText = 'Vuoi davvero eliminare e ricreare TUTTI i container di questo player?';
+            
+            Swal.fire({
+                title: 'Attenzione',
+                text: confirmText,
+                type: 'warning',
+                showCancelButton: true,
+                buttonsStyling: false,
+                confirmButtonClass: 'btn btn-danger',
+                cancelButtonClass: 'btn btn-default',
+                confirmButtonText: 'Conferma',
+                cancelButtonText: 'Annulla'
+            }).then(function (result) {
+                if (!result.value) {
+                    return;
+                }
+
+                const ids = containersState.map(function (item) { return item.id; });
+                if (ids.length === 0) {
+                    Swal.fire('Nessun container da ricreare.');
+                    return;
+                }
+
+                $.ajax({
+                    url: ACTION_URLS.bulk,
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    data: {
+                        action: 'recreate',
+                        ids: ids
+                    },
+                    success: function (response) {
+                        if (response && response.success) {
+                            refreshContainers(true);
+                            Swal.fire({
+                                title: 'Successo',
+                                text: 'Tutti i container sono stati ricreati.',
+                                type: 'success',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                        }
+                    },
+                    error: function (xhr) {
+                        const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Errore durante la ricreazione dei container.';
+                        Swal.fire({
+                            title: 'Ops!',
+                            text: message,
+                            type: 'danger',
+                            confirmButtonClass: 'btn btn-info'
+                        });
+                    }
+                });
+            });
+        }
+
         function selectedAction(action) {
             if (!selectedContainer) return;
             const containerId = selectedContainer.id;
@@ -1957,8 +2019,14 @@
                 }, 100);
             });
 
-            $('#refresh-pixi').on('click', function () {
-                refreshContainers(false);
+            document.getElementById('bulk-start-visible').addEventListener('click', function () { bulkOperateVisible('start'); });
+            document.getElementById('bulk-stop-visible').addEventListener('click', function () { bulkOperateVisible('stop'); });
+            document.getElementById('bulk-restart-visible').addEventListener('click', function () { bulkOperateVisible('restart'); });
+            document.getElementById('bulk-delete-visible').addEventListener('click', function () { bulkOperateVisible('delete'); });
+            document.getElementById('bulk-recreate-all').addEventListener('click', function () { bulkRecreateAll(); });
+
+            document.getElementById('refresh-pixi').addEventListener('click', function () {
+                refreshContainers();
             });
 
             if (refreshVolumeButton) {

@@ -200,7 +200,7 @@ function updateNeuron(params, ws) {
 
     const content = fs.readFileSync(absolutePath, 'utf8');
     console.log(`[Element ${elementHasPositionId}] update_neuron: ${neuronUid} via file: ${relativePath}`);
-    console.log(content);
+    //console.log(content);
 
     ws.send(JSON.stringify({
       success: true,
