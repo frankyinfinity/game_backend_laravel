@@ -72,6 +72,15 @@ class SceneGraphMover
 
                 if (!empty($movedPoints)) {
                     $newAttributes = ['points' => $movedPoints];
+                    $firstPoint = $movedPoints[0] ?? null;
+                    if (is_array($firstPoint)) {
+                        if (isset($firstPoint['x']) && is_numeric($firstPoint['x'])) {
+                            $newAttributes['x'] = (float) $firstPoint['x'];
+                        }
+                        if (isset($firstPoint['y']) && is_numeric($firstPoint['y'])) {
+                            $newAttributes['y'] = (float) $firstPoint['y'];
+                        }
+                    }
                 }
             } else {
                 $newAttributes = [];
