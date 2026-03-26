@@ -15,16 +15,18 @@ class UpdateDrawEvent implements ShouldBroadcast
 
     private Player $player;
     private string $borderUid;
-    private $fileData;
+    private $attributes;
+    private $object;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Player $player, string $borderUid, $fileData)
+    public function __construct(Player $player, string $borderUid, $attributes, $object)
     {
         $this->player = $player;
         $this->borderUid = $borderUid;
-        $this->fileData = $fileData;
+        $this->attributes = $attributes;
+        $this->object = $object;
     }
 
     /**
@@ -50,7 +52,8 @@ class UpdateDrawEvent implements ShouldBroadcast
         return [
             'player_id' => $this->player->id,
             'border_uid' => $this->borderUid,
-            'file_data' => $this->fileData,
+            'attributes' => $this->attributes,
+            'object' => $this->object,
         ];
     }
 }

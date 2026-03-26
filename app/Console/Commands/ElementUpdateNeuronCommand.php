@@ -43,6 +43,12 @@ class ElementUpdateNeuronCommand extends Command
             return self::FAILURE;
         }
 
+        $elementHasPositionNeuron = ElementHasPositionNeuron::find($neuronId);
+        if (!$elementHasPositionNeuron) {
+            $this->error("ElementHasPositionNeuron con ID {$neuronId} non trovato.");
+            return self::FAILURE;
+        }
+
         $player = $elementPosition->player;
         if (!$player) {
             $this->error("Player associato all'elemento non trovato.");
@@ -73,17 +79,11 @@ class ElementUpdateNeuronCommand extends Command
 
         $relativePath = ObjectCache::sessionVolumePath($sessionId);
 
-        // Ottenere il brain dell'elemento per determinare il colore in base allo stato active dei neuroni
-        $brain = $elementPosition->brain;
-        $color = null;
-        if ($brain) {
-            $neurons = $brain->neurons()->get();
-            $hasActiveNeuron = $neurons->contains('active', true);
-            // Colore: GREEN se c'è almeno un neurone attivo, GRAY altrimenti
-            // Il colore viene passato al container dell'element senza usare UpdateDraw
-            $color = $hasActiveNeuron ? '0x' . dechex(Colors::GREEN) : '0x' . dechex(Colors::GRAY);
-            $this->info("Stato neuroni - Attivi presenti: " . ($hasActiveNeuron ? 'true' : 'false') . " - Colore: {$color}");
-        }
+        // Colore: GREEN se il neurone è attivo, BLACK altrimenti
+        $color = $elementHasPositionNeuron->active
+            ? (sprintf('0x%06X', Colors::GREEN))
+            : (sprintf('0x%06X', Colors::BLACK));
+        $this->info('Stato neurone: ' . $elementHasPositionNeuron->active . ' - Colore: ' . $color);
 
         $this->info("Invio comando update_neuron via GATEWAY al container {$container->name} (ws_port={$container->ws_port})...");
 

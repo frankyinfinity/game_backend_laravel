@@ -219,7 +219,10 @@ function broadcastNeuronUpdate(borderUid, fileData, playerId) {
     const path = '/neurons/broadcast-update';
     const postData = JSON.stringify({
       border_uid: borderUid,
-      file_data: fileData,
+      attributes: {
+        borderColor: fileData.borderColor,
+      },
+      object: fileData,
       player_id: playerId,
     });
 

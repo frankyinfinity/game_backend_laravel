@@ -51,7 +51,8 @@ class NeuronController extends Controller
     public function broadcastNeuronUpdate(Request $request)
     {
         $borderUid = $request->input('border_uid');
-        $fileData = $request->input('file_data');
+        $attributes = $request->input('attributes');
+        $object = $request->input('object');
         $playerId = $request->input('player_id');
 
         if (!$borderUid || $playerId === null) {
@@ -63,7 +64,7 @@ class NeuronController extends Controller
             return response()->json(['success' => false, 'message' => 'Player not found'], 404);
         }
 
-        event(new UpdateDrawEvent($player, $borderUid, $fileData));
+        event(new UpdateDrawEvent($player, $borderUid, $attributes, $object));
 
         return response()->json(['success' => true]);
     }
