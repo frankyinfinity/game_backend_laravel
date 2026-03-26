@@ -97,6 +97,7 @@ class BrainFlowRunner
         }
 
         $seen = [];
+        $terminalNeuronId = null;
         while (!empty($queue)) {
             $entry = array_shift($queue);
             $currentId = (int) ($entry['id'] ?? 0);
@@ -142,9 +143,18 @@ class BrainFlowRunner
 
                 if (($neuron['is_active'] ?? false) === true && !$hasActiveOutgoing) {
                     $terminalReached = true;
+                    $terminalNeuronId = $currentId;
                 }
             } finally {
                 $this->setNeuronActiveState($model, false);
+            }
+        }
+
+        if ($terminalNeuronId !== null) {
+            $terminalModel = $neuronsById->get($terminalNeuronId);
+            if ($terminalModel !== null) {
+                $terminalModel->refresh();
+                $this->setNeuronActiveState($terminalModel, false);
             }
         }
 
