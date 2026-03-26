@@ -14,9 +14,17 @@
             .reduce((obj, [key, value]) => { obj[key] = value; return obj; }, {});
         for (const [key, objectPanel] of Object.entries(entityPanels)) {
             if (shapes[key]) shapes[key].renderable = false;
+            if (objects[key]) {
+                objects[key].attributes = objects[key].attributes || {};
+                objects[key].attributes.renderable = false;
+            }
             if (objectPanel['children']) {
                 for (const childUid of objectPanel['children']) {
                     if (shapes[childUid]) shapes[childUid].renderable = false;
+                    if (objects[childUid]) {
+                        objects[childUid].attributes = objects[childUid].attributes || {};
+                        objects[childUid].attributes.renderable = false;
+                    }
                 }
             }
         }
@@ -25,6 +33,11 @@
         let show = !isVisible;
         shapes[panel_uid].renderable = show;
         shapes[panel_uid].zIndex = 10000;
+        if (objects[panel_uid]) {
+            objects[panel_uid].attributes = objects[panel_uid].attributes || {};
+            objects[panel_uid].attributes.renderable = show;
+            objects[panel_uid].attributes.z_index = 10000;
+        }
         AppData.actual_focus_uid_entity = show ? object_uid : null;
 
         const resolveDivisionEnabled = () => {
@@ -58,9 +71,17 @@
 
         // Figli del pannello entity
         for (const childUid of objects[panel_uid]['children']) {
+            const childZIndex = (objects[childUid] && objects[childUid].attributes && typeof objects[childUid].attributes.z_index === 'number')
+                ? objects[childUid].attributes.z_index
+                : 10001;
             if (shapes[childUid]) {
                 shapes[childUid].renderable = show;
-                shapes[childUid].zIndex = 10001;
+                shapes[childUid].zIndex = childZIndex;
+            }
+            if (objects[childUid]) {
+                objects[childUid].attributes = objects[childUid].attributes || {};
+                objects[childUid].attributes.renderable = show;
+                objects[childUid].attributes.z_index = childZIndex;
             }
         }
         applyDivisionButtonVisibility();
@@ -125,12 +146,23 @@
                 for (const childUid of objects[elPanelUid]['children']) {
                     if (childUid.includes('_btn_consume')) {
                         if (shapes[childUid]) shapes[childUid].renderable = show;
+                        if (objects[childUid]) {
+                            objects[childUid].attributes = objects[childUid].attributes || {};
+                            objects[childUid].attributes.renderable = show;
+                        }
                     }
                     if (childUid.includes('_btn_attack')) {
                         if (shapes[childUid]) shapes[childUid].renderable = show;
+                        if (objects[childUid]) {
+                            objects[childUid].attributes = objects[childUid].attributes || {};
+                            objects[childUid].attributes.renderable = show;
+                        }
                     }
                 }
             }
+        }
+        if (app && app.stage) {
+            app.stage.sortChildren();
         }
     }
     window['__name__']();

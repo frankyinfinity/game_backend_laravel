@@ -1007,6 +1007,28 @@ class DockerContainerService
             'bytes' => strlen($contents),
         ]);
 
+        $playerContainer = $this->resolvePlayerContainer($player);
+        if ($playerContainer !== null) {
+            try {
+                $this->executeRemoteDockerCommandWithInput([
+                    'exec',
+                    '-i',
+                    (string) $playerContainer->container_id,
+                    'sh',
+                    '-lc',
+                    $command,
+                ], $contents);
+                return;
+            } catch (\Throwable $e) {
+                \Log::warning('Scrittura via docker exec fallita, fallback a docker run', [
+                    'player_id' => $player->id,
+                    'container_id' => $playerContainer->container_id,
+                    'path' => $filePath,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $this->executeRemoteDockerCommandWithInput([
             'run',
             '--rm',
@@ -1034,17 +1056,48 @@ class DockerContainerService
         ]);
 
         try {
-            $output = $this->executeRemoteDockerCommand([
-                'run',
-                '--rm',
-                '--entrypoint',
-                'sh',
-                '-v',
-                $this->resolvePlayerVolumeName($player) . ':/data',
-                'player:latest',
-                '-lc',
-                '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
-            ]);
+            $playerContainer = $this->resolvePlayerContainer($player);
+            if ($playerContainer !== null) {
+                try {
+                    $output = $this->executeRemoteDockerCommand([
+                        'exec',
+                        (string) $playerContainer->container_id,
+                        'sh',
+                        '-lc',
+                        '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+                    ]);
+                } catch (\Throwable $e) {
+                    \Log::warning('Lettura via docker exec fallita, fallback a docker run', [
+                        'player_id' => $player->id,
+                        'container_id' => $playerContainer->container_id,
+                        'path' => $filePath,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $output = $this->executeRemoteDockerCommand([
+                        'run',
+                        '--rm',
+                        '--entrypoint',
+                        'sh',
+                        '-v',
+                        $this->resolvePlayerVolumeName($player) . ':/data',
+                        'player:latest',
+                        '-lc',
+                        '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+                    ]);
+                }
+            } else {
+                $output = $this->executeRemoteDockerCommand([
+                    'run',
+                    '--rm',
+                    '--entrypoint',
+                    'sh',
+                    '-v',
+                    $this->resolvePlayerVolumeName($player) . ':/data',
+                    'player:latest',
+                    '-lc',
+                    '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+                ]);
+            }
         } catch (\Throwable $e) {
             \Log::warning('Impossibile leggere il file del volume player', [
                 'player_id' => $player->id,
@@ -1068,6 +1121,27 @@ class DockerContainerService
             'volume_name' => $this->resolvePlayerVolumeName($player),
             'path' => $filePath,
         ]);
+
+        $playerContainer = $this->resolvePlayerContainer($player);
+        if ($playerContainer !== null) {
+            try {
+                $this->executeRemoteDockerCommand([
+                    'exec',
+                    (string) $playerContainer->container_id,
+                    'sh',
+                    '-lc',
+                    'rm -f /data/' . $filePath,
+                ]);
+                return;
+            } catch (\Throwable $e) {
+                \Log::warning('Cancellazione via docker exec fallita, fallback a docker run', [
+                    'player_id' => $player->id,
+                    'container_id' => $playerContainer->container_id,
+                    'path' => $filePath,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         $this->executeRemoteDockerCommand([
             'run',
@@ -1098,17 +1172,48 @@ class DockerContainerService
             'max_depth' => max(1, $maxDepth),
         ]);
 
-        $output = $this->executeRemoteDockerCommand([
-            'run',
-            '--rm',
-            '--entrypoint',
-            'sh',
-            '-v',
-            $this->resolvePlayerVolumeName($player) . ':/data',
-            'player:latest',
-            '-lc',
-            'dir="/data/object-cache"; if [ -d "$dir" ]; then for file in "$dir"/*; do [ -f "$file" ] || continue; rel="${file#/data/}"; size=$(wc -c < "$file"); echo "$rel::$size"; done; fi | sort',
-        ]);
+        $listCommand = 'dir="/data/object-cache"; if [ -d "$dir" ]; then for file in "$dir"/*; do [ -f "$file" ] || continue; rel="${file#/data/}"; size=$(wc -c < "$file"); echo "$rel::$size"; done; fi | sort';
+        $playerContainer = $this->resolvePlayerContainer($player);
+        if ($playerContainer !== null) {
+            try {
+                $output = $this->executeRemoteDockerCommand([
+                    'exec',
+                    (string) $playerContainer->container_id,
+                    'sh',
+                    '-lc',
+                    $listCommand,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::warning('Listing via docker exec fallito, fallback a docker run', [
+                    'player_id' => $player->id,
+                    'container_id' => $playerContainer->container_id,
+                    'error' => $e->getMessage(),
+                ]);
+                $output = $this->executeRemoteDockerCommand([
+                    'run',
+                    '--rm',
+                    '--entrypoint',
+                    'sh',
+                    '-v',
+                    $this->resolvePlayerVolumeName($player) . ':/data',
+                    'player:latest',
+                    '-lc',
+                    $listCommand,
+                ]);
+            }
+        } else {
+            $output = $this->executeRemoteDockerCommand([
+                'run',
+                '--rm',
+                '--entrypoint',
+                'sh',
+                '-v',
+                $this->resolvePlayerVolumeName($player) . ':/data',
+                'player:latest',
+                '-lc',
+                $listCommand,
+            ]);
+        }
 
         $files = [];
         foreach (preg_split('/\\r\\n|\\r|\\n/', trim($output)) as $line) {
@@ -1202,5 +1307,13 @@ class DockerContainerService
         }
 
         return implode('/', $segments);
+    }
+
+    private function resolvePlayerContainer(Player $player): ?Container
+    {
+        return Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_PLAYER)
+            ->where('parent_id', $player->id)
+            ->first();
     }
 }
