@@ -12,19 +12,27 @@
             if (!rootObject || !Array.isArray(rootObject['children'])) return;
 
             for (const childUid of rootObject['children']) {
+                let childRenderable = show;
                 if (shapes[childUid]) {
                     if (childUid.includes('_btn_consume')) {
                         let canConsume = (show && AppData.actual_focus_uid_entity !== null && AppData.actual_focus_uid_entity !== undefined);
+                        childRenderable = canConsume;
                         shapes[childUid].renderable = canConsume;
                         shapes[childUid].zIndex = zIndex + 1;
                     } else if (childUid.includes('_btn_attack')) {
                         let canAttack = (show && AppData.actual_focus_uid_entity !== null && AppData.actual_focus_uid_entity !== undefined);
+                        childRenderable = canAttack;
                         shapes[childUid].renderable = canAttack;
                         shapes[childUid].zIndex = zIndex + 1;
                     } else {
                         shapes[childUid].renderable = show;
                         shapes[childUid].zIndex = zIndex;
                     }
+                }
+
+                if (objects[childUid]) {
+                    objects[childUid].attributes = objects[childUid].attributes || {};
+                    objects[childUid].attributes.renderable = childRenderable;
                 }
 
                 if (objects[childUid] && Array.isArray(objects[childUid]['children']) && objects[childUid]['children'].length > 0) {
@@ -50,6 +58,10 @@
         let show = !isVisible;
         shapes[panel_uid].renderable = show;
         shapes[panel_uid].zIndex = 10000;
+        if (objects[panel_uid]) {
+            objects[panel_uid].attributes = objects[panel_uid].attributes || {};
+            objects[panel_uid].attributes.renderable = show;
+        }
         AppData.actual_focus_uid_element = show ? object_uid : null;
 
         // Toggle all descendants too, so nested structures remain visible
