@@ -13,29 +13,34 @@
 
             for (const childUid of rootObject['children']) {
                 let childRenderable = show;
+                const childObject = objects[childUid];
+                const childAttributes = childObject && childObject.attributes ? childObject.attributes : {};
+                const defaultChildZIndex = (typeof childAttributes.z_index === 'number')
+                    ? childAttributes.z_index
+                    : zIndex;
                 if (shapes[childUid]) {
                     if (childUid.includes('_btn_consume')) {
                         let canConsume = (show && AppData.actual_focus_uid_entity !== null && AppData.actual_focus_uid_entity !== undefined);
                         childRenderable = canConsume;
                         shapes[childUid].renderable = canConsume;
-                        shapes[childUid].zIndex = zIndex + 1;
+                        shapes[childUid].zIndex = defaultChildZIndex;
                     } else if (childUid.includes('_btn_attack')) {
                         let canAttack = (show && AppData.actual_focus_uid_entity !== null && AppData.actual_focus_uid_entity !== undefined);
                         childRenderable = canAttack;
                         shapes[childUid].renderable = canAttack;
-                        shapes[childUid].zIndex = zIndex + 1;
+                        shapes[childUid].zIndex = defaultChildZIndex;
                     } else {
                         shapes[childUid].renderable = show;
-                        shapes[childUid].zIndex = zIndex;
+                        shapes[childUid].zIndex = defaultChildZIndex;
                     }
                 }
 
-                if (objects[childUid]) {
-                    objects[childUid].attributes = objects[childUid].attributes || {};
-                    objects[childUid].attributes.renderable = childRenderable;
+                if (childObject) {
+                    childObject.attributes = childObject.attributes || {};
+                    childObject.attributes.renderable = childRenderable;
                 }
 
-                if (objects[childUid] && Array.isArray(objects[childUid]['children']) && objects[childUid]['children'].length > 0) {
+                if (childObject && Array.isArray(childObject['children']) && childObject['children'].length > 0) {
                     setChildrenVisibility(childUid, show, zIndex + 1);
                 }
             }
@@ -57,7 +62,9 @@
         // Toggle this panel
         let show = !isVisible;
         shapes[panel_uid].renderable = show;
-        shapes[panel_uid].zIndex = 10000;
+        shapes[panel_uid].zIndex = (objects[panel_uid] && objects[panel_uid].attributes && typeof objects[panel_uid].attributes.z_index === 'number')
+            ? objects[panel_uid].attributes.z_index
+            : 10000;
         if (objects[panel_uid]) {
             objects[panel_uid].attributes = objects[panel_uid].attributes || {};
             objects[panel_uid].attributes.renderable = show;
@@ -66,6 +73,9 @@
 
         // Toggle all descendants too, so nested structures remain visible
         setChildrenVisibility(panel_uid, show, 10001);
+        if (app && app.stage) {
+            app.stage.sortChildren();
+        }
     }
     window['__name__']();
 </script>

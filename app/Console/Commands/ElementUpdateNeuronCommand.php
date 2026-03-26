@@ -79,9 +79,9 @@ class ElementUpdateNeuronCommand extends Command
 
         $relativePath = ObjectCache::sessionVolumePath($sessionId);
 
-        // Colore: GREEN se il neurone è attivo, BLACK altrimenti
+        // Colore: BLUE se il neurone è attivo, BLACK altrimenti
         $color = $elementHasPositionNeuron->active
-            ? (sprintf('0x%06X', Colors::GREEN))
+            ? (sprintf('0x%06X', Colors::BLUE))
             : (sprintf('0x%06X', Colors::BLACK));
         $this->info('Stato neurone: ' . $elementHasPositionNeuron->active . ' - Colore: ' . $color);
 
