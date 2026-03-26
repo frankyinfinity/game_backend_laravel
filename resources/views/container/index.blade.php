@@ -41,7 +41,7 @@
         $(document).ready(function () {
 
             var table = $("#table_list").DataTable({
-                order: [1, 'asc'],
+                order: [1, 'desc'],
                 pageLength: -1,
                 ajax: {
                     type: 'POST',

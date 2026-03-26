@@ -1654,20 +1654,20 @@ class GameController extends Controller
                     $xEnd = $endCenterSquare['x'];
                     $yEnd = $endCenterSquare['y'];
 
-                // Update Entity
-                $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
-                $updateObject->setAttributes('x', $xEnd);
-                $updateObject->setAttributes('y', $yEnd);
-                $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data)
-                    $drawCommands[] = $data;
-                $drawCommands = array_merge(
-                    $drawCommands,
-                    $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
-                );
+                    // Update Entity
+                    $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
+                    $updateObject->setAttributes('x', $xEnd);
+                    $updateObject->setAttributes('y', $yEnd);
+                    $updateObject->setAttributes('zIndex', 100);
+                    foreach ($updateObject->get() as $data)
+                        $drawCommands[] = $data;
+                    $drawCommands = array_merge(
+                        $drawCommands,
+                        $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
+                    );
 
+                }
             }
-        }
 
             // === PHASE 6: CLEAR SECOND PATH ===
             foreach ($secondPathIds as $idToClear) {
@@ -2083,9 +2083,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        return response()->json($result['body'], $result['status']);
-        //return response()->json(['success' => true]);
+        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        //return response()->json($result['body'], $result['status']);
+        return response()->json(['success' => true]);
 
     }
 

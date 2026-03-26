@@ -276,6 +276,56 @@ function safeVolumePath(relativePath) {
   return absolutePath;
 }
 
+function normalizeColorValue(color) {
+  if (color === null || color === undefined || color === '') {
+    return null;
+  }
+
+  if (typeof color === 'number' && Number.isFinite(color)) {
+    const numeric = Math.max(0, Math.min(0xFFFFFF, Math.trunc(color)));
+    const hex = numeric.toString(16).toUpperCase().padStart(6, '0');
+    return {
+      numeric,
+      formatted: `0x${hex}`,
+    };
+  }
+
+  if (typeof color !== 'string') {
+    return null;
+  }
+
+  let normalized = color.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  normalized = normalized.replace(/^#/, '').replace(/^0x/i, '');
+  if (/^[0-9A-Fa-f]{3}$/.test(normalized)) {
+    normalized = normalized.split('').map((char) => char + char).join('');
+  }
+
+  if (!/^[0-9A-Fa-f]{6}$/.test(normalized)) {
+    return null;
+  }
+
+  const hex = normalized.toUpperCase();
+  return {
+    numeric: parseInt(hex, 16),
+    formatted: `0x${hex}`,
+  };
+}
+
+function applyBorderColorToNeuronData(fileData, colorInfo) {
+  if (!colorInfo || fileData === null || typeof fileData !== 'object' || Array.isArray(fileData)) {
+    return fileData;
+  }
+
+  return {
+    ...fileData,
+    borderColor: colorInfo.numeric,
+  };
+}
+
 /**
  * Aggiorna lo stato di un neurone leggendo il file dal volume (storicamente logVolumeFile)
  */
@@ -284,6 +334,7 @@ async function updateNeuron(params, ws) {
   const neuronId = params ? params.neuron_id : null;
   const playerId = params ? params.player_id : null;
   const color = params ? params.color : null;
+  const normalizedColor = normalizeColorValue(color);
 
   if (!relativePath) {
     console.error(`[Element ${elementHasPositionId}] Missing path for update_neuron`);
@@ -324,12 +375,16 @@ async function updateNeuron(params, ws) {
     } catch (e) {
       fileData = content;
     }
-    console.log(`[Element ${elementHasPositionId}] neuron data (node ${borderUid}):`, fileData);
 
     //Gestione Colore
-    if (color) {
-      console.log('Colore: ', color);
+    if (color && !normalizedColor) {
+      console.error(`[Element ${elementHasPositionId}] Invalid color format: ${color}`);
     }
+    if (normalizedColor) {
+      fileData = applyBorderColorToNeuronData(fileData, normalizedColor);
+      console.log(`[Element ${elementHasPositionId}] Applied borderColor ${normalizedColor.formatted} to neuron data.`);
+    }
+    console.log(`[Element ${elementHasPositionId}] neuron data (node ${borderUid}):`, fileData);
 
     // Broadcast the neuron update to the frontend via Pusher
     if (borderUid && playerId) {
@@ -344,7 +399,7 @@ async function updateNeuron(params, ws) {
       data: fileData,
       path: relativePath,
       bytes: Buffer.byteLength(content, 'utf8'),
-      color: color,
+      color: normalizedColor ? normalizedColor.formatted : color,
     }));
 
   } catch (error) {
