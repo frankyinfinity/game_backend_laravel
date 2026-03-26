@@ -112,33 +112,39 @@ class BrainFlowRunner
             $neuron = $model->attributesToArray();
             $neuron['neuron_from'] = $entry['from'];
 
-            $this->handleNeuronByType($neuron, $item);
-            $this->processedNeuronsById[$currentId] = $neuron;
-            $processedFlow[] = $neuron;
-            $seen[$currentId] = true;
+            $this->setNeuronActiveState($model, true);
 
-            $hasActiveOutgoing = false;
-            foreach ($outgoingById[$currentId] ?? [] as $link) {
-                if (!$this->isLinkActiveFromNeuron($neuron, $link)) {
-                    continue;
+            try {
+                $this->handleNeuronByType($neuron, $item);
+                $this->processedNeuronsById[$currentId] = $neuron;
+                $processedFlow[] = $neuron;
+                $seen[$currentId] = true;
+
+                $hasActiveOutgoing = false;
+                foreach ($outgoingById[$currentId] ?? [] as $link) {
+                    if (!$this->isLinkActiveFromNeuron($neuron, $link)) {
+                        continue;
+                    }
+
+                    $hasActiveOutgoing = true;
+                    $toId = (int) $link->to_element_has_position_neuron_id;
+                    if ($toId > 0 && !isset($seen[$toId])) {
+                        $queue[] = [
+                            'id' => $toId,
+                            'from' => [
+                                'id' => (int) $currentId,
+                                'type' => $neuron['type'] ?? null,
+                                'condition' => $link->condition ?? null,
+                            ],
+                        ];
+                    }
                 }
 
-                $hasActiveOutgoing = true;
-                $toId = (int) $link->to_element_has_position_neuron_id;
-                if ($toId > 0 && !isset($seen[$toId])) {
-                    $queue[] = [
-                        'id' => $toId,
-                        'from' => [
-                            'id' => (int) $currentId,
-                            'type' => $neuron['type'] ?? null,
-                            'condition' => $link->condition ?? null,
-                        ],
-                    ];
+                if (($neuron['is_active'] ?? false) === true && !$hasActiveOutgoing) {
+                    $terminalReached = true;
                 }
-            }
-
-            if (($neuron['is_active'] ?? false) === true && !$hasActiveOutgoing) {
-                $terminalReached = true;
+            } finally {
+                $this->setNeuronActiveState($model, false);
             }
         }
 
@@ -262,6 +268,16 @@ class BrainFlowRunner
                 $this->handleUnknownNeuron($neuron);
                 break;
         }
+    }
+
+    private function setNeuronActiveState(ElementHasPositionNeuron $neuron, bool $active): void
+    {
+        if ((bool) $neuron->active === $active) {
+            return;
+        }
+
+        $neuron->active = $active;
+        $neuron->save();
     }
 
     private function handleMovementNeuron(array $neuron, $elementHasPosition): void
