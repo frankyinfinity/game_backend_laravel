@@ -98,9 +98,11 @@ class ElementDraw
         $jsContentClickElement = Helper::setCommonJsCode($jsContentClickElement, Str::random(20));
         $image->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickElement);
 
-        // Panel
-        $panelX = $x + (Helper::TILE_SIZE / 2);
-        $panelY = $y + (Helper::TILE_SIZE / 2);
+        // Panel: keep it visually attached to the element, like EntityDraw.
+        $imageCenterX = $x + 16;
+        $imageCenterY = $y + 16;
+        $panelX = $imageCenterX + (Helper::TILE_SIZE / 3);
+        $panelY = $imageCenterY + (Helper::TILE_SIZE / 3);
 
         $panel = new Rectangle($uid . '_panel');
         $panel->setOrigin($panelX, $panelY);

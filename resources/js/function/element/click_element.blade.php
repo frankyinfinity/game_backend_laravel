@@ -38,6 +38,7 @@
                 if (childObject) {
                     childObject.attributes = childObject.attributes || {};
                     childObject.attributes.renderable = childRenderable;
+                    childObject.attributes.z_index = defaultChildZIndex;
                 }
 
                 if (childObject && Array.isArray(childObject['children']) && childObject['children'].length > 0) {
@@ -68,6 +69,7 @@
         if (objects[panel_uid]) {
             objects[panel_uid].attributes = objects[panel_uid].attributes || {};
             objects[panel_uid].attributes.renderable = show;
+            objects[panel_uid].attributes.z_index = shapes[panel_uid].zIndex;
         }
         AppData.actual_focus_uid_element = show ? object_uid : null;
 

@@ -65,27 +65,45 @@ class ProgressBarDraw {
         $operations = [];
         
         // 1. Update the label text (name + value)
-        // Extract name from cached text (remove the old value part)
-        if (is_array($cachedText) && isset($cachedText['text'])) {
-            $cachedTextContent = $cachedText['text'];
-            if (preg_match('/^(.+?)\s*\(\d+\)$/', $cachedTextContent, $matches)) {
-                $this->name = $matches[1];
+        $cachedAttributes = is_array($cachedBorder['attributes'] ?? null) ? $cachedBorder['attributes'] : [];
+        $cachedName = $cachedAttributes['progress_name'] ?? null;
+        if (is_string($cachedName) && trim($cachedName) !== '') {
+            $this->name = trim($cachedName);
+        } elseif (is_array($cachedText) && isset($cachedText['text']) && is_string($cachedText['text'])) {
+            $cachedTextContent = trim($cachedText['text']);
+            if (preg_match('/^(.+?)\s*\([^)]*\)\s*$/', $cachedTextContent, $matches)) {
+                $this->name = trim($matches[1]);
+            } elseif ($cachedTextContent !== '') {
+                $this->name = $cachedTextContent;
             }
-            if ($this->name !== '') {
-                $operations[] = [
-                    'type' => 'update',
-                    'uid' => $this->uid . '_text',
-                    'attributes' => [
-                        'text' => $this->name . " (" . $this->value . ")"
-                    ]
-                ];
+        }
+
+        if ($this->name !== '') {
+            $labelText = $this->name . " (" . $this->value . ")";
+            $operations[] = [
+                'type' => 'update',
+                'uid' => $this->uid . '_text',
+                'attributes' => [
+                    'text' => $labelText
+                ]
+            ];
+
+            if (is_array($cachedText)) {
+                $cachedText['text'] = $labelText;
+                \App\Custom\Manipulation\ObjectCache::put($sessionId, $cachedText);
             }
         }
         
         // 2. Calculate new bar dimensions
         // We need min/max - try to extract from range text or use defaults
         $cachedRange = \App\Custom\Manipulation\ObjectCache::find($sessionId, $this->uid . '_range');
-        if ($cachedRange && preg_match('/\((\d+)\s*\/\s*(\d+)\)/', $cachedRange['text'], $matches)) {
+        if (isset($cachedAttributes['progress_min']) && is_numeric($cachedAttributes['progress_min'])) {
+            $this->min = (float) $cachedAttributes['progress_min'];
+        }
+        if (isset($cachedAttributes['progress_max']) && is_numeric($cachedAttributes['progress_max'])) {
+            $this->max = (float) $cachedAttributes['progress_max'];
+        }
+        if ($cachedRange && preg_match('/\(([-]?\d+(?:\.\d+)?)\s*\/\s*([-]?\d+(?:\.\d+)?)\)/', $cachedRange['text'], $matches)) {
             $this->min = (int)$matches[1];
             $this->max = (int)$matches[2];
         }
@@ -158,6 +176,9 @@ class ProgressBarDraw {
         $border->setThickness(2); // Giving it some thickness to look like a border
         $border->setBorderRadius(0);
         $border->setRenderable($this->renderable);
+        $border->addAttributes('progress_name', $this->name);
+        $border->addAttributes('progress_min', $this->min);
+        $border->addAttributes('progress_max', $this->max);
         $this->drawItems[] = $border;
 
         // 2. The Progress Bar (Filled part)
@@ -175,6 +196,9 @@ class ProgressBarDraw {
         $bar->setColor($this->barColor);
         $bar->setBorderRadius(0);
         $bar->setRenderable($this->renderable);
+        $bar->addAttributes('progress_name', $this->name);
+        $bar->addAttributes('progress_min', $this->min);
+        $bar->addAttributes('progress_max', $this->max);
         $this->drawItems[] = $bar;
 
         // 3. The Name (Label)
@@ -185,6 +209,7 @@ class ProgressBarDraw {
             $text->setFontSize(14);
             $text->setColor(Colors::BLACK);
             $text->setRenderable($this->renderable);
+            $text->addAttributes('progress_name', $this->name);
             $this->drawItems[] = $text;
         }
 
@@ -196,6 +221,8 @@ class ProgressBarDraw {
         $rangeText->setColor(Colors::BLACK);
         $rangeText->setCenterAnchor(true);
         $rangeText->setRenderable($this->renderable);
+        $rangeText->addAttributes('progress_min', $this->min);
+        $rangeText->addAttributes('progress_max', $this->max);
         $this->drawItems[] = $rangeText;
     }
 }
