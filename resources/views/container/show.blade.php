@@ -97,23 +97,23 @@
         border: 1px solid #e2e8f0;
         border-radius: 12px;
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-        padding: 10px 12px;
-        min-height: 64px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        padding: 8px 10px;
+        min-height: 56px;
     }
 
     .container-stat-card .label {
         display: block;
-        font-size: 10px;
+        font-size: 9px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: #64748b;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
 
     .container-stat-card .value {
         display: block;
-        font-size: 19px;
+        font-size: 16px;
         font-weight: 800;
         color: #0f172a;
         line-height: 1;
@@ -121,8 +121,8 @@
 
     .container-stat-card .hint {
         display: block;
-        font-size: 11px;
-        margin-top: 4px;
+        font-size: 10px;
+        margin-top: 2px;
         color: #64748b;
     }
 
@@ -159,13 +159,14 @@
     .container-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 9px;
+        gap: 5px;
+        padding: 4px 8px;
         border-radius: 999px;
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 600;
-        background: #e2e8f0;
+        background: #f1f5f9;
         color: #334155;
+        border: 1px solid #e2e8f0;
     }
 
     .container-pill strong {
@@ -501,23 +502,38 @@
             </div>
             <div class="card-body p-3">
                 <div class="mb-2">
-                    <div class="container-pill mb-2">Nome: <strong id="selected-container-name">-</strong></div>
-                    <div class="container-pill mb-2">Tipo: <strong id="selected-container-type">-</strong></div>
-                    <div class="container-pill mb-2">Scope: <strong id="selected-container-scope">-</strong></div>
-                    <div class="container-pill mb-2">Container ID: <strong id="selected-container-id">-</strong></div>
-                    <div class="container-pill mb-2">WS Port: <strong id="selected-container-port">-</strong></div>
-                    <div class="status-chip is-unknown mb-2" id="selected-container-status-chip">
+                    <div class="container-pill mb-1 d-block" style="border-radius: 6px;">Nome: <strong id="selected-container-name">-</strong></div>
+                    
+                    <div class="row no-gutters mb-2" style="margin: 0 -3px;">
+                        <div class="col-6" style="padding: 0 3px;">
+                            <div class="container-pill mb-1 w-100" style="border-radius: 4px;">T: <strong id="selected-container-type">-</strong></div>
+                            <div class="container-pill mb-1 w-100" style="border-radius: 4px;">ID: <strong id="selected-container-id">-</strong></div>
+                        </div>
+                        <div class="col-6" style="padding: 0 3px;">
+                            <div class="container-pill mb-1 w-100" style="border-radius: 4px;">S: <strong id="selected-container-scope">-</strong></div>
+                            <div class="container-pill mb-1 w-100" style="border-radius: 4px;">WS: <strong id="selected-container-port">-</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="status-chip is-unknown mb-2 w-100" id="selected-container-status-chip">
                         <span class="status-dot" id="selected-container-status-dot" style="background: #64748b;"></span>
                         <span id="selected-container-status">-</span>
                     </div>
+
                     <div id="container-resource-stats" class="mt-2">
                         <div class="container-section-divider">
                             <span class="title">Risorse (Real-time)</span>
                         </div>
-                        <div class="container-pill mb-2">CPU: <strong id="selected-container-cpu">-</strong></div>
-                        <div class="container-pill mb-2">Memoria: <strong id="selected-container-mem">-</strong></div>
-                        <div class="container-pill mb-2">Net I/O: <strong id="selected-container-net">-</strong></div>
-                        <div class="container-pill mb-2">PIDs: <strong id="selected-container-pids">-</strong></div>
+                        <div class="row no-gutters" style="margin: 0 -3px;">
+                            <div class="col-6" style="padding: 0 3px;">
+                                <div class="container-pill mb-1 w-100" style="border-radius: 4px; font-size: 10px;">CPU: <strong id="selected-container-cpu">-</strong></div>
+                                <div class="container-pill mb-1 w-100" style="border-radius: 4px; font-size: 10px;">NET: <strong id="selected-container-net">-</strong></div>
+                            </div>
+                            <div class="col-6" style="padding: 0 3px;">
+                                <div class="container-pill mb-1 w-100" style="border-radius: 4px; font-size: 10px;">MEM: <strong id="selected-container-mem">-</strong></div>
+                                <div class="container-pill mb-1 w-100" style="border-radius: 4px; font-size: 10px;">PID: <strong id="selected-container-pids">-</strong></div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="d-flex flex-wrap" style="gap: 8px;">
@@ -884,18 +900,22 @@
             const availableHeight = Math.max(containerHost.clientHeight - 24, 320);
 
             let columns = 1;
-            if (availableWidth >= 1600) {
+            if (availableWidth >= 1800) {
+                columns = 7;
+            } else if (availableWidth >= 1500) {
+                columns = 6;
+            } else if (availableWidth >= 1200) {
                 columns = 5;
-            } else if (availableWidth >= 1280) {
+            } else if (availableWidth >= 960) {
                 columns = 4;
-            } else if (availableWidth >= 1024) {
+            } else if (availableWidth >= 700) {
                 columns = 3;
-            } else if (availableWidth >= 680) {
+            } else if (availableWidth >= 480) {
                 columns = 2;
             }
 
-            const cardWidth = Math.max(180, Math.min(300, Math.floor((availableWidth - ((columns - 1) * gapX)) / columns)));
-            const cardHeight = Math.max(112, Math.min(160, Math.round(cardWidth * 0.52)));
+            const cardWidth = Math.max(160, Math.min(280, Math.floor((availableWidth - ((columns - 1) * gapX)) / columns)));
+            const cardHeight = Math.max(90, Math.min(130, Math.round(cardWidth * 0.44)));
             const cardsPerPage = Math.max(1, Math.floor((availableHeight + gapY) / (cardHeight + gapY)));
 
             return { cardWidth, cardHeight, gapX, gapY, columns, cardsPerPage };
@@ -1158,12 +1178,12 @@
                 fill: container.color || 0x64748b,
             });
             const badgeBg = new PIXI.Graphics();
-            const badgeWidth = Math.max(86, Math.min(140, badge.width + 18));
-            badgeBg.lineStyle(2, container.color || 0x64748b, 1);
-            badgeBg.drawRoundedRect(24, 12, badgeWidth, 24, 999);
+            const badgeWidth = Math.max(76, Math.min(120, badge.width + 14));
+            badgeBg.lineStyle(1.5, container.color || 0x64748b, 1);
+            badgeBg.drawRoundedRect(22, 10, badgeWidth, 20, 999);
             card.addChild(badgeBg);
-            badge.x = 24 + 9;
-            badge.y = 18;
+            badge.x = 22 + 7;
+            badge.y = 14;
             card.addChild(badge);
 
             const statusValue = container.status_label || 'Unknown';
@@ -1174,22 +1194,22 @@
                 fontWeight: '700',
                 fill: 0xffffff,
             });
-            const statusWidth = Math.max(82, Math.min(width - 160, statusText.width + 24));
+            const statusWidth = Math.max(70, Math.min(width - 140, statusText.width + 20));
             statusBg.beginFill(container.status_color || 0x64748b, 1);
-            statusBg.drawRoundedRect(width - statusWidth - 14, 12, statusWidth, 24, 999);
+            statusBg.drawRoundedRect(width - statusWidth - 12, 10, statusWidth, 20, 999);
             statusBg.endFill();
             card.addChild(statusBg);
 
             const statusDot = new PIXI.Graphics();
             statusDot.beginFill(0xffffff, 1);
-            statusDot.drawCircle(5, 5, 4);
+            statusDot.drawCircle(4, 4, 3);
             statusDot.endFill();
-            statusDot.x = width - statusWidth - 14 + 9;
-            statusDot.y = 18;
+            statusDot.x = width - statusWidth - 12 + 8;
+            statusDot.y = 15;
             card.addChild(statusDot);
 
-            statusText.x = width - statusWidth - 14 + 21;
-            statusText.y = 18;
+            statusText.x = width - statusWidth - 12 + 18;
+            statusText.y = 14;
             card.addChild(statusText);
 
             const meta = new PIXI.Text(
@@ -1198,13 +1218,13 @@
                 ].join('\n'),
                 {
                     fontFamily: 'Arial',
-                    fontSize: compact ? 11 : 12,
+                    fontSize: compact ? 10 : 11,
                     fill: 0x475569,
-                    lineHeight: compact ? 15 : 16,
+                    lineHeight: compact ? 13 : 14,
                 }
             );
-            meta.x = 24;
-            meta.y = 44;
+            meta.x = 22;
+            meta.y = 38;
             card.addChild(meta);
 
             if (!compact) {
@@ -1260,29 +1280,29 @@
 
             const background = new PIXI.Graphics();
             background.beginFill(0xffffff, 0.82);
-            background.drawRoundedRect(0, 0, width, 34, 12);
+            background.drawRoundedRect(0, 0, width, 28, 10);
             background.endFill();
             background.lineStyle(1, 0xdbe4f0, 1);
-            background.drawRoundedRect(0, 0, width, 34, 12);
+            background.drawRoundedRect(0, 0, width, 28, 10);
             container.addChild(background);
 
             const title = new PIXI.Text(group.label, {
                 fontFamily: 'Arial',
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: '800',
                 fill: 0x0f172a,
             });
-            title.x = 14;
-            title.y = 9;
+            title.x = 12;
+            title.y = 7;
             container.addChild(title);
 
             const counter = new PIXI.Text(String(group.items.length) + ' container', {
                 fontFamily: 'Arial',
-                fontSize: 11,
+                fontSize: 10,
                 fill: 0x64748b,
             });
-            counter.x = width - counter.width - 14;
-            counter.y = 11;
+            counter.x = width - counter.width - 12;
+            counter.y = 9;
             container.addChild(counter);
 
             if (issueCount > 0) {
@@ -1298,7 +1318,7 @@
             }
 
             app.stage.addChild(container);
-            return 42;
+            return 36;
         }
 
         function layoutCards() {

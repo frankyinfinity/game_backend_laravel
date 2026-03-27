@@ -49,7 +49,7 @@ class ElementHasPositionNeuronObserver
 
             $relativePath = ObjectCache::sessionVolumePath($sessionId);
             $color = $elementHasPositionNeuron->active
-                ? sprintf('0x%06X', Colors::BLUE)
+                ? sprintf('0x%06X', Colors::GREEN)
                 : sprintf('0x%06X', Colors::BLACK);
 
             $payload = [
