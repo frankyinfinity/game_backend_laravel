@@ -95,35 +95,34 @@
 
     .container-stat-card {
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-        padding: 8px 10px;
-        min-height: 56px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        padding: 6px 12px;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
 
     .container-stat-card .label {
-        display: block;
-        font-size: 9px;
+        font-size: 8.5px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: #64748b;
-        margin-bottom: 2px;
+        font-weight: 700;
+        white-space: nowrap;
     }
 
     .container-stat-card .value {
-        display: block;
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 800;
         color: #0f172a;
-        line-height: 1;
+        margin-left: auto;
     }
 
     .container-stat-card .hint {
-        display: block;
-        font-size: 10px;
-        margin-top: 2px;
-        color: #64748b;
+        display: none;
     }
 
     .container-card-footer {
@@ -457,40 +456,33 @@
 </div>
 
 <div class="container-stat-strip">
-    <div class="container-stat-card">
-        <span class="label">Container visibili</span>
+    <div class="container-stat-card" title="Container filtrati nella vista corrente">
+        <span class="label">Container</span>
         <span class="value" id="stat-visible-count">0</span>
-        <span class="hint">Filtrati nella vista corrente</span>
     </div>
-    <div class="container-stat-card">
+    <div class="container-stat-card" title="Container attivi">
         <span class="label">Running</span>
         <span class="value" id="stat-running-count">0</span>
-        <span class="hint">Container attivi</span>
     </div>
-    <div class="container-stat-card">
-        <span class="label">Stopped</span>
+    <div class="container-stat-card" title="Exited / Paused / Created">
+        <span class="label">Fermi</span>
         <span class="value" id="stat-stopped-count">0</span>
-        <span class="hint">Exited / Paused / Created</span>
     </div>
-    <div class="container-stat-card">
-        <span class="label">Problemi</span>
+    <div class="container-stat-card" title="Problemi (Stato non running)">
+        <span class="label">Issue</span>
         <span class="value" id="stat-issue-count">0</span>
-        <span class="hint">Stato non running</span>
     </div>
-    <div class="container-stat-card">
-        <span class="label">CPU Totale</span>
+    <div class="container-stat-card" title="Utilizzo combinato CPU">
+        <span class="label">CPU</span>
         <span class="value" id="stat-cpu-total">0%</span>
-        <span class="hint">Utilizzo combinato</span>
     </div>
-    <div class="container-stat-card">
-        <span class="label">RAM Totale</span>
+    <div class="container-stat-card" title="Memoria fisica utilizzata">
+        <span class="label">RAM</span>
         <span class="value" id="stat-mem-total">0 MB</span>
-        <span class="hint">Memoria utilizzata</span>
     </div>
     <div class="container-stat-card">
-        <span class="label">Ultimo refresh</span>
+        <span class="label" id="stat-refresh-label">Refresh</span>
         <span class="value" id="stat-refresh-age">-</span>
-        <span class="hint" id="stat-refresh-label">In attesa</span>
     </div>
 </div>
 
