@@ -2284,4 +2284,108 @@ class GameController extends Controller
         return 'init_session_id';
     }
 
+    public function getPlayerContainerData(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $player = Player::with('user')->find($validated['player_id']);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        // Recuperiamo i container associati al player (Player, Entity, Map, Objective, ElementHasPosition)
+        $entityIds = \App\Models\Entity::whereHas('specie', fn($q) => $q->where('player_id', $player->id))->pluck('id')->toArray();
+        $elementHasPositionIds = \App\Models\ElementHasPosition::where('player_id', $player->id)->pluck('id')->toArray();
+        $birthRegionId = (int) ($player->birth_region_id ?? 0);
+
+        $containers = \App\Models\Container::where(function($q) use ($player, $entityIds, $elementHasPositionIds, $birthRegionId) {
+            $q->where('parent_type', \App\Models\Container::PARENT_TYPE_PLAYER)
+              ->where('parent_id', $player->id);
+            
+            if (!empty($entityIds)) {
+                $q->orWhere(function($sq) use ($entityIds) {
+                    $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_ENTITY)
+                       ->whereIn('parent_id', $entityIds);
+                });
+            }
+            
+            if (!empty($elementHasPositionIds)) {
+                $q->orWhere(function($sq) use ($elementHasPositionIds) {
+                    $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+                       ->whereIn('parent_id', $elementHasPositionIds);
+                });
+            }
+
+            if ($birthRegionId > 0) {
+                $q->orWhere(function($sq) use ($birthRegionId) {
+                    $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_MAP)
+                       ->where('parent_id', $birthRegionId);
+                });
+            }
+        })->get();
+
+        $data = [
+            'email' => $player->user->email ?? 'N/A',
+            'containers' => []
+        ];
+
+        foreach ($containers as $container) {
+            $dockerName = $container->container_id;
+            if (!$dockerName) continue;
+
+            $status = $containerService->getContainerStatus($dockerName);
+            $stats = ($status === 'running') ? $containerService->getContainerStats($dockerName) : [];
+
+            $data['containers'][] = [
+                'id' => $container->id,
+                'name' => $container->name,
+                'type' => $container->parent_type,
+                'docker_name' => $dockerName,
+                'status' => $status,
+                'stats' => $stats,
+                'ws_port' => $container->ws_port,
+            ];
+        }
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    public function containerAction(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'container_id' => ['required', 'integer'],
+            'action' => ['required', 'string', 'in:restart,recreate,stop,start'],
+        ]);
+
+        $container = \App\Models\Container::find($validated['container_id']);
+        if (!$container) {
+            return response()->json(['success' => false, 'message' => 'Container not found'], 404);
+        }
+
+        $dockerId = $container->container_id;
+        $action = $validated['action'];
+
+        try {
+            switch ($action) {
+                case 'restart':
+                    $containerService->restartContainerById($dockerId);
+                    break;
+                case 'stop':
+                    $containerService->stopContainerById($dockerId);
+                    break;
+                case 'start':
+                    $containerService->startContainerById($dockerId);
+                    break;
+                case 'recreate':
+                    // Per ora facciamo restart, la ricreazione totale richiederebbe più logica di config
+                    $containerService->restartContainerById($dockerId);
+                    break;
+            }
+            return response()->json(['success' => true, 'message' => "Azione $action eseguita con successo"]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }

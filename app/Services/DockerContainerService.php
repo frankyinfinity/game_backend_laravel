@@ -496,7 +496,7 @@ class DockerContainerService
         return 'player_' . $player->id . '_data';
     }
 
-    private function resolvePlayerContainers(Player $player)
+    private function getPlayerContainers(Player $player)
     {
         $player = Player::query()->find($player->id) ?? $player;
         $entityIds = Entity::query()
@@ -564,7 +564,7 @@ class DockerContainerService
     public function startContainer($target): void
     {
         if ($target instanceof Player) {
-            $containers = $this->resolvePlayerContainers($target);
+            $containers = $this->getPlayerContainers($target);
             $containerIds = $containers->pluck('container_id')->filter()->values()->all();
 
             if (empty($containerIds)) {
@@ -609,7 +609,7 @@ class DockerContainerService
     public function stopContainer($target): void
     {
         if ($target instanceof Player) {
-            $containers = $this->resolvePlayerContainers($target);
+            $containers = $this->getPlayerContainers($target);
             $containerIds = $containers->pluck('container_id')->filter()->values()->all();
 
             if (empty($containerIds)) {
@@ -1007,7 +1007,7 @@ class DockerContainerService
         $this->ensurePlayerVolume($player);
         $this->ensureImageExists('player:latest');
 
-        $playerContainer = $this->resolvePlayerContainer($player);
+        $playerContainer = $this->getPlayerContainer($player);
         $containerId = $playerContainer ? (string) $playerContainer->container_id : null;
 
         // Creiamo un archivio TAR localmente
@@ -1082,7 +1082,7 @@ class DockerContainerService
         ]);
 
         try {
-            $playerContainer = $this->resolvePlayerContainer($player);
+            $playerContainer = $this->getPlayerContainer($player);
             if ($playerContainer !== null) {
                 try {
                     $output = $this->executeRemoteDockerCommand([
@@ -1148,7 +1148,7 @@ class DockerContainerService
             'path' => $filePath,
         ]);
 
-        $playerContainer = $this->resolvePlayerContainer($player);
+        $playerContainer = $this->getPlayerContainer($player);
         if ($playerContainer !== null) {
             try {
                 $this->executeRemoteDockerCommand([
@@ -1199,7 +1199,7 @@ class DockerContainerService
         ]);
 
         $listCommand = 'dir="/data/object-cache"; if [ -d "$dir" ]; then for file in "$dir"/*; do [ -f "$file" ] || continue; rel="${file#/data/}"; size=$(wc -c < "$file"); echo "$rel::$size"; done; fi | sort';
-        $playerContainer = $this->resolvePlayerContainer($player);
+        $playerContainer = $this->getPlayerContainer($player);
         if ($playerContainer !== null) {
             try {
                 $output = $this->executeRemoteDockerCommand([
@@ -1335,11 +1335,142 @@ class DockerContainerService
         return implode('/', $segments);
     }
 
-    private function resolvePlayerContainer(Player $player): ?Container
+    public function getPlayerContainer(Player $player): ?Container
     {
         return Container::query()
             ->where('parent_type', Container::PARENT_TYPE_PLAYER)
             ->where('parent_id', $player->id)
             ->first();
+    }
+
+    /**
+     * Recupera le statistiche di utilizzo risorse di più container in una singola operazione.
+     */
+    public function getContainerStatsBulk(array $containerIds): array
+    {
+        $containerIds = array_values(array_unique(array_filter(array_map('strval', $containerIds))));
+        if (empty($containerIds)) {
+            return [];
+        }
+
+        try {
+            // Usiamo un separatore custom invece del JSON per evitare problemi di escaping delle virgolette su SSH
+            $format = '{{.Container}}::{{.CPUPerc}}::{{.MemUsage}}::{{.MemPerc}}::{{.NetIO}}::{{.BlockIO}}::{{.PIDs}}';
+            $args = array_merge(['stats', '--no-stream', '--format', $format], $containerIds);
+            $output = $this->executeRemoteDockerCommand($args);
+
+            $stats = [];
+            foreach (preg_split('/\r\n|\r|\n/', trim($output)) as $line) {
+                if ($line === '') continue;
+                
+                $parts = explode('::', $line);
+                if (count($parts) >= 7) {
+                    $containerName = trim($parts[0]);
+                    $stats[$containerName] = [
+                        'container' => $containerName,
+                        'cpu'       => trim($parts[1]),
+                        'mem'       => trim($parts[2]),
+                        'mem_perc'  => trim($parts[3]),
+                        'net'       => trim($parts[4]),
+                        'block'     => trim($parts[5]),
+                        'pids'      => trim($parts[6]),
+                    ];
+                }
+            }
+            
+            $resolved = [];
+            foreach ($containerIds as $id) {
+                $match = $stats[$id] ?? null;
+                if (!$match) {
+                    $prefix = substr($id, 0, 12);
+                    foreach($stats as $sId => $sData) {
+                        if (str_starts_with($sId, $prefix)) {
+                            $match = $sData;
+                            break;
+                        }
+                    }
+                }
+                $resolved[$id] = $match ?: [];
+            }
+
+            return $resolved;
+        } catch (\Throwable $e) {
+            \Log::error("Errore nel recupero bulk stats: " . $e->getMessage());
+            return array_fill_keys($containerIds, []);
+        }
+    }
+
+    /**
+     * Recupera le statistiche di utilizzo risorse di un container.
+     */
+    public function getContainerStats(string $containerId): array
+    {
+        try {
+            $format = '{{.Container}}::{{.CPUPerc}}::{{.MemUsage}}::{{.MemPerc}}::{{.NetIO}}::{{.BlockIO}}::{{.PIDs}}';
+            $output = $this->executeRemoteDockerCommand([
+                'stats',
+                '--no-stream',
+                '--format',
+                $format,
+                $containerId
+            ]);
+            
+            $parts = explode('::', trim($output));
+            if (count($parts) >= 7) {
+                return [
+                    'container' => trim($parts[0]),
+                    'cpu'       => trim($parts[1]),
+                    'mem'       => trim($parts[2]),
+                    'mem_perc'  => trim($parts[3]),
+                    'net'       => trim($parts[4]),
+                    'block'     => trim($parts[5]),
+                    'pids'      => trim($parts[6]),
+                ];
+            }
+            return [];
+        } catch (\Throwable $e) {
+            \Log::error("Errore nel recupero stats per il container $containerId: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Recupera lo stato attuale di un container (running, exited, etc).
+     */
+    public function getContainerStatus(string $containerId): string
+    {
+        try {
+            return strtolower(trim($this->executeRemoteDockerCommand([
+                'inspect',
+                '--format={{.State.Status}}',
+                $containerId
+            ])));
+        } catch (\Throwable $e) {
+            return 'not_found';
+        }
+    }
+
+    /**
+     * Avvia un container tramite il suo ID o nome Docker.
+     */
+    public function startContainerById(string $containerId): void
+    {
+        $this->executeRemoteDockerCommand(['start', $containerId]);
+    }
+
+    /**
+     * Ferma un container tramite il suo ID o nome Docker.
+     */
+    public function stopContainerById(string $containerId): void
+    {
+        $this->executeRemoteDockerCommand(['stop', $containerId]);
+    }
+
+    /**
+     * Riavvia un container tramite il suo ID o nome Docker.
+     */
+    public function restartContainerById(string $containerId): void
+    {
+        $this->executeRemoteDockerCommand(['restart', $containerId]);
     }
 }

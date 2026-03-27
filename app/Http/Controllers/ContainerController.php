@@ -227,10 +227,11 @@ class ContainerController extends Controller
             ->get();
 
         $statuses = [];
+        $stats = [];
         if ($containerService !== null) {
-            $statuses = $containerService->getContainerStatuses(
-                $containers->pluck('container_id')->filter()->values()->all()
-            );
+            $containerIds = $containers->pluck('container_id')->filter()->values()->all();
+            $statuses = $containerService->getContainerStatuses($containerIds);
+            $stats = $containerService->getContainerStatsBulk($containerIds);
         }
 
         return $containers
@@ -244,8 +245,9 @@ class ContainerController extends Controller
                 );
             })
             ->values()
-            ->map(function (DockerContainer $container) use ($player, $statuses) {
+            ->map(function (DockerContainer $container) use ($player, $statuses, $stats) {
                 $status = $statuses[$container->container_id] ?? 'unknown';
+                $containerStats = $stats[$container->container_id] ?? [];
 
                 return [
                     'id' => $container->id,
@@ -260,6 +262,7 @@ class ContainerController extends Controller
                     'status' => $status,
                     'status_label' => $this->statusLabel($status),
                     'status_color' => $this->statusColor($status),
+                    'stats' => $containerStats,
                 ];
             })->values();
     }

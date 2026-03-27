@@ -88,7 +88,7 @@
 
     .container-stat-strip {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 8px;
         margin-bottom: 12px;
     }
@@ -477,6 +477,16 @@
         <span class="hint">Stato non running</span>
     </div>
     <div class="container-stat-card">
+        <span class="label">CPU Totale</span>
+        <span class="value" id="stat-cpu-total">0%</span>
+        <span class="hint">Utilizzo combinato</span>
+    </div>
+    <div class="container-stat-card">
+        <span class="label">RAM Totale</span>
+        <span class="value" id="stat-mem-total">0 MB</span>
+        <span class="hint">Memoria utilizzata</span>
+    </div>
+    <div class="container-stat-card">
         <span class="label">Ultimo refresh</span>
         <span class="value" id="stat-refresh-age">-</span>
         <span class="hint" id="stat-refresh-label">In attesa</span>
@@ -500,6 +510,16 @@
                         <span class="status-dot" id="selected-container-status-dot" style="background: #64748b;"></span>
                         <span id="selected-container-status">-</span>
                     </div>
+                    <div id="container-resource-stats" class="mt-2">
+                        <div class="container-section-divider">
+                            <span class="title">Risorse (Real-time)</span>
+                        </div>
+                        <div class="container-pill mb-2">CPU: <strong id="selected-container-cpu">-</strong></div>
+                        <div class="container-pill mb-2">Memoria: <strong id="selected-container-mem">-</strong></div>
+                        <div class="container-pill mb-2">Net I/O: <strong id="selected-container-net">-</strong></div>
+                        <div class="container-pill mb-2">PIDs: <strong id="selected-container-pids">-</strong></div>
+                    </div>
+
                     <div class="d-flex flex-wrap" style="gap: 8px;">
                         <button type="button" class="btn btn-light btn-sm js-copy-field" data-target="selected-container-id" data-label="Container ID" disabled>
                             <i class="fa fa-copy"></i> ID
@@ -741,10 +761,43 @@
             }, { running: 0, stopped: 0, issues: 0 });
         }
 
+        function parseBytes(str) {
+            if (!str) return 0;
+            const units = { 'B': 1, 'KB': 1024, 'MB': 1024 * 1024, 'GB': 1024 * 1024 * 1024, 'TB': 1024 * 1024 * 1024 * 1024, 'KiB': 1024, 'MiB': 1024 * 1024, 'GiB': 1024 * 1024 * 1024 };
+            const match = str.match(/^([0-9.]+)\s*([a-zA-Z]+)$/);
+            if (!match) return parseFloat(str) || 0;
+            return parseFloat(match[1]) * (units[match[2]] || 1);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
         function updateStatsPanel(visibleContainers) {
             const counters = getStatusCounters(visibleContainers);
             const total = visibleContainers.length;
             const ageSeconds = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt.getTime()) / 1000)) : null;
+
+            let totalCpu = 0;
+            let totalMemUsed = 0;
+
+            visibleContainers.forEach(function(c) {
+                if (c.stats) {
+                    if (c.stats.cpu) {
+                        totalCpu += parseFloat(c.stats.cpu.replace('%', '')) || 0;
+                    }
+                    if (c.stats.mem) {
+                        const parts = c.stats.mem.split(' / ');
+                        if (parts.length >= 1) {
+                            totalMemUsed += parseBytes(parts[0]);
+                        }
+                    }
+                }
+            });
 
             const setNode = function (id, value) {
                 const node = document.getElementById(id);
@@ -757,6 +810,8 @@
             setNode('stat-running-count', String(counters.running));
             setNode('stat-stopped-count', String(counters.stopped));
             setNode('stat-issue-count', String(counters.issues));
+            setNode('stat-cpu-total', totalCpu.toFixed(1) + '%');
+            setNode('stat-mem-total', formatBytes(totalMemUsed));
             setNode('stat-refresh-age', ageSeconds === null ? '-' : (ageSeconds + 's'));
             setNode('stat-refresh-label', lastRefreshAt ? 'Aggiornato ora' : 'In attesa');
         }
@@ -917,6 +972,10 @@
                 status: document.getElementById('selected-container-status'),
                 statusChip: document.getElementById('selected-container-status-chip'),
                 statusDot: document.getElementById('selected-container-status-dot'),
+                cpu: document.getElementById('selected-container-cpu'),
+                mem: document.getElementById('selected-container-mem'),
+                net: document.getElementById('selected-container-net'),
+                pids: document.getElementById('selected-container-pids'),
             };
 
             if (!container) {
@@ -928,6 +987,10 @@
                 fields.status.textContent = '-';
                 fields.statusChip.className = 'status-chip is-unknown mb-2';
                 fields.statusDot.style.background = '#64748b';
+                fields.cpu.textContent = '-';
+                fields.mem.textContent = '-';
+                fields.net.textContent = '-';
+                fields.pids.textContent = '-';
                 document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = true);
                 return;
             }
@@ -940,6 +1003,13 @@
             fields.status.textContent = container.status_label || 'Unknown';
             fields.statusChip.className = 'status-chip is-' + String(container.status || 'unknown').toLowerCase() + ' mb-2';
             fields.statusDot.style.background = container.status_color || '#64748b';
+            
+            const stats = container.stats || {};
+            fields.cpu.textContent = stats.cpu || '-';
+            fields.mem.textContent = stats.mem || '-';
+            fields.net.textContent = stats.net || '-';
+            fields.pids.textContent = stats.pids || '-';
+
             document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = false);
         }
 

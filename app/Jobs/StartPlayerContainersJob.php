@@ -28,6 +28,10 @@ class StartPlayerContainersJob implements ShouldQueue
             /** @var DockerContainerService $containerService */
             $containerService = app(DockerContainerService::class);
             $containerService->startContainersForPlayer($this->player);
+            
+            // Broadcast that the environment is ready
+            \App\Events\PlayerContainerReady::dispatch($this->player);
+            
             \Log::info("Tutti i container del player {$this->player->id} sono stati avviati");
         } catch (\Throwable $e) {
             \Log::error("Errore nell'avvio dei container per il player {$this->player->id}: " . $e->getMessage());
