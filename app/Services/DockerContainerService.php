@@ -991,56 +991,82 @@ class DockerContainerService
 
     public function writePlayerVolumeFile(Player $player, string $relativePath, string $contents): void
     {
+        $this->writeMultipleFilesToPlayerVolume($player, [$relativePath => $contents]);
+    }
+
+    /**
+     * Scrive più file nel volume del player in un'unica operazione SSH/Docker.
+     * Molto più veloce per scritture multiple.
+     */
+    public function writeMultipleFilesToPlayerVolume(Player $player, array $files): void
+    {
+        if (empty($files)) {
+            return;
+        }
+
         $this->ensurePlayerVolume($player);
         $this->ensureImageExists('player:latest');
 
-        $filePath = $this->normalizeVolumeRelativePath($relativePath);
-        $directory = dirname($filePath);
-        $mkdirCommand = $directory === '.' ? '' : 'mkdir -p /data/' . $directory . ' && ';
-
-        $command = $mkdirCommand . 'cat > /data/' . $filePath;
-
-        \Log::info('Scrittura file nel volume player', [
-            'player_id' => $player->id,
-            'volume_name' => $this->resolvePlayerVolumeName($player),
-            'path' => $filePath,
-            'bytes' => strlen($contents),
-        ]);
-
         $playerContainer = $this->resolvePlayerContainer($player);
-        if ($playerContainer !== null) {
-            try {
-                $this->executeRemoteDockerCommandWithInput([
-                    'exec',
-                    '-i',
-                    (string) $playerContainer->container_id,
-                    'sh',
-                    '-lc',
-                    $command,
-                ], $contents);
-                return;
-            } catch (\Throwable $e) {
-                \Log::warning('Scrittura via docker exec fallita, fallback a docker run', [
-                    'player_id' => $player->id,
-                    'container_id' => $playerContainer->container_id,
-                    'path' => $filePath,
-                    'error' => $e->getMessage(),
-                ]);
+        $containerId = $playerContainer ? (string) $playerContainer->container_id : null;
+
+        // Creiamo un archivio TAR localmente
+        $tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'docker_tar_' . uniqid();
+        mkdir($tempDir, 0777, true);
+        
+        try {
+            foreach ($files as $path => $content) {
+                $normalizedPath = $this->normalizeVolumeRelativePath($path);
+                $fullPath = $tempDir . DIRECTORY_SEPARATOR . $normalizedPath;
+                $dir = dirname($fullPath);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0777, true);
+                }
+                file_put_contents($fullPath, $content);
             }
+
+            $archivePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'archive_' . uniqid() . '.tar';
+            
+            // Creazione TAR (compatibile con Windows e Linux)
+            $processTar = new Process(['tar', '-cf', $archivePath, '-C', $tempDir, '.']);
+            $processTar->run();
+
+            if (!$processTar->isSuccessful()) {
+                throw new \RuntimeException("Errore nella creazione dell'archivio TAR locale: " . $processTar->getErrorOutput());
+            }
+
+            $tarContents = file_get_contents($archivePath);
+            $tarCommand = "tar -xf - -C /data";
+
+            if ($containerId) {
+                $this->executeRemoteDockerCommandWithInput([
+                    'exec', '-i', $containerId, 'sh', '-c', $tarCommand
+                ], $tarContents);
+            } else {
+                $this->executeRemoteDockerCommandWithInput([
+                    'run', '--rm', '-i', '-v', $this->resolvePlayerVolumeName($player) . ':/data', 'player:latest', 'sh', '-c', $tarCommand
+                ], $tarContents);
+            }
+            
+            @unlink($archivePath);
+        } finally {
+            $this->recursiveDelete($tempDir);
         }
 
-        $this->executeRemoteDockerCommandWithInput([
-            'run',
-            '--rm',
-            '-i',
-            '--entrypoint',
-            'sh',
-            '-v',
-            $this->resolvePlayerVolumeName($player) . ':/data',
-            'player:latest',
-            '-lc',
-            $command,
-        ], $contents);
+        \Log::info('Scrittura batch completata nel volume player', [
+            'player_id' => $player->id,
+            'files_count' => count($files),
+        ]);
+    }
+
+    private function recursiveDelete(string $dir): void
+    {
+        if (!is_dir($dir)) return;
+        $files = array_diff(scandir($dir), ['.', '..']);
+        foreach ($files as $file) {
+            (is_dir("$dir" . DIRECTORY_SEPARATOR . "$file")) ? $this->recursiveDelete("$dir" . DIRECTORY_SEPARATOR . "$file") : unlink("$dir" . DIRECTORY_SEPARATOR . "$file");
+        }
+        rmdir($dir);
     }
 
     public function readPlayerVolumeFile(Player $player, string $relativePath): ?string
