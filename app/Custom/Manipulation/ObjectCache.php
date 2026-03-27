@@ -2,6 +2,8 @@
 
 namespace App\Custom\Manipulation;
 
+use App\Jobs\DeleteObjectCacheFromPlayerVolumeJob;
+use App\Jobs\WriteObjectCacheToPlayerVolumeJob;
 use App\Models\Player;
 use App\Services\DockerContainerService;
 use Illuminate\Support\Facades\Cache;
@@ -27,7 +29,7 @@ class ObjectCache
     }
 
     /**
-     * Persist the buffer to the player volume and clear memory.
+     * Queue the buffer persistence to the player volume and clear memory.
      */
     public static function flush(string $sessionId): void
     {
@@ -200,7 +202,7 @@ class ObjectCache
         self::$dirty[$sessionId] = false;
     }
 
-    private static function volumeCachePath(string $sessionId): string
+    public static function volumeCachePath(string $sessionId): string
     {
         return 'object-cache/' . self::sessionFileName($sessionId);
     }
@@ -210,7 +212,7 @@ class ObjectCache
         return self::volumeCachePath($sessionId);
     }
 
-    private static function legacyVolumeCachePath(string $sessionId): string
+    public static function legacyVolumeCachePath(string $sessionId): string
     {
         return 'object-cache/' . sha1($sessionId) . '.json';
     }
@@ -251,17 +253,9 @@ class ObjectCache
             return;
         }
 
-        try {
-            $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new RuntimeException('Impossibile serializzare ObjectCache per il volume del player: ' . $e->getMessage(), 0, $e);
-        }
+        WriteObjectCacheToPlayerVolumeJob::dispatch($player, $sessionId, $data)->afterCommit();
 
-        $service = app(DockerContainerService::class);
-        $service->writePlayerVolumeFile($player, self::volumeCachePath($sessionId), $json);
-        $service->deletePlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
-
-        \Log::info('ObjectCache salvato nel volume player', [
+        \Log::info('ObjectCache accodato per il salvataggio nel volume player', [
             'session_id' => $sessionId,
             'player_id' => $player->id,
             'path' => self::volumeCachePath($sessionId),
@@ -277,11 +271,9 @@ class ObjectCache
             return;
         }
 
-        $service = app(DockerContainerService::class);
-        $service->deletePlayerVolumeFile($player, self::volumeCachePath($sessionId));
-        $service->deletePlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
+        DeleteObjectCacheFromPlayerVolumeJob::dispatch($player, $sessionId)->afterCommit();
 
-        \Log::info('ObjectCache rimosso dal volume player', [
+        \Log::info('ObjectCache accodato per la rimozione dal volume player', [
             'session_id' => $sessionId,
             'player_id' => $player->id,
             'path' => self::volumeCachePath($sessionId),
