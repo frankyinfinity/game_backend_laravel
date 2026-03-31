@@ -381,6 +381,11 @@ return [
                     'text' => 'Elementi Chimici Complessi',
                     'url'  => '/complex-chimical-elements',
                     'icon' => 'fas fa-atom',
+                ],
+                [
+                    'text' => 'Generatori',
+                    'url'  => '/generator-chimical-elements',
+                    'icon' => 'fas fa-cogs',
                 ]
             ]
         ],
