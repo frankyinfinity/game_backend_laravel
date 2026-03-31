@@ -41,8 +41,9 @@ class ContainerController extends Controller
         $player->load(['user', 'birthRegion']);
         $containers = $this->buildContainerPayloads($player, $containerService);
         $volume = $this->buildPlayerVolumePayload($player, $containerService);
+        $containerTypes = DockerContainer::parentTypeMeta();
 
-        return view('container.show', compact('player', 'containers', 'volume'));
+        return view('container.show', compact('player', 'containers', 'volume', 'containerTypes'));
     }
 
     public function snapshot(Player $player, DockerContainerService $containerService): JsonResponse
@@ -258,7 +259,7 @@ class ContainerController extends Controller
                     'container_id' => $container->container_id,
                     'ws_port' => $container->ws_port,
                     'scope' => $this->describeContainerScope($container, $player),
-                    'color' => $this->containerTypeColor($container->parent_type),
+                    'color' => $this->hexColorToNumeric($this->containerTypeColor($container->parent_type)),
                     'status' => $status,
                     'status_label' => $this->statusLabel($status),
                     'status_color' => $this->statusColor($status),
@@ -350,7 +351,6 @@ class ContainerController extends Controller
         return match ($container->parent_type) {
             DockerContainer::PARENT_TYPE_PLAYER => 'Player #' . $player->id,
             DockerContainer::PARENT_TYPE_MAP => 'Map #' . ($player->birth_region_id ?? '-'),
-            DockerContainer::PARENT_TYPE_OBJECTIVE => 'Objective #' . $player->id,
             DockerContainer::PARENT_TYPE_CACHE_SYNC => 'CacheSync #' . $player->id,
             DockerContainer::PARENT_TYPE_ENTITY => 'Entity #' . $container->parent_id,
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element #' . $container->parent_id,
@@ -360,41 +360,22 @@ class ContainerController extends Controller
 
     private function containerTypeColor(string $type): string
     {
-        return match ($type) {
-            DockerContainer::PARENT_TYPE_PLAYER => '#3b82f6',
-            DockerContainer::PARENT_TYPE_MAP => '#10b981',
-            DockerContainer::PARENT_TYPE_OBJECTIVE => '#a855f7',
-            DockerContainer::PARENT_TYPE_CACHE_SYNC => '#06b6d4',
-            DockerContainer::PARENT_TYPE_ENTITY => '#f59e0b',
-            DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => '#ef4444',
-            default => '#64748b',
-        };
+        return DockerContainer::parentTypeMeta()[$type]['color'] ?? '#64748b';
     }
 
     private function containerTypeLabel(string $type): string
     {
-        return match ($type) {
-            DockerContainer::PARENT_TYPE_PLAYER => 'Player',
-            DockerContainer::PARENT_TYPE_MAP => 'Map',
-            DockerContainer::PARENT_TYPE_OBJECTIVE => 'Objective',
-            DockerContainer::PARENT_TYPE_CACHE_SYNC => 'CacheSync',
-            DockerContainer::PARENT_TYPE_ENTITY => 'Entity',
-            DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element',
-            default => (string) $type,
-        };
+        return DockerContainer::parentTypeMeta()[$type]['label'] ?? $type;
     }
 
     private function containerTypeOrder(string $type): int
     {
-        return match ($type) {
-            DockerContainer::PARENT_TYPE_PLAYER => 0,
-            DockerContainer::PARENT_TYPE_MAP => 1,
-            DockerContainer::PARENT_TYPE_OBJECTIVE => 2,
-            DockerContainer::PARENT_TYPE_CACHE_SYNC => 5,
-            DockerContainer::PARENT_TYPE_ENTITY => 3,
-            DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 4,
-            default => 9,
-        };
+        return DockerContainer::parentTypeMeta()[$type]['order'] ?? 9;
+    }
+
+    private function hexColorToNumeric(string $hex): int
+    {
+        return (int) hexdec(ltrim($hex, '#'));
     }
 
     private function statusLabel(string $status): string

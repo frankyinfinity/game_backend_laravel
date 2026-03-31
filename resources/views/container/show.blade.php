@@ -634,11 +634,9 @@
                 </select>
                 <select class="custom-select custom-select-sm" id="filter-type" style="max-width: 180px;">
                     <option value="all">Tutti i tipi</option>
-                    <option value="Player">Player</option>
-                    <option value="Map">Map</option>
-                    <option value="Objective">Objective</option>
-                    <option value="Entity">Entity</option>
-                    <option value="ElementHasPosition">Element</option>
+                    @foreach($containerTypes as $type => $meta)
+                        <option value="{{ $type }}">{{ $meta['label'] }}</option>
+                    @endforeach
                 </select>
                 <label class="container-issue-toggle mb-0">
                     <input type="checkbox" id="filter-issues-only">
@@ -688,7 +686,10 @@
         };
         const SNAPSHOT_URL = "{{ route('containers.snapshot', $player) }}";
         const VOLUME_FILE_URL = "{{ route('containers.volume-file', $player) }}";
-        const TYPE_ORDER = ['Player', 'Map', 'Objective', 'Entity', 'ElementHasPosition'];
+        const CONTAINER_TYPES_META = @json($containerTypes);
+        const TYPE_ORDER = Object.keys(CONTAINER_TYPES_META).sort(function (a, b) {
+            return (CONTAINER_TYPES_META[a].order ?? 99) - (CONTAINER_TYPES_META[b].order ?? 99);
+        });
 
         const containerHost = document.getElementById('container-pixi');
         let app = null;
@@ -730,14 +731,7 @@
         }
 
         function typeLabel(type) {
-            const labels = {
-                'Player': 'Player',
-                'Map': 'Map',
-                'Objective': 'Objective',
-                'Entity': 'Entity',
-                'ElementHasPosition': 'Element',
-            };
-            return labels[type] || type;
+            return (CONTAINER_TYPES_META[type] && CONTAINER_TYPES_META[type].label) || type;
         }
 
         function typeOrder(type) {
