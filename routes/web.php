@@ -97,6 +97,12 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/complex-chimical-elements/list/table', [App\Http\Controllers\ComplexChimicalElementController::class, 'listDataTable'])->name('complex-chimical-elements.datatable');
     Route::post('/complex-chimical-elements/delete', [App\Http\Controllers\ComplexChimicalElementController::class, 'delete'])->name('complex-chimical-elements.delete');
 
+    //Complex Chimical Element Details
+    Route::post('/complex-chimical-elements/{complexChimicalElement}/details', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'listDataTable'])->name('complex-chimical-elements.details.datatable');
+    Route::post('/complex-chimical-elements/{complexChimicalElement}/details/store', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'store'])->name('complex-chimical-elements.details.store');
+    Route::delete('/complex-chimical-elements/{complexChimicalElement}/details/{detail}', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'destroy'])->name('complex-chimical-elements.details.destroy');
+    Route::post('/complex-chimical-elements/{complexChimicalElement}/details/delete', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'delete'])->name('complex-chimical-elements.details.delete');
+
     //Elements
     Route::resource('elements', App\Http\Controllers\ElementController::class);
     Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');

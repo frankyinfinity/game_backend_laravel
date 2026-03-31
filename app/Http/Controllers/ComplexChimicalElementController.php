@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\ChimicalElement;
 use App\Models\ComplexChimicalElement;
 use Illuminate\Http\Request;
 
@@ -39,7 +40,8 @@ class ComplexChimicalElementController extends Controller
 
     public function show(ComplexChimicalElement $complexChimicalElement)
     {
-        return view('complex_chimical_elements.show', compact('complexChimicalElement'));
+        $chimicalElements = ChimicalElement::all();
+        return view('complex_chimical_elements.show', compact('complexChimicalElement', 'chimicalElements'));
     }
 
     public function edit(ComplexChimicalElement $complexChimicalElement)

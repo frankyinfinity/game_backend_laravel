@@ -105,7 +105,8 @@
                     },
                     {
                         render: function(data, type, row){
-                            return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
+                            return '<a href="{{ url('complex-chimical-elements') }}/' + data + '" class="btn btn-info btn-sm btn_show" title="Dettagli"><i class="fa fa-eye"></i></a> ' +
+                                '<button type="button" class="btn btn-primary btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
                         },
                         targets:   4
                     },

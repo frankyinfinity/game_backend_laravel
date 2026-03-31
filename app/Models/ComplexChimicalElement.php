@@ -7,4 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class ComplexChimicalElement extends Model
 {
     protected $fillable = ['name', 'symbol'];
+
+    public function details()
+    {
+        return $this->hasMany(ComplexChimicalElementDetail::class);
+    }
 }
