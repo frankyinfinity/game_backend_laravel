@@ -66,6 +66,7 @@
                         'color' => $tile->color
                     ];
                 })->values()),
+                generators: @json($generatorsData),
                 updateTilesBatchUrl: "{{ route('regions.tiles-batch') }}",
                 csrfToken: $('meta[name="csrf-token"]').attr('content')
             };
@@ -75,6 +76,8 @@
 
             let tile_selected_id = String(regionConfig.defaultTileId);
             let tile_selected_color = regionConfig.defaultTileColor;
+            let tile_selected_generator_id = null;
+            let tile_selected_generator_symbol = '';
             let activeTool = 'paint';
             let brushWidth = 1;
             let brushHeight = 1;
@@ -91,20 +94,27 @@
             const pendingChanges = {};
             const tilePickerItems = {};
             const tileById = {};
+            const generatorById = {};
             const hexToNumber = (hexColor) => parseInt(hexColor.replace('#', '0x'), 16);
             const getKey = (i, j) => i + '_' + j;
             const defaultState = {
                 id: String(regionConfig.defaultTileId),
-                color: regionConfig.defaultTileColor
+                color: regionConfig.defaultTileColor,
+                generatorId: null,
+                generatorSymbol: ''
             };
 
             regionConfig.tiles.forEach(function (tile) {
                 tileById[String(tile.id)] = tile;
             });
 
+            regionConfig.generators.forEach(function (gen) {
+                generatorById[String(gen.id)] = gen;
+            });
+
             for (let i = 0; i < regionConfig.height; i++) {
                 for (let j = 0; j < regionConfig.width; j++) {
-                    tileStates[getKey(i, j)] = { id: defaultState.id, color: defaultState.color };
+                    tileStates[getKey(i, j)] = { id: defaultState.id, color: defaultState.color, generatorId: null, generatorSymbol: '' };
                 }
             }
 
@@ -112,7 +122,9 @@
                 if (item && item.tile && item.i !== undefined && item.j !== undefined) {
                     tileStates[getKey(item.i, item.j)] = {
                         id: String(item.tile.id),
-                        color: item.tile.color
+                        color: item.tile.color,
+                        generatorId: item.generator ? item.generator.id : null,
+                        generatorSymbol: item.generator ? (item.generator.symbol || '') : ''
                     };
                 }
             });
@@ -120,7 +132,9 @@
             Object.keys(tileStates).forEach(function (key) {
                 initialTileStates[key] = {
                     id: tileStates[key].id,
-                    color: tileStates[key].color
+                    color: tileStates[key].color,
+                    generatorId: tileStates[key].generatorId,
+                    generatorSymbol: tileStates[key].generatorSymbol
                 };
             });
 
@@ -141,9 +155,11 @@
             const pickerGap = 8;
             const pickerButtonW = 180;
             const pickerButtonH = 38;
-            const pickerRows = Math.ceil(regionConfig.tiles.length / pickerCols);
-            const pickerWidth = pickerPadding * 2 + pickerCols * pickerButtonW + (pickerCols - 1) * pickerGap;
-            const pickerHeight = pickerPadding * 2 + pickerRows * pickerButtonH + (pickerRows - 1) * pickerGap;
+            const pickerSectionGap = 30;
+            const pickerTitleH = 28;
+            const pickerSectionWidth = pickerPadding + pickerCols * pickerButtonW + (pickerCols - 1) * pickerGap;
+            const pickerWidth = pickerSectionWidth * 2 + pickerSectionGap;
+            const pickerHeight = 800;
 
             const pickerApp = new PIXI.Application({
                 width: pickerWidth,
@@ -160,9 +176,11 @@
                 refreshPreviewFromHover();
             }
 
-            function setSelectedTile(tileId, tileColor) {
+            function setSelectedTile(tileId, tileColor, generatorId, generatorSymbol) {
                 tile_selected_id = String(tileId);
                 tile_selected_color = tileColor;
+                tile_selected_generator_id = generatorId || null;
+                tile_selected_generator_symbol = generatorSymbol || '';
                 updatePickerSelection();
                 refreshPreviewFromHover();
             }
@@ -174,7 +192,7 @@
                     return;
                 }
 
-                if (initial.id === current.id && initial.color === current.color) {
+                if (initial.id === current.id && initial.color === current.color && initial.generatorId === current.generatorId) {
                     delete pendingChanges[key];
                     return;
                 }
@@ -182,7 +200,8 @@
                 pendingChanges[key] = {
                     i: parseInt(key.split('_')[0], 10),
                     j: parseInt(key.split('_')[1], 10),
-                    tile_id: current.id
+                    tile_id: current.id,
+                    generator_id: current.generatorId
                 };
             }
 
@@ -218,6 +237,29 @@
                     regionConfig.tileSize
                 );
                 graphic.endFill();
+
+                if (state.generatorId && state.generatorSymbol) {
+                    graphic.lineStyle(2, 0x000000, 1);
+                    graphic.drawRect(
+                        j * regionConfig.tileSize + 1,
+                        i * regionConfig.tileSize + 1,
+                        regionConfig.tileSize - 2,
+                        regionConfig.tileSize - 2
+                    );
+
+                    const symbolText = new PIXI.Text(state.generatorSymbol, {
+                        fontFamily: 'Arial',
+                        fontSize: 14,
+                        fontWeight: 'bold',
+                        fill: 0x000000,
+                        align: 'center'
+                    });
+                    symbolText.anchor.set(0.5);
+                    symbolText.x = j * regionConfig.tileSize + regionConfig.tileSize / 2;
+                    symbolText.y = i * regionConfig.tileSize + regionConfig.tileSize / 2;
+                    graphic.addChild(symbolText);
+                }
+
                 graphic.eventMode = 'static';
                 graphic.cursor = 'pointer';
                 graphic.on('pointerdown', function () {
@@ -369,17 +411,51 @@
             }
 
             function updatePickerSelection() {
-                Object.keys(tilePickerItems).forEach(function (tileId) {
-                    drawPickerItem(tilePickerItems[tileId], tileId === tile_selected_id);
+                const selectedKey = tile_selected_generator_id ? ('gen_' + tile_selected_generator_id) : tile_selected_id;
+                Object.keys(tilePickerItems).forEach(function (key) {
+                    drawPickerItem(tilePickerItems[key], key === selectedKey);
                 });
             }
 
             function buildPicker() {
+                const labelMaxW = pickerButtonW - 46;
+
+                function truncateText(text, maxWidth, style) {
+                    const measure = new PIXI.Text(text, style);
+                    if (measure.width <= maxWidth) {
+                        measure.destroy();
+                        return text;
+                    }
+                    let truncated = text;
+                    while (truncated.length > 0) {
+                        truncated = truncated.slice(0, -1);
+                        measure.text = truncated + '...';
+                        if (measure.width <= maxWidth) {
+                            measure.destroy();
+                            return truncated + '...';
+                        }
+                    }
+                    measure.destroy();
+                    return '...';
+                }
+
+                const tilesTitle = new PIXI.Text('Tile', {
+                    fontFamily: 'Arial',
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                    fill: 0x374151
+                });
+                tilesTitle.x = pickerPadding;
+                tilesTitle.y = pickerPadding;
+                pickerApp.stage.addChild(tilesTitle);
+
+                const tilesStartY = pickerPadding + pickerTitleH;
+
                 regionConfig.tiles.forEach(function (tile, index) {
                     const row = Math.floor(index / pickerCols);
                     const col = index % pickerCols;
                     const x = pickerPadding + col * (pickerButtonW + pickerGap);
-                    const y = pickerPadding + row * (pickerButtonH + pickerGap);
+                    const y = tilesStartY + row * (pickerButtonH + pickerGap);
 
                     const itemContainer = new PIXI.Container();
                     itemContainer.x = x;
@@ -396,28 +472,110 @@
                     swatch.endFill();
                     itemContainer.addChild(swatch);
 
-                    const label = new PIXI.Text(tile.name, {
-                        fontFamily: 'Arial',
-                        fontSize: 13,
-                        fill: 0x1F2937
-                    });
+                    const labelStyle = { fontFamily: 'Arial', fontSize: 13, fill: 0x1F2937 };
+                    const labelText = truncateText(tile.name, labelMaxW, labelStyle);
+                    const label = new PIXI.Text(labelText, labelStyle);
                     label.x = 36;
                     label.y = 10;
                     itemContainer.addChild(label);
 
                     itemContainer.on('pointertap', function () {
-                        setSelectedTile(tile.id, tile.color);
+                        setSelectedTile(tile.id, tile.color, null, '');
                         setActiveTool('paint');
                     });
 
                     const pickerItem = {
                         background: background,
-                        label: label
+                        label: label,
+                        itemId: String(tile.id)
                     };
                     tilePickerItems[String(tile.id)] = pickerItem;
-                    drawPickerItem(pickerItem, String(tile.id) === tile_selected_id);
+                    drawPickerItem(pickerItem, String(tile.id) === tile_selected_id && !tile_selected_generator_id);
                     pickerApp.stage.addChild(itemContainer);
                 });
+
+                const tilesEndY = tilesStartY + Math.ceil(regionConfig.tiles.length / pickerCols) * (pickerButtonH + pickerGap);
+
+                let genEndY = tilesStartY;
+
+                if (regionConfig.generators.length > 0) {
+                    const genOffsetX = pickerSectionWidth + pickerSectionGap;
+
+                    const genTitle = new PIXI.Text('Generatori', {
+                        fontFamily: 'Arial',
+                        fontSize: 14,
+                        fontWeight: 'bold',
+                        fill: 0x374151
+                    });
+                    genTitle.x = genOffsetX;
+                    genTitle.y = pickerPadding;
+                    pickerApp.stage.addChild(genTitle);
+
+                    regionConfig.generators.forEach(function (gen, index) {
+                        const row = Math.floor(index / pickerCols);
+                        const col = index % pickerCols;
+                        const x = genOffsetX + col * (pickerButtonW + pickerGap);
+                        const y = tilesStartY + row * (pickerButtonH + pickerGap);
+
+                        const itemContainer = new PIXI.Container();
+                        itemContainer.x = x;
+                        itemContainer.y = y;
+                        itemContainer.eventMode = 'static';
+                        itemContainer.cursor = 'pointer';
+
+                        const background = new PIXI.Graphics();
+                        itemContainer.addChild(background);
+
+                        const swatch = new PIXI.Graphics();
+                        swatch.beginFill(0xE5E7EB);
+                        swatch.lineStyle(2, 0x000000, 1);
+                        swatch.drawRoundedRect(10, 10, 18, 18, 4);
+                        swatch.endFill();
+                        itemContainer.addChild(swatch);
+
+                        if (gen.symbol) {
+                            const symText = new PIXI.Text(gen.symbol, {
+                                fontFamily: 'Arial',
+                                fontSize: 10,
+                                fontWeight: 'bold',
+                                fill: 0x000000,
+                                align: 'center'
+                            });
+                            symText.anchor.set(0.5);
+                            symText.x = 19;
+                            symText.y = 19;
+                            itemContainer.addChild(symText);
+                        }
+
+                        const labelStyle = { fontFamily: 'Arial', fontSize: 13, fill: 0x1F2937 };
+                        const fullText = gen.name + ' (' + gen.symbol + ')';
+                        const labelText = truncateText(fullText, labelMaxW, labelStyle);
+                        const label = new PIXI.Text(labelText, labelStyle);
+                        label.x = 36;
+                        label.y = 10;
+                        itemContainer.addChild(label);
+
+                        const genId = 'gen_' + gen.id;
+                        itemContainer.on('pointertap', function () {
+                            setSelectedTile(tile_selected_id, tile_selected_color, gen.id, gen.symbol);
+                            setActiveTool('paint');
+                        });
+
+                        const pickerItem = {
+                            background: background,
+                            label: label,
+                            itemId: genId
+                        };
+                        tilePickerItems[genId] = pickerItem;
+                        drawPickerItem(pickerItem, tile_selected_generator_id === gen.id);
+                        pickerApp.stage.addChild(itemContainer);
+                    });
+
+                    genEndY = tilesStartY + Math.ceil(regionConfig.generators.length / pickerCols) * (pickerButtonH + pickerGap);
+                }
+
+                const finalHeight = Math.max(tilesEndY, genEndY) + pickerPadding;
+                pickerApp.renderer.resize(pickerWidth, finalHeight);
             }
 
             function saveTilesBatch(tiles, onError, onComplete) {
@@ -510,7 +668,7 @@
             function applyChange(i, j, newState, changeSet) {
                 const key = getKey(i, j);
                 const current = tileStates[key];
-                if (!current || (current.id === newState.id && current.color === newState.color)) {
+                if (!current || (current.id === newState.id && current.color === newState.color && current.generatorId === (newState.generatorId || null))) {
                     return;
                 }
 
@@ -518,14 +676,14 @@
                     changeSet[key] = {
                         i: i,
                         j: j,
-                        before: { id: current.id, color: current.color },
-                        after: { id: newState.id, color: newState.color }
+                        before: { id: current.id, color: current.color, generatorId: current.generatorId, generatorSymbol: current.generatorSymbol },
+                        after: { id: newState.id, color: newState.color, generatorId: newState.generatorId || null, generatorSymbol: newState.generatorSymbol || '' }
                     };
                 } else {
-                    changeSet[key].after = { id: newState.id, color: newState.color };
+                    changeSet[key].after = { id: newState.id, color: newState.color, generatorId: newState.generatorId || null, generatorSymbol: newState.generatorSymbol || '' };
                 }
 
-                tileStates[key] = { id: newState.id, color: newState.color };
+                tileStates[key] = { id: newState.id, color: newState.color, generatorId: newState.generatorId || null, generatorSymbol: newState.generatorSymbol || '' };
                 drawMapTile(i, j, tileStates[key]);
                 updateDirtyState(key);
             }
@@ -567,7 +725,12 @@
                         return;
                     }
                     dragChangedKeys[key] = true;
-                    applyChange(cell.i, cell.j, { id: tile_selected_id, color: tile_selected_color }, changeSet);
+                    applyChange(cell.i, cell.j, {
+                        id: tile_selected_id,
+                        color: tile_selected_color,
+                        generatorId: tile_selected_generator_id,
+                        generatorSymbol: tile_selected_generator_symbol
+                    }, changeSet);
                 });
             }
 
@@ -577,7 +740,7 @@
                 if (!startState) {
                     return;
                 }
-                if (startState.id === tile_selected_id) {
+                if (startState.id === tile_selected_id && startState.generatorId === tile_selected_generator_id) {
                     return;
                 }
 
@@ -595,7 +758,12 @@
                         continue;
                     }
 
-                    applyChange(node.i, node.j, { id: tile_selected_id, color: tile_selected_color }, changeSet);
+                    applyChange(node.i, node.j, {
+                        id: tile_selected_id,
+                        color: tile_selected_color,
+                        generatorId: tile_selected_generator_id,
+                        generatorSymbol: tile_selected_generator_symbol
+                    }, changeSet);
 
                     const neighbors = [
                         { i: node.i - 1, j: node.j },
@@ -621,7 +789,7 @@
             function eraseAt(i, j, changeSet) {
                 const cells = getBrushCells(i, j);
                 cells.forEach(function (cell) {
-                    applyChange(cell.i, cell.j, { id: defaultState.id, color: defaultState.color }, changeSet);
+                    applyChange(cell.i, cell.j, { id: defaultState.id, color: defaultState.color, generatorId: null, generatorSymbol: '' }, changeSet);
                 });
             }
 
@@ -635,7 +803,7 @@
                 if (!tile) {
                     return;
                 }
-                setSelectedTile(tile.id, tile.color);
+                setSelectedTile(tile.id, tile.color, state.generatorId, state.generatorSymbol);
                 setActiveTool('paint');
             }
 
@@ -668,7 +836,7 @@
 
                 last.forEach(function (item) {
                     const key = getKey(item.i, item.j);
-                    tileStates[key] = { id: item.before.id, color: item.before.color };
+                    tileStates[key] = { id: item.before.id, color: item.before.color, generatorId: item.before.generatorId || null, generatorSymbol: item.before.generatorSymbol || '' };
                     drawMapTile(item.i, item.j, tileStates[key]);
                     updateDirtyState(key);
                 });
@@ -684,7 +852,8 @@
                     return {
                         tile_i: item.i,
                         tile_j: item.j,
-                        tile_id: item.tile_id
+                        tile_id: item.tile_id,
+                        generator_id: item.generator_id || null
                     };
                 });
 
@@ -713,7 +882,9 @@
                         Object.keys(pendingChanges).forEach(function (key) {
                             initialTileStates[key] = {
                                 id: tileStates[key].id,
-                                color: tileStates[key].color
+                                color: tileStates[key].color,
+                                generatorId: tileStates[key].generatorId,
+                                generatorSymbol: tileStates[key].generatorSymbol
                             };
                             delete pendingChanges[key];
                         });

@@ -8,6 +8,7 @@ use App\Models\Planet;
 use App\Models\Region;
 use App\Models\Climate;
 use App\Models\Tile;
+use App\Models\GeneratorChimicalElement;
 use Illuminate\Support\Facades\Storage;
 
 class RegionController extends Controller
@@ -61,13 +62,21 @@ class RegionController extends Controller
             $tile->text_color = 'color: ' . $tile->color;
         }
 
+        $generatorsData = GeneratorChimicalElement::with('chimicalElement')->orderBy('name')->get()->map(function ($gen) {
+            return [
+                'id' => $gen->id,
+                'name' => $gen->name,
+                'symbol' => $gen->chimicalElement->symbol ?? '',
+            ];
+        })->values();
+
         $map = [];
         if($region->filename !== null) {
             $jsonContent = Storage::disk('regions')->get($region->id.'/'.$region->filename);
             $map = json_decode($jsonContent, true);
         }
 
-        return view("planet.region.edit-map", compact('region', 'tiles', 'map'));
+        return view("planet.region.edit-map", compact('region', 'tiles', 'generatorsData', 'map'));
     }
 
 /**
@@ -181,6 +190,21 @@ class RegionController extends Controller
             ->get()
             ->keyBy('id');
 
+        $generatorIds = collect($updates)
+            ->pluck('generator_id')
+            ->filter(function ($id) { return $id !== null && $id !== '' && $id !== 0; })
+            ->map(function ($id) { return (int) $id; })
+            ->unique()
+            ->values();
+
+        $generatorsById = [];
+        if ($generatorIds->isNotEmpty()) {
+            $generatorsById = GeneratorChimicalElement::with('chimicalElement')
+                ->whereIn('id', $generatorIds)
+                ->get()
+                ->keyBy('id');
+        }
+
         $json = [];
         $filename = null;
         if($region->filename === null) {
@@ -216,11 +240,23 @@ class RegionController extends Controller
                 continue;
             }
 
-            $mapByKey[$tile_i.'_'.$tile_j] = [
+            $entry = [
                 'tile' => $tile,
                 'i' => $tile_i,
                 'j' => $tile_j,
             ];
+
+            $generatorId = isset($item['generator_id']) && $item['generator_id'] ? (int) $item['generator_id'] : null;
+            if ($generatorId && $generatorsById->has($generatorId)) {
+                $generator = $generatorsById->get($generatorId);
+                $entry['generator'] = [
+                    'id' => $generator->id,
+                    'name' => $generator->name,
+                    'symbol' => $generator->chimicalElement->symbol ?? '',
+                ];
+            }
+
+            $mapByKey[$tile_i.'_'.$tile_j] = $entry;
         }
 
         $jsonData = json_encode(array_values($mapByKey), JSON_PRETTY_PRINT);
