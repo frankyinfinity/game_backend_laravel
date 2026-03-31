@@ -13,5 +13,6 @@ class Container extends Model
     const PARENT_TYPE_OBJECTIVE = 'Objective';
     const PARENT_TYPE_PLAYER = 'Player';
     const PARENT_TYPE_ELEMENT_HAS_POSITION = 'ElementHasPosition';
+    const PARENT_TYPE_CACHE_SYNC = 'CacheSync';
 
 }

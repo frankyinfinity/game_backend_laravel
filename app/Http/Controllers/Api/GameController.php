@@ -2083,9 +2083,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 
@@ -2304,6 +2304,11 @@ class GameController extends Controller
             $q->where('parent_type', \App\Models\Container::PARENT_TYPE_PLAYER)
                 ->where('parent_id', $player->id);
 
+            $q->orWhere(function ($sq) use ($player) {
+                $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_CACHE_SYNC)
+                    ->where('parent_id', $player->id);
+            });
+
             if (!empty($entityIds)) {
                 $q->orWhere(function ($sq) use ($entityIds) {
                     $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_ENTITY)
@@ -2386,6 +2391,45 @@ class GameController extends Controller
             }
             return response()->json(['success' => true, 'message' => "Azione $action eseguita con successo"]);
         } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function syncObjectCache(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $player = Player::find($validated['player_id']);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        $sessionId = trim((string) ($player->actual_session_id ?? ''));
+        if ($sessionId === '') {
+            return response()->json(['success' => true, 'message' => 'No active session']);
+        }
+
+        try {
+            $disk = \Illuminate\Support\Facades\Storage::disk('object_cache');
+            $fileName = ObjectCache::volumeCachePath($sessionId);
+            $diskFileName = 'object_cache_player_' . $player->id . '.json';
+
+            if (!$disk->exists($diskFileName)) {
+                return response()->json(['success' => true, 'message' => 'No object cache file to sync']);
+            }
+
+            $content = $disk->get($diskFileName);
+            $containerService->writePlayerVolumeFile($player, $fileName, $content);
+
+            return response()->json(['success' => true, 'message' => 'Object cache synced to volume']);
+        } catch (\Throwable $e) {
+            \Log::error('ObjectCache sync failed', [
+                'player_id' => $player->id,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

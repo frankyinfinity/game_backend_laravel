@@ -51,6 +51,10 @@ class BuildDockerImage extends Command
                 'name' => 'ws-gateway:latest',
                 'path' => base_path('docker/ws-gateway')
             ],
+            [
+                'name' => 'cache-sync:latest',
+                'path' => base_path('docker/cache-sync')
+            ],
         ];
 
         foreach ($images as $image) {

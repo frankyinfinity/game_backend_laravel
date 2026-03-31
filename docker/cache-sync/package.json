@@ -1,0 +1,7 @@
+{
+  "name": "cache-sync-service",
+  "version": "1.0.0",
+  "description": "Cache Sync Docker service - syncs object_cache from storage to volume",
+  "main": "index.js",
+  "dependencies": {}
+}

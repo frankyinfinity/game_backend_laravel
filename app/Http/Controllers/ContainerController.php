@@ -330,6 +330,10 @@ class ContainerController extends Controller
                         $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_OBJECTIVE)
                             ->where('parent_id', $player->id);
                     })
+                    ->orWhere(function ($subQuery) use ($player) {
+                        $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_CACHE_SYNC)
+                            ->where('parent_id', $player->id);
+                    })
                     ->orWhere(function ($subQuery) use ($entityIds) {
                         $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_ENTITY)
                             ->whereIn('parent_id', $entityIds);
@@ -347,6 +351,7 @@ class ContainerController extends Controller
             DockerContainer::PARENT_TYPE_PLAYER => 'Player #' . $player->id,
             DockerContainer::PARENT_TYPE_MAP => 'Map #' . ($player->birth_region_id ?? '-'),
             DockerContainer::PARENT_TYPE_OBJECTIVE => 'Objective #' . $player->id,
+            DockerContainer::PARENT_TYPE_CACHE_SYNC => 'CacheSync #' . $player->id,
             DockerContainer::PARENT_TYPE_ENTITY => 'Entity #' . $container->parent_id,
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element #' . $container->parent_id,
             default => (string) $container->parent_type,
@@ -359,6 +364,7 @@ class ContainerController extends Controller
             DockerContainer::PARENT_TYPE_PLAYER => '#3b82f6',
             DockerContainer::PARENT_TYPE_MAP => '#10b981',
             DockerContainer::PARENT_TYPE_OBJECTIVE => '#a855f7',
+            DockerContainer::PARENT_TYPE_CACHE_SYNC => '#06b6d4',
             DockerContainer::PARENT_TYPE_ENTITY => '#f59e0b',
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => '#ef4444',
             default => '#64748b',
@@ -371,6 +377,7 @@ class ContainerController extends Controller
             DockerContainer::PARENT_TYPE_PLAYER => 'Player',
             DockerContainer::PARENT_TYPE_MAP => 'Map',
             DockerContainer::PARENT_TYPE_OBJECTIVE => 'Objective',
+            DockerContainer::PARENT_TYPE_CACHE_SYNC => 'CacheSync',
             DockerContainer::PARENT_TYPE_ENTITY => 'Entity',
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element',
             default => (string) $type,
@@ -383,6 +390,7 @@ class ContainerController extends Controller
             DockerContainer::PARENT_TYPE_PLAYER => 0,
             DockerContainer::PARENT_TYPE_MAP => 1,
             DockerContainer::PARENT_TYPE_OBJECTIVE => 2,
+            DockerContainer::PARENT_TYPE_CACHE_SYNC => 5,
             DockerContainer::PARENT_TYPE_ENTITY => 3,
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 4,
             default => 9,

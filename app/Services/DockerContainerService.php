@@ -60,6 +60,7 @@ class DockerContainerService
         $this->createMapContainer($birthRegion, $player->id, false);
         $this->createPlayerContainer($player, false);
         $this->createObjectiveContainer($player, false);
+        $this->createCacheSyncContainer($player, false);
     }
 
     public function startContainersForPlayer(Player $player): void
@@ -233,6 +234,40 @@ class DockerContainerService
             'container_id' => $containerId,
             'name' => $name,
             'parent_type' => Container::PARENT_TYPE_OBJECTIVE,
+            'parent_id' => $player->id,
+            'ws_port' => null,
+        ]);
+    }
+
+    public function createCacheSyncContainer(Player $player, bool $start = false): Container
+    {
+        $imageName = 'cache-sync:latest';
+        $this->ensureImageExists($imageName);
+        $this->ensurePlayerVolume($player);
+
+        $name = 'cache_sync_' . $player->id;
+        $env = [
+            'BACKEND_URL=' . $this->backendUrl(),
+            'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+            'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+            'PLAYER_ID=' . $player->id,
+        ];
+        $labels = $this->playerGroupingLabels($player->id, 'cache-sync');
+
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            null,
+            $start,
+            $this->playerVolumeMount($player)
+        );
+
+        return Container::query()->create([
+            'container_id' => $containerId,
+            'name' => $name,
+            'parent_type' => Container::PARENT_TYPE_CACHE_SYNC,
             'parent_id' => $player->id,
             'ws_port' => null,
         ]);
@@ -532,6 +567,9 @@ class DockerContainerService
                 })->orWhere(function ($sq2) use ($player) {
                     $sq2->where('parent_type', Container::PARENT_TYPE_PLAYER)
                         ->where('parent_id', $player->id);
+                })->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_CACHE_SYNC)
+                        ->where('parent_id', $player->id);
                 });
                 if (!empty($elementHasPositionIds)) {
                     $q->orWhere(function ($sq2) use ($elementHasPositionIds) {
@@ -784,6 +822,10 @@ class DockerContainerService
                 case Container::PARENT_TYPE_ELEMENT_HAS_POSITION:
                     $element = ElementHasPosition::find($parentId);
                     return $element ? $this->createElementHasPositionContainer($element, $start) : null;
+
+                case Container::PARENT_TYPE_CACHE_SYNC:
+                    $player = Player::find($parentId);
+                    return $player ? $this->createCacheSyncContainer($player, $start) : null;
 
                 default:
                     return null;
