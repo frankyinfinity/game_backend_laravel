@@ -3,6 +3,7 @@
         <h4 class="mb-0">Mappa</h5>
     </div>
     <div class="card-body" style="overflow: auto;">
+        <div id="map-tooltip" style="display:none; position:fixed; background:#1F2937; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; pointer-events:none; z-index:9999; white-space:nowrap;"></div>
         <div class="row">
             <div class="col-12 mb-3">
                 <div class="d-flex flex-wrap" style="gap: 8px;">
@@ -176,6 +177,28 @@
                 refreshPreviewFromHover();
             }
 
+            function showTooltip(event, text) {
+                const tip = document.getElementById('map-tooltip');
+                tip.textContent = text;
+                tip.style.display = 'block';
+                const rect = pickerApp.view.getBoundingClientRect();
+                tip.style.left = (rect.left + event.global.x + 10) + 'px';
+                tip.style.top = (rect.top + event.global.y - 30) + 'px';
+            }
+
+            function showTooltipMap(event, text) {
+                const tip = document.getElementById('map-tooltip');
+                tip.textContent = text;
+                tip.style.display = 'block';
+                const rect = mapApp.view.getBoundingClientRect();
+                tip.style.left = (rect.left + event.global.x + 10) + 'px';
+                tip.style.top = (rect.top + event.global.y - 30) + 'px';
+            }
+
+            function hideTooltip() {
+                document.getElementById('map-tooltip').style.display = 'none';
+            }
+
             function setSelectedTile(tileId, tileColor, generatorId, generatorSymbol) {
                 tile_selected_id = String(tileId);
                 tile_selected_color = tileColor;
@@ -269,14 +292,22 @@
                     handleTileInteraction(i, j, true);
                     refreshPreviewFromHover();
                 });
-                graphic.on('pointerover', function () {
+                graphic.on('pointerover', function (event) {
                     hoveredCell = { i: i, j: j };
                     if (isPainting && activeTool === 'paint') {
                         handleTileInteraction(i, j, true);
                     }
+                    const tileObj = tileById[String(state.id)];
+                    let tipText = tileObj ? tileObj.name : 'Tile';
+                    if (state.generatorId && state.generatorSymbol) {
+                        const genObj = generatorById[String(state.generatorId)];
+                        tipText += ' - ' + (genObj ? genObj.name + ' (' + genObj.symbol + ')' : state.generatorSymbol);
+                    }
+                    showTooltipMap(event, tipText);
                     refreshPreviewFromHover();
                 });
                 graphic.on('pointerout', function () {
+                    hideTooltip();
                     if (hoveredCell && hoveredCell.i === i && hoveredCell.j === j) {
                         hoveredCell = null;
                         clearPreview();
@@ -484,6 +515,13 @@
                         setActiveTool('paint');
                     });
 
+                    itemContainer.on('pointerover', function (event) {
+                        showTooltip(event, tile.name);
+                    });
+                    itemContainer.on('pointerout', function () {
+                        hideTooltip();
+                    });
+
                     const pickerItem = {
                         background: background,
                         label: label,
@@ -557,8 +595,18 @@
 
                         const genId = 'gen_' + gen.id;
                         itemContainer.on('pointertap', function () {
-                            setSelectedTile(tile_selected_id, tile_selected_color, gen.id, gen.symbol);
+                            tile_selected_generator_id = gen.id;
+                            tile_selected_generator_symbol = gen.symbol;
+                            updatePickerSelection();
+                            refreshPreviewFromHover();
                             setActiveTool('paint');
+                        });
+
+                        itemContainer.on('pointerover', function (event) {
+                            showTooltip(event, gen.name + ' (' + gen.symbol + ')');
+                        });
+                        itemContainer.on('pointerout', function () {
+                            hideTooltip();
                         });
 
                         const pickerItem = {
@@ -725,12 +773,23 @@
                         return;
                     }
                     dragChangedKeys[key] = true;
-                    applyChange(cell.i, cell.j, {
-                        id: tile_selected_id,
-                        color: tile_selected_color,
-                        generatorId: tile_selected_generator_id,
-                        generatorSymbol: tile_selected_generator_symbol
-                    }, changeSet);
+
+                    const current = tileStates[key];
+                    if (tile_selected_generator_id && current && current.id === tile_selected_id) {
+                        applyChange(cell.i, cell.j, {
+                            id: current.id,
+                            color: current.color,
+                            generatorId: tile_selected_generator_id,
+                            generatorSymbol: tile_selected_generator_symbol
+                        }, changeSet);
+                    } else {
+                        applyChange(cell.i, cell.j, {
+                            id: tile_selected_id,
+                            color: tile_selected_color,
+                            generatorId: tile_selected_generator_id,
+                            generatorSymbol: tile_selected_generator_symbol
+                        }, changeSet);
+                    }
                 });
             }
 
