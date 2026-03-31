@@ -2083,9 +2083,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        return response()->json($result['body'], $result['status']);
-        //return response()->json(['success' => true]);
+        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        //return response()->json($result['body'], $result['status']);
+        return response()->json(['success' => true]);
 
     }
 
@@ -2300,28 +2300,28 @@ class GameController extends Controller
         $elementHasPositionIds = \App\Models\ElementHasPosition::where('player_id', $player->id)->pluck('id')->toArray();
         $birthRegionId = (int) ($player->birth_region_id ?? 0);
 
-        $containers = \App\Models\Container::where(function($q) use ($player, $entityIds, $elementHasPositionIds, $birthRegionId) {
+        $containers = \App\Models\Container::where(function ($q) use ($player, $entityIds, $elementHasPositionIds, $birthRegionId) {
             $q->where('parent_type', \App\Models\Container::PARENT_TYPE_PLAYER)
-              ->where('parent_id', $player->id);
-            
+                ->where('parent_id', $player->id);
+
             if (!empty($entityIds)) {
-                $q->orWhere(function($sq) use ($entityIds) {
+                $q->orWhere(function ($sq) use ($entityIds) {
                     $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_ENTITY)
-                       ->whereIn('parent_id', $entityIds);
+                        ->whereIn('parent_id', $entityIds);
                 });
             }
-            
+
             if (!empty($elementHasPositionIds)) {
-                $q->orWhere(function($sq) use ($elementHasPositionIds) {
+                $q->orWhere(function ($sq) use ($elementHasPositionIds) {
                     $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
-                       ->whereIn('parent_id', $elementHasPositionIds);
+                        ->whereIn('parent_id', $elementHasPositionIds);
                 });
             }
 
             if ($birthRegionId > 0) {
-                $q->orWhere(function($sq) use ($birthRegionId) {
+                $q->orWhere(function ($sq) use ($birthRegionId) {
                     $sq->where('parent_type', \App\Models\Container::PARENT_TYPE_MAP)
-                       ->where('parent_id', $birthRegionId);
+                        ->where('parent_id', $birthRegionId);
                 });
             }
         })->get();
@@ -2333,7 +2333,8 @@ class GameController extends Controller
 
         foreach ($containers as $container) {
             $dockerName = $container->container_id;
-            if (!$dockerName) continue;
+            if (!$dockerName)
+                continue;
 
             $status = $containerService->getContainerStatus($dockerName);
             $stats = ($status === 'running') ? $containerService->getContainerStats($dockerName) : [];

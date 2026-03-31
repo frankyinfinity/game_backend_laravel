@@ -2,11 +2,8 @@
 
 namespace App\Custom\Manipulation;
 
-use App\Jobs\DeleteObjectCacheFromPlayerVolumeJob;
-use App\Jobs\WriteObjectCacheToPlayerVolumeJob;
 use App\Models\Player;
-use App\Services\DockerContainerService;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -29,24 +26,14 @@ class ObjectCache
     }
 
     /**
-     * Queue the buffer persistence to the player volume and clear memory.
+     * Queue the buffer persistence to disk and clear memory.
      */
     public static function flush(string $sessionId): void
     {
         if (isset(self::$buffers[$sessionId])) {
-            $player = self::resolvePlayer($sessionId);
-            
-            if ($player === null || $player->id == 1) {
-                if (self::$dirty[$sessionId] ?? false) {
-                    Cache::put('object_cache_' . $sessionId, self::$buffers[$sessionId], now()->addHours(24));
-                }
-            } elseif (self::$dirty[$sessionId] ?? false) {
-                \Log::info('ObjectCache flush verso volume player', [
-                    'session_id' => $sessionId,
-                    'player_id' => $player->id,
-                    'entries' => count(self::$buffers[$sessionId]),
-                ]);
-                self::writeToPlayerStorage($player, $sessionId, self::$buffers[$sessionId]);
+            if (self::$dirty[$sessionId] ?? false) {
+                $player = self::resolvePlayer($sessionId);
+                self::writeToDisk($sessionId, self::$buffers[$sessionId], $player);
             }
 
             unset(self::$buffers[$sessionId]);
@@ -130,15 +117,7 @@ class ObjectCache
         unset(self::$dirty[$sessionId]);
 
         $player = self::resolvePlayer($sessionId);
-        
-        // Se non c'è un player associato o è il player 1, pulisci la Cache
-        if ($player === null || $player->id == 1) {
-            Cache::forget('object_cache_' . $sessionId);
-        }
-
-        if ($player !== null) {
-            self::deletePlayerStorage($player, $sessionId);
-        }
+        self::deleteFromDisk($sessionId, $player);
     }
 
     private static function read(string $sessionId): array
@@ -148,13 +127,7 @@ class ObjectCache
         }
 
         $player = self::resolvePlayer($sessionId);
-        
-        // Se è il player 1 o non c'è un player associato alla sessione (es. init_session_id), usa la Cache di Laravel
-        if ($player === null || $player->id == 1) {
-            return Cache::get('object_cache_' . $sessionId) ?? [];
-        }
-
-        return self::readFromPlayerStorage($player, $sessionId);
+        return self::readFromDisk($sessionId, $player);
     }
 
     private static function resolvePlayer(string $sessionId): ?Player
@@ -190,15 +163,7 @@ class ObjectCache
         }
 
         $player = self::resolvePlayer($sessionId);
-        
-        // Se è il player 1 o non c'è un player associato alla sessione, usa la Cache
-        if ($player === null || $player->id == 1) {
-            Cache::put('object_cache_' . $sessionId, $data, now()->addHours(24));
-            self::$dirty[$sessionId] = false;
-            return;
-        }
-
-        self::writeToPlayerStorage($player, $sessionId, $data);
+        self::writeToDisk($sessionId, $data, $player);
         self::$dirty[$sessionId] = false;
     }
 
@@ -221,71 +186,77 @@ class ObjectCache
     {
         $sessionId = trim($sessionId);
         if ($sessionId === '') {
-            throw new InvalidArgumentException('Il session_id non può essere vuoto.');
+            throw new InvalidArgumentException('Il session_id non puo essere vuoto.');
+        }
+
+        $player = self::resolvePlayer($sessionId);
+        if ($player !== null) {
+            return self::playerFileName($player->id);
         }
 
         $safeSessionId = preg_replace('/[^A-Za-z0-9._-]/', '_', $sessionId);
-        return $safeSessionId . '.json';
+        return 'object_cache_session_' . $safeSessionId . '.json';
     }
 
-    private static function readFromPlayerStorage(Player $player, string $sessionId): array
+    private static function diskFileName(string $sessionId, ?Player $player = null): string
     {
-        $service = app(DockerContainerService::class);
-        $json = $service->readPlayerVolumeFile($player, self::volumeCachePath($sessionId));
+        $sessionId = trim($sessionId);
+        if ($sessionId === '') {
+            throw new InvalidArgumentException('Il session_id non puo essere vuoto.');
+        }
 
-        if ($json === null || trim($json) === '') {
-            $legacyJson = $service->readPlayerVolumeFile($player, self::legacyVolumeCachePath($sessionId));
-            if ($legacyJson !== null && trim($legacyJson) !== '') {
-                return self::decodePlayerStorage($legacyJson);
-            }
+        if ($player !== null) {
+            return self::playerFileName($player->id);
+        }
 
+        $safeSessionId = preg_replace('/[^A-Za-z0-9._-]/', '_', $sessionId);
+        return 'object_cache_session_' . $safeSessionId . '.json';
+    }
+
+    private static function playerFileName(int $playerId): string
+    {
+        return 'object_cache_player_' . $playerId . '.json';
+    }
+
+    private static function readFromDisk(string $sessionId, ?Player $player = null): array
+    {
+        $disk = Storage::disk('object_cache');
+        $path = self::diskFileName($sessionId, $player);
+
+        if (!$disk->exists($path)) {
             return [];
         }
 
-        return self::decodePlayerStorage($json);
-    }
-
-    private static function writeToPlayerStorage(Player $player, string $sessionId, array $data): void
-    {
-        // Se è il player 1, salva in Cache invece che nel volume
-        if ($player->id == 1) {
-            Cache::put('object_cache_' . $sessionId, $data, now()->addHours(24));
-            return;
+        $json = $disk->get($path);
+        if ($json === null || trim($json) === '') {
+            return [];
         }
 
-        WriteObjectCacheToPlayerVolumeJob::dispatch($player, $sessionId, $data)->afterCommit();
-
-        \Log::info('ObjectCache accodato per il salvataggio nel volume player', [
-            'session_id' => $sessionId,
-            'player_id' => $player->id,
-            'path' => self::volumeCachePath($sessionId),
-            'entries' => count($data),
-        ]);
+        return self::decodeJson($json);
     }
 
-    private static function deletePlayerStorage(Player $player, string $sessionId): void
+    private static function writeToDisk(string $sessionId, array $data, ?Player $player = null): void
     {
-        // Se è il player 1, rimuovi dalla Cache
-        if ($player->id == 1) {
-            Cache::forget('object_cache_' . $sessionId);
-            return;
+        try {
+            $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new RuntimeException('Impossibile serializzare ObjectCache per il disk locale: ' . $e->getMessage(), 0, $e);
         }
 
-        DeleteObjectCacheFromPlayerVolumeJob::dispatch($player, $sessionId)->afterCommit();
-
-        \Log::info('ObjectCache accodato per la rimozione dal volume player', [
-            'session_id' => $sessionId,
-            'player_id' => $player->id,
-            'path' => self::volumeCachePath($sessionId),
-        ]);
+        Storage::disk('object_cache')->put(self::diskFileName($sessionId, $player), $json);
     }
 
-    private static function decodePlayerStorage(string $json): array
+    private static function deleteFromDisk(string $sessionId, ?Player $player = null): void
+    {
+        Storage::disk('object_cache')->delete(self::diskFileName($sessionId, $player));
+    }
+
+    private static function decodeJson(string $json): array
     {
         try {
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            throw new RuntimeException('Impossibile leggere ObjectCache dal volume del player: ' . $e->getMessage(), 0, $e);
+            throw new RuntimeException('Impossibile leggere ObjectCache dal disk: ' . $e->getMessage(), 0, $e);
         }
 
         return is_array($decoded) ? $decoded : [];

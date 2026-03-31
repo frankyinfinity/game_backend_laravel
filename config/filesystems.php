@@ -92,6 +92,12 @@ return [
             'throw' => false,
         ],
 
+        'object_cache' => [
+            'driver' => 'local',
+            'root' => storage_path('app/object_cache'),
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
