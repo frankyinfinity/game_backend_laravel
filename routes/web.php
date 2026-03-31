@@ -92,6 +92,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/chimical-elements/list/table', [App\Http\Controllers\ChimicalElementController::class, 'listDataTable'])->name('chimical-elements.datatable');
     Route::post('/chimical-elements/delete', [App\Http\Controllers\ChimicalElementController::class, 'delete'])->name('chimical-elements.delete');
 
+    //Complex Chimical Elements
+    Route::resource('complex-chimical-elements', App\Http\Controllers\ComplexChimicalElementController::class);
+    Route::post('/complex-chimical-elements/list/table', [App\Http\Controllers\ComplexChimicalElementController::class, 'listDataTable'])->name('complex-chimical-elements.datatable');
+    Route::post('/complex-chimical-elements/delete', [App\Http\Controllers\ComplexChimicalElementController::class, 'delete'])->name('complex-chimical-elements.delete');
+
     //Elements
     Route::resource('elements', App\Http\Controllers\ElementController::class);
     Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');

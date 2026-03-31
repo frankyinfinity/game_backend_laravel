@@ -376,6 +376,11 @@ return [
                     'text' => 'Elementi Chimici',
                     'url'  => '/chimical-elements',
                     'icon' => 'fas fa-atom',
+                ],
+                [
+                    'text' => 'Elementi Chimici Complessi',
+                    'url'  => '/complex-chimical-elements',
+                    'icon' => 'fas fa-atom',
                 ]
             ]
         ],
