@@ -369,6 +369,17 @@ return [
             ]
         ],
         [
+            'text'    => 'Elementi Chimici',
+            'icon'    => 'fas fa-flask',
+            'submenu' => [
+                [
+                    'text' => 'Elementi Chimici',
+                    'url'  => '/chimical-elements',
+                    'icon' => 'fas fa-atom',
+                ]
+            ]
+        ],
+        [
             'text'    => 'Obiettivi',
             'icon'    => 'fas fa-trophy',
             'submenu' => [
