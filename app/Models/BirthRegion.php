@@ -16,5 +16,9 @@ class BirthRegion extends Model
     public function birthClimate(){
         return $this->belongsTo(BirthClimate::class);
     }
-    
+
+    public function birthRegionDetails(){
+        return $this->hasMany(BirthRegionDetail::class);
+    }
+
 }

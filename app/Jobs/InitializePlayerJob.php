@@ -11,6 +11,7 @@ use App\Models\Region;
 use App\Models\BirthPlanet;
 use App\Models\BirthRegion;
 use App\Models\BirthClimate;
+use App\Models\BirthRegionDetail;
 use App\Models\Score;
 use App\Models\PlayerHasScore;
 use App\Models\EntityInformation;
@@ -77,11 +78,37 @@ class InitializePlayerJob implements ShouldQueue
                 'filename' => $filename,
             ]);
 
+            $jsonEntries = [];
             if ($filename !== null) {
                 $jsonContent = Storage::disk('regions')->get($itemRegion->id . '/' . $filename);
                 $json = json_decode($jsonContent, true);
                 $jsonData = json_encode($json, JSON_PRETTY_PRINT);
                 Storage::disk('birth_regions')->put($birthRegion->id . '/' . $filename, $jsonData);
+
+                if (is_array($json)) {
+                    foreach ($json as $entry) {
+                        $tileI = $entry['i'] ?? 0;
+                        $tileJ = $entry['j'] ?? 0;
+                        $jsonEntries[$tileI . ':' . $tileJ] = $entry;
+                    }
+                }
+            }
+
+            $defaultTile = $birthClimate->default_tile;
+            for ($ti = 0; $ti < $itemRegion->height; $ti++) {
+                for ($tj = 0; $tj < $itemRegion->width; $tj++) {
+                    $entry = $jsonEntries[$ti . ':' . $tj] ?? null;
+                    $tileData = $entry['tile'] ?? $defaultTile;
+                    $generatorData = $entry['generator'] ?? null;
+
+                    BirthRegionDetail::query()->create([
+                        'birth_region_id' => $birthRegion->id,
+                        'tile_i' => $ti,
+                        'tile_j' => $tj,
+                        'json_tile' => json_encode($tileData),
+                        'json_generator' => $generatorData ? json_encode($generatorData) : null,
+                    ]);
+                }
             }
         }
 
