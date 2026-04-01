@@ -19,6 +19,7 @@ console.log(`WebSocket Port: ${wsPort}`);
 let sessionCookie = null;
 let xsrfToken = null;
 let latestTilesByBirthRegion = null;
+let latestBirthRegionDetails = null;
 
 function findTileInCache(tileI, tileJ) {
   if (!latestTilesByBirthRegion || !Array.isArray(latestTilesByBirthRegion.tiles)) {
@@ -180,8 +181,12 @@ async function bootstrapAndStartLoop() {
     const initialTiles = await callGetTilesByBirthRegion();
     latestTilesByBirthRegion = initialTiles;
     console.log('[Map] Initial get_tiles_by_birth_region completed.');
+
+    const initialDetails = await callGetBirthRegionDetails();
+    latestBirthRegionDetails = initialDetails;
+    console.log('[Map] Initial get_birth_region_details completed.');
   } catch (error) {
-    console.error(`[Map] Initial get_tiles_by_birth_region error: ${error.message}`);
+    console.error(`[Map] Initial bootstrap error: ${error.message}`);
   }
 
   scheduleNextCycle();
@@ -252,15 +257,30 @@ function callGetTilesByBirthRegion() {
   );
 }
 
+function callGetBirthRegionDetails() {
+  return callGameApi(
+    '/api/auth/game/get_birth_region_details',
+    { birth_region_id: birthRegionId },
+    'get_birth_region_details'
+  );
+}
+
 async function runCycle() {
   const results = await Promise.allSettled([
     callSetElementInMap(),
     callGetTilesByBirthRegion(),
+    callGetBirthRegionDetails(),
   ]);
 
   const getTilesResult = results[1];
   if (getTilesResult && getTilesResult.status === 'fulfilled') {
     latestTilesByBirthRegion = getTilesResult.value;
+  }
+
+  const getDetailsResult = results[2];
+  if (getDetailsResult && getDetailsResult.status === 'fulfilled') {
+    latestBirthRegionDetails = getDetailsResult.value;
+    console.log('[Map] Latest Birth Region Details');
   }
 
   for (const result of results) {

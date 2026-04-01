@@ -19,6 +19,8 @@ use App\Models\Gene;
 use App\Models\Tile;
 use App\Models\Element;
 use App\Models\BirthRegion;
+use App\Models\BirthRegionDetail;
+use App\Models\BirthRegionDetailData;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
 use App\Models\ElementHasPosition;
@@ -755,6 +757,28 @@ class GameController extends Controller
             'success' => true,
             'birth_region_id' => $birthRegionId,
             'tiles' => $tiles,
+        ]);
+    }
+
+    public function getBirthRegionDetails(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $birthRegionId = (int) $request->input('birth_region_id');
+        if ($birthRegionId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'birth_region_id obbligatorio',
+            ], 422);
+        }
+
+        $details = BirthRegionDetail::query()
+            ->where('birth_region_id', $birthRegionId)
+            ->with(['birthRegionDetailData'])
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'birth_region_id' => $birthRegionId,
+            'details' => $details,
         ]);
     }
 
