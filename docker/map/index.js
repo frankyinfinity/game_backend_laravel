@@ -31,6 +31,16 @@ function findTileInCache(tileI, tileJ) {
   )) || null;
 }
 
+function findDetailsInCache(tileI, tileJ) {
+  if (!latestBirthRegionDetails || !Array.isArray(latestBirthRegionDetails.details)) {
+    return null;
+  }
+
+  return latestBirthRegionDetails.details.find((detail) => (
+    Number(detail.tile_i) === Number(tileI) && Number(detail.tile_j) === Number(tileJ)
+  )) || null;
+}
+
 function handleWebSocketCommand(data, ws) {
   const { command, params } = data || {};
 
@@ -60,6 +70,29 @@ function handleWebSocketCommand(data, ws) {
     ws.send(JSON.stringify({
       success: true,
       tile,
+    }));
+    return;
+  }
+
+  if (command === 'get_birth_region_details') {
+    const tileI = params ? params.tile_i : undefined;
+    const tileJ = params ? params.tile_j : undefined;
+
+    if (tileI === undefined || tileJ === undefined) {
+      ws.send(JSON.stringify({
+        success: false,
+        error: 'Missing tile_i or tile_j',
+      }));
+      return;
+    }
+
+    const detail = findDetailsInCache(tileI, tileJ);
+    
+    ws.send(JSON.stringify({
+      success: true,
+      detail,
+      tile_i: Number(tileI),
+      tile_j: Number(tileJ),
     }));
     return;
   }
