@@ -21,4 +21,9 @@ class BirthRegionDetail extends Model
         return $this->belongsTo(BirthRegion::class);
     }
 
+    public function birthRegionDetailData()
+    {
+        return $this->hasMany(BirthRegionDetailData::class);
+    }
+
 }

@@ -12,6 +12,8 @@ use App\Models\BirthPlanet;
 use App\Models\BirthRegion;
 use App\Models\BirthClimate;
 use App\Models\BirthRegionDetail;
+use App\Models\BirthRegionDetailData;
+use App\Models\GeneratorChimicalElement;
 use App\Models\Score;
 use App\Models\PlayerHasScore;
 use App\Models\EntityInformation;
@@ -101,13 +103,30 @@ class InitializePlayerJob implements ShouldQueue
                     $tileData = $entry['tile'] ?? $defaultTile;
                     $generatorData = $entry['generator'] ?? null;
 
-                    BirthRegionDetail::query()->create([
+                    $birthRegionDetail = BirthRegionDetail::query()->create([
                         'birth_region_id' => $birthRegion->id,
                         'tile_i' => $ti,
                         'tile_j' => $tj,
                         'json_tile' => json_encode($tileData),
                         'json_generator' => $generatorData ? json_encode($generatorData) : null,
                     ]);
+
+                    if ($generatorData !== null && isset($generatorData['id'])) {
+                        $generator = GeneratorChimicalElement::with('chimicalElement')->find($generatorData['id']);
+                        if ($generator !== null) {
+                            $chimicalElement = $generator->chimicalElement;
+                            BirthRegionDetailData::query()->create([
+                                'birth_region_detail_id' => $birthRegionDetail->id,
+                                'json_chimical_element' => $chimicalElement ? json_encode([
+                                    'id' => $chimicalElement->id,
+                                    'name' => $chimicalElement->name,
+                                    'symbol' => $chimicalElement->symbol,
+                                ]) : null,
+                                'json_complex_chimical_element' => null,
+                                'quantity' => $generator->tick_quantity,
+                            ]);
+                        }
+                    }
                 }
             }
         }
