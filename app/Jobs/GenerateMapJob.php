@@ -108,6 +108,7 @@ class GenerateMapJob implements ShouldQueue
         $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
         $jsContentClickTileTemplate = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentClickTileTemplate);
         $jsContentClickTileTemplate = str_replace('__PLAYER_ID__', (string) $player->id, $jsContentClickTileTemplate);
+        $jsContentClickTileTemplate = str_replace('__MAP_CONTAINER_NAME__', 'map_' . $birthRegion->id, $jsContentClickTileTemplate);
         $jsContentPointerTileTemplate = file_get_contents($jsPathPointerTile);
 
         ObjectCache::buffer($player->actual_session_id);
@@ -162,11 +163,9 @@ class GenerateMapJob implements ShouldQueue
                 $square->setOrigin($pixelX, $pixelY);
                 $square->setSize($tileSize);
                 $square->setColor($squareColor);
-                if($tile['type'] == Tile::TYPE_LIQUID) {
-                    $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
-                    $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
-                    $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
-                }
+                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
+                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
+                $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
 
                 //Draw
                 $squareJson = ScrollGroup::attach($square->buildJson(), Helper::MAP_SCROLL_GROUP_MAIN);

@@ -2,11 +2,13 @@
     window['__name__'] = function() {
 
         let actual_focus_uid_entity = AppData.actual_focus_uid_entity ?? null;
+        let actual_focus_uid_element = AppData.actual_focus_uid_element ?? null;
+        let i = '__i__';
+        let j = '__j__';
+
         if (actual_focus_uid_entity !== null) {
 
             let playerId = '__PLAYER_ID__';
-            let i = '__i__';
-            let j = '__j__';
             let ports = (window.entityWsPorts && typeof window.entityWsPorts === 'object')
                 ? window.entityWsPorts
                 : JSON.parse('__ports__');
@@ -80,6 +82,38 @@
                 return;
             }
             connectAndSend(port);
+
+        } else if (actual_focus_uid_element === null) {
+
+            var mapContainerName = '__MAP_CONTAINER_NAME__';
+            window.gameWebSockets = window.gameWebSockets || {};
+            var mapWs = window.gameWebSockets[mapContainerName];
+
+            if (!mapWs || mapWs.readyState === WebSocket.CLOSED || mapWs.readyState === WebSocket.CLOSING) {
+                console.warn('Map WebSocket not available for container: ' + mapContainerName);
+                return;
+            }
+
+            if (mapWs.readyState === WebSocket.OPEN) {
+                mapWs.send(JSON.stringify({
+                    command: 'get_birth_region_details',
+                    params: {
+                        tile_i: i,
+                        tile_j: j
+                    }
+                }));
+
+                var handler = function(event) {
+                    try {
+                        var mapDetails = JSON.parse(event.data);
+                        console.log('Map tile details [' + i + ',' + j + ']:', mapDetails);
+                    } catch (e) {
+                        console.error('Error parsing map tile response:', e);
+                    }
+                    mapWs.removeEventListener('message', handler);
+                };
+                mapWs.addEventListener('message', handler);
+            }
 
         }
 
