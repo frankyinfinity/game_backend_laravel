@@ -87,14 +87,8 @@
 
             var mapContainerName = '__MAP_CONTAINER_NAME__';
             window.gameWebSockets = window.gameWebSockets || {};
-            var mapWs = window.gameWebSockets[mapContainerName];
 
-            if (!mapWs || mapWs.readyState === WebSocket.CLOSED || mapWs.readyState === WebSocket.CLOSING) {
-                console.warn('Map WebSocket not available for container: ' + mapContainerName);
-                return;
-            }
-
-            if (mapWs.readyState === WebSocket.OPEN) {
+            var showTilePanel = function(mapWs) {
                 mapWs.send(JSON.stringify({
                     command: 'get_birth_region_details',
                     params: {
@@ -132,13 +126,190 @@
                         });
 
                         console.log('Lines:', lines);
+
+                        var panelUid = 'tile_panel';
+                        var tileSize = 40;
+                        var mapStartX = 0;
+                        var mapStartY = 80;
+
+                        var tileX = (j * tileSize) + mapStartX;
+                        var tileY = (i * tileSize) + mapStartY;
+
+                        var panelWidth = 320;
+                        var panelHeight = 400;
+                        var panelX = tileX + tileSize + 10;
+                        var panelY = tileY;
+
+                        if (panelX + panelWidth > window.innerWidth) {
+                            panelX = tileX - panelWidth - 10;
+                        }
+                        if (panelY + panelHeight > window.innerHeight) {
+                            panelY = window.innerHeight - panelHeight - 10;
+                        }
+                        if (panelY < 80) panelY = 80;
+
+                        var allUids = [
+                            panelUid + '_body',
+                            panelUid + '_header',
+                            panelUid + '_title',
+                            panelUid + '_close_button',
+                            panelUid + '_close_text'
+                        ];
+                        for (var ci = 0; ci < 10; ci++) {
+                            allUids.push(panelUid + '_content_' + ci);
+                        }
+
+                        for (var hi = 0; hi < allUids.length; hi++) {
+                            var huid = allUids[hi];
+                            if (shapes[huid]) shapes[huid].renderable = false;
+                            if (objects[huid] && objects[huid].attributes) {
+                                objects[huid].attributes.renderable = false;
+                            }
+                        }
+
+                        var bodyUid = panelUid + '_body';
+                        var bodyObj = objects[bodyUid];
+                        var bodyShape = shapes[bodyUid];
+                        if (!bodyObj || !bodyShape) {
+                            console.warn('Tile panel not found in draw objects');
+                            return;
+                        }
+
+                        var dx = panelX - (bodyObj.x || 0);
+                        var dy = panelY - (bodyObj.y || 0);
+
+                        function movePanelElement(uid, deltaX, deltaY) {
+                            var obj = objects[uid];
+                            var shape = shapes[uid];
+                            if (!obj || !shape) return;
+                            if (typeof obj.x === 'number') {
+                                obj.x += deltaX;
+                                shape.x += deltaX;
+                            }
+                            if (typeof obj.y === 'number') {
+                                obj.y += deltaY;
+                                shape.y += deltaY;
+                            }
+                        }
+
+                        for (var mi = 0; mi < allUids.length; mi++) {
+                            movePanelElement(allUids[mi], dx, dy);
+                        }
+
+                        var titleUid = panelUid + '_title';
+                        if (shapes[titleUid]) {
+                            shapes[titleUid].text = 'Dettagli Tile [' + i + ', ' + j + ']';
+                            shapes[titleUid].renderable = true;
+                        }
+                        if (objects[titleUid]) {
+                            objects[titleUid].text = 'Dettagli Tile [' + i + ', ' + j + ']';
+                            if (objects[titleUid].attributes) objects[titleUid].attributes.renderable = true;
+                        }
+
+                        var maxLines = 10;
+                        for (var li = 0; li < maxLines; li++) {
+                            var lineUid = panelUid + '_content_' + li;
+                            var lineText = li < lines.length ? ('* ' + lines[li]) : '';
+                            if (shapes[lineUid]) {
+                                shapes[lineUid].text = lineText;
+                                shapes[lineUid].renderable = li < lines.length;
+                            }
+                            if (objects[lineUid]) {
+                                objects[lineUid].text = lineText;
+                                if (objects[lineUid].attributes) objects[lineUid].attributes.renderable = li < lines.length;
+                            }
+                        }
+
+                        if (lines.length === 0) {
+                            var emptyUid = panelUid + '_content_0';
+                            if (shapes[emptyUid]) {
+                                shapes[emptyUid].text = 'Nessun elemento';
+                                shapes[emptyUid].renderable = true;
+                            }
+                            if (objects[emptyUid]) {
+                                objects[emptyUid].text = 'Nessun elemento';
+                                if (objects[emptyUid].attributes) objects[emptyUid].attributes.renderable = true;
+                            }
+                        }
+
+                        bodyShape.renderable = true;
+                        if (bodyObj.attributes) bodyObj.attributes.renderable = true;
+
+                        var headerUid = panelUid + '_header';
+                        if (shapes[headerUid]) { shapes[headerUid].renderable = true; }
+                        if (objects[headerUid] && objects[headerUid].attributes) objects[headerUid].attributes.renderable = true;
+
+                        var closeBtnUid = panelUid + '_close_button';
+                        if (shapes[closeBtnUid]) { shapes[closeBtnUid].renderable = true; }
+                        if (objects[closeBtnUid] && objects[closeBtnUid].attributes) objects[closeBtnUid].attributes.renderable = true;
+
+                        var closeTxtUid = panelUid + '_close_text';
+                        if (shapes[closeTxtUid]) { shapes[closeTxtUid].renderable = true; }
+                        if (objects[closeTxtUid] && objects[closeTxtUid].attributes) objects[closeTxtUid].attributes.renderable = true;
+
+                        if (!AppData.open_modals || typeof AppData.open_modals !== 'object') {
+                            AppData.open_modals = {};
+                        }
+                        AppData.open_modals[panelUid] = true;
+
+                        if (app && app.stage) app.stage.sortChildren();
+
                     } catch (e) {
                         console.error('Error parsing map tile response:', e);
                     }
                     mapWs.removeEventListener('message', handler);
                 };
                 mapWs.addEventListener('message', handler);
-            }
+            };
+
+            var ensureMapWs = function(callback) {
+                var mapWs = window.gameWebSockets[mapContainerName];
+
+                if (mapWs && mapWs.readyState === WebSocket.OPEN) {
+                    callback(mapWs);
+                    return;
+                }
+
+                if (mapWs && mapWs.readyState === WebSocket.CONNECTING) {
+                    mapWs.addEventListener('open', function() { callback(mapWs); }, { once: true });
+                    return;
+                }
+
+                var wsUrl = window.__mapWsGatewayUrl || null;
+                if (wsUrl) {
+                    var ws = new WebSocket(wsUrl);
+                    window.gameWebSockets[mapContainerName] = ws;
+                    ws.onopen = function() { callback(ws); };
+                    ws.onerror = function(err) { console.error('Map WS connect error:', err); };
+                    return;
+                }
+
+                if (typeof $ !== 'undefined' && typeof BACK_URL !== 'undefined') {
+                    var pid = '__PLAYER_ID__';
+                    $.ajax({
+                        url: BACK_URL + '/api/game/websocket_info',
+                        type: 'POST',
+                        data: { player_id: pid }
+                    }).then(function(response) {
+                        if (!response || !response.success || !response.containers) return;
+                        response.containers.forEach(function(c) {
+                            if (c.name === mapContainerName && c.ws_gateway_url) {
+                                var ws = new WebSocket(c.ws_gateway_url);
+                                window.gameWebSockets[mapContainerName] = ws;
+                                window.__mapWsGatewayUrl = c.ws_gateway_url;
+                                ws.onopen = function() { callback(ws); };
+                                ws.onerror = function(err) { console.error('Map WS connect error:', err); };
+                            }
+                        });
+                    }).catch(function(err) {
+                        console.error('Failed to fetch websocket_info:', err);
+                    });
+                }
+            };
+
+            ensureMapWs(function(mapWs) {
+                showTilePanel(mapWs);
+            });
 
         }
 

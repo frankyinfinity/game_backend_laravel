@@ -6,6 +6,7 @@ use App\Custom\Draw\Complex\EntityDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\Appbar\HomeAppbarDraw;
+use App\Custom\Draw\Complex\TilePanelDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
@@ -30,11 +31,11 @@ class GenerateMapJob implements ShouldQueue
 {
     use Queueable;
 
-    private Array $jobPayload;
+    private array $jobPayload;
     /**
      * Create a new job instance.
      */
-    public function __construct(Array $jobPayload)
+    public function __construct(array $jobPayload)
     {
         $this->jobPayload = $jobPayload;
     }
@@ -44,6 +45,9 @@ class GenerateMapJob implements ShouldQueue
      */
     public function handle(): void
     {
+
+        ini_set('memory_limit', '-1');
+        set_time_limit(0);
 
         $jobPayload = $this->jobPayload;
         $player_id = $jobPayload['player_id'];
@@ -139,7 +143,7 @@ class GenerateMapJob implements ShouldQueue
                 $formattedHexColor = $colorCache[$color];
 
                 //Square
-                $squareUid = 'square_'.$i.'_'.$j;
+                $squareUid = 'square_' . $i . '_' . $j;
 
                 //Click
                 $jsContentClickTile = Helper::setCommonJsCode($jsContentClickTileTemplate, \Illuminate\Support\Str::random(20));
@@ -176,9 +180,9 @@ class GenerateMapJob implements ShouldQueue
                 $tileBorders = new MultiLine();
                 $tileBorders->setThickness(thickness: 1);
                 $tileBorders->setPoint($pixelX, $pixelY);
-                $tileBorders->setPoint($pixelX, $pixelY+$tileSize);
-                $tileBorders->setPoint($pixelX+$tileSize, $pixelY+$tileSize);
-                $tileBorders->setPoint($pixelX+$tileSize, $pixelY);
+                $tileBorders->setPoint($pixelX, $pixelY + $tileSize);
+                $tileBorders->setPoint($pixelX + $tileSize, $pixelY + $tileSize);
+                $tileBorders->setPoint($pixelX + $tileSize, $pixelY);
                 $tileBorders->setPoint($pixelX, $pixelY);
                 $tileBorders->setColor(0xFFFFFF);
 
@@ -189,7 +193,7 @@ class GenerateMapJob implements ShouldQueue
 
                 //Entity
                 $searchEntity = $entitiesByCoord[$i . ':' . $j] ?? null;
-                if($searchEntity !== null) {
+                if ($searchEntity !== null) {
 
                     $entityDraw = new EntityDraw($searchEntity, $square);
 
@@ -234,6 +238,14 @@ class GenerateMapJob implements ShouldQueue
                 $objectDraw = new ObjectDraw($item, $player->actual_session_id);
                 $drawItems[] = $objectDraw->get();
             }
+        }
+
+        // Tile Panel (hidden, shown on tile click)
+        $tilePanel = new TilePanelDraw();
+        $tilePanel->build();
+        foreach ($tilePanel->getDrawItems() as $tilePanelItem) {
+            $objectDraw = new ObjectDraw($tilePanelItem, $player->actual_session_id);
+            $drawItems[] = $objectDraw->get();
         }
 
         $mapMoveScriptPath = resource_path('js/function/map/click_move_map.blade.php');
