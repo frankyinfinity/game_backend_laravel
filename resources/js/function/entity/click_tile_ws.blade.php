@@ -107,6 +107,31 @@
                     try {
                         var mapDetails = JSON.parse(event.data);
                         console.log('Map tile details [' + i + ',' + j + ']:', mapDetails);
+                        
+                        var lines = [];
+                        var detailData = (mapDetails.detail && mapDetails.detail.birth_region_detail_data) ? mapDetails.detail.birth_region_detail_data : [];
+
+                        detailData.forEach(function(item) {
+                            var qty = item.quantity || 0;
+                            var chemicalEl = null;
+                            var complexEl = null;
+
+                            if (item.json_chimical_element) {
+                                try { chemicalEl = JSON.parse(item.json_chimical_element); } catch(e) {}
+                            }
+                            if (item.json_complex_chimical_element) {
+                                try { complexEl = JSON.parse(item.json_complex_chimical_element); } catch(e) {}
+                            }
+
+                            if (chemicalEl) {
+                                lines.push((chemicalEl.name || 'Sconosciuto') + ' (' + (chemicalEl.symbol || '?') + '): ' + qty);
+                            }
+                            if (complexEl) {
+                                lines.push((complexEl.name || 'Sconosciuto') + ' (' + (complexEl.symbol || '?') + '): ' + qty);
+                            }
+                        });
+
+                        console.log('Lines:', lines);
                     } catch (e) {
                         console.error('Error parsing map tile response:', e);
                     }
