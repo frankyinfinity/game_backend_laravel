@@ -797,59 +797,37 @@ class GameController extends Controller
             'birth_region_id' => $birthRegionId,
         ]);
 
-        $detailsWithGenerators = BirthRegionDetail::query()
-            ->where('birth_region_id', $birthRegionId)
-            ->whereNotNull('json_generator')
-            ->get();
+        $birthRegion = $this->findBirthRegionOrError($birthRegionId);
+        if ($birthRegion instanceof \Illuminate\Http\JsonResponse) {
+            return $birthRegion;
+        }
+
+        $detailsWithGenerators = $this->getDetailsWithGenerators($birthRegionId);
 
         $created = 0;
+        $overflowCount = 0;
 
         foreach ($detailsWithGenerators as $birthRegionDetail) {
-            $generatorData = is_string($birthRegionDetail->json_generator)
-                ? json_decode($birthRegionDetail->json_generator, true)
-                : $birthRegionDetail->json_generator;
+            $result = $this->processGeneratorDetail($birthRegionDetail);
 
-            if (!is_array($generatorData) || !isset($generatorData['id'])) {
+            if ($result === null) {
                 continue;
-            }
-
-            $generator = GeneratorChimicalElement::with('chimicalElement')->find($generatorData['id']);
-            if ($generator === null) {
-                continue;
-            }
-
-            $chimicalElement = $generator->chimicalElement;
-
-            $data = [
-                'json_chimical_element' => $chimicalElement ? json_encode([
-                    'id' => $chimicalElement->id,
-                    'name' => $chimicalElement->name,
-                    'symbol' => $chimicalElement->symbol,
-                ]) : null,
-                'json_complex_chimical_element' => null,
-                'quantity' => $generator->tick_quantity,
-            ];
-
-            $existing = BirthRegionDetailData::query()
-                ->where('birth_region_detail_id', $birthRegionDetail->id)
-                ->first();
-
-            if ($existing) {
-                $data['quantity'] = $existing->quantity + $generator->tick_quantity;
-                $existing->update($data);
-            } else {
-                BirthRegionDetailData::query()->create(array_merge($data, [
-                    'birth_region_detail_id' => $birthRegionDetail->id,
-                ]));
             }
 
             $created++;
+
+            $overflowCount += $this->applyOverflowIfNeeded(
+                $birthRegion,
+                $birthRegionDetail,
+                $result['json_chimical_element']
+            );
         }
 
         \Log::info('[calculateChimicalElement] Completato', [
             'birth_region_id' => $birthRegionId,
             'details_with_generators' => $detailsWithGenerators->count(),
             'created' => $created,
+            'overflow_tiles' => $overflowCount,
         ]);
 
         return response()->json([
@@ -857,6 +835,101 @@ class GameController extends Controller
             'birth_region_id' => $birthRegionId,
             'created' => $created,
         ]);
+    }
+
+    private function findBirthRegionOrError(int $birthRegionId): BirthRegion|\Illuminate\Http\JsonResponse
+    {
+        $birthRegion = BirthRegion::find($birthRegionId);
+        if ($birthRegion === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Birth region non trovata',
+            ], 404);
+        }
+        return $birthRegion;
+    }
+
+    private function getDetailsWithGenerators(int $birthRegionId)
+    {
+        return BirthRegionDetail::query()
+            ->where('birth_region_id', $birthRegionId)
+            ->whereNotNull('json_generator')
+            ->get();
+    }
+
+    private function processGeneratorDetail(BirthRegionDetail $birthRegionDetail): ?array
+    {
+        $generatorData = is_string($birthRegionDetail->json_generator)
+            ? json_decode($birthRegionDetail->json_generator, true)
+            : $birthRegionDetail->json_generator;
+
+        if (!is_array($generatorData) || !isset($generatorData['id'])) {
+            return null;
+        }
+
+        $generator = GeneratorChimicalElement::with('chimicalElement')->find($generatorData['id']);
+        if ($generator === null) {
+            return null;
+        }
+
+        $chimicalElement = $generator->chimicalElement;
+
+        $jsonChimicalElement = $chimicalElement ? json_encode([
+            'id' => $chimicalElement->id,
+            'name' => $chimicalElement->name,
+            'symbol' => $chimicalElement->symbol,
+        ]) : null;
+
+        $data = [
+            'json_chimical_element' => $jsonChimicalElement,
+            'json_complex_chimical_element' => null,
+            'quantity' => $generator->tick_quantity,
+        ];
+
+        $existing = BirthRegionDetailData::query()
+            ->where('birth_region_detail_id', $birthRegionDetail->id)
+            ->first();
+
+        if ($existing) {
+            $data['quantity'] = $existing->quantity + $generator->tick_quantity;
+            $existing->update($data);
+        } else {
+            BirthRegionDetailData::query()->create(array_merge($data, [
+                'birth_region_detail_id' => $birthRegionDetail->id,
+            ]));
+        }
+
+        return ['json_chimical_element' => $jsonChimicalElement];
+    }
+
+    private function applyOverflowIfNeeded(
+        BirthRegion $birthRegion,
+        BirthRegionDetail $birthRegionDetail,
+        ?string $jsonChimicalElement
+    ): int {
+        $currentData = BirthRegionDetailData::query()
+            ->where('birth_region_detail_id', $birthRegionDetail->id)
+            ->first();
+
+        if ($currentData === null || $currentData->quantity < 100) {
+            return 0;
+        }
+
+        $excess = $currentData->quantity - 100;
+        $currentData->update(['quantity' => 100]);
+
+        if ($excess > 0) {
+            $this->distributeOverflow(
+                $birthRegion,
+                $birthRegionDetail->tile_i,
+                $birthRegionDetail->tile_j,
+                $excess,
+                $jsonChimicalElement
+            );
+            return 1;
+        }
+
+        return 0;
     }
 
     /**
@@ -2322,6 +2395,73 @@ class GameController extends Controller
         }
 
         return array_values(array_unique($uids));
+    }
+
+    private function distributeOverflow(
+        BirthRegion $birthRegion,
+        int $tileI,
+        int $tileJ,
+        int $excess,
+        ?string $jsonChimicalElement
+    ): void {
+        $directions = [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1],
+        ];
+
+        shuffle($directions);
+
+        $adjacents = [];
+        foreach ($directions as [$di, $dj]) {
+            $ni = $tileI + $di;
+            $nj = $tileJ + $dj;
+
+            if ($ni < 0 || $nj < 0 || $ni >= $birthRegion->height || $nj >= $birthRegion->width) {
+                continue;
+            }
+
+            $adjacentDetail = BirthRegionDetail::query()
+                ->where('birth_region_id', $birthRegion->id)
+                ->where('tile_i', $ni)
+                ->where('tile_j', $nj)
+                ->first();
+
+            if ($adjacentDetail !== null) {
+                $adjacents[] = $adjacentDetail;
+            }
+        }
+
+        if (empty($adjacents)) {
+            return;
+        }
+
+        $remaining = $excess;
+
+        while ($remaining > 0) {
+            $target = $adjacents[array_rand($adjacents)];
+            $portion = rand(1, $remaining);
+
+            $existingData = BirthRegionDetailData::query()
+                ->where('birth_region_detail_id', $target->id)
+                ->first();
+
+            if ($existingData) {
+                $existingData->update([
+                    'quantity' => $existingData->quantity + $portion,
+                ]);
+            } else {
+                BirthRegionDetailData::query()->create([
+                    'birth_region_detail_id' => $target->id,
+                    'json_chimical_element' => $jsonChimicalElement,
+                    'json_complex_chimical_element' => null,
+                    'quantity' => $portion,
+                ]);
+            }
+
+            $remaining -= $portion;
+        }
     }
 
     private function buildPlayerValuesResetCode(int $playerId, string $resetAction): string
