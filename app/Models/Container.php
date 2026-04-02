@@ -14,6 +14,7 @@ class Container extends Model
     const PARENT_TYPE_PLAYER = 'Player';
     const PARENT_TYPE_ELEMENT_HAS_POSITION = 'ElementHasPosition';
     const PARENT_TYPE_CACHE_SYNC = 'CacheSync';
+    const PARENT_TYPE_CHIMICAL_ELEMENT = 'ChimicalElement';
 
     public static function parentTypes(): array
     {
@@ -24,6 +25,7 @@ class Container extends Model
             self::PARENT_TYPE_ENTITY,
             self::PARENT_TYPE_ELEMENT_HAS_POSITION,
             self::PARENT_TYPE_CACHE_SYNC,
+            self::PARENT_TYPE_CHIMICAL_ELEMENT,
         ];
     }
 
@@ -36,6 +38,7 @@ class Container extends Model
             self::PARENT_TYPE_ENTITY => ['label' => 'Entity', 'color' => '#f59e0b', 'order' => 3],
             self::PARENT_TYPE_ELEMENT_HAS_POSITION => ['label' => 'Element', 'color' => '#ef4444', 'order' => 4],
             self::PARENT_TYPE_CACHE_SYNC => ['label' => 'CacheSync', 'color' => '#06b6d4', 'order' => 5],
+            self::PARENT_TYPE_CHIMICAL_ELEMENT => ['label' => 'ChimicalElement', 'color' => '#ec4899', 'order' => 6],
         ];
     }
 }

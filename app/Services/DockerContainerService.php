@@ -61,6 +61,7 @@ class DockerContainerService
         $this->createPlayerContainer($player, false);
         $this->createObjectiveContainer($player, false);
         $this->createCacheSyncContainer($player, false);
+        $this->createChimicalElementContainer($birthRegion, $player->id, false);
     }
 
     public function startContainersForPlayer(Player $player): void
@@ -269,6 +270,39 @@ class DockerContainerService
             'name' => $name,
             'parent_type' => Container::PARENT_TYPE_CACHE_SYNC,
             'parent_id' => $player->id,
+            'ws_port' => null,
+        ]);
+    }
+
+    public function createChimicalElementContainer(BirthRegion $birthRegion, int $playerId, bool $start = false): Container
+    {
+        $imageName = 'chimical-element:latest';
+        $this->ensureImageExists($imageName);
+
+        $name = 'chimical_element_' . $birthRegion->id;
+        $env = [
+            'BACKEND_URL=' . $this->backendUrl(),
+            'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+            'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+            'BIRTH_REGION_ID=' . $birthRegion->id,
+        ];
+        $labels = $this->playerGroupingLabels($playerId, 'chimical-element');
+
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            null,
+            $start,
+            $this->playerVolumeMountByPlayerId($playerId)
+        );
+
+        return Container::query()->create([
+            'container_id' => $containerId,
+            'name' => $name,
+            'parent_type' => Container::PARENT_TYPE_CHIMICAL_ELEMENT,
+            'parent_id' => $birthRegion->id,
             'ws_port' => null,
         ]);
     }
@@ -560,6 +594,10 @@ class DockerContainerService
                         $sq2->where('parent_type', Container::PARENT_TYPE_MAP)
                             ->where('parent_id', $birthRegionId);
                     });
+                    $q->orWhere(function ($sq2) use ($birthRegionId) {
+                        $sq2->where('parent_type', Container::PARENT_TYPE_CHIMICAL_ELEMENT)
+                            ->where('parent_id', $birthRegionId);
+                    });
                 }
                 $q->orWhere(function ($sq2) use ($player) {
                     $sq2->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)
@@ -827,6 +865,11 @@ class DockerContainerService
                     $player = Player::find($parentId);
                     return $player ? $this->createCacheSyncContainer($player, $start) : null;
 
+                case Container::PARENT_TYPE_CHIMICAL_ELEMENT:
+                    $birthRegion = BirthRegion::find($parentId);
+                    $player = Player::where('birth_region_id', $parentId)->first();
+                    return ($birthRegion && $player) ? $this->createChimicalElementContainer($birthRegion, $player->id, $start) : null;
+
                 default:
                     return null;
             }
@@ -847,6 +890,8 @@ class DockerContainerService
                     $sq->where('parent_type', Container::PARENT_TYPE_PLAYER)->where('parent_id', $player->id);
                 })->orWhere(function($sq) use ($player) {
                     $sq->where('parent_type', Container::PARENT_TYPE_MAP)->where('parent_id', $player->birth_region_id);
+                })->orWhere(function($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_CHIMICAL_ELEMENT)->where('parent_id', $player->birth_region_id);
                 })->orWhere(function($sq) use ($player) {
                     $sq->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)->where('parent_id', $player->id);
                 })->orWhere(function($sq) use ($entities) {

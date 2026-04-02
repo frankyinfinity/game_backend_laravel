@@ -782,6 +782,26 @@ class GameController extends Controller
         ]);
     }
 
+    public function calculateChimicalElement(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $birthRegionId = (int) $request->input('birth_region_id');
+        if ($birthRegionId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'birth_region_id obbligatorio',
+            ], 422);
+        }
+
+        \Log::info('[calculateChimicalElement] Chiamata ricevuta', [
+            'birth_region_id' => $birthRegionId,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'birth_region_id' => $birthRegionId,
+        ]);
+    }
+
     /**
      * Gestisce il movimento di un'entity
      */

@@ -55,6 +55,10 @@ class BuildDockerImage extends Command
                 'name' => 'cache-sync:latest',
                 'path' => base_path('docker/cache-sync')
             ],
+            [
+                'name' => 'chimical-element:latest',
+                'path' => base_path('docker/chimical-element')
+            ],
         ];
 
         foreach ($images as $image) {

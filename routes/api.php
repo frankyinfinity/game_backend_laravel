@@ -32,6 +32,7 @@ Route::group(['prefix' => 'auth'], function (){
     Route::post('/game/entity/division', [App\Http\Controllers\Api\GameController::class, 'division'])->name('game.entity.division');
     Route::post('/game/get_tiles_by_birth_region', [App\Http\Controllers\Api\GameController::class, 'getTilesByBirthRegion'])->name('game.get_tiles_by_birth_region');
     Route::post('/game/get_birth_region_details', [App\Http\Controllers\Api\GameController::class, 'getBirthRegionDetails'])->name('game.get_birth_region_details');
+    Route::post('/game/calculate_chimical_element', [App\Http\Controllers\Api\GameController::class, 'calculateChimicalElement'])->name('game.calculate_chimical_element');
     Route::post('/game/player_values/reset', [App\Http\Controllers\Api\GameController::class, 'resetPlayerValues'])->name('game.player_values.reset');
     Route::post('/game/player_values/get', [App\Http\Controllers\Api\GameController::class, 'getPlayerValues'])->name('game.player_values.get');
     Route::post('/game/objective/modal_visibility', [App\Http\Controllers\Api\GameController::class, 'setObjectiveModalVisibility'])->name('game.objective.modal_visibility');
