@@ -20,6 +20,11 @@ window['__name__'] = function() {
         }
     }
 
+    if (window.__tilePanelRefreshInterval) {
+        clearInterval(window.__tilePanelRefreshInterval);
+        window.__tilePanelRefreshInterval = null;
+    }
+
     if (typeof AppData !== 'undefined') {
         if (!AppData.open_modals || typeof AppData.open_modals !== 'object') {
             AppData.open_modals = {};

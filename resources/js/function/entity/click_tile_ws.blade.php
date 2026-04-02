@@ -1,5 +1,5 @@
 <script>
-    window['__name__'] = function() {
+    window['__name__'] = function () {
 
         let actual_focus_uid_entity = AppData.actual_focus_uid_entity ?? null;
         let actual_focus_uid_element = AppData.actual_focus_uid_element ?? null;
@@ -18,8 +18,7 @@
 
             const connectAndSend = (resolvedPort) => {
                 let wsUrl = '__gateway_base__' + resolvedPort;
-                
-                // Global cache for WebSockets
+
                 window.gameWebSockets = window.gameWebSockets || {};
                 let ws = window.gameWebSockets[resolvedPort];
 
@@ -37,16 +36,16 @@
                     ws = new WebSocket(wsUrl);
                     window.gameWebSockets[resolvedPort] = ws;
 
-                    ws.onopen = function() {
+                    ws.onopen = function () {
                         sendCommand();
                     };
 
-                    ws.onmessage = function(event) {
+                    ws.onmessage = function (event) {
                         let response = JSON.parse(event.data);
                         console.log('WS Response:', response);
                     };
 
-                    ws.onerror = function(error) {
+                    ws.onerror = function (error) {
                         console.error('WS Error:', error);
                     };
                 } else {
@@ -67,10 +66,10 @@
                                 : (window.entityWsPorts || {});
                             const refreshedPort = resolvedPorts[actual_focus_uid_entity];
                             if (!refreshedPort) {
-                            console.error('WebSocket port not found for entity ' + actual_focus_uid_entity);
-                            return;
-                        }
-                        connectAndSend(refreshedPort);
+                                console.error('WebSocket port not found for entity ' + actual_focus_uid_entity);
+                                return;
+                            }
+                            connectAndSend(refreshedPort);
                         })
                         .catch(function (error) {
                             console.error('Failed to refresh websocket ports:', error);
@@ -88,7 +87,89 @@
             var mapContainerName = '__MAP_CONTAINER_NAME__';
             window.gameWebSockets = window.gameWebSockets || {};
 
-            var showTilePanel = function(mapWs) {
+            var updateTilePanelContent = function (lines) {
+                var panelUid = 'tile_panel';
+
+                var maxLines = 10;
+                for (var li = 0; li < maxLines; li++) {
+                    var lineUid = panelUid + '_content_' + li;
+                    var lineText = li < lines.length ? ('* ' + lines[li]) : '';
+                    if (shapes[lineUid]) {
+                        shapes[lineUid].text = lineText;
+                        shapes[lineUid].renderable = li < lines.length;
+                    }
+                    if (objects[lineUid]) {
+                        objects[lineUid].text = lineText;
+                        if (objects[lineUid].attributes) objects[lineUid].attributes.renderable = li < lines.length;
+                    }
+                }
+
+                if (lines.length === 0) {
+                    var emptyUid = panelUid + '_content_0';
+                    if (shapes[emptyUid]) {
+                        shapes[emptyUid].text = 'Nessun elemento';
+                        shapes[emptyUid].renderable = true;
+                    }
+                    if (objects[emptyUid]) {
+                        objects[emptyUid].text = 'Nessun elemento';
+                        if (objects[emptyUid].attributes) objects[emptyUid].attributes.renderable = true;
+                    }
+                }
+            };
+
+            var startTilePanelRefresh = function (mapWs) {
+                if (window.__tilePanelRefreshInterval) {
+                    clearInterval(window.__tilePanelRefreshInterval);
+                }
+
+                window.__tilePanelRefreshInterval = setInterval(function () {
+                    if (!mapWs || mapWs.readyState !== WebSocket.OPEN) return;
+
+                    mapWs.send(JSON.stringify({
+                        command: 'get_birth_region_details',
+                        params: {
+                            tile_i: i,
+                            tile_j: j
+                        }
+                    }));
+
+                    var handler = function (event) {
+                        try {
+                            var mapDetails = JSON.parse(event.data);
+                            var detailData = (mapDetails.detail && mapDetails.detail.birth_region_detail_data) ? mapDetails.detail.birth_region_detail_data : [];
+                            var lines = [];
+
+                            detailData.forEach(function (item) {
+                                var qty = item.quantity || 0;
+                                var chemicalEl = null;
+                                var complexEl = null;
+
+                                if (item.json_chimical_element) {
+                                    try { chemicalEl = JSON.parse(item.json_chimical_element); } catch (e) { }
+                                }
+                                if (item.json_complex_chimical_element) {
+                                    try { complexEl = JSON.parse(item.json_complex_chimical_element); } catch (e) { }
+                                }
+
+                                if (chemicalEl) {
+                                    lines.push((chemicalEl.name || 'Sconosciuto') + ' (' + (chemicalEl.symbol || '?') + '): ' + qty);
+                                }
+                                if (complexEl) {
+                                    lines.push((complexEl.name || 'Sconosciuto') + ' (' + (complexEl.symbol || '?') + '): ' + qty);
+                                }
+                            });
+
+                            updateTilePanelContent(lines);
+                        } catch (e) {
+                            console.error('Error refreshing tile panel:', e);
+                        }
+                        mapWs.removeEventListener('message', handler);
+                    };
+                    mapWs.addEventListener('message', handler);
+                }, (2 * 1000));
+            };
+
+            var showTilePanel = function (mapWs) {
                 mapWs.send(JSON.stringify({
                     command: 'get_birth_region_details',
                     params: {
@@ -97,24 +178,24 @@
                     }
                 }));
 
-                var handler = function(event) {
+                var handler = function (event) {
                     try {
                         var mapDetails = JSON.parse(event.data);
                         console.log('Map tile details [' + i + ',' + j + ']:', mapDetails);
-                        
+
                         var lines = [];
                         var detailData = (mapDetails.detail && mapDetails.detail.birth_region_detail_data) ? mapDetails.detail.birth_region_detail_data : [];
 
-                        detailData.forEach(function(item) {
+                        detailData.forEach(function (item) {
                             var qty = item.quantity || 0;
                             var chemicalEl = null;
                             var complexEl = null;
 
                             if (item.json_chimical_element) {
-                                try { chemicalEl = JSON.parse(item.json_chimical_element); } catch(e) {}
+                                try { chemicalEl = JSON.parse(item.json_chimical_element); } catch (e) { }
                             }
                             if (item.json_complex_chimical_element) {
-                                try { complexEl = JSON.parse(item.json_complex_chimical_element); } catch(e) {}
+                                try { complexEl = JSON.parse(item.json_complex_chimical_element); } catch (e) { }
                             }
 
                             if (chemicalEl) {
@@ -206,31 +287,7 @@
                             if (objects[titleUid].attributes) objects[titleUid].attributes.renderable = true;
                         }
 
-                        var maxLines = 10;
-                        for (var li = 0; li < maxLines; li++) {
-                            var lineUid = panelUid + '_content_' + li;
-                            var lineText = li < lines.length ? ('* ' + lines[li]) : '';
-                            if (shapes[lineUid]) {
-                                shapes[lineUid].text = lineText;
-                                shapes[lineUid].renderable = li < lines.length;
-                            }
-                            if (objects[lineUid]) {
-                                objects[lineUid].text = lineText;
-                                if (objects[lineUid].attributes) objects[lineUid].attributes.renderable = li < lines.length;
-                            }
-                        }
-
-                        if (lines.length === 0) {
-                            var emptyUid = panelUid + '_content_0';
-                            if (shapes[emptyUid]) {
-                                shapes[emptyUid].text = 'Nessun elemento';
-                                shapes[emptyUid].renderable = true;
-                            }
-                            if (objects[emptyUid]) {
-                                objects[emptyUid].text = 'Nessun elemento';
-                                if (objects[emptyUid].attributes) objects[emptyUid].attributes.renderable = true;
-                            }
-                        }
+                        updateTilePanelContent(lines);
 
                         bodyShape.renderable = true;
                         if (bodyObj.attributes) bodyObj.attributes.renderable = true;
@@ -254,6 +311,8 @@
 
                         if (app && app.stage) app.stage.sortChildren();
 
+                        startTilePanelRefresh(mapWs);
+
                     } catch (e) {
                         console.error('Error parsing map tile response:', e);
                     }
@@ -262,7 +321,7 @@
                 mapWs.addEventListener('message', handler);
             };
 
-            var ensureMapWs = function(callback) {
+            var ensureMapWs = function (callback) {
                 var mapWs = window.gameWebSockets[mapContainerName];
 
                 if (mapWs && mapWs.readyState === WebSocket.OPEN) {
@@ -271,7 +330,7 @@
                 }
 
                 if (mapWs && mapWs.readyState === WebSocket.CONNECTING) {
-                    mapWs.addEventListener('open', function() { callback(mapWs); }, { once: true });
+                    mapWs.addEventListener('open', function () { callback(mapWs); }, { once: true });
                     return;
                 }
 
@@ -279,8 +338,8 @@
                 if (wsUrl) {
                     var ws = new WebSocket(wsUrl);
                     window.gameWebSockets[mapContainerName] = ws;
-                    ws.onopen = function() { callback(ws); };
-                    ws.onerror = function(err) { console.error('Map WS connect error:', err); };
+                    ws.onopen = function () { callback(ws); };
+                    ws.onerror = function (err) { console.error('Map WS connect error:', err); };
                     return;
                 }
 
@@ -290,24 +349,24 @@
                         url: BACK_URL + '/api/game/websocket_info',
                         type: 'POST',
                         data: { player_id: pid }
-                    }).then(function(response) {
+                    }).then(function (response) {
                         if (!response || !response.success || !response.containers) return;
-                        response.containers.forEach(function(c) {
+                        response.containers.forEach(function (c) {
                             if (c.name === mapContainerName && c.ws_gateway_url) {
                                 var ws = new WebSocket(c.ws_gateway_url);
                                 window.gameWebSockets[mapContainerName] = ws;
                                 window.__mapWsGatewayUrl = c.ws_gateway_url;
-                                ws.onopen = function() { callback(ws); };
-                                ws.onerror = function(err) { console.error('Map WS connect error:', err); };
+                                ws.onopen = function () { callback(ws); };
+                                ws.onerror = function (err) { console.error('Map WS connect error:', err); };
                             }
                         });
-                    }).catch(function(err) {
+                    }).catch(function (err) {
                         console.error('Failed to fetch websocket_info:', err);
                     });
                 }
             };
 
-            ensureMapWs(function(mapWs) {
+            ensureMapWs(function (mapWs) {
                 showTilePanel(mapWs);
             });
 
