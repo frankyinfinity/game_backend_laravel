@@ -178,6 +178,60 @@
                     }
                 }));
 
+                var selectedTileUid = 'selected_tile_border_' + i + '_' + j;
+
+                if (typeof AppData !== 'undefined' && AppData.__selectedTileBorderUid) {
+                    var prevUid = AppData.__selectedTileBorderUid;
+                    if (shapes[prevUid]) {
+                        if (shapes[prevUid].parent) {
+                            shapes[prevUid].parent.removeChild(shapes[prevUid]);
+                        }
+                        if (typeof shapes[prevUid].destroy === 'function') shapes[prevUid].destroy();
+                        delete shapes[prevUid];
+                        delete objects[prevUid];
+                    }
+                }
+
+                if (shapes[selectedTileUid]) {
+                    if (shapes[selectedTileUid].parent) {
+                        shapes[selectedTileUid].parent.removeChild(shapes[selectedTileUid]);
+                    }
+                    if (typeof shapes[selectedTileUid].destroy === 'function') shapes[selectedTileUid].destroy();
+                    delete shapes[selectedTileUid];
+                    delete objects[selectedTileUid];
+                }
+
+                var tileSize = 40;
+                var mapStartX = 0;
+                var mapStartY = 80;
+                var tileX = (j * tileSize) + mapStartX;
+                var tileY = (i * tileSize) + mapStartY;
+                var borderWidth = 3;
+
+                var borderGraphics = new PIXI.Graphics();
+                borderGraphics.lineStyle(borderWidth, 0xFFDD00, 1);
+                borderGraphics.drawRect(tileX, tileY, tileSize, tileSize);
+
+                if (typeof mainLayer !== 'undefined') {
+                    mainLayer.addChild(borderGraphics);
+                } else if (typeof app !== 'undefined' && app.stage) {
+                    app.stage.addChild(borderGraphics);
+                }
+
+                borderGraphics.zIndex = 9999;
+                if (typeof mainLayer !== 'undefined' && mainLayer.sortChildren) {
+                    mainLayer.sortChildren();
+                } else if (typeof app !== 'undefined' && app.stage && app.stage.sortChildren) {
+                    app.stage.sortChildren();
+                }
+
+                shapes[selectedTileUid] = borderGraphics;
+                objects[selectedTileUid] = { uid: selectedTileUid, attributes: { renderable: true, z_index: 9999 } };
+
+                if (typeof AppData !== 'undefined') {
+                    AppData.__selectedTileBorderUid = selectedTileUid;
+                }
+
                 var handler = function (event) {
                     try {
                         var mapDetails = JSON.parse(event.data);

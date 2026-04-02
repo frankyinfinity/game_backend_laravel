@@ -30,6 +30,17 @@ window['__name__'] = function() {
             AppData.open_modals = {};
         }
         AppData.open_modals[panelUid] = false;
+
+        var borderUid = AppData.__selectedTileBorderUid;
+        if (borderUid && typeof shapes !== 'undefined' && shapes[borderUid]) {
+            if (shapes[borderUid].parent) {
+                shapes[borderUid].parent.removeChild(shapes[borderUid]);
+            }
+            if (typeof shapes[borderUid].destroy === 'function') shapes[borderUid].destroy();
+            delete shapes[borderUid];
+            if (typeof objects !== 'undefined') delete objects[borderUid];
+            AppData.__selectedTileBorderUid = null;
+        }
     }
 };
 window['__name__']();
