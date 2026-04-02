@@ -41,6 +41,8 @@ window['__name__'] = function() {
             if (typeof objects !== 'undefined') delete objects[borderUid];
             AppData.__selectedTileBorderUid = null;
         }
+
+        AppData.__tilePanelInfo = null;
     }
 };
 window['__name__']();

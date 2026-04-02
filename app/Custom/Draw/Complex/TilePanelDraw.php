@@ -120,6 +120,5 @@ class TilePanelDraw
             $this->drawItems[] = $line;
         }
 
-        $this->drawItems = ScrollGroup::attachMany($this->drawItems, Helper::MAP_SCROLL_GROUP_MAIN);
     }
 }

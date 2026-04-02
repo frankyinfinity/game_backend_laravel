@@ -178,6 +178,12 @@
                     }
                 }));
 
+                var squareUid = 'square_' + i + '_' + j;
+                var squareObj = objects[squareUid] || {};
+                var tileX = (typeof squareObj.x === 'number') ? squareObj.x : (j * 40);
+                var tileY = (typeof squareObj.y === 'number') ? squareObj.y : (i * 40 + 80);
+                var tileSize = squareObj.size || 40;
+
                 var selectedTileUid = 'selected_tile_border_' + i + '_' + j;
 
                 if (typeof AppData !== 'undefined' && AppData.__selectedTileBorderUid) {
@@ -201,11 +207,6 @@
                     delete objects[selectedTileUid];
                 }
 
-                var tileSize = 40;
-                var mapStartX = 0;
-                var mapStartY = 80;
-                var tileX = (j * tileSize) + mapStartX;
-                var tileY = (i * tileSize) + mapStartY;
                 var borderWidth = 3;
 
                 var borderGraphics = new PIXI.Graphics();
@@ -226,7 +227,13 @@
                 }
 
                 shapes[selectedTileUid] = borderGraphics;
-                objects[selectedTileUid] = { uid: selectedTileUid, attributes: { renderable: true, z_index: 9999 } };
+                objects[selectedTileUid] = {
+                    uid: selectedTileUid,
+                    type: 'multi_line',
+                    x: tileX,
+                    y: tileY,
+                    attributes: { renderable: true, z_index: 9999, scroll_group: 'map_main' }
+                };
 
                 if (typeof AppData !== 'undefined') {
                     AppData.__selectedTileBorderUid = selectedTileUid;
@@ -263,25 +270,23 @@
                         console.log('Lines:', lines);
 
                         var panelUid = 'tile_panel';
-                        var tileSize = 40;
-                        var mapStartX = 0;
-                        var mapStartY = 80;
-
-                        var tileX = (j * tileSize) + mapStartX;
-                        var tileY = (i * tileSize) + mapStartY;
+                        var curSquareObj = objects[squareUid] || {};
+                        var curTileX = (typeof curSquareObj.x === 'number') ? curSquareObj.x : (j * 40);
+                        var curTileY = (typeof curSquareObj.y === 'number') ? curSquareObj.y : (i * 40 + 80);
+                        var curTileSize = curSquareObj.size || 40;
 
                         var panelWidth = 320;
                         var panelHeight = 400;
-                        var panelX = tileX + tileSize + 10;
-                        var panelY = tileY;
+                        var panelX = curTileX + curTileSize + 10;
+                        var panelY = curTileY;
 
                         if (panelX + panelWidth > window.innerWidth) {
-                            panelX = tileX - panelWidth - 10;
+                            panelX = curTileX - panelWidth - 10;
                         }
                         if (panelY + panelHeight > window.innerHeight) {
                             panelY = window.innerHeight - panelHeight - 10;
                         }
-                        if (panelY < 80) panelY = 80;
+                        if (panelY < 0) panelY = 10;
 
                         var allUids = [
                             panelUid + '_body',
@@ -329,6 +334,55 @@
 
                         for (var mi = 0; mi < allUids.length; mi++) {
                             movePanelElement(allUids[mi], dx, dy);
+                        }
+
+                        AppData.__tilePanelInfo = {
+                            tileI: parseInt(i, 10),
+                            tileJ: parseInt(j, 10),
+                            allUids: allUids,
+                            squareUid: squareUid
+                        };
+
+                        if (typeof AppData.__tilePanelReposition !== 'function') {
+                            AppData.__tilePanelReposition = function () {
+                                var info = AppData.__tilePanelInfo;
+                                if (!info || !info.allUids) return;
+                                var sqObj = objects[info.squareUid] || {};
+                                var tX = (typeof sqObj.x === 'number') ? sqObj.x : 0;
+                                var tY = (typeof sqObj.y === 'number') ? sqObj.y : 0;
+                                var tSize = sqObj.size || 40;
+                                var pW = 320;
+                                var pH = 400;
+                                var pX = tX + tSize + 10;
+                                var pY = tY;
+                                if (pX + pW > window.innerWidth) {
+                                    pX = tX - pW - 10;
+                                }
+                                if (pY + pH > window.innerHeight) {
+                                    pY = window.innerHeight - pH - 10;
+                                }
+                                if (pY < 0) pY = 10;
+
+                                var bodyUid = 'tile_panel_body';
+                                var bodyObj = objects[bodyUid];
+                                if (!bodyObj) return;
+                                var rdx = pX - (bodyObj.x || 0);
+                                var rdy = pY - (bodyObj.y || 0);
+                                for (var ri = 0; ri < info.allUids.length; ri++) {
+                                    var ruid = info.allUids[ri];
+                                    var robj = objects[ruid];
+                                    var rshape = shapes[ruid];
+                                    if (!robj || !rshape) continue;
+                                    if (typeof robj.x === 'number') {
+                                        robj.x += rdx;
+                                        rshape.x += rdx;
+                                    }
+                                    if (typeof robj.y === 'number') {
+                                        robj.y += rdy;
+                                        rshape.y += rdy;
+                                    }
+                                }
+                            };
                         }
 
                         var titleUid = panelUid + '_title';

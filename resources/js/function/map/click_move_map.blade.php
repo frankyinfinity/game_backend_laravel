@@ -79,6 +79,10 @@
         const scrollGroupManager = new window.ScrollGroupManager(objects, shapes);
         scrollGroupManager.move(scrollGroup, deltaX, deltaY);
 
+        if (typeof AppData !== 'undefined' && typeof AppData.__tilePanelReposition === 'function') {
+            AppData.__tilePanelReposition();
+        }
+
         if (typeof window.incrementScrollGroupOffset === 'function') {
             window.incrementScrollGroupOffset(AppData, scrollGroup, deltaX, deltaY);
         }
