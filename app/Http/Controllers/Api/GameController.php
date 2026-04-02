@@ -23,6 +23,7 @@ use App\Models\BirthRegionDetail;
 use App\Models\BirthRegionDetailData;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
+use App\Models\GeneratorChimicalElement;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionScore;
 use App\Models\ElementHasPositionInformation;
@@ -796,9 +797,65 @@ class GameController extends Controller
             'birth_region_id' => $birthRegionId,
         ]);
 
+        $detailsWithGenerators = BirthRegionDetail::query()
+            ->where('birth_region_id', $birthRegionId)
+            ->whereNotNull('json_generator')
+            ->get();
+
+        $created = 0;
+
+        foreach ($detailsWithGenerators as $birthRegionDetail) {
+            $generatorData = is_string($birthRegionDetail->json_generator)
+                ? json_decode($birthRegionDetail->json_generator, true)
+                : $birthRegionDetail->json_generator;
+
+            if (!is_array($generatorData) || !isset($generatorData['id'])) {
+                continue;
+            }
+
+            $generator = GeneratorChimicalElement::with('chimicalElement')->find($generatorData['id']);
+            if ($generator === null) {
+                continue;
+            }
+
+            $chimicalElement = $generator->chimicalElement;
+
+            $data = [
+                'json_chimical_element' => $chimicalElement ? json_encode([
+                    'id' => $chimicalElement->id,
+                    'name' => $chimicalElement->name,
+                    'symbol' => $chimicalElement->symbol,
+                ]) : null,
+                'json_complex_chimical_element' => null,
+                'quantity' => $generator->tick_quantity,
+            ];
+
+            $existing = BirthRegionDetailData::query()
+                ->where('birth_region_detail_id', $birthRegionDetail->id)
+                ->first();
+
+            if ($existing) {
+                $data['quantity'] = $existing->quantity + $generator->tick_quantity;
+                $existing->update($data);
+            } else {
+                BirthRegionDetailData::query()->create(array_merge($data, [
+                    'birth_region_detail_id' => $birthRegionDetail->id,
+                ]));
+            }
+
+            $created++;
+        }
+
+        \Log::info('[calculateChimicalElement] Completato', [
+            'birth_region_id' => $birthRegionId,
+            'details_with_generators' => $detailsWithGenerators->count(),
+            'created' => $created,
+        ]);
+
         return response()->json([
             'success' => true,
             'birth_region_id' => $birthRegionId,
+            'created' => $created,
         ]);
     }
 
