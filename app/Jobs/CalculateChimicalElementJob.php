@@ -6,6 +6,7 @@ use App\Models\BirthRegion;
 use App\Models\BirthRegionDetail;
 use App\Models\BirthRegionDetailData;
 use App\Models\GeneratorChimicalElement;
+use App\Models\ComplexChimicalElement;
 use App\Models\PlayerValue;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -102,6 +103,89 @@ class CalculateChimicalElementJob implements ShouldQueue
             'details_with_generators' => $detailsWithGenerators->count(),
             'created' => $created,
         ]);
+
+        $this->generateComplexElements($birthRegion);
+    }
+
+    private function generateComplexElements(BirthRegion $birthRegion): void
+    {
+        $complexElements = ComplexChimicalElement::query()
+            ->with('details')
+            ->get();
+
+        foreach ($complexElements as $complexElement) {
+            $tilesWithElements = BirthRegionDetailData::query()
+                ->whereHas('birthRegionDetail', function ($q) use ($birthRegion) {
+                    $q->where('birth_region_id', $birthRegion->id);
+                })
+                ->whereNotNull('json_chimical_element')
+                ->whereNull('json_complex_chimical_element')
+                ->get()
+                ->groupBy(function ($item) {
+                    return $item->birth_region_detail_id;
+                });
+
+            foreach ($tilesWithElements as $detailId => $elements) {
+                $canGenerate = true;
+                $consumedQuantities = [];
+
+                foreach ($complexElement->details as $detail) {
+                    $requiredElement = $elements->first(function ($el) use ($detail) {
+                        $jsonEl = is_string($el->json_chimical_element) 
+                            ? json_decode($el->json_chimical_element, true) 
+                            : $el->json_chimical_element;
+                        return $jsonEl && ($jsonEl['id'] ?? null) == $detail->chimical_element_id;
+                    });
+
+                    if (!$requiredElement || $requiredElement->quantity < $detail->quantity) {
+                        $canGenerate = false;
+                        break;
+                    }
+
+                    $consumedQuantities[] = [
+                        'element' => $requiredElement,
+                        'required' => $detail->quantity
+                    ];
+                }
+
+                if ($canGenerate) {
+                    $jsonComplexElement = json_encode([
+                        'id' => $complexElement->id,
+                        'name' => $complexElement->name,
+                        'symbol' => $complexElement->symbol,
+                    ]);
+
+                    foreach ($consumedQuantities as $consume) {
+                        $newQty = $consume['element']->quantity - $consume['required'];
+                        if ($newQty > 0) {
+                            $consume['element']->update(['quantity' => $newQty]);
+                        } else {
+                            $consume['element']->delete();
+                        }
+                    }
+
+                    $existingComplex = BirthRegionDetailData::query()
+                        ->where('birth_region_detail_id', $detailId)
+                        ->where('json_complex_chimical_element', $jsonComplexElement)
+                        ->first();
+
+                    if ($existingComplex) {
+                        if ($existingComplex->quantity < 100) {
+                            $existingComplex->update([
+                                'quantity' => $existingComplex->quantity + 1,
+                            ]);
+                        }
+                    } else {
+                        BirthRegionDetailData::query()->create([
+                            'birth_region_detail_id' => $detailId,
+                            'json_chimical_element' => null,
+                            'json_complex_chimical_element' => $jsonComplexElement,
+                            'quantity' => 1,
+                        ]);
+                    }
+                }
+            }
+        }
     }
 
     private function processGeneratorDetail(BirthRegionDetail $birthRegionDetail): ?array
