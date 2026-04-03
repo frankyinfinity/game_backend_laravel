@@ -23,6 +23,7 @@ use App\Models\BirthRegionDetail;
 use App\Models\BirthRegionDetailData;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
+use App\Jobs\CalculateChimicalElementJob;
 use App\Models\GeneratorChimicalElement;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionScore;
@@ -793,108 +794,30 @@ class GameController extends Controller
             ], 422);
         }
 
-        \Log::info('[calculateChimicalElement] Chiamata ricevuta', [
-            'birth_region_id' => $birthRegionId,
-        ]);
-
         $birthRegion = $this->findBirthRegionOrError($birthRegionId);
         if ($birthRegion instanceof \Illuminate\Http\JsonResponse) {
             return $birthRegion;
         }
 
-        $detailsWithGenerators = $this->getDetailsWithGenerators($birthRegionId);
-
-        $created = 0;
-
-        foreach ($detailsWithGenerators as $birthRegionDetail) {
-            $result = $this->processGeneratorDetail($birthRegionDetail);
-
-            if ($result === null) {
-                continue;
-            }
-
-            $created++;
-
-            $maxDepth = $result['depth'] ?? 0;
-            if ($maxDepth > 0) {
-                $currentData = BirthRegionDetailData::query()
-                    ->where('birth_region_detail_id', $birthRegionDetail->id)
-                    ->where('json_chimical_element', $result['json_chimical_element'])
-                    ->first();
-
-                if ($currentData && $currentData->quantity > 100) {
-                    $excess = $currentData->quantity - 100;
-                    $currentData->update(['quantity' => 100]);
-
-                    $queue = [[
-                        'tile_i' => $birthRegionDetail->tile_i,
-                        'tile_j' => $birthRegionDetail->tile_j,
-                        'excess' => $excess,
-                        'depth' => 0
-                    ]];
-                    $processed = [];
-
-                    while (!empty($queue)) {
-                        $item = array_shift($queue);
-                        $ti = $item['tile_i'];
-                        $tj = $item['tile_j'];
-                        $exc = $item['excess'];
-                        $depth = $item['depth'];
-
-                        if ($depth >= $maxDepth) {
-                            continue;
-                        }
-
-                        $nextTiles = $this->distributeOverflowRecursive(
-                            $birthRegion,
-                            $ti,
-                            $tj,
-                            $exc,
-                            $result['json_chimical_element'],
-                            $depth,
-                            $maxDepth
-                        );
-
-                        foreach ($nextTiles as $nextDetailId) {
-                            if (in_array($nextDetailId, $processed)) {
-                                continue;
-                            }
-                            $processed[] = $nextDetailId;
-
-                            $nextDetail = BirthRegionDetail::find($nextDetailId);
-                            if ($nextDetail) {
-                                $nextData = BirthRegionDetailData::query()
-                                    ->where('birth_region_detail_id', $nextDetailId)
-                                    ->where('json_chimical_element', $result['json_chimical_element'])
-                                    ->first();
-
-                                if ($nextData && $nextData->quantity >= 100) {
-                                    $excFromNext = $nextData->quantity - 100;
-                                    $nextData->update(['quantity' => 100]);
-                                    $queue[] = [
-                                        'tile_i' => $nextDetail->tile_i,
-                                        'tile_j' => $nextDetail->tile_j,
-                                        'excess' => $excFromNext,
-                                        'depth' => $depth + 1
-                                    ];
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        $player = Player::query()->where('birth_region_id', $birthRegion->id)->first();
+        if ($player === null) {
+            return response()->json(['success' => false, 'message' => 'Player non trovato']);
         }
 
-        \Log::info('[calculateChimicalElement] Completato', [
-            'birth_region_id' => $birthRegionId,
-            'details_with_generators' => $detailsWithGenerators->count(),
-            'created' => $created,
-        ]);
+        $playerId = $player->id;
+        if (PlayerValue::hasAnyActive($playerId, [PlayerValue::KEY_CHIMICAL_ELEMENT])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Job già in esecuzione',
+            ], 409);
+        }
+
+        CalculateChimicalElementJob::dispatch($birthRegionId);
 
         return response()->json([
             'success' => true,
             'birth_region_id' => $birthRegionId,
-            'created' => $created,
+            'message' => 'Job avviato',
         ]);
     }
 
@@ -1262,11 +1185,14 @@ class GameController extends Controller
             PlayerValue::setFlag($playerId, PlayerValue::KEY_CONSUME, false);
         } elseif ($resetAction === PlayerValue::KEY_ATTACK) {
             PlayerValue::setFlag($playerId, PlayerValue::KEY_ATTACK, false);
+        } elseif ($resetAction === PlayerValue::KEY_CHIMICAL_ELEMENT) {
+            PlayerValue::setFlag($playerId, PlayerValue::KEY_CHIMICAL_ELEMENT, false);
         } else {
             // Backward compatibility: if no action is specified, reset all.
             PlayerValue::setFlag($playerId, PlayerValue::KEY_MOVEMENT, false);
             PlayerValue::setFlag($playerId, PlayerValue::KEY_CONSUME, false);
             PlayerValue::setFlag($playerId, PlayerValue::KEY_ATTACK, false);
+            PlayerValue::setFlag($playerId, PlayerValue::KEY_CHIMICAL_ELEMENT, false);
         }
 
         return response()->json(['success' => true]);
