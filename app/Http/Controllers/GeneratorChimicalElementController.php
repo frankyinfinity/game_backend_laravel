@@ -21,6 +21,9 @@ class GeneratorChimicalElementController extends Controller
             ->addColumn('chimical_element_name', function ($row) {
                 return $row->chimicalElement->name ?? '';
             })
+            ->addColumn('depth', function ($row) {
+                return $row->depth ?? 0;
+            })
             ->toJson();
     }
 
@@ -36,6 +39,7 @@ class GeneratorChimicalElementController extends Controller
             'name' => 'required|string|max:255',
             'chimical_element_id' => 'required|exists:chimical_elements,id',
             'tick_quantity' => 'required|integer|min:1',
+            'depth' => 'required|integer|min:0',
         ]);
 
         GeneratorChimicalElement::create($request->all());
@@ -61,6 +65,7 @@ class GeneratorChimicalElementController extends Controller
             'name' => 'required|string|max:255',
             'chimical_element_id' => 'required|exists:chimical_elements,id',
             'tick_quantity' => 'required|integer|min:1',
+            'depth' => 'required|integer|min:0',
         ]);
 
         $generatorChimicalElement->update($request->all());

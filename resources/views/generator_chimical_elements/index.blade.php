@@ -40,6 +40,7 @@
                             <th>Nome</th>
                             <th>Elemento Chimico</th>
                             <th>Quantità per Tick</th>
+                            <th>Profondità</th>
                             <th>Azioni</th>
                         </tr>
                         </thead>
@@ -86,6 +87,7 @@
                     {data:"name", name:"name"},
                     {data:"chimical_element_name", name:"chimical_element_name"},
                     {data:"tick_quantity", name:"tick_quantity"},
+                    {data:"depth", name:"depth"},
                     {data:"id", name:"id"},
                 ],
                 sDom: '<"dataTables_top"lfBr>t<"dataTables_bottom"ip><"clear">',
@@ -109,7 +111,7 @@
                         render: function(data, type, row){
                             return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
                         },
-                        targets:   5
+                        targets:   6
                     },
                 ],
             });

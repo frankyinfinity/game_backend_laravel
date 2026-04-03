@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class GeneratorChimicalElement extends Model
 {
-    protected $fillable = ['name', 'chimical_element_id', 'tick_quantity'];
+    protected $fillable = ['name', 'chimical_element_id', 'tick_quantity', 'depth'];
 
     protected $casts = [
         'chimical_element_id' => 'integer',
         'tick_quantity' => 'integer',
+        'depth' => 'integer',
     ];
 
     public function chimicalElement()

@@ -805,7 +805,6 @@ class GameController extends Controller
         $detailsWithGenerators = $this->getDetailsWithGenerators($birthRegionId);
 
         $created = 0;
-        $overflowCount = 0;
 
         foreach ($detailsWithGenerators as $birthRegionDetail) {
             $result = $this->processGeneratorDetail($birthRegionDetail);
@@ -816,18 +815,80 @@ class GameController extends Controller
 
             $created++;
 
-            $overflowCount += $this->applyOverflowIfNeeded(
-                $birthRegion,
-                $birthRegionDetail,
-                $result['json_chimical_element']
-            );
+            $maxDepth = $result['depth'] ?? 0;
+            if ($maxDepth > 0) {
+                $currentData = BirthRegionDetailData::query()
+                    ->where('birth_region_detail_id', $birthRegionDetail->id)
+                    ->where('json_chimical_element', $result['json_chimical_element'])
+                    ->first();
+
+                if ($currentData && $currentData->quantity > 100) {
+                    $excess = $currentData->quantity - 100;
+                    $currentData->update(['quantity' => 100]);
+
+                    $queue = [[
+                        'tile_i' => $birthRegionDetail->tile_i,
+                        'tile_j' => $birthRegionDetail->tile_j,
+                        'excess' => $excess,
+                        'depth' => 0
+                    ]];
+                    $processed = [];
+
+                    while (!empty($queue)) {
+                        $item = array_shift($queue);
+                        $ti = $item['tile_i'];
+                        $tj = $item['tile_j'];
+                        $exc = $item['excess'];
+                        $depth = $item['depth'];
+
+                        if ($depth >= $maxDepth) {
+                            continue;
+                        }
+
+                        $nextTiles = $this->distributeOverflowRecursive(
+                            $birthRegion,
+                            $ti,
+                            $tj,
+                            $exc,
+                            $result['json_chimical_element'],
+                            $depth,
+                            $maxDepth
+                        );
+
+                        foreach ($nextTiles as $nextDetailId) {
+                            if (in_array($nextDetailId, $processed)) {
+                                continue;
+                            }
+                            $processed[] = $nextDetailId;
+
+                            $nextDetail = BirthRegionDetail::find($nextDetailId);
+                            if ($nextDetail) {
+                                $nextData = BirthRegionDetailData::query()
+                                    ->where('birth_region_detail_id', $nextDetailId)
+                                    ->where('json_chimical_element', $result['json_chimical_element'])
+                                    ->first();
+
+                                if ($nextData && $nextData->quantity >= 100) {
+                                    $excFromNext = $nextData->quantity - 100;
+                                    $nextData->update(['quantity' => 100]);
+                                    $queue[] = [
+                                        'tile_i' => $nextDetail->tile_i,
+                                        'tile_j' => $nextDetail->tile_j,
+                                        'excess' => $excFromNext,
+                                        'depth' => $depth + 1
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         \Log::info('[calculateChimicalElement] Completato', [
             'birth_region_id' => $birthRegionId,
             'details_with_generators' => $detailsWithGenerators->count(),
             'created' => $created,
-            'overflow_tiles' => $overflowCount,
         ]);
 
         return response()->json([
@@ -888,6 +949,7 @@ class GameController extends Controller
 
         $existing = BirthRegionDetailData::query()
             ->where('birth_region_detail_id', $birthRegionDetail->id)
+            ->where('json_chimical_element', $jsonChimicalElement)
             ->first();
 
         if ($existing) {
@@ -899,37 +961,101 @@ class GameController extends Controller
             ]));
         }
 
-        return ['json_chimical_element' => $jsonChimicalElement];
+        return ['json_chimical_element' => $jsonChimicalElement, 'depth' => $generator->depth ?? 0];
     }
 
-    private function applyOverflowIfNeeded(
+    private function distributeOverflowRecursive(
         BirthRegion $birthRegion,
-        BirthRegionDetail $birthRegionDetail,
-        ?string $jsonChimicalElement
-    ): int {
-        $currentData = BirthRegionDetailData::query()
-            ->where('birth_region_detail_id', $birthRegionDetail->id)
-            ->first();
+        int $tileI,
+        int $tileJ,
+        int $excess,
+        ?string $jsonChimicalElement,
+        int $currentDepth,
+        int $maxDepth
+    ): array {
+        $directions = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1],          [0, 1],
+            [1, -1],  [1, 0], [1, 1],
+        ];
 
-        if ($currentData === null || $currentData->quantity < 100) {
-            return 0;
+        $adjacents = [];
+        foreach ($directions as [$di, $dj]) {
+            $ni = $tileI + $di;
+            $nj = $tileJ + $dj;
+
+            if ($ni < 0 || $nj < 0 || $ni >= $birthRegion->height || $nj >= $birthRegion->width) {
+                continue;
+            }
+
+            $adjacentDetail = BirthRegionDetail::query()
+                ->where('birth_region_id', $birthRegion->id)
+                ->where('tile_i', $ni)
+                ->where('tile_j', $nj)
+                ->first();
+
+            if ($adjacentDetail) {
+                $adjacents[] = $adjacentDetail;
+            }
         }
 
-        $excess = $currentData->quantity - 100;
-        $currentData->update(['quantity' => 100]);
-
-        if ($excess > 0) {
-            $this->distributeOverflow(
-                $birthRegion,
-                $birthRegionDetail->tile_i,
-                $birthRegionDetail->tile_j,
-                $excess,
-                $jsonChimicalElement
-            );
-            return 1;
+        if (empty($adjacents) || $currentDepth >= $maxDepth) {
+            return [];
         }
 
-        return 0;
+        $remaining = $excess;
+
+        while ($remaining > 0) {
+            $availableAdjacents = [];
+
+            foreach ($adjacents as $adj) {
+                $existingData = BirthRegionDetailData::query()
+                    ->where('birth_region_detail_id', $adj->id)
+                    ->where('json_chimical_element', $jsonChimicalElement)
+                    ->first();
+
+                if (!$existingData || $existingData->quantity < 100) {
+                    $availableAdjacents[] = $adj;
+                }
+            }
+
+            if (empty($availableAdjacents)) {
+                break;
+            }
+
+            $target = $availableAdjacents[array_rand($availableAdjacents)];
+            $portion = min($remaining, 100);
+
+            $existingData = BirthRegionDetailData::query()
+                ->where('birth_region_detail_id', $target->id)
+                ->where('json_chimical_element', $jsonChimicalElement)
+                ->first();
+
+            if ($existingData) {
+                $toAdd = min($portion, 100 - $existingData->quantity);
+                $existingData->update([
+                    'quantity' => $existingData->quantity + $toAdd,
+                ]);
+                $remaining -= $toAdd;
+            } else {
+                BirthRegionDetailData::query()->create([
+                    'birth_region_detail_id' => $target->id,
+                    'json_chimical_element' => $jsonChimicalElement,
+                    'json_complex_chimical_element' => null,
+                    'quantity' => $portion,
+                ]);
+                $remaining -= $portion;
+            }
+        }
+
+        $nextDetailIds = [];
+        if ($currentDepth + 1 < $maxDepth) {
+            foreach ($adjacents as $adj) {
+                $nextDetailIds[] = $adj->id;
+            }
+        }
+
+        return $nextDetailIds;
     }
 
     /**
@@ -2395,73 +2521,6 @@ class GameController extends Controller
         }
 
         return array_values(array_unique($uids));
-    }
-
-    private function distributeOverflow(
-        BirthRegion $birthRegion,
-        int $tileI,
-        int $tileJ,
-        int $excess,
-        ?string $jsonChimicalElement
-    ): void {
-        $directions = [
-            [-1, 0],
-            [1, 0],
-            [0, -1],
-            [0, 1],
-        ];
-
-        shuffle($directions);
-
-        $adjacents = [];
-        foreach ($directions as [$di, $dj]) {
-            $ni = $tileI + $di;
-            $nj = $tileJ + $dj;
-
-            if ($ni < 0 || $nj < 0 || $ni >= $birthRegion->height || $nj >= $birthRegion->width) {
-                continue;
-            }
-
-            $adjacentDetail = BirthRegionDetail::query()
-                ->where('birth_region_id', $birthRegion->id)
-                ->where('tile_i', $ni)
-                ->where('tile_j', $nj)
-                ->first();
-
-            if ($adjacentDetail !== null) {
-                $adjacents[] = $adjacentDetail;
-            }
-        }
-
-        if (empty($adjacents)) {
-            return;
-        }
-
-        $remaining = $excess;
-
-        while ($remaining > 0) {
-            $target = $adjacents[array_rand($adjacents)];
-            $portion = rand(1, $remaining);
-
-            $existingData = BirthRegionDetailData::query()
-                ->where('birth_region_detail_id', $target->id)
-                ->first();
-
-            if ($existingData) {
-                $existingData->update([
-                    'quantity' => $existingData->quantity + $portion,
-                ]);
-            } else {
-                BirthRegionDetailData::query()->create([
-                    'birth_region_detail_id' => $target->id,
-                    'json_chimical_element' => $jsonChimicalElement,
-                    'json_complex_chimical_element' => null,
-                    'quantity' => $portion,
-                ]);
-            }
-
-            $remaining -= $portion;
-        }
     }
 
     private function buildPlayerValuesResetCode(int $playerId, string $resetAction): string

@@ -61,6 +61,21 @@
                         </span>
                     @enderror
                 </div>
+                <div class="form-group">
+                    <label for="depth">Profondità <span class="text-danger">*</span></label>
+                    <input type="number"
+                           class="form-control @error('depth') is-invalid @enderror"
+                           id="depth"
+                           name="depth"
+                           value="{{ old('depth', $generatorChimicalElement->depth ?? 0) }}"
+                           min="0"
+                           required>
+                    @error('depth')
+                        <span class="invalid-feedback" role="alert">
+                            <strong>{{ $message }}</strong>
+                        </span>
+                    @enderror
+                </div>
             </div>
             <div class="card-footer">
                 <button type="submit" class="btn btn-primary">
