@@ -17,9 +17,10 @@ console.log(`Entity UID: ${entityUid}`);
 console.log(`Tile Position: (${entityTileI}, ${entityTileJ})`);
 console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
 
-// Variabili per tracciare la posizione attuale
+// Variabili per tracciare la posizione attuale e i geni
 let currentTileI = entityTileI;
 let currentTileJ = entityTileJ;
+let currentGenes = {};
 
 // function to handle login and session
 let sessionCookie = null;
@@ -174,10 +175,52 @@ function fetchCurrentPosition() {
 }
 
 
+function fetchCurrentGenes() {
+  if (!sessionCookie) return;
+
+  const path = `/entities/genes?uid=${entityUid}`;
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: path,
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Cookie': sessionCookie
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          currentGenes = response.genes;
+          console.log(`[Entity ${entityUid}] Current Gene Values:`, JSON.stringify(currentGenes));
+        }
+      } catch (error) {
+        console.error(`[Entity ${entityUid}] Error parsing gene values: ${error.message}`);
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`[Entity ${entityUid}] Error fetching genes: ${error.message}`);
+  });
+
+  req.end();
+}
+
+
 // Funzione per programmare il prossimo ciclo
 function scheduleNextCycle() {
   setTimeout(() => {
     fetchCurrentPosition();
+    fetchCurrentGenes();
   }, 5000);
 }
 

@@ -40,4 +40,52 @@ class EntityController extends Controller
         ]);
     }
 
+    /**
+     * Recupera i valori attuali dei geni di un'entity tramite uid
+     */
+    public function genes(Request $request)
+    {
+        $uid = $request->query('uid');
+
+        if (!$uid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'UID non fornito'
+            ], 400);
+        }
+
+        $entity = Entity::where('uid', $uid)->first();
+
+        if (!$entity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity non trovata'
+            ], 404);
+        }
+
+        $genesData = [];
+        $entity->load(['genomes.gene', 'genomes.entityInformations']);
+
+        foreach ($entity->genomes as $genome) {
+            $gene = $genome->gene;
+            // Prende l'ultimo valore registrato o l'unico disponibile
+            $currentValue = $genome->entityInformations->last()->value ?? 0;
+            
+            $genesData[] = [
+                'id' => $gene->id,
+                'key' => $gene->key,
+                'name' => $gene->name,
+                'value' => $currentValue,
+                'min' => $genome->min,
+                'max' => $genome->max,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'uid' => $entity->uid,
+            'genes' => $genesData
+        ]);
+    }
+
 }
