@@ -319,6 +319,7 @@ class DockerContainerService
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'ELEMENT_HAS_POSITION_ID=' . $elementHasPosition->id,
+            'ELEMENT_HAS_POSITION_UID=' . $elementHasPosition->uid,
             'WS_PORT=' . $wsPort,
         ];
         $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
@@ -859,7 +860,10 @@ class DockerContainerService
 
                 case Container::PARENT_TYPE_ELEMENT_HAS_POSITION:
                     $element = ElementHasPosition::find($parentId);
-                    return $element ? $this->createElementHasPositionContainer($element, $start) : null;
+                    if ($element) {
+                        return $this->createElementHasPositionContainer($element, $start);
+                    }
+                    return null;
 
                 case Container::PARENT_TYPE_CACHE_SYNC:
                     $player = Player::find($parentId);

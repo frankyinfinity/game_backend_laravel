@@ -7,6 +7,7 @@ const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
 const elementHasPositionId = process.env.ELEMENT_HAS_POSITION_ID;
+const elementHasPositionUid = process.env.ELEMENT_HAS_POSITION_UID;
 const wsPort = Number(process.env.WS_PORT || 0);
 
 console.log('Element service started.');
@@ -15,6 +16,7 @@ console.log(`ElementHasPosition ID: ${elementHasPositionId || 'MISSING'}`);
 
 let sessionCookie = null;
 let xsrfToken = null;
+let currentGenes = [];
 
 function parseCookies(response) {
   const list = {};
@@ -158,7 +160,48 @@ let SECOND_TIMEOUT = 20;
 function scheduleNextCycle() {
   setTimeout(() => {
     callGameBrain();
+    fetchCurrentGenes();
   }, SECOND_TIMEOUT * 1000);
+}
+
+function fetchCurrentGenes() {
+  if (!sessionCookie) return;
+
+  const path = `/elements/genes?uid=${elementHasPositionUid}`;
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: path,
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Cookie': sessionCookie
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          currentGenes = response.genes;
+          console.log(`[Element ${elementHasPositionUid}] Current Gene Values:`, JSON.stringify(currentGenes));
+        }
+      } catch (error) {
+        console.error(`[Element ${elementHasPositionUid}] Error parsing gene values: ${error.message}`);
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`[Element ${elementHasPositionUid}] Error fetching genes: ${error.message}`);
+  });
+
+  req.end();
 }
 
 function fetchNeuronBorderUid(neuronId) {
@@ -432,6 +475,14 @@ if (wsPort > 0) {
         switch (command) {
           case 'update_neuron':
             updateNeuron(data.params, ws);
+            break;
+          case 'get_genes':
+            ws.send(JSON.stringify({
+              success: true,
+              command: 'get_genes',
+              genes: currentGenes,
+              uid: elementHasPositionUid
+            }));
             break;
           default:
             ws.send(JSON.stringify({

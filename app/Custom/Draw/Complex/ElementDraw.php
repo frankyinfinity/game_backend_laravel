@@ -6,6 +6,8 @@ use App\Models\Element;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionInformation;
 use App\Models\ElementHasInformation;
+use App\Models\Container;
+use App\Services\DockerContainerService;
 use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
@@ -77,6 +79,22 @@ class ElementDraw
             $uid = (string) $elementHasPosition->uid;
         }
 
+        // --- Container Retrieval ---
+        // The container is always created by ElementHasPositionObserver when the record is created.
+        $container = Container::where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->where('parent_id', $elementHasPosition->id)
+            ->first();
+
+        $wsPort = (int) ($container->ws_port ?? 0);
+        $playerPort = 0;
+        $playerContainer = Container::where('parent_type', Container::PARENT_TYPE_PLAYER)
+            ->where('parent_id', $this->playerId)
+            ->first();
+        if ($playerContainer) {
+            $playerPort = (int) ($playerContainer->ws_port ?? 0);
+        }
+        // ------------------------------
+
         if ($elementHasPosition) {
             $elementHasPosition->loadMissing([
                 'brain.neurons.outgoingLinks.toNeuron',
@@ -91,11 +109,22 @@ class ElementDraw
         $image->setSrc($imagePath);
         $image->setOrigin($x, $y);
         $image->setSize(32, 32);
+        $image->addAttributes('element_id', (int) $this->element->id);
+        $image->addAttributes('uid', $uid);
+        $image->addAttributes('i', (int) $this->tileI);
+        $image->addAttributes('j', (int) $this->tileJ);
+        $image->addAttributes('ws_port', $wsPort);
+        $image->addAttributes('player_port', $playerPort);
 
         // Interactivity
         $jsPathClickElement = resource_path('js/function/element/click_element.blade.php');
         $jsContentClickElement = file_get_contents($jsPathClickElement);
+        
+        $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $jsContentClickElement = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentClickElement);
+        $jsContentClickElement = str_replace('__player_port__', $playerPort, $jsContentClickElement);
         $jsContentClickElement = Helper::setCommonJsCode($jsContentClickElement, Str::random(20));
+        
         $image->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickElement);
 
         // Panel: keep it visually attached to the element, like EntityDraw.

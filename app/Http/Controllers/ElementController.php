@@ -15,11 +15,57 @@ use App\Models\Neuron;
 use App\Models\NeuronLink;
 use App\Models\Score;
 use App\Models\ElementHasGene;
+use App\Models\ElementHasPosition;
+use App\Models\ElementHasPositionInformation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ElementController extends Controller
 {
+    /**
+     * Recupera i valori attuali dei geni di un'elemento tramite uid (ElementHasPosition)
+     */
+    public function genes(Request $request)
+    {
+        $uid = $request->query('uid');
+
+        if (!$uid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'UID non fornito'
+            ], 400);
+        }
+
+        $elementHasPosition = ElementHasPosition::where('uid', $uid)->first();
+
+        if (!$elementHasPosition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ElementHasPosition non trovato'
+            ], 404);
+        }
+
+        $genesData = [];
+        $elementHasPosition->load(['informations.gene']);
+
+        foreach ($elementHasPosition->informations as $info) {
+            $gene = $info->gene;
+            $genesData[] = [
+                'id' => $gene->id,
+                'key' => $gene->key,
+                'name' => $gene->name,
+                'value' => $info->value,
+                'min' => $info->min_value,
+                'max' => $info->max_value,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'uid' => $elementHasPosition->uid,
+            'genes' => $genesData
+        ]);
+    }
     // ... index, listDataTable, create, store methods remain unchanged ...
 
     public function index()

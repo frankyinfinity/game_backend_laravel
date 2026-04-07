@@ -24,10 +24,9 @@ class ElementHasPositionObserver
      */
     public function created(ElementHasPosition $elementHasPosition): void
     {
-        if ($elementHasPosition->element->isInteractive()) {
+        $element = $elementHasPosition->element;
 
-            $element = $elementHasPosition->element;
-
+        if ($element->isInteractive()) {
             //Information
             $elementHasInformations = ElementInformation::query()
                 ->where('element_id', $element->id)
@@ -100,18 +99,17 @@ class ElementHasPositionObserver
                         ]);
                     }
                 }
-
-                // Create and start a dedicated element container for cloned brain execution
-                try {
-                    app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, true);
-                } catch (\Throwable $e) {
-                    Log::error('Unable to create element container', [
-                        'element_has_position_id' => $elementHasPosition->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
             }
 
+            // Create and start a dedicated element container (only for interactive)
+            try {
+                app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, true);
+            } catch (\Throwable $e) {
+                Log::error('Unable to create element container', [
+                    'element_has_position_id' => $elementHasPosition->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 
