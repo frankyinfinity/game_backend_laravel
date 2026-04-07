@@ -96,6 +96,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::resource('complex-chimical-elements', App\Http\Controllers\ComplexChimicalElementController::class);
     Route::post('/complex-chimical-elements/list/table', [App\Http\Controllers\ComplexChimicalElementController::class, 'listDataTable'])->name('complex-chimical-elements.datatable');
     Route::post('/complex-chimical-elements/delete', [App\Http\Controllers\ComplexChimicalElementController::class, 'delete'])->name('complex-chimical-elements.delete');
+    Route::get('/complex-chimical-elements/{complexChimicalElement}/tree-data', [App\Http\Controllers\ComplexChimicalElementController::class, 'treeData'])->name('complex-chimical-elements.tree-data');
 
     //Complex Chimical Element Details
     Route::post('/complex-chimical-elements/{complexChimicalElement}/details', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'listDataTable'])->name('complex-chimical-elements.details.datatable');

@@ -80,4 +80,42 @@ class ComplexChimicalElementController extends Controller
         }
         return response()->json(['success' => true]);
     }
+
+    public function treeData(ComplexChimicalElement $complexChimicalElement)
+    {
+        return response()->json($this->buildTree($complexChimicalElement));
+    }
+
+    private function buildTree(ComplexChimicalElement $element)
+    {
+        // Eager load details and their relations if not loaded
+        $element->load(['details.chimicalElement', 'details.complexChimicalElement']);
+
+        $node = [
+            'name' => $element->name . ' (' . $element->symbol . ')',
+            'type' => 'complex'
+        ];
+
+        $children = [];
+        foreach ($element->details as $detail) {
+            if ($detail->chimical_element_id) {
+                $children[] = [
+                    'name' => ($detail->chimicalElement->name ?? 'Unknown') . ' (' . ($detail->chimicalElement->symbol ?? '?') . ') x' . $detail->quantity,
+                    'type' => 'simple'
+                ];
+            } else if ($detail->complex_chimical_element_id) {
+                if ($detail->complexChimicalElement) {
+                    $childNode = $this->buildTree($detail->complexChimicalElement);
+                    $childNode['name'] .= ' x' . $detail->quantity;
+                    $children[] = $childNode;
+                }
+            }
+        }
+
+        if (!empty($children)) {
+            $node['children'] = $children;
+        }
+
+        return $node;
+    }
 }
