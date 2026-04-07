@@ -386,6 +386,11 @@ return [
                     'text' => 'Generatori',
                     'url'  => '/generator-chimical-elements',
                     'icon' => 'fas fa-cogs',
+                ],
+                [
+                    'text' => 'Regole',
+                    'url'  => '/rule-chimical-elements',
+                    'icon' => 'fas fa-balance-scale',
                 ]
             ]
         ],

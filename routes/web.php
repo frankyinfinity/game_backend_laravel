@@ -113,6 +113,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/generator-chimical-elements/list/table', [App\Http\Controllers\GeneratorChimicalElementController::class, 'listDataTable'])->name('generator-chimical-elements.datatable');
     Route::post('/generator-chimical-elements/delete', [App\Http\Controllers\GeneratorChimicalElementController::class, 'delete'])->name('generator-chimical-elements.delete');
 
+    //Rule Chimical Elements
+    Route::resource('rule-chimical-elements', App\Http\Controllers\RuleChimicalElementController::class);
+    Route::post('/rule-chimical-elements/list/table', [App\Http\Controllers\RuleChimicalElementController::class, 'listDataTable'])->name('rule-chimical-elements.datatable');
+    Route::post('/rule-chimical-elements/delete', [App\Http\Controllers\RuleChimicalElementController::class, 'delete'])->name('rule-chimical-elements.delete');
+
     //Elements
     Route::resource('elements', App\Http\Controllers\ElementController::class);
     Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');
