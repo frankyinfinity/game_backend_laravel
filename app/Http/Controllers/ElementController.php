@@ -55,8 +55,8 @@ class ElementController extends Controller
                 'key' => $gene->key,
                 'name' => $gene->name,
                 'value' => $info->value,
-                'min' => $info->min_value,
-                'max' => $info->max_value,
+                'min' => $info->min,
+                'max' => $info->max,
             ];
         }
 

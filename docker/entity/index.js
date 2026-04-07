@@ -221,7 +221,7 @@ function scheduleNextCycle() {
   setTimeout(() => {
     fetchCurrentPosition();
     fetchCurrentGenes();
-  }, 5000);
+  }, 2000);
 }
 
 // ========== WebSocket Server ==========

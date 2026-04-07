@@ -81,8 +81,9 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful, starting game/brain loop...');
-        scheduleNextCycle();
+        console.log('Login successful, starting game/brain and genes cycles...');
+        callGameBrain();
+        fetchCurrentGenes();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', (d) => console.error(d.toString()));
@@ -142,26 +143,33 @@ function callGameBrain() {
       } catch (error) {
         console.error(`[Element ${elementHasPositionId}] Parse error: ${error.message}`);
       } finally {
-        scheduleNextCycle();
+        scheduleNextBrainCycle();
       }
     });
   });
 
   req.on('error', (error) => {
     console.error(`[Element ${elementHasPositionId}] Error calling game/brain: ${error.message}`);
-    scheduleNextCycle();
+    scheduleNextBrainCycle();
   });
 
   req.write(postData);
   req.end();
 }
 
-let SECOND_TIMEOUT = 20;
-function scheduleNextCycle() {
+const BRAIN_WAIT_SECONDS = 10;
+const GENES_WAIT_SECONDS = 2;
+
+function scheduleNextBrainCycle() {
   setTimeout(() => {
     callGameBrain();
+  }, BRAIN_WAIT_SECONDS * 1000);
+}
+
+function scheduleNextGenesCycle() {
+  setTimeout(() => {
     fetchCurrentGenes();
-  }, SECOND_TIMEOUT * 1000);
+  }, GENES_WAIT_SECONDS * 1000);
 }
 
 function fetchCurrentGenes() {
@@ -177,7 +185,8 @@ function fetchCurrentGenes() {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Cookie': sessionCookie
+      'Cookie': sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken,
     },
   };
 
@@ -186,6 +195,10 @@ function fetchCurrentGenes() {
     res.on('data', (chunk) => { data += chunk; });
     res.on('end', () => {
       try {
+        if (!data) {
+          console.warn(`[Element ${elementHasPositionUid}] Empty response from genes API.`);
+          return;
+        }
         const response = JSON.parse(data);
         if (response.success) {
           currentGenes = response.genes;
@@ -193,12 +206,15 @@ function fetchCurrentGenes() {
         }
       } catch (error) {
         console.error(`[Element ${elementHasPositionUid}] Error parsing gene values: ${error.message}`);
+      } finally {
+        scheduleNextGenesCycle();
       }
     });
   });
 
   req.on('error', (error) => {
     console.error(`[Element ${elementHasPositionUid}] Error fetching genes: ${error.message}`);
+    scheduleNextGenesCycle();
   });
 
   req.end();

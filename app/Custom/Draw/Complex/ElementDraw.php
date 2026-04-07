@@ -275,7 +275,7 @@ class ElementDraw
                 $gene = $elementHasPositionInformation->gene;
                 $elementHasPosition = $elementHasPositionInformation->elementHasPosition;
 
-                $progressBarUid = 'gene_progress_' . $gene->key . '_element_' . $elementHasPosition->uid;
+                $progressBarUid = $elementHasPosition->uid . '_progress_bar_' . $gene->key;
                 
                 $progressBar = new ProgressBarDraw($progressBarUid);
                 $progressBar->setName($gene->name);

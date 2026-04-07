@@ -88,6 +88,16 @@
             delete AppData._genePollingIntervals[object_uid];
         }
 
+        // --- Gene Polling Management is moved to the end of the function ---
+        // ------------------------------
+
+        // Toggle all descendants too, so nested structures remain visible
+        setChildrenVisibility(panel_uid, show, 10001);
+        if (app && app.stage) {
+            app.stage.sortChildren();
+        }
+
+        // --- Gene Polling Management (moved to end to ensure UI is ready) ---
         if (show && object.attributes && object.attributes.ws_port) {
             const elementPort = object.attributes.ws_port;
             const elementWsUrl = '__gateway_base__' + elementPort;
@@ -95,37 +105,20 @@
             const elementWsKey = 'element_' + elementPort;
             let elementWs = window.gameWebSockets[elementWsKey];
 
-            const startPolling = (ws) => {
-                console.log('[Gene Polling] Started for element:', object_uid);
-                AppData._genePollingIntervals[object_uid] = setInterval(() => {
-                    if (ws && ws.readyState === 1) { // 1 = OPEN
-                        ws.send(JSON.stringify({ command: 'get_genes' }));
-                    }
-                }, 2000);
-            };
-
-            if (!elementWs || elementWs.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
-                elementWs = new WebSocket(elementWsUrl);
-                window.gameWebSockets[elementWsKey] = elementWs;
-                elementWs.onopen = () => startPolling(elementWs);
-                elementWs.onmessage = (event) => {
+            const bindMessageHandler = (ws) => {
+                ws.onmessage = (event) => {
                     try {
                         const response = JSON.parse(event.data);
                         if (response.command === 'get_genes') {
-                            console.log('[Gene Polling] Genes for element ' + object_uid + ':', response.genes);
-                            
+                            console.log('[Gene Polling] Response for ' + object_uid + ' arrived.');
                             if (response.genes && Array.isArray(response.genes)) {
                                 response.genes.forEach(gene => {
                                     const baseUid = object_uid + '_progress_bar_' + gene.key;
-                                    
-                                    // 1. Update Text Label
                                     const textUid = baseUid + '_text';
                                     if (objects[textUid]) {
                                         objects[textUid].text = (gene.name || gene.key) + " (" + gene.value + ")";
                                         if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(textUid);
                                     }
-
-                                    // 2. Update Progress Bar Width
                                     const barUid = baseUid + '_bar';
                                     const borderUid = baseUid + '_border';
                                     if (objects[barUid] && objects[borderUid]) {
@@ -134,12 +127,15 @@
                                         const range = max - min;
                                         const percent = range > 0 ? (gene.value - min) / range : 0;
                                         const clampedPercent = Math.max(0, Math.min(1, percent));
-                                        
                                         const fullWidth = objects[borderUid].width || 200;
                                         const newWidth = (fullWidth - 4) * clampedPercent;
-                                        
                                         objects[barUid].width = Math.max(0, newWidth);
                                         if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(barUid);
+                                        const rangeUid = baseUid + '_range';
+                                        if (objects[rangeUid]) {
+                                            objects[rangeUid].text = "(" + min + " / " + max + ")";
+                                            if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(rangeUid);
+                                        }
                                     }
                                 });
                                 if (app && app.stage) app.stage.sortChildren();
@@ -149,20 +145,42 @@
                         console.error('[Element WS] Parse Error:', e);
                     }
                 };
+            };
+
+            const startPolling = (ws) => {
+                console.log('[Gene Polling] Starting cycle for:', object_uid);
+                const fetchGenes = (isImmediate = false) => {
+                    if (ws && ws.readyState === 1) {
+                        if (isImmediate) console.log('[Gene Polling] Sending IMMEDIATE refresh call...');
+                        ws.send(JSON.stringify({ command: 'get_genes' }));
+                    }
+                };
+                
+                // Immediate refresh after a small delay to ensure rendering is complete
+                setTimeout(() => fetchGenes(true), 50); 
+                
+                // Standard 2s cycle
+                AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 2000);
+            };
+
+            if (!elementWs || elementWs.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
+                elementWs = new WebSocket(elementWsUrl);
+                window.gameWebSockets[elementWsKey] = elementWs;
+                elementWs.onopen = () => {
+                    bindMessageHandler(elementWs);
+                    startPolling(elementWs);
+                };
             } else if (elementWs.readyState === 1) {
+                bindMessageHandler(elementWs);
                 startPolling(elementWs);
             } else if (elementWs.readyState === 0) { // 0 = CONNECTING
-                elementWs.addEventListener('open', () => startPolling(elementWs), { once: true });
+                elementWs.addEventListener('open', () => {
+                    bindMessageHandler(elementWs);
+                    startPolling(elementWs);
+                }, { once: true });
             }
         } else {
-            console.log('[Gene Polling] Stopped for element:', object_uid);
-        }
-        // ------------------------------
-
-        // Toggle all descendants too, so nested structures remain visible
-        setChildrenVisibility(panel_uid, show, 10001);
-        if (app && app.stage) {
-            app.stage.sortChildren();
+            console.log('[Gene Polling] Polling state inactive for:', object_uid);
         }
     }
     window['__name__']();

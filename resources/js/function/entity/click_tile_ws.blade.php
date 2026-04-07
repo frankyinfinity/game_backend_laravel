@@ -166,7 +166,7 @@
                         mapWs.removeEventListener('message', handler);
                     };
                     mapWs.addEventListener('message', handler);
-                }, (2 * 1000));
+                }, (10 * 1000));
             };
 
             var showTilePanel = function (mapWs) {
