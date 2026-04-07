@@ -118,12 +118,12 @@ class CalculateChimicalElementJob implements ShouldQueue
                 ->whereHas('birthRegionDetail', function ($q) use ($birthRegion) {
                     $q->where('birth_region_id', $birthRegion->id);
                 })
-                ->whereNotNull('json_chimical_element')
-                ->whereNull('json_complex_chimical_element')
+                ->where(function($q) {
+                    $q->whereNotNull('json_chimical_element')
+                      ->orWhereNotNull('json_complex_chimical_element');
+                })
                 ->get()
-                ->groupBy(function ($item) {
-                    return $item->birth_region_detail_id;
-                });
+                ->groupBy('birth_region_detail_id');
 
             foreach ($tilesWithElements as $detailId => $elements) {
                 $canGenerate = true;
@@ -131,10 +131,19 @@ class CalculateChimicalElementJob implements ShouldQueue
 
                 foreach ($complexElement->details as $detail) {
                     $requiredElement = $elements->first(function ($el) use ($detail) {
-                        $jsonEl = is_string($el->json_chimical_element) 
-                            ? json_decode($el->json_chimical_element, true) 
-                            : $el->json_chimical_element;
-                        return $jsonEl && ($jsonEl['id'] ?? null) == $detail->chimical_element_id;
+                        if ($detail->chimical_element_id) {
+                            $jsonEl = is_string($el->json_chimical_element) 
+                                ? json_decode($el->json_chimical_element, true) 
+                                : $el->json_chimical_element;
+                            return $jsonEl && ($jsonEl['id'] ?? null) == $detail->chimical_element_id;
+                        }
+                        if ($detail->complex_chimical_element_id) {
+                            $jsonEl = is_string($el->json_complex_chimical_element) 
+                                ? json_decode($el->json_complex_chimical_element, true) 
+                                : $el->json_complex_chimical_element;
+                            return $jsonEl && ($jsonEl['id'] ?? null) == $detail->complex_chimical_element_id;
+                        }
+                        return false;
                     });
 
                     if (!$requiredElement || $requiredElement->quantity < $detail->quantity) {

@@ -41,7 +41,8 @@ class ComplexChimicalElementController extends Controller
     public function show(ComplexChimicalElement $complexChimicalElement)
     {
         $chimicalElements = ChimicalElement::all();
-        return view('complex_chimical_elements.show', compact('complexChimicalElement', 'chimicalElements'));
+        $allComplexChimicalElements = ComplexChimicalElement::where('id', '!=', $complexChimicalElement->id)->get();
+        return view('complex_chimical_elements.show', compact('complexChimicalElement', 'chimicalElements', 'allComplexChimicalElements'));
     }
 
     public function edit(ComplexChimicalElement $complexChimicalElement)

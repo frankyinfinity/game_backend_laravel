@@ -10,6 +10,6 @@ class ComplexChimicalElement extends Model
 
     public function details()
     {
-        return $this->hasMany(ComplexChimicalElementDetail::class);
+        return $this->hasMany(ComplexChimicalElementDetail::class, 'parent_id');
     }
 }

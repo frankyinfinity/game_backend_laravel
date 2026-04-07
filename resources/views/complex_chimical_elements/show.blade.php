@@ -27,21 +27,79 @@
                 <hr>
 
                 <div class="row mb-3">
-                    <div class="col-md-4">
-                        <select id="chimical_element_id" class="form-control form-control-sm">
-                            <option value="">Seleziona Elemento Chimico</option>
-                            @foreach($chimicalElements as $ce)
-                                <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <input type="number" id="quantity" class="form-control form-control-sm" placeholder="Quantità" min="1">
-                    </div>
-                    <div class="col-md-2">
-                        <button type="button" id="btn_add_detail" class="btn btn-success btn-sm btn-block">
-                            <i class="fa fa-plus"></i> Aggiungi
+                    <div class="col-md-12">
+                        <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#modal_add_chimical">
+                            <i class="fa fa-plus"></i> Aggiungi Elemento Chimico
                         </button>
+                        <button type="button" class="btn btn-info btn-sm ml-2" data-toggle="modal" data-target="#modal_add_complex">
+                            <i class="fa fa-plus"></i> Aggiungi Elemento Chimico Complesso
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal A: Simple Element -->
+                <div class="modal fade" id="modal_add_chimical" tabindex="-1" role="dialog" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Aggiungi Elemento Chimico</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label>Elemento Chimico</label>
+                                    <select id="modal_chimical_element_id" class="form-control">
+                                        <option value="">Seleziona Elemento Chimico</option>
+                                        @foreach($chimicalElements as $ce)
+                                            <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Quantità</label>
+                                    <input type="number" id="modal_chimical_quantity" class="form-control" placeholder="Quantità" min="1">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
+                                <button type="button" id="btn_save_chimical" class="btn btn-success">Salva</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal B: Complex Element -->
+                <div class="modal fade" id="modal_add_complex" tabindex="-1" role="dialog" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Aggiungi Elemento Chimico Complesso</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label>Elemento Chimico Complesso</label>
+                                    <select id="modal_complex_chimical_element_id" class="form-control">
+                                        <option value="">Seleziona Elemento Complesso</option>
+                                        @foreach($allComplexChimicalElements as $cce)
+                                            <option value="{{ $cce->id }}">{{ $cce->name }} ({{ $cce->symbol }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Quantità</label>
+                                    <input type="number" id="modal_complex_quantity" class="form-control" placeholder="Quantità" min="1">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
+                                <button type="button" id="btn_save_complex" class="btn btn-info">Salva</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -126,9 +184,9 @@
                 ],
             });
 
-            $('#btn_add_detail').on('click', function() {
-                var chimicalElementId = $('#chimical_element_id').val();
-                var quantity = $('#quantity').val();
+            $('#btn_save_chimical').on('click', function() {
+                var chimicalElementId = $('#modal_chimical_element_id').val();
+                var quantity = $('#modal_chimical_quantity').val();
 
                 if (!chimicalElementId) {
                     alert('Seleziona un elemento chimico.');
@@ -150,12 +208,48 @@
                         quantity: quantity
                     },
                     success: function(response) {
-                        $('#chimical_element_id').val('');
-                        $('#quantity').val('');
+                        $('#modal_chimical_element_id').val('');
+                        $('#modal_chimical_quantity').val('');
+                        $('#modal_add_chimical').modal('hide');
                         detailTable.ajax.reload();
                     },
                     error: function(xhr) {
-                        alert('Errore durante il salvataggio.');
+                        alert(xhr.responseJSON.message || 'Errore durante il salvataggio.');
+                    }
+                });
+            });
+
+            $('#btn_save_complex').on('click', function() {
+                var complexChimicalElementId = $('#modal_complex_chimical_element_id').val();
+                var quantity = $('#modal_complex_quantity').val();
+
+                if (!complexChimicalElementId) {
+                    alert('Seleziona un elemento chimico complesso.');
+                    return;
+                }
+                if (!quantity || quantity < 1) {
+                    alert('Inserisci una quantità valida.');
+                    return;
+                }
+
+                $.ajax({
+                    url: '{{ route('complex-chimical-elements.details.store', $complexChimicalElement) }}',
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    data: {
+                        complex_chimical_element_id: complexChimicalElementId,
+                        quantity: quantity
+                    },
+                    success: function(response) {
+                        $('#modal_complex_chimical_element_id').val('');
+                        $('#modal_complex_quantity').val('');
+                        $('#modal_add_complex').modal('hide');
+                        detailTable.ajax.reload();
+                    },
+                    error: function(xhr) {
+                        alert(xhr.responseJSON.message || 'Errore durante il salvataggio.');
                     }
                 });
             });
