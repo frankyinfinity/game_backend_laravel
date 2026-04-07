@@ -1181,28 +1181,6 @@ class BrainFlowRunner
         }
 
 
-                        foreach ($updateObject->get() as $data) {
-                            $drawCommands[] = $data;
-                        }
-                        continue;
-                    }
-
-                    if (($operation['type'] ?? null) === 'draw') {
-                        $drawCommands[] = $this->drawMapGroupObject($operation['object'], $sessionId);
-                        continue;
-                    }
-
-                    if (($operation['type'] ?? null) === 'clear') {
-                        $clearObject = new ObjectClear($operation['uid'], $sessionId);
-                        $drawCommands[] = $clearObject->get();
-                        ObjectCache::forget($sessionId, $operation['uid']);
-                    }
-                }
-            } catch (\Throwable $e) {
-                Log::warning('ProgressBar update failed in handleAttackNeuron', ['error' => $e->getMessage()]);
-            }
-        }
-
         if ($newLife !== null && $newLife <= 0) {
             if ($targetType === 'entity' && $targetEntity !== null) {
                 $targetEntity->update(['state' => Entity::STATE_DEATH]);
