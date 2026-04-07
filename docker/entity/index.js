@@ -287,6 +287,15 @@ function handleWebSocketCommand(data, ws) {
       }));
       break;
 
+    case 'get_genes':
+      // Ritorna i geni correnti
+      ws.send(JSON.stringify({
+        success: true,
+        command: 'get_genes',
+        genes: currentGenes
+      }));
+      break;
+
     default:
       ws.send(JSON.stringify({
         success: false,

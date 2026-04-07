@@ -1180,19 +1180,7 @@ class BrainFlowRunner
             $targetUid = (string) $targetElementPosition->uid;
         }
 
-        if ($lifeGene !== null && $targetUid !== null) {
-            $progressBarUid = $targetType === 'entity'
-                ? ($targetUid . '_progress_bar_' . $lifeGene->key)
-                : ('gene_progress_' . $lifeGene->key . '_element_' . $targetUid);
-            try {
-                $progressBar = new ProgressBarDraw($progressBarUid);
-                $operations = $progressBar->updateValue($newLife, $sessionId);
-                foreach ($operations as $operation) {
-                    if (($operation['type'] ?? null) === 'update') {
-                        $updateObject = new ObjectUpdate($operation['uid'], $sessionId);
-                        foreach (($operation['attributes'] ?? []) as $attribute => $value) {
-                            $updateObject->setAttributes($attribute, $value);
-                        }
+
                         foreach ($updateObject->get() as $data) {
                             $drawCommands[] = $data;
                         }

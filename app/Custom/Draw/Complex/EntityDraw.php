@@ -97,6 +97,13 @@ class EntityDraw
             ->where('parent_id', $dbEntity->specie->player_id)
             ->first();
         $playerWsPort = $playerContainer ? $playerContainer->ws_port : null;
+
+        $container = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+            ->where('parent_id', $dbEntity->id)
+            ->first();
+        $wsPort = $container ? $container->ws_port : null;
+
         $jsContentClickEntity = str_replace('__player_port__', $playerWsPort, $jsContentClickEntity);
         $jsContentClickEntity = Helper::setCommonJsCode($jsContentClickEntity, Str::random(20));
 
@@ -104,6 +111,8 @@ class EntityDraw
         foreach ($dbEntity->getFieldAttributes() as $key => $value) {
             $circle->addAttributes($key, $value);
         }
+        $circle->addAttributes('ws_port', $wsPort);
+        $circle->addAttributes('player_port', $playerWsPort);
 
         //Panel
         $panelX = $centerSquare['x'] + ($size / 3);
@@ -139,11 +148,6 @@ class EntityDraw
         $player_id = $this->dbEntity->specie->player_id;
 
         //WS Port
-        $container = Container::query()
-            ->where('parent_type', Container::PARENT_TYPE_ENTITY)
-            ->where('parent_id', $this->dbEntity->id)
-            ->first();
-        $wsPort = $container ? $container->ws_port : null;
 
         $jsMovPaths = [];
         $directions = ['up', 'left', 'down', 'right'];

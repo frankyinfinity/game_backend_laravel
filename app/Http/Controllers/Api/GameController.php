@@ -1690,13 +1690,6 @@ class GameController extends Controller
 
             Log::info("Element {$elementUid} health: {$elementLifeInfo->value} -> {$newHealth}");
 
-            // Update element's lifepoint progress bar in UI
-            $progressBarUid = 'gene_progress_' . $elementLifeInfo->gene->key . '_element_' . $elementLifeInfo->elementHasPosition->uid;
-            $progressBar = new ProgressBarDraw($progressBarUid);
-            $progressBarUpdate = $progressBar->updateValue($newHealth, $player->actual_session_id);
-            foreach ($progressBarUpdate as $data)
-                $drawCommands[] = $data;
-
             if ($newHealth <= 0) {
                 $elementDied = true;
                 Log::info("Element {$elementUid} died!");
@@ -2090,7 +2083,6 @@ class GameController extends Controller
             ]);
 
             // Aggiorna progressbar lifepoint dell'entity target in UI
-            $this->dispatchEntityLifepointProgressBarUpdate($request, $player, $entityUid, $updatedTargetLife);
             // Disegna subito la nuova entity spawnata
             $this->dispatchNewEntitySpawnDraw($request, $player, $newEntity);
 
@@ -2177,65 +2169,6 @@ class GameController extends Controller
         return $candidates[0];
     }
 
-    private function dispatchEntityLifepointProgressBarUpdate(Request $request, Player $player, string $entityUid, int $newValue): void
-    {
-        $sessionId = $this->resolveSessionId($request, $player);
-        if ($sessionId === '') {
-            return;
-        }
-
-        try {
-            ObjectCache::buffer($sessionId);
-
-            $drawCommands = [];
-            $progressBarUid = $entityUid . '_progress_bar_' . Gene::KEY_LIFEPOINT;
-            $progressBar = new ProgressBarDraw($progressBarUid);
-            $operations = $progressBar->updateValue($newValue, $sessionId);
-
-            foreach ($operations as $operation) {
-                if (($operation['type'] ?? null) === 'update') {
-                    $updateObject = new ObjectUpdate($operation['uid'], $sessionId);
-                    foreach (($operation['attributes'] ?? []) as $attribute => $value) {
-                        $updateObject->setAttributes($attribute, $value);
-                    }
-                    foreach ($updateObject->get() as $data) {
-                        $drawCommands[] = $data;
-                    }
-                    continue;
-                }
-
-                if (($operation['type'] ?? null) === 'draw') {
-                    $drawCommands[] = $this->drawMapGroupObject($operation['object'], $sessionId);
-                    continue;
-                }
-
-                if (($operation['type'] ?? null) === 'clear') {
-                    $clearObject = new ObjectClear($operation['uid'], $sessionId);
-                    $drawCommands[] = $clearObject->get();
-                    ObjectCache::forget($sessionId, $operation['uid']);
-                }
-            }
-
-            ObjectCache::flush($sessionId);
-
-            if (!empty($drawCommands)) {
-                $requestId = Str::random(20);
-                DrawRequest::query()->create([
-                    'session_id' => $sessionId,
-                    'request_id' => $requestId,
-                    'player_id' => $player->id,
-                    'items' => json_encode($drawCommands),
-                ]);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Unable to update entity lifepoint progressbar after division', [
-                'entity_uid' => $entityUid,
-                'player_id' => $player->id,
-                'session_id' => $sessionId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
 
     private function dispatchNewEntitySpawnDraw(Request $request, Player $player, Entity $newEntity): void
     {
