@@ -618,13 +618,9 @@ class BrainFlowRunner
             return null;
         }
 
+        Log::info('matches ' . json_encode($matches));
         if (empty($matches)) {
-            return $this->findDetectionTargetAroundElementHasPositionFromDb(
-                $elementHasPosition,
-                $range,
-                $targetType,
-                $targetElementId
-            );
+            return null;
         }
 
         usort($matches, function (array $a, array $b): int {
@@ -651,87 +647,6 @@ class BrainFlowRunner
         }
 
         return false;
-    }
-
-    private function findDetectionTargetAroundElementHasPositionFromDb(
-        ElementHasPosition $elementHasPosition,
-        int $range,
-        string $targetType,
-        ?int $targetElementId
-    ): ?string {
-        $player = $elementHasPosition->player()->first();
-        $birthRegion = $player?->birthRegion;
-        $tiles = $birthRegion ? Helper::getBirthRegionTiles($birthRegion) : collect();
-
-        $minI = max(0, (int) $elementHasPosition->tile_i - $range);
-        $maxI = max(0, (int) $elementHasPosition->tile_i + $range);
-        $minJ = max(0, (int) $elementHasPosition->tile_j - $range);
-        $maxJ = max(0, (int) $elementHasPosition->tile_j + $range);
-        $centerI = (int) $elementHasPosition->tile_i;
-        $centerJ = (int) $elementHasPosition->tile_j;
-
-        $matches = [];
-
-        if ($targetType === Neuron::TARGET_TYPE_ENTITY) {
-            $entities = Entity::query()
-                ->where('state', Entity::STATE_LIFE)
-                ->whereBetween('tile_i', [$minI, $maxI])
-                ->whereBetween('tile_j', [$minJ, $maxJ])
-                ->get(['tile_i', 'tile_j']);
-
-            foreach ($entities as $entity) {
-                $tileI = (int) $entity->tile_i;
-                $tileJ = (int) $entity->tile_j;
-                if (!$this->isLiquidTileAt($tiles, $tileI, $tileJ)) {
-                    continue;
-                }
-                $matches[] = [
-                    'i' => $tileI,
-                    'j' => $tileJ,
-                    'distance' => abs($tileI - $centerI) + abs($tileJ - $centerJ),
-                ];
-            }
-        } elseif ($targetType === Neuron::TARGET_TYPE_ELEMENT) {
-            $query = ElementHasPosition::query()
-                ->whereBetween('tile_i', [$minI, $maxI])
-                ->whereBetween('tile_j', [$minJ, $maxJ])
-                ->where('id', '!=', (int) $elementHasPosition->id);
-
-            if ($targetElementId !== null && $targetElementId > 0) {
-                $query->where('element_id', $targetElementId);
-            }
-
-            $elements = $query->get(['tile_i', 'tile_j']);
-            foreach ($elements as $element) {
-                $tileI = (int) $element->tile_i;
-                $tileJ = (int) $element->tile_j;
-                if (!$this->isLiquidTileAt($tiles, $tileI, $tileJ)) {
-                    continue;
-                }
-                $matches[] = [
-                    'i' => $tileI,
-                    'j' => $tileJ,
-                    'distance' => abs($tileI - $centerI) + abs($tileJ - $centerJ),
-                ];
-            }
-        }
-
-        if (empty($matches)) {
-            return null;
-        }
-
-        usort($matches, function (array $a, array $b): int {
-            if ($a['distance'] !== $b['distance']) {
-                return $a['distance'] <=> $b['distance'];
-            }
-            if ($a['i'] !== $b['i']) {
-                return $a['i'] <=> $b['i'];
-            }
-            return $a['j'] <=> $b['j'];
-        });
-
-        $best = $matches[0];
-        return '(' . $best['i'] . ',' . $best['j'] . ')';
     }
 
     private function resolveMapContainerForElementPosition(ElementHasPosition $elementHasPosition): ?Container
@@ -778,7 +693,7 @@ class BrainFlowRunner
         if (!is_array($tile)) {
             return false;
         }
-        if (($tile['type'] ?? null) !== Tile::TYPE_LIQUID) {
+        if (($tile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
             return false;
         }
 
