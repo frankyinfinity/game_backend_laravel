@@ -10,6 +10,7 @@ use App\Models\Player;
 use App\Custom\Manipulation\ObjectCache;
 use App\Models\DrawRequest;
 use App\Custom\Draw\Complex\Form\SelectDraw;
+use App\Custom\Draw\Complex\Form\MultiSelectDraw;
 use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Colors;
@@ -23,8 +24,9 @@ use Illuminate\Support\Facades\Log;
 class RegionController extends Controller
 {
 
-    public function get(Request $request, $planet_id){
-        
+    public function get(Request $request, $planet_id)
+    {
+
         $x = doubleval($request->x);
         $y = doubleval($request->y);
         $width_input = doubleval($request->width_input);
@@ -56,7 +58,7 @@ class RegionController extends Controller
         $drawItems = [];
 
         //Select Region
-        $x += $width_input + ($width_input/10);
+        $x += $width_input + ($width_input / 10);
         $selectRegion = new SelectDraw(Str::random(20), $sessionId);
         $selectRegion->setName('birth_region_id');
         $selectRegion->setRequired(true);
@@ -76,6 +78,33 @@ class RegionController extends Controller
         $selectRegion->setBoxIconColor(Colors::LIGHT_GRAY);
         $selectRegion->setBoxIconTextColor(Colors::BLACK);
         $selectRegion->build();
+
+        // MultiSelect for RuleChimicalElements (with details)
+        $rulesWithDetails = \App\Models\RuleChimicalElement::whereHas('details')->get();
+        $multiSelectOptions = $rulesWithDetails->map(function ($rule) {
+            return ['id' => $rule->id, 'name' => $rule->title];
+        })->toArray();
+
+        $yMultiSelect = $y;
+        $xMultiSelect = $x + $width_input + ($width_input / 10);
+
+        $multiSelect = new MultiSelectDraw(Str::random(20), $sessionId);
+        $multiSelect->setName('str_rule_chimical_element_ids');
+        $multiSelect->setTitle('Elementi Chimici*');
+        $multiSelect->setOrigin($xMultiSelect, $yMultiSelect);
+        $multiSelect->setSize($width_input, $height_input);
+        $multiSelect->setBorderThickness(2);
+        $multiSelect->setBorderColor(Colors::DARK_GRAY);
+        $multiSelect->setTitleColor(Colors::BLACK);
+        $multiSelect->setBackgroundColor(Colors::WHITE);
+        $multiSelect->setBoxIconColor(Colors::LIGHT_GRAY);
+        $multiSelect->setBoxIconTextColor(Colors::BLACK);
+        $multiSelect->setValueColor(Colors::BLACK);
+        $multiSelect->setOptionId('id');
+        $multiSelect->setOptionText('name');
+        $multiSelect->setOptionShowDisplay(3);
+        $multiSelect->setOptions($multiSelectOptions);
+        $multiSelect->build();
 
         //Table
         $x = 15;
@@ -126,7 +155,7 @@ class RegionController extends Controller
         foreach ($genes as $gene) {
 
             $row = [];
-            
+
             // Col 1: Nome Gene
             $cell1 = new TableCellDraw(Str::random(20));
             $cell1->setContent($gene['name']);
@@ -145,7 +174,7 @@ class RegionController extends Controller
             $cell3 = new TableCellDraw(Str::random(20));
             $cell3->setBorderThickness(1);
             $cell3->setBorderColor(Colors::DARK_GRAY);
-            if($gene['max'] !== null) {
+            if ($gene['max'] !== null) {
                 $cell3->setContent('Fisso: ' . $gene['max']);
             } else {
                 $cell3->setContent($gene['max_from'] . ' / ' . $gene['max_to']);
@@ -166,7 +195,7 @@ class RegionController extends Controller
             $inputGene->setBackgroundColor(Colors::WHITE);
             $inputGene->setSize(130, 68);
             $inputGene->setValue($gene['max'] !== null ? $gene['min'] : $gene['max_from']);
-            if($gene['max'] !== null) {
+            if ($gene['max'] !== null) {
                 $inputGene->setMin($gene['min']);
                 $inputGene->setMax($gene['max']);
             } else {
@@ -182,7 +211,7 @@ class RegionController extends Controller
             $cell3->setSize(250, 50);
 
             $table->addRow($row);
-            
+
             $tableInputs[] = $inputGene;
 
         }
@@ -192,7 +221,7 @@ class RegionController extends Controller
         //Button Registrazione (Blu)
         $x = 15;
         $y = $table->getBottomY() + 50;
-        $submitButton = new ButtonDraw(Str::random(20).'_submit_button');
+        $submitButton = new ButtonDraw(Str::random(20) . '_submit_button');
         $submitButton->setSize(400, 50);
         $submitButton->setOrigin($x, $y);
         $submitButton->setString('Registrazione');
@@ -202,7 +231,7 @@ class RegionController extends Controller
 
         //Button Torna al Login (Rosso)
         $xBack = $x + 400 + 20; // 400 width + 20 gap
-        $backButton = new ButtonDraw(Str::random(20).'_back_button');
+        $backButton = new ButtonDraw(Str::random(20) . '_back_button');
         $backButton->setSize(400, 50);
         $backButton->setOrigin($xBack, $y);
         $backButton->setString('Torna al Login');
@@ -224,57 +253,58 @@ class RegionController extends Controller
         $actionForm->setSubmitFunction(resource_path('js/function/register/on_submit_register.blade.php'));
 
 
-        
+
         //Gost Input & Select
-        if($name_input_uid){
+        if ($name_input_uid) {
             $nameInput = new InputDraw($name_input_uid, $sessionId);
             $nameInput->setName('name');
             $actionForm->setInput($nameInput);
         }
 
-        if($email_input_uid){
+        if ($email_input_uid) {
             $emailInput = new InputDraw($email_input_uid, $sessionId);
             $emailInput->setName('email');
             $actionForm->setInput($emailInput);
         }
 
-        if($password_input_uid){
+        if ($password_input_uid) {
             $passwordInput = new InputDraw($password_input_uid, $sessionId);
             $passwordInput->setName('password');
             $actionForm->setInput($passwordInput);
         }
 
-        if($name_specie_input_uid){
+        if ($name_specie_input_uid) {
             $nameSpecieInput = new InputDraw($name_specie_input_uid, $sessionId);
             $nameSpecieInput->setName('name_specie');
             $actionForm->setInput($nameSpecieInput);
         }
-    
-        if($tile_i_input_uid){
+
+        if ($tile_i_input_uid) {
             $tileIInput = new InputDraw($tile_i_input_uid, $sessionId);
             $tileIInput->setName('tile_i');
             $actionForm->setInput($tileIInput);
         }
 
-        if($tile_j_input_uid){
+        if ($tile_j_input_uid) {
             $tileJInput = new InputDraw($tile_j_input_uid, $sessionId);
             $tileJInput->setName('tile_j');
             $actionForm->setInput($tileJInput);
         }
-    
+
         if ($planet_select_uid) {
             $planetSelect = new SelectDraw($planet_select_uid, $sessionId);
             $planetSelect->setName('birth_planet_id');
             $actionForm->setSelect($planetSelect);
         }
-        
+
         $actionForm->setSelect($selectRegion);
+        $actionForm->setMultiSelect($multiSelect);
 
         //Table Inputs
         $geneIds = [];
         foreach ($genes as $gene) {
             $geneIds[] = $gene['id'];
-            $actionForm->setExtraData('gene_min_'.$gene['id'], $gene['min']);
+            $actionForm->setExtraData('gene_min_' . $gene['id'], $gene['min']);
         }
         $actionForm->setExtraData('gene_ids', implode(',', $geneIds));
 
@@ -284,8 +314,8 @@ class RegionController extends Controller
         $actionForm->setButton($submitButton);
 
         //Add Back Button to items
-        $listItems = $backButton->getDrawItems(); 
-        foreach($listItems as $listItem) {
+        $listItems = $backButton->getDrawItems();
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
@@ -293,19 +323,25 @@ class RegionController extends Controller
 
         //Get all
         $listItems = $selectRegion->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
+            $objectDraw = new ObjectDraw($listItem, $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        $listItems = $multiSelect->getDrawItems();
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
         $listItems = $table->getDrawItems();
-        foreach($listItems as $listItem) {
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();
         }
 
-        $listItems = $submitButton->getDrawItems(); 
-        foreach($listItems as $listItem) {
+        $listItems = $submitButton->getDrawItems();
+        foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
@@ -324,5 +360,5 @@ class RegionController extends Controller
         return response()->json(['success' => true]);
 
     }
-    
+
 }

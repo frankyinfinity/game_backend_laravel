@@ -11,7 +11,7 @@ use App\Models\Player;
 
 class AuthController extends Controller
 {
-    
+
     public function register(Request $request)
     {
         // Create User
@@ -28,7 +28,7 @@ class AuthController extends Controller
             'name_specie' => $request->name_specie,
             'tile_i' => intval($request->tile_i),
             'tile_j' => intval($request->tile_j),
-            'gene_ids' => $request->gene_ids,
+            'gene_ids' => $request->gene_ids
         ];
 
         // Add gene data to registration data
@@ -42,6 +42,7 @@ class AuthController extends Controller
         // Create Player with registration data
         $player = new Player();
         $player->user_id = $user->id;
+        $player->str_rule_chimical_element_ids = $request->str_rule_chimical_element_ids;
         $player->registrationData = $registrationData;
         $player->save();
 
