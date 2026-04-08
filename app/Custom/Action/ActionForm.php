@@ -4,6 +4,7 @@ namespace App\Custom\Action;
 
 use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\Form\SelectDraw;
+use App\Custom\Draw\Complex\Form\MultiSelectDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
@@ -12,6 +13,7 @@ class ActionForm {
 
     private array $inputs;
     private array $selects;
+    private array $multiSelects;
     private array $extraDatas;
     private $urlRequest;
     private $submitFunctionPath;
@@ -20,6 +22,7 @@ class ActionForm {
     public function __construct() {
         $this->inputs = [];
         $this->selects = [];
+        $this->multiSelects = [];
         $this->extraDatas = [];
         $this->submitFunctionPath = null;
         $this->submitFunctionParams = [];
@@ -31,6 +34,10 @@ class ActionForm {
 
     public function setSelect(SelectDraw $select) {
         $this->selects[] = $select;
+    }
+
+    public function setMultiSelect(MultiSelectDraw $multiSelect) {
+        $this->multiSelects[] = $multiSelect;
     }
 
     public function setExtraData($key, $value) {
@@ -51,6 +58,8 @@ class ActionForm {
         $datas = [];
         $inputs = $this->inputs;
         $selects = $this->selects;
+        $multiSelects = $this->multiSelects;
+        
         foreach ($inputs as $input) {
             $name = $input->getName();
             $uid = $input->getUidValueElement();
@@ -59,6 +68,11 @@ class ActionForm {
         foreach ($selects as $select) {
             $name = $select->getName();
             $uid = $select->getUidValueElement();
+            $datas['field_'.$name] = $uid;
+        }
+        foreach ($multiSelects as $multiSelect) {
+            $name = $multiSelect->getName();
+            $uid = $multiSelect->getUidValueElement();
             $datas['field_'.$name] = $uid;
         }
 

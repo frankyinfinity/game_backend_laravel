@@ -8,6 +8,14 @@ class RuleChimicalElement extends Model
 {
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    protected $fillable = [
+        'title',
+        'chimical_element_id',
+        'complex_chimical_element_id',
+        'min',
+        'max',
+    ];
+
     protected $casts = [
         'chimical_element_id' => 'integer',
         'complex_chimical_element_id' => 'integer',

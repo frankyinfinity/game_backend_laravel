@@ -5,7 +5,9 @@ namespace App\Console\Commands;
 use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\Form\MultiSelectDraw;
+use App\Custom\Action\ActionForm;
 use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
+use App\Models\RuleChimicalElement;
 use App\Helper\Helper;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
@@ -41,10 +43,10 @@ class TestDrawCommand extends Command
         $requestId = Str::uuid()->toString();
         $sessionId = 'test_session_fixed';
 
-        // Player ID for DrawInterface event (always 1)
-        $eventPlayerId = 1;
+        // Player ID for DrawInterface event (matches test page player ID)
+        $eventPlayerId = 61;
         $eventPlayer = Player::find($eventPlayerId);
-        
+
         // ============================================================
         // OBIETTIVI DISABILITATI SU RICHIESTA:
         // la parte relativa all'ObjectiveTree e' stata commentata/sostituita
@@ -148,11 +150,18 @@ class TestDrawCommand extends Command
             $drawItems[] = $objectDraw->get();
         }
 
-        // MultiSelect test
-        $multiSelect = new MultiSelectDraw('test_multiselect', $sessionId);
+        // MultiSelect test with RuleChimicalElement (only those with details)
+        $rulesWithDetails = RuleChimicalElement::whereHas('details')->get();
+
+        $multiSelectOptions = $rulesWithDetails->map(function ($rule) {
+            return ['id' => $rule->id, 'name' => $rule->title];
+        })->toArray();
+
+        $multiSelect = new MultiSelectDraw(Str::random(20), $sessionId);
+        $multiSelect->setName('str_rule_chimical_element_ids');
         $multiSelect->setOrigin(250, 24);
-        $multiSelect->setSize(200, 40);
-        $multiSelect->setTitle('Seleziona opzioni');
+        $multiSelect->setSize(350, 40);
+        $multiSelect->setTitle('Elementi Chimici');
         $multiSelect->setTitleColor(0x000000);
         $multiSelect->setBackgroundColor(0xFFFFFF);
         $multiSelect->setBorderColor(0x888888);
@@ -162,20 +171,29 @@ class TestDrawCommand extends Command
         $multiSelect->setValueColor(0x000000);
         $multiSelect->setOptionId('id');
         $multiSelect->setOptionText('name');
-        $multiSelect->setOptionShowDisplay(4);
-        $multiSelect->setOptions([
-            ['id' => 1, 'name' => 'Opzione 1'],
-            ['id' => 2, 'name' => 'Opzione 2'],
-            ['id' => 3, 'name' => 'Opzione 3'],
-            ['id' => 4, 'name' => 'Opzione 4'],
-            ['id' => 5, 'name' => 'Opzione 5'],
-            ['id' => 6, 'name' => 'Opzione 6'],
-            ['id' => 7, 'name' => 'Opzione 7'],
-            ['id' => 8, 'name' => 'Opzione 8'],
-        ]);
+        $multiSelect->setOptionShowDisplay(5);
+        $multiSelect->setOptions($multiSelectOptions);
         $multiSelect->build();
 
         foreach ($multiSelect->getDrawItems() as $drawItem) {
+            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        // Form with MultiSelect and Submit button
+        $form = new ActionForm();
+        $form->setMultiSelect($multiSelect);
+        
+        $submitButton = new ButtonDraw('btn_submit_form');
+        $submitButton->setOrigin(510, 24);
+        $submitButton->setSize(120, 40);
+        $submitButton->setString('Mostra Value');
+        $submitButton->setColorButton(0x4CAF50);
+        $submitButton->setColorString(0xFFFFFF);
+        
+        $form->setButton($submitButton);
+
+        foreach ($submitButton->getDrawItems() as $drawItem) {
             $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
@@ -185,7 +203,7 @@ class TestDrawCommand extends Command
 
         // Flush to cache
         ObjectCache::flush($sessionId);
-        
+
         $this->info('Total draw items: ' . count($drawItems));
 
         // Dispatch event with player_id = 1

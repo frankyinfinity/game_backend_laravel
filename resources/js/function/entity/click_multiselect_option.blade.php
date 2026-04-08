@@ -64,7 +64,7 @@
         
         let valueIdText = shapes[window.input_uid + '_value_ids'];
         if (valueIdText) {
-            valueIdText.text = JSON.stringify(selectedOptionIds);
+            valueIdText.text = selectedOptionIds.join(',');
         }
         
         if (objectBody.attributes.onChangeJs) {

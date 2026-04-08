@@ -41,14 +41,14 @@ class RuleChimicalElementController extends Controller
         $chimicalElementId = $request->input('chimical_element_id');
         $complexChimicalElementId = $request->input('complex_chimical_element_id');
 
-        $chimicalElementId = $chimicalElementId ? (int) $chimicalElementId : null;
-        $complexChimicalElementId = $complexChimicalElementId ? (int) $complexChimicalElementId : null;
+        $chimicalElementId = $chimicalElementId !== '' && $chimicalElementId !== null ? (int) $chimicalElementId : null;
+        $complexChimicalElementId = $complexChimicalElementId !== '' && $complexChimicalElementId !== null ? (int) $complexChimicalElementId : null;
 
         if (empty($chimicalElementId) && empty($complexChimicalElementId)) {
             return back()->withErrors('Seleziona almeno un elemento chimico o elemento chimico complesso');
         }
 
-        RuleChimicalElement::create([
+        $rule = RuleChimicalElement::create([
             'chimical_element_id' => $chimicalElementId,
             'complex_chimical_element_id' => $complexChimicalElementId,
             'min' => $request->input('min'),
@@ -140,16 +140,15 @@ class RuleChimicalElementController extends Controller
 
     public function listDataTable()
     {
-        $rules = RuleChimicalElement::with(['chimicalElement', 'complexChimicalElement'])->get();
+        $rules = RuleChimicalElement::all();
         
         return response()->json([
             'data' => $rules->map(function ($rule) {
-                $element = $rule->chimicalElement ? $rule->chimicalElement->name . ' (' . $rule->chimicalElement->symbol . ')' : ($rule->complexChimicalElement?->name ?? '-');
                 $type = $rule->chimicalElement ? 'Semplice' : 'Complesso';
                 
                 return [
                     'id' => $rule->id,
-                    'element' => $element,
+                    'element' => $rule->title ?? '-',
                     'type' => $type,
                     'min' => $rule->min,
                     'max' => $rule->max,

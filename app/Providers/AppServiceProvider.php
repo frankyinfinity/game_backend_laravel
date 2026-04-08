@@ -15,6 +15,8 @@ use App\Models\DrawRequest;
 use App\Observers\DrawRequestObserver;
 use App\Models\ElementHasPositionNeuron;
 use App\Observers\ElementHasPositionNeuronObserver;
+use App\Models\RuleChimicalElement;
+use App\Observers\RuleChimicalElementObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -37,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
         BrainSchedule::observe(BrainScheduleObserver::class);
         DrawRequest::observe(DrawRequestObserver::class);
         ElementHasPositionNeuron::observe(ElementHasPositionNeuronObserver::class);
+        RuleChimicalElement::observe(RuleChimicalElementObserver::class);
 
     }
 }

@@ -80,7 +80,7 @@
             DRAW_WS_URL: 'ws://localhost:8080',
             DEBUG_MODE: true
         };
-        const testPlayerId = 1; // Use existing player ID
+        const testPlayerId = 61; // Use player 61 to match TestDrawCommand
         window.playerId = 61;
         const sessionId = 'test_session_fixed';
         const hostname = new URL(BACK_URL).hostname;
@@ -296,6 +296,18 @@
         function status(msg) {
             console.log('Status:', msg);
             document.querySelector('.status-msg').textContent = msg;
+        }
+
+        function getFormData(fields) {
+            let data = {};
+            for (let key in fields) {
+                let uid = fields[key];
+                let shape = shapes[uid];
+                if (shape) {
+                    data[key] = shape.text || '';
+                }
+            }
+            return data;
         }
 
         function sleep(ms) {
