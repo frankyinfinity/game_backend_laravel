@@ -78,6 +78,16 @@
                            required
                            {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
                 </div>
+                <div class="form-group">
+                    <label for="default_value">Valore Default</label>
+                    <input type="text"
+                           class="form-control"
+                           id="default_value"
+                           name="default_value"
+                           value="{{ old('default_value', $ruleChimicalElement->default_value) }}"
+                           placeholder="es: 0, 50, 100"
+                           {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
+                </div>
             </div>
             <div class="card-footer">
                 @if($ruleChimicalElement->details->isEmpty())

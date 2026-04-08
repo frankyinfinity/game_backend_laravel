@@ -53,6 +53,7 @@ class RuleChimicalElementController extends Controller
             'complex_chimical_element_id' => $complexChimicalElementId,
             'min' => $request->input('min'),
             'max' => $request->input('max'),
+            'default_value' => $request->input('default_value'),
         ]);
 
         return redirect()->route('rule-chimical-elements.index');
@@ -100,6 +101,7 @@ class RuleChimicalElementController extends Controller
                 'complex_chimical_element_id' => null,
                 'min' => $request->input('min'),
                 'max' => $request->input('max'),
+                'default_value' => $request->input('default_value'),
             ]);
         } else {
             $complexChimicalElementId = $request->input('complex_chimical_element_id');
@@ -114,6 +116,7 @@ class RuleChimicalElementController extends Controller
                 'complex_chimical_element_id' => $complexChimicalElementId,
                 'min' => $request->input('min'),
                 'max' => $request->input('max'),
+                'default_value' => $request->input('default_value'),
             ]);
         }
 

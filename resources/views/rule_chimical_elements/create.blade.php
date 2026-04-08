@@ -77,6 +77,20 @@
                         </span>
                     @enderror
                 </div>
+                <div class="form-group">
+                    <label for="default_value">Valore Default</label>
+                    <input type="text"
+                           class="form-control @error('default_value') is-invalid @enderror"
+                           id="default_value"
+                           name="default_value"
+                           value="{{ old('default_value') }}"
+                           placeholder="es: 0, 50, 100">
+                    @error('default_value')
+                        <span class="invalid-feedback" role="alert">
+                            <strong>{{ $message }}</strong>
+                        </span>
+                    @enderror
+                </div>
             </div>
             <div class="card-footer">
                 <button type="submit" class="btn btn-success">

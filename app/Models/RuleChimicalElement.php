@@ -14,6 +14,7 @@ class RuleChimicalElement extends Model
         'complex_chimical_element_id',
         'min',
         'max',
+        'default_value',
     ];
 
     protected $casts = [

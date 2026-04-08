@@ -12,6 +12,16 @@ class PlayerRuleChimicalElement extends Model
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    protected $fillable = [
+        'player_id',
+        'chimical_element_id',
+        'complex_chimical_element_id',
+        'min',
+        'max',
+        'title',
+        'default_value',
+    ];
+
     protected $casts = [
         'chimical_element_id' => 'integer',
         'complex_chimical_element_id' => 'integer',

@@ -195,7 +195,8 @@ class PlayerObserver
                 'complex_chimical_element_id' => $rule->complex_chimical_element_id,
                 'min' => $rule->min,
                 'max' => $rule->max,
-                'title' => $rule->title
+                'title' => $rule->title,
+                'default_value' => $rule->default_value
             ]);
 
             foreach ($rule->details as $detail) {

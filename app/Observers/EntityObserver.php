@@ -25,10 +25,11 @@ class EntityObserver
 
         $playerRules = PlayerRuleChimicalElement::where('player_id', $player->id)->get();
         foreach ($playerRules as $playerRule) {
+            $value = $playerRule->default_value ?? $playerRule->max;
             EntityChimicalElement::query()->create([
                 'entity_id' => $entity->id,
                 'player_rule_chimical_element_id' => $playerRule->id,
-                'value' => $playerRule->max
+                'value' => $value
             ]);
         }
     }
