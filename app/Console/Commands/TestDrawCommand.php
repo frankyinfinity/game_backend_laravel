@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\Form\MultiSelectDraw;
 use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Helper\Helper;
 use App\Custom\Manipulation\ObjectCache;
@@ -143,6 +144,38 @@ class TestDrawCommand extends Command
         $modal->build();
 
         foreach ($modal->getDrawItems() as $drawItem) {
+            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
+
+        // MultiSelect test
+        $multiSelect = new MultiSelectDraw('test_multiselect', $sessionId);
+        $multiSelect->setOrigin(250, 24);
+        $multiSelect->setSize(200, 40);
+        $multiSelect->setTitle('Seleziona opzioni');
+        $multiSelect->setTitleColor(0x000000);
+        $multiSelect->setBackgroundColor(0xFFFFFF);
+        $multiSelect->setBorderColor(0x888888);
+        $multiSelect->setBorderThickness(2);
+        $multiSelect->setBoxIconColor(0xDDDDDD);
+        $multiSelect->setBoxIconTextColor(0x333333);
+        $multiSelect->setValueColor(0x000000);
+        $multiSelect->setOptionId('id');
+        $multiSelect->setOptionText('name');
+        $multiSelect->setOptionShowDisplay(4);
+        $multiSelect->setOptions([
+            ['id' => 1, 'name' => 'Opzione 1'],
+            ['id' => 2, 'name' => 'Opzione 2'],
+            ['id' => 3, 'name' => 'Opzione 3'],
+            ['id' => 4, 'name' => 'Opzione 4'],
+            ['id' => 5, 'name' => 'Opzione 5'],
+            ['id' => 6, 'name' => 'Opzione 6'],
+            ['id' => 7, 'name' => 'Opzione 7'],
+            ['id' => 8, 'name' => 'Opzione 8'],
+        ]);
+        $multiSelect->build();
+
+        foreach ($multiSelect->getDrawItems() as $drawItem) {
             $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
             $drawItems[] = $objectDraw->get();
         }
