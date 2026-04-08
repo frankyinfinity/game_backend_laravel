@@ -8,6 +8,7 @@ use App\Jobs\StopPlayerContainersJob;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Player;
+use App\Models\RuleChimicalElement;
 
 class AuthController extends Controller
 {

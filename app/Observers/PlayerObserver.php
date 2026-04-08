@@ -17,6 +17,10 @@ use App\Models\TargetHasScorePlayer;
 use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
 use App\Models\PlayerValue;
+use App\Models\RuleChimicalElement;
+use App\Models\PlayerRuleChimicalElement;
+use App\Models\PlayerRuleChimicalElementDetail;
+use App\Models\PlayerRuleChimicalElementDetailEffect;
 use App\Services\DockerContainerService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +42,10 @@ class PlayerObserver
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
-        
+
+        // Clone RuleChimicalElements for the player
+        $this->cloneRuleChimicalElements($player);
+
         // Check if there's registration data stored on the player
         if (isset($player->registrationData)) {
             InitializePlayerJob::dispatch($player, $player->registrationData);
@@ -109,7 +116,7 @@ class PlayerObserver
             ->orderBy('slot')
             ->orderBy('id')
             ->value('id');
-        
+
         $targets = Target::all();
         foreach ($targets as $target) {
             // Only the first target of first phase in first age is unlocked
@@ -162,6 +169,52 @@ class PlayerObserver
                 'from_target_player_id' => $targetMap[$targetLink->from_target_id],
                 'to_target_player_id' => $targetMap[$targetLink->to_target_id],
             ]);
+        }
+    }
+
+    /**
+     * Clone RuleChimicalElements for the player.
+     */
+    protected function cloneRuleChimicalElements(Player $player): void
+    {
+        $ruleChimicalElementIds = $player->str_rule_chimical_element_ids;
+        if (empty($ruleChimicalElementIds)) {
+            return;
+        }
+
+        $ruleIds = array_filter(array_map('trim', explode(',', $ruleChimicalElementIds)));
+        foreach ($ruleIds as $ruleId) {
+            $rule = RuleChimicalElement::with(['details', 'details.effects'])->find($ruleId);
+            if (!$rule) {
+                continue;
+            }
+
+            $playerRule = PlayerRuleChimicalElement::create([
+                'player_id' => $player->id,
+                'chimical_element_id' => $rule->chimical_element_id,
+                'complex_chimical_element_id' => $rule->complex_chimical_element_id,
+                'min' => $rule->min,
+                'max' => $rule->max,
+                'title' => $rule->title
+            ]);
+
+            foreach ($rule->details as $detail) {
+                $playerDetail = PlayerRuleChimicalElementDetail::create([
+                    'player_rule_chimical_element_id' => $playerRule->id,
+                    'min' => $detail->min,
+                    'max' => $detail->max,
+                    'color' => $detail->color
+                ]);
+
+                foreach ($detail->effects as $effect) {
+                    PlayerRuleChimicalElementDetailEffect::create([
+                        'player_rule_chimical_element_detail_id' => $playerDetail->id,
+                        'type' => $effect->type,
+                        'gene_id' => $effect->gene_id,
+                        'value' => $effect->value
+                    ]);
+                }
+            }
         }
     }
 
