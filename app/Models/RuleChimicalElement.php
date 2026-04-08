@@ -24,4 +24,9 @@ class RuleChimicalElement extends Model
     {
         return $this->belongsTo(ComplexChimicalElement::class);
     }
+
+    public function details()
+    {
+        return $this->hasMany(RuleChimicalElementDetail::class, 'rule_chimical_element_id')->orderBy('min');
+    }
 }

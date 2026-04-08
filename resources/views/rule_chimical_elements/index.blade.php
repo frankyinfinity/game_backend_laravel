@@ -51,7 +51,8 @@
                             <th>Tipo</th>
                             <th>Min</th>
                             <th>Max</th>
-                            <th>Azioni</th>
+                            <th>Regola</th>
+                            <th>Grafico</th>
                         </tr>
                         </thead>
                         <tbody></tbody>
@@ -151,6 +152,18 @@
                 window.location.href = url;
             });
 
+            $(document).on('click', '.btn_edit-rule', function (e) {
+                var url="{{ route('rule-chimical-elements.edit',['_id_']) }}";
+                url = url.replace('_id_',$(this).data('id'));
+                window.location.href = url;
+            });
+
+            $(document).on('click', '.btn-graph', function (e) {
+                var url="{{ route('rule-chimical-elements.show',['_id_']) }}";
+                url = url.replace('_id_',$(this).data('id'));
+                window.location.href = url;
+            });
+
             var table = $("#table_list").DataTable({
                 order: [1, 'asc'],
                 pageLength: -1,
@@ -177,6 +190,7 @@
                     {data:"min", name:"min"},
                     {data:"max", name:"max"},
                     {data:"id", name:"id"},
+                    {data:"id", name:"id"},
                 ],
                 sDom: '<"dataTables_top"lfBr>t<"dataTables_bottom"ip><"clear">',
                 initComplete: function(a, b) {
@@ -197,9 +211,15 @@
                     },
                     {
                         render: function(data, type, row){
-                            return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
+                            return '<button type="button" class="btn btn-warning btn-sm btn-block btn_edit-rule" data-id="'+data+'" title="Modifica Regola"><i class="fa fa-cog"></i></button>';
                         },
                         targets:   6
+                    },
+                    {
+                        render: function(data, type, row){
+                            return '<button type="button" class="btn btn-info btn-sm btn-block btn-graph" data-id="'+data+'" title="Grafico Lineare"><i class="fa fa-chart-bar"></i></button>';
+                        },
+                        targets:   7
                     },
                 ],
             });

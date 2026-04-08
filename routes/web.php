@@ -117,6 +117,17 @@ Route::group(['middleware' => ['auth']], function () {
     Route::resource('rule-chimical-elements', App\Http\Controllers\RuleChimicalElementController::class);
     Route::post('/rule-chimical-elements/list/table', [App\Http\Controllers\RuleChimicalElementController::class, 'listDataTable'])->name('rule-chimical-elements.datatable');
     Route::post('/rule-chimical-elements/delete', [App\Http\Controllers\RuleChimicalElementController::class, 'delete'])->name('rule-chimical-elements.delete');
+    Route::post('/rule-chimical-elements/{ruleChimicalElement}/details', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'store'])->name('rule-chimical-elements.detail.store');
+    Route::post('/rule-chimical-elements/{ruleChimicalElement}/save-all', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'saveAll'])->name('rule-chimical-elements.detail.saveAll');
+    Route::post('/rule-chimical-elements/{ruleChimicalElement}/details/{detail}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'update'])->name('rule-chimical-elements.detail.update');
+    Route::get('/rule-chimical-elements/{ruleChimicalElement}/reload', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'reload'])->name('rule-chimical-elements.detail.reload');
+    Route::delete('/rule-chimical-elements/{ruleChimicalElement}/details/{detail}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'destroy'])->name('rule-chimical-elements.detail.destroy');
+    
+    //Rule Chimical Element Detail Effects
+    Route::get('/rule-chimical-elements/details/{detail}/effects', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'listEffects'])->name('rule-chimical-elements.detail.effects.list');
+    Route::post('/rule-chimical-elements/details/{detail}/effects', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'storeEffect'])->name('rule-chimical-elements.detail.effects.store');
+    Route::put('/rule-chimical-elements/effects/{effect}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'updateEffect'])->name('rule-chimical-elements.detail.effects.update');
+    Route::delete('/rule-chimical-elements/effects/{effect}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'destroyEffect'])->name('rule-chimical-elements.detail.effects.destroy');
 
     //Elements
     Route::resource('elements', App\Http\Controllers\ElementController::class);
