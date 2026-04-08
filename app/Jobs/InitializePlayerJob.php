@@ -187,6 +187,8 @@ class InitializePlayerJob implements ShouldQueue
             ]);
         }
 
+        // EntityChimicalElements are created by EntityObserver
+
         // Dispatch container creation job
         CreatePlayerContainerJob::dispatch($player);
     }

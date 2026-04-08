@@ -17,6 +17,8 @@ use App\Models\ElementHasPositionNeuron;
 use App\Observers\ElementHasPositionNeuronObserver;
 use App\Models\RuleChimicalElement;
 use App\Observers\RuleChimicalElementObserver;
+use App\Models\Entity;
+use App\Observers\EntityObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -40,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         DrawRequest::observe(DrawRequestObserver::class);
         ElementHasPositionNeuron::observe(ElementHasPositionNeuronObserver::class);
         RuleChimicalElement::observe(RuleChimicalElementObserver::class);
+        Entity::observe(EntityObserver::class);
 
     }
 }
