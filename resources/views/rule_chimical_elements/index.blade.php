@@ -51,6 +51,7 @@
                             <th>Tipo</th>
                             <th>Min</th>
                             <th>Max</th>
+                            <th>Default</th>
                             <th>Regola</th>
                             <th>Grafico</th>
                         </tr>
@@ -86,11 +87,15 @@
                     </div>
                     <div class="form-group">
                         <label for="min">Min <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="min" name="min" value="0" min="0" required>
+                        <input type="number" class="form-control" id="min" name="min" value="0" required>
                     </div>
                     <div class="form-group">
                         <label for="max">Max <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="max" name="max" value="0" min="0" required>
+                        <input type="number" class="form-control" id="max" name="max" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="default_value">Valore Default</label>
+                        <input type="number" class="form-control" id="default_value" name="default_value" value="0">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -125,11 +130,15 @@
                     </div>
                     <div class="form-group">
                         <label for="min">Min <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="min" name="min" value="0" min="0" required>
+                        <input type="number" class="form-control" id="min" name="min" value="0" required>
                     </div>
                     <div class="form-group">
                         <label for="max">Max <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="max" name="max" value="0" min="0" required>
+                        <input type="number" class="form-control" id="max" name="max" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="default_value">Valore Default</label>
+                        <input type="number" class="form-control" id="default_value" name="default_value" value="0">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -189,6 +198,7 @@
                     {data:"type", name:"type"},
                     {data:"min", name:"min"},
                     {data:"max", name:"max"},
+                    {data:"default_value", name:"default_value"},
                     {data:"id", name:"id"},
                     {data:"id", name:"id"},
                 ],
@@ -213,13 +223,13 @@
                         render: function(data, type, row){
                             return '<button type="button" class="btn btn-warning btn-sm btn-block btn_edit-rule" data-id="'+data+'" title="Modifica Regola"><i class="fa fa-cog"></i></button>';
                         },
-                        targets:   6
+                        targets:   7
                     },
                     {
                         render: function(data, type, row){
                             return '<button type="button" class="btn btn-info btn-sm btn-block btn-graph" data-id="'+data+'" title="Grafico Lineare"><i class="fa fa-chart-bar"></i></button>';
                         },
-                        targets:   7
+                        targets:   8
                     },
                 ],
             });

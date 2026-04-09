@@ -34,8 +34,8 @@ class RuleChimicalElementController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'min' => 'required|integer|min:0',
-            'max' => 'required|integer|min:0',
+            'min' => 'required|integer',
+            'max' => 'required|integer',
         ]);
 
         $chimicalElementId = $request->input('chimical_element_id');
@@ -82,8 +82,8 @@ class RuleChimicalElementController extends Controller
         }
 
         $request->validate([
-            'min' => 'required|integer|min:0',
-            'max' => 'required|integer|min:0',
+            'min' => 'required|integer',
+            'max' => 'required|integer',
         ]);
 
         $elementType = $request->input('element_type');
@@ -155,6 +155,7 @@ class RuleChimicalElementController extends Controller
                     'type' => $type,
                     'min' => $rule->min,
                     'max' => $rule->max,
+                    'default_value' => $rule->default_value,
                 ];
             }),
         ]);

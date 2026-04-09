@@ -68,8 +68,8 @@ class RuleChimicalElementDetailController extends Controller
     public function store(Request $request, RuleChimicalElement $ruleChimicalElement)
     {
         $request->validate([
-            'min' => 'required|integer|min:0',
-            'max' => 'required|integer|min:0',
+            'min' => 'required|integer',
+            'max' => 'required|integer',
             'color' => 'required|string|size:7',
         ]);
 
@@ -78,10 +78,6 @@ class RuleChimicalElementDetailController extends Controller
 
         if ($newMin >= $newMax) {
             return back()->withErrors('Min deve essere minore di Max');
-        }
-
-        if ($newMin < $ruleChimicalElement->min || $newMax > $ruleChimicalElement->max) {
-            return back()->withErrors('I valori devono essere compresi tra ' . $ruleChimicalElement->min . ' e ' . $ruleChimicalElement->max);
         }
 
         $overlap = $ruleChimicalElement->details()
@@ -138,8 +134,8 @@ class RuleChimicalElementDetailController extends Controller
     public function update(Request $request, RuleChimicalElement $ruleChimicalElement, RuleChimicalElementDetail $detail)
     {
         $request->validate([
-            'min' => 'required|integer|min:0',
-            'max' => 'required|integer|min:0',
+            'min' => 'required|integer',
+            'max' => 'required|integer',
         ]);
 
         $newMin = $request->input('min');
@@ -147,10 +143,6 @@ class RuleChimicalElementDetailController extends Controller
 
         if ($newMin >= $newMax) {
             return response()->json(['error' => 'Min must be less than max'], 400);
-        }
-
-        if ($newMin < $ruleChimicalElement->min || $newMax > $ruleChimicalElement->max) {
-            return response()->json(['error' => 'Values out of range'], 400);
         }
 
         $overlap = $ruleChimicalElement->details()

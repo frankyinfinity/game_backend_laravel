@@ -114,7 +114,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/generator-chimical-elements/delete', [App\Http\Controllers\GeneratorChimicalElementController::class, 'delete'])->name('generator-chimical-elements.delete');
 
     //Rule Chimical Elements
-    Route::resource('rule-chimical-elements', App\Http\Controllers\RuleChimicalElementController::class);
+    Route::resource('rule-chimical-elements', App\Http\Controllers\RuleChimicalElementController::class)->except(['create']);
     Route::post('/rule-chimical-elements/list/table', [App\Http\Controllers\RuleChimicalElementController::class, 'listDataTable'])->name('rule-chimical-elements.datatable');
     Route::post('/rule-chimical-elements/delete', [App\Http\Controllers\RuleChimicalElementController::class, 'delete'])->name('rule-chimical-elements.delete');
     Route::post('/rule-chimical-elements/{ruleChimicalElement}/details', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'store'])->name('rule-chimical-elements.detail.store');

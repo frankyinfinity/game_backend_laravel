@@ -343,6 +343,12 @@
 
     function openEditModal(detailId, detailMin, detailMax, color) {
         editDetailId = detailId;
+        var titleEl = document.querySelector('#addDetailModal .modal-title');
+        if (detailId) {
+            titleEl.textContent = 'Modifica Dettaglio';
+        } else {
+            titleEl.textContent = 'Aggiungi Dettaglio';
+        }
         document.getElementById('detail_min').value = detailMin;
         document.getElementById('detail_max').value = detailMax;
 
