@@ -7,12 +7,14 @@ use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Primitive\Line;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Helper\Helper;
 use App\Custom\Colors;
 use App\Models\Entity;
 use App\Models\Gene;
 use App\Models\Container;
+use App\Models\EntityChimicalElement;
 use App\Models\EntityInformation;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Support\ScrollGroup;
@@ -120,7 +122,7 @@ class EntityDraw
 
         $panel = new Rectangle($dbEntity->uid.'_panel');
         $panel->setOrigin($panelX, y: $panelY);
-        $panel->setSize(400, 405);
+        $panel->setSize(400, 800);
         $panel->setColor(0xFFFFFF);
         $panel->setRenderable(false);
 
@@ -244,14 +246,20 @@ class EntityDraw
             ->with(['genome'])
             ->get();
 
-        $panelX = $centerSquare['x'] + ($size / 3) + 10; // Reset X to panel start
-        $panelY += $sizeButton + 110; // Space after movement row + division button
+        $panelX = $centerSquare['x'] + ($size / 3) + 10;
+        $panelY += $sizeButton + 110;
+
+        $genomeIds = $dbEntity->genomes->pluck('id')->toArray();
+        $entityInformations = EntityInformation::query()
+            ->whereIn('genome_id', $genomeIds)
+            ->with(['genome'])
+            ->get();
 
         foreach($entityInformations as $entityInformation) {
             $genome = $entityInformation->genome;
             $gene = $genome->gene;
             if($gene->type === 'dynamic_max') {
-             
+               
                 $progressBar = new ProgressBarDraw($dbEntity->uid.'_progress_bar_'.$gene->key);
                 $progressBar->setName($gene->name);
                 $progressBar->setMin($genome->min);
@@ -265,9 +273,21 @@ class EntityDraw
                 $progressBar->build();
 
                 $itemBars[] = $progressBar->getDrawItems();
-                $panelY += 60; // Space for the next progress bar (label + bar + range)
+                $panelY += 80;
 
             }
+        }
+
+        $chimicalElements = $dbEntity->chimicalElements()->with(['playerRuleChimicalElement.details.effects.gene'])->get();
+        
+        foreach($chimicalElements as $entityChimicalElement) {
+            $barChimicalElement = new BarChimicalElementDraw($entityChimicalElement);
+            $barChimicalElement->setOrigin($panelX, $panelY);
+            $barChimicalElement->setRenderable(false);
+            $barChimicalElement->build();
+
+            $itemBars[] = $barChimicalElement->getDrawItems();
+            $panelY += 80;
         }
 
         //Set Children (Panel)
@@ -279,9 +299,11 @@ class EntityDraw
         foreach ($downButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($rightButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($divisionButton->getDrawItems() as $item) {$panel->addChild($item);}
-        foreach ($itemBars as $item) {
-            foreach ($item as $item2) {
-                $panel->addChild($item2);
+        foreach ($itemBars as $items) {
+            foreach ($items as $item) {
+                if (is_object($item)) {
+                    $panel->addChild($item);
+                }
             }
         }
 
@@ -295,9 +317,11 @@ class EntityDraw
         foreach ($downButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($rightButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($divisionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
-        foreach ($itemBars as $item) {
-            foreach ($item as $item2) {
-                $this->drawItems[] = $item2->buildJson();
+        foreach ($itemBars as $items) {
+            foreach ($items as $item) {
+                if (is_object($item)) {
+                    $this->drawItems[] = $item->buildJson();
+                }
             }
         }
 

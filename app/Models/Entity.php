@@ -28,4 +28,8 @@ class Entity extends Model
         return $this->hasMany(Genome::class);
     }
 
+    public function chimicalElements(){
+        return $this->hasMany(EntityChimicalElement::class);
+    }
+
 }
