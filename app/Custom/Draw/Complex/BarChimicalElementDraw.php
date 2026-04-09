@@ -12,7 +12,6 @@ class BarChimicalElementDraw
 {
     private const BAR_WIDTH = 300;
     private const BAR_HEIGHT = 40;
-    private const BORDER_RADIUS = 20;
 
     private EntityChimicalElement $entityChimicalElement;
     private float $x = 0;
@@ -76,26 +75,26 @@ class BarChimicalElementDraw
         $this->drawItems[] = $titleText;
 
         $glassBorder = new Rectangle($uid . '_glass_border');
-        $glassBorder->setOrigin($this->x, $this->y);
-        $glassBorder->setSize(self::BAR_WIDTH, self::BAR_HEIGHT);
-        $glassBorder->setColor(Colors::WHITE);
-        $glassBorder->setBorderColor(Colors::DARK_GRAY);
-        $glassBorder->setThickness(3);
-        $glassBorder->setBorderRadius(self::BORDER_RADIUS);
+        $glassBorder->setOrigin($this->x - 1, $this->y - 1);
+        $glassBorder->setSize(self::BAR_WIDTH + 2, self::BAR_HEIGHT + 2);
+        $glassBorder->setColor(Colors::BLACK);
         $glassBorder->setRenderable($this->renderable);
         $this->drawItems[] = $glassBorder;
 
         $glassInner = new Rectangle($uid . '_glass_inner');
-        $glassInner->setOrigin($this->x + 3, $this->y + 3);
-        $glassInner->setSize(self::BAR_WIDTH - 6, self::BAR_HEIGHT - 6);
+        $glassInner->setOrigin($this->x, $this->y);
+        $glassInner->setSize(self::BAR_WIDTH, self::BAR_HEIGHT);
         $glassInner->setColor(Colors::SILVER);
-        $glassInner->setBorderRadius(self::BORDER_RADIUS - 2);
         $glassInner->setRenderable($this->renderable);
         $this->drawItems[] = $glassInner;
 
         $details = $playerRuleChimicalElement->details()->orderBy('min')->get();
+        $innerWidth = self::BAR_WIDTH;
+        $innerHeight = self::BAR_HEIGHT;
+        $innerX = $this->x;
+        $innerY = $this->y;
 
-        foreach ($details as $detail) {
+        foreach ($details as $index => $detail) {
             $leftPercent = (($detail->min - $min) / $range) * 100;
             $widthPercent = (($detail->max - $detail->min) / $range) * 100;
 
@@ -109,15 +108,14 @@ class BarChimicalElementDraw
                 $widthPercent = 100 - $leftPercent;
             }
 
-            $segmentX = $this->x + 3 + (($leftPercent / 100) * (self::BAR_WIDTH - 6));
-            $segmentWidth = ($widthPercent / 100) * (self::BAR_WIDTH - 6);
-            $segmentHeight = self::BAR_HEIGHT - 6;
+            $segmentX = $innerX + (($leftPercent / 100) * $innerWidth);
+            $segmentWidth = ($widthPercent / 100) * $innerWidth;
+            $segmentHeight = $innerHeight;
 
             $segment = new Rectangle($uid . '_segment_' . $detail->id);
-            $segment->setOrigin($segmentX, $this->y + 3);
+            $segment->setOrigin($segmentX, $innerY);
             $segment->setSize(max(1, $segmentWidth), $segmentHeight);
             $segment->setColor($detail->color ? $this->hexToColor($detail->color) : Colors::LIGHT_GRAY);
-            $segment->setBorderRadius(0);
             $segment->setRenderable($this->renderable);
 
             $tooltipText = $this->buildTooltipText($detail);
@@ -140,9 +138,9 @@ class BarChimicalElementDraw
         $percent = $range > 0 ? ($value - $min) / $range : 0;
         $percent = max(0, min(1, $percent));
 
-        $indicatorX = $this->x + 3 + (($percent) * (self::BAR_WIDTH - 6));
-        $indicatorY1 = $this->y + 4;
-        $indicatorY2 = $this->y + self::BAR_HEIGHT - 4;
+        $indicatorX = $innerX + (($percent) * $innerWidth);
+        $indicatorY1 = $innerY;
+        $indicatorY2 = $innerY + $innerHeight;
 
         $line = new Rectangle($uid . '_line');
         $line->setOrigin($indicatorX - 1, $indicatorY1);
