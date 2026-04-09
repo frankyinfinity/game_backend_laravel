@@ -135,7 +135,6 @@ class BarChimicalElementDraw
         $line->setSize(2, $indicatorY2 - $indicatorY1);
         $line->setColor(Colors::BLACK);
         $line->setRenderable($this->renderable);
-        $line->addAttributes('tooltip_text', "Valore attuale: {$value}");
         $this->drawItems[] = $line;
 
         $valueText = new Text($uid . '_value');

@@ -21,6 +21,7 @@ console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' :
 let currentTileI = entityTileI;
 let currentTileJ = entityTileJ;
 let currentGenes = {};
+let currentChimicalElements = {};
 
 // function to handle login and session
 let sessionCookie = null;
@@ -215,12 +216,53 @@ function fetchCurrentGenes() {
   req.end();
 }
 
+function fetchCurrentChimicalElements() {
+  if (!sessionCookie) return;
+
+  const path = `/entities/chimical-elements?uid=${entityUid}`;
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: path,
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Cookie': sessionCookie
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          currentChimicalElements = response.chimical_elements;
+          console.log(`[Entity ${entityUid}] Current Chimical Elements:`, JSON.stringify(currentChimicalElements));
+        }
+      } catch (error) {
+        console.error(`[Entity ${entityUid}] Error parsing chimical elements: ${error.message}`);
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`[Entity ${entityUid}] Error fetching chimical elements: ${error.message}`);
+  });
+
+  req.end();
+}
+
 
 // Funzione per programmare il prossimo ciclo
 function scheduleNextCycle() {
   setTimeout(() => {
     fetchCurrentPosition();
     fetchCurrentGenes();
+    fetchCurrentChimicalElements();
   }, 2000);
 }
 
@@ -293,6 +335,15 @@ function handleWebSocketCommand(data, ws) {
         success: true,
         command: 'get_genes',
         genes: currentGenes
+      }));
+      break;
+
+    case 'get_chimical_elements':
+      // Ritorna gli elementi chimici correnti
+      ws.send(JSON.stringify({
+        success: true,
+        command: 'get_chimical_elements',
+        chimical_elements: currentChimicalElements
       }));
       break;
 

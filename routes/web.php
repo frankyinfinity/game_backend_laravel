@@ -82,6 +82,7 @@ Route::group(['middleware' => ['auth']], function () {
     //Entity
     Route::get('entities/position', [App\Http\Controllers\EntityController::class, 'position']);
     Route::get('entities/genes', [App\Http\Controllers\EntityController::class, 'genes']);
+    Route::get('entities/chimical-elements', [App\Http\Controllers\EntityController::class, 'chimicalElements']);
 
     //Element
     Route::get('elements/genes', [App\Http\Controllers\ElementController::class, 'genes']);

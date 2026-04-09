@@ -88,4 +88,49 @@ class EntityController extends Controller
         ]);
     }
 
+    /**
+     * Recupera i valori attuali degli elementi chimici di un'entity tramite uid
+     */
+    public function chimicalElements(Request $request)
+    {
+        $uid = $request->query('uid');
+
+        if (!$uid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'UID non fornito'
+            ], 400);
+        }
+
+        $entity = Entity::where('uid', $uid)->first();
+
+        if (!$entity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity non trovata'
+            ], 404);
+        }
+
+        $chimicalData = [];
+        $entity->load(['chimicalElements.playerRuleChimicalElement', 'chimicalElements.playerRuleChimicalElement.details']);
+
+        foreach ($entity->chimicalElements as $entityChimical) {
+            $ruleChimical = $entityChimical->playerRuleChimicalElement;
+            if (!$ruleChimical) continue;
+
+            $chimicalData[] = [
+                'id' => $entityChimical->id,
+                'value' => (int) $entityChimical->value,
+                'min' => (int) $ruleChimical->min,
+                'max' => (int) $ruleChimical->max,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'uid' => $entity->uid,
+            'chimical_elements' => $chimicalData
+        ]);
+    }
+
 }
