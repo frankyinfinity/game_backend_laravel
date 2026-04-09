@@ -2,18 +2,12 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Draw\Complex\ModalDraw;
-use App\Custom\Draw\Complex\ButtonDraw;
-use App\Custom\Draw\Complex\Form\MultiSelectDraw;
-use App\Custom\Action\ActionForm;
-use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
-use App\Models\RuleChimicalElement;
-use App\Helper\Helper;
+use App\Custom\Draw\Complex\BarChimicalElementDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
-use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Models\DrawRequest;
+use App\Models\EntityChimicalElement;
 use App\Models\Player;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -43,170 +37,36 @@ class TestDrawCommand extends Command
         $requestId = Str::uuid()->toString();
         $sessionId = 'test_session_fixed';
 
-        // Player ID for DrawInterface event (matches test page player ID)
         $eventPlayerId = 61;
-        $eventPlayer = Player::find($eventPlayerId);
 
-        // ============================================================
-        // OBIETTIVI DISABILITATI SU RICHIESTA:
-        // la parte relativa all'ObjectiveTree e' stata commentata/sostituita
-        // da un test dedicato alla modal.
-        // ============================================================
-
-        // Use the cache system
         ObjectCache::buffer($sessionId);
 
         $drawItems = [];
 
-        // Clear all existing elements before drawing
         $existingObjects = ObjectCache::all($sessionId);
         foreach ($existingObjects as $uid => $object) {
             $objectClear = new ObjectClear($uid, $sessionId);
             $drawItems[] = $objectClear->get();
         }
 
-        // Clear the cache after sending clears
         ObjectCache::clear($sessionId);
 
-        // ------------------------------------------------------------
-        // BLOCCO OBIETTIVI ORIGINALE (COMMENTATO)
-        // ------------------------------------------------------------
-        // $objectivePlayerId = $this->argument('objective_player_id');
-        // $objectivePlayer = Player::find($objectivePlayerId);
-        // if (!$objectivePlayer) {
-        //     $this->error("Player with ID {$objectivePlayerId} not found. Please ensure a player with that ID exists.");
-        //     return;
-        // }
-        //
-        // $this->info("Drawing objective tree for player ID: {$objectivePlayerId}");
-        // $this->info('Player name: ' . $objectivePlayer->name);
-        //
-        // $objectiveTree = new ObjectiveTreeDraw('objective_tree_' . $objectivePlayerId, $objectivePlayer);
-        // $objectiveTree->setOrigin(20, 20);
-        // $objectiveTree->build();
-        //
-        // $stats = $objectiveTree->getStatistics();
-        // $this->info('--- Objective Tree Statistics ---');
-        // $this->info("Total Ages: {$stats['total_ages']}");
-        // $this->info("Total Phases: {$stats['total_phases']}");
-        // $this->info("Total Targets: {$stats['total_targets']}");
-        // $this->info("Total Links: {$stats['total_links']}");
-        // $this->info('States:');
-        // foreach ($stats['states'] as $state => $count) {
-        //     $this->info("  - {$state}: {$count}");
-        // }
-        // foreach ($objectiveTree->getDrawItems() as $drawItem) {
-        //     $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-        //     $drawItems[] = $objectDraw->get();
-        // }
-        // ------------------------------------------------------------
+        $entityChimicalElement = EntityChimicalElement::with(['playerRuleChimicalElement.details.effects'])->first();
+        if ($entityChimicalElement) {
+            $barChimicalElement = new BarChimicalElementDraw($entityChimicalElement);
+            $barChimicalElement->setOrigin(50, 50);
+            $barChimicalElement->setRenderable(true);
 
-        // Modal test
-        $modalUid = 'test_modal_draw';
-
-        $jsOpenModal = file_get_contents(resource_path('js/function/modal/click_open_modal.blade.php'));
-        $jsOpenModal = str_replace('__MODAL_UID__', $modalUid, $jsOpenModal);
-        $jsOpenModal = Helper::setCommonJsCode($jsOpenModal, Str::random(20));
-
-        $objectivesButton = new ButtonDraw('test_open_objectives_button');
-        $objectivesButton->setOrigin(24, 24);
-        $objectivesButton->setSize(180, 46);
-        $objectivesButton->setString('Obiettivi');
-        $objectivesButton->setColorButton(0x1E90FF);
-        $objectivesButton->setColorString(0xFFFFFF);
-        $objectivesButton->setOnClick($jsOpenModal);
-        $objectivesButton->build();
-
-        foreach ($objectivesButton->getDrawItems() as $drawItem) {
-            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        $modal = new ModalDraw($modalUid);
-        $modal->setScreenSize(1280, 680);
-        $modal->setSize(1120, 640);
-        $modal->setTitle('Obiettivi');
-        $modal->setRenderable(false);
-
-        $objectivePlayerId = 61;
-        $objectivePlayer = Player::find($objectivePlayerId);
-        if ($objectivePlayer) {
-            $objectiveTree = new ObjectiveTreeDraw('objective_tree_' . $objectivePlayerId, $objectivePlayer);
-            $objectiveTree->setOrigin(0, 0);
-            $objectiveTree->build();
-
-            foreach ($objectiveTree->getDrawItems() as $objectiveItem) {
-                $json = $objectiveItem->buildJson();
-                $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
-                $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
-                $modal->addContentItem($objectiveItem, $offsetX, $offsetY);
+            foreach ($barChimicalElement->getDrawItems() as $drawItem) {
+                $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
+                $drawItems[] = $objectDraw->get();
             }
         }
 
-        $modal->build();
-
-        foreach ($modal->getDrawItems() as $drawItem) {
-            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        // MultiSelect test with RuleChimicalElement (only those with details)
-        $rulesWithDetails = RuleChimicalElement::whereHas('details')->get();
-
-        $multiSelectOptions = $rulesWithDetails->map(function ($rule) {
-            return ['id' => $rule->id, 'name' => $rule->title];
-        })->toArray();
-
-        $multiSelect = new MultiSelectDraw(Str::random(20), $sessionId);
-        $multiSelect->setName('str_rule_chimical_element_ids');
-        $multiSelect->setOrigin(250, 24);
-        $multiSelect->setSize(350, 40);
-        $multiSelect->setTitle('Elementi Chimici');
-        $multiSelect->setTitleColor(0x000000);
-        $multiSelect->setBackgroundColor(0xFFFFFF);
-        $multiSelect->setBorderColor(0x888888);
-        $multiSelect->setBorderThickness(2);
-        $multiSelect->setBoxIconColor(0xDDDDDD);
-        $multiSelect->setBoxIconTextColor(0x333333);
-        $multiSelect->setValueColor(0x000000);
-        $multiSelect->setOptionId('id');
-        $multiSelect->setOptionText('name');
-        $multiSelect->setOptionShowDisplay(5);
-        $multiSelect->setOptions($multiSelectOptions);
-        $multiSelect->build();
-
-        foreach ($multiSelect->getDrawItems() as $drawItem) {
-            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        // Form with MultiSelect and Submit button
-        $form = new ActionForm();
-        $form->setMultiSelect($multiSelect);
-        
-        $submitButton = new ButtonDraw('btn_submit_form');
-        $submitButton->setOrigin(510, 24);
-        $submitButton->setSize(120, 40);
-        $submitButton->setString('Mostra Value');
-        $submitButton->setColorButton(0x4CAF50);
-        $submitButton->setColorString(0xFFFFFF);
-        
-        $form->setButton($submitButton);
-
-        foreach ($submitButton->getDrawItems() as $drawItem) {
-            $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        // Backend-triggered JS code execution (processed as the last item)
-        $drawItems[] = (new ObjectCode("console.log('Hello World');"))->get();
-
-        // Flush to cache
         ObjectCache::flush($sessionId);
 
         $this->info('Total draw items: ' . count($drawItems));
 
-        // Dispatch event with player_id = 1
         DrawRequest::query()->create([
             'session_id' => $sessionId,
             'request_id' => $requestId,
