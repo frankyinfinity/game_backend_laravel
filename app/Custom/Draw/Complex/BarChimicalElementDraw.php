@@ -122,17 +122,6 @@ class BarChimicalElementDraw
             $segment->addAttributes('tooltip_text', $tooltipText);
 
             $this->drawItems[] = $segment;
-
-            if ($segmentWidth > 30) {
-                $rangeText = new Text($uid . '_segment_text_' . $detail->id);
-                $rangeText->setText("{$detail->min}-{$detail->max}");
-                $rangeText->setOrigin($segmentX + ($segmentWidth / 2), $this->y + (self::BAR_HEIGHT / 2));
-                $rangeText->setFontSize(10);
-                $rangeText->setColor(Colors::WHITE);
-                $rangeText->setCenterAnchor(true);
-                $rangeText->setRenderable($this->renderable);
-                $this->drawItems[] = $rangeText;
-            }
         }
 
         $percent = $range > 0 ? ($value - $min) / $range : 0;
@@ -161,16 +150,17 @@ class BarChimicalElementDraw
 
         $minText = new Text($uid . '_min');
         $minText->setText((string) $min);
-        $minText->setOrigin($this->x + 10, $this->y + self::BAR_HEIGHT + 10);
-        $minText->setFontSize(12);
+        $minText->setOrigin($this->x + 4, $this->y + self::BAR_HEIGHT + 14);
+        $minText->setFontSize(14);
         $minText->setColor(Colors::DARK_GRAY);
+        $minText->setCenterAnchor(true);
         $minText->setRenderable($this->renderable);
         $this->drawItems[] = $minText;
 
         $maxText = new Text($uid . '_max');
         $maxText->setText((string) $max);
-        $maxText->setOrigin($this->x + self::BAR_WIDTH - 10, $this->y + self::BAR_HEIGHT + 10);
-        $maxText->setFontSize(12);
+        $maxText->setOrigin($this->x + self::BAR_WIDTH - 4, $this->y + self::BAR_HEIGHT + 14);
+        $maxText->setFontSize(14);
         $maxText->setColor(Colors::DARK_GRAY);
         $maxText->setCenterAnchor(true);
         $maxText->setRenderable($this->renderable);
@@ -191,14 +181,13 @@ class BarChimicalElementDraw
 
     private function buildTooltipText($detail): string
     {
-        $tooltip = "Range: {$detail->min} - {$detail->max}\n";
+        $tooltip = '';
 
         $effects = $detail->effects;
         if ($effects->isNotEmpty()) {
-            $tooltip .= "Effetti:\n";
             foreach ($effects as $effect) {
                 $typeName = $effect->type === 1 ? 'Fisso' : 'A tempo';
-                $tooltip .= "  - {$typeName}: {$effect->value}\n";
+                $tooltip .= "{$typeName}: {$effect->value}\n";
             }
         }
 
