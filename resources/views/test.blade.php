@@ -491,6 +491,60 @@
                 shapes[uid] = this.shape;
                 objects[uid] = this.object;
                 this.addInteractive();
+                this.addTooltip();
+            }
+            addTooltip() {
+                const object = objects[this.object['uid']];
+                if (!object['attributes'] || !object['attributes']['tooltip_text']) return;
+
+                this.shape.interactive = true;
+                this.shape.cursor = 'help';
+
+                const tooltipText = object['attributes']['tooltip_text'];
+                let tooltipGraphics = null;
+                let tooltipLabel = null;
+
+                this.shape.on('pointerover', (event) => {
+                    if (!tooltipGraphics) {
+                        tooltipGraphics = new PIXI.Graphics();
+                        tooltipGraphics.zIndex = 99999;
+                        tooltipGraphics.visible = false;
+                        app.stage.addChild(tooltipGraphics);
+                    }
+                    if (!tooltipLabel) {
+                        tooltipLabel = new PIXI.Text(tooltipText, {
+                            fontFamily: 'Arial',
+                            fontSize: 12,
+                            fill: 0x000000,
+                            align: 'left'
+                        });
+                        tooltipLabel.zIndex = 100000;
+                        tooltipLabel.visible = false;
+                        app.stage.addChild(tooltipLabel);
+                    }
+
+                    const padding = 6;
+                    tooltipLabel.text = tooltipText;
+                    tooltipLabel.visible = true;
+
+                    const globalPos = this.shape.getGlobalPosition();
+                    tooltipGraphics.clear();
+                    tooltipGraphics.lineStyle(1, 0x000000, 1);
+                    tooltipGraphics.beginFill(0xFFFFFF, 0.95);
+                    tooltipGraphics.drawRoundedRect(0, 0, tooltipLabel.width + (padding * 2), tooltipLabel.height + (padding * 2), 4);
+                    tooltipGraphics.endFill();
+                    tooltipGraphics.visible = true;
+
+                    tooltipLabel.x = globalPos.x + padding;
+                    tooltipLabel.y = globalPos.y + padding;
+                    tooltipGraphics.x = globalPos.x;
+                    tooltipGraphics.y = globalPos.y;
+                });
+
+                this.shape.on('pointerout', () => {
+                    if (tooltipGraphics) tooltipGraphics.visible = false;
+                    if (tooltipLabel) tooltipLabel.visible = false;
+                });
             }
             addInteractive() {
                 const object = objects[this.object['uid']];

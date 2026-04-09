@@ -11,7 +11,7 @@ use App\Custom\Colors;
 class BarChimicalElementDraw
 {
     private const BAR_WIDTH = 300;
-    private const BAR_HEIGHT = 40;
+    private const BAR_HEIGHT = 28;
 
     private EntityChimicalElement $entityChimicalElement;
     private float $x = 0;
@@ -67,10 +67,9 @@ class BarChimicalElementDraw
 
         $titleText = new Text($uid . '_title');
         $titleText->setText($title);
-        $titleText->setOrigin($this->x + (self::BAR_WIDTH / 2), $this->y - 18);
+        $titleText->setOrigin($this->x, $this->y - 18);
         $titleText->setFontSize(16);
         $titleText->setColor(Colors::BLACK);
-        $titleText->setCenterAnchor(true);
         $titleText->setRenderable($this->renderable);
         $this->drawItems[] = $titleText;
 
@@ -88,7 +87,7 @@ class BarChimicalElementDraw
         $glassInner->setRenderable($this->renderable);
         $this->drawItems[] = $glassInner;
 
-        $details = $playerRuleChimicalElement->details()->orderBy('min')->get();
+        $details = $playerRuleChimicalElement->details()->with('effects.gene')->orderBy('min')->get();
         $innerWidth = self::BAR_WIDTH;
         $innerHeight = self::BAR_HEIGHT;
         $innerX = $this->x;
@@ -181,14 +180,18 @@ class BarChimicalElementDraw
 
     private function buildTooltipText($detail): string
     {
-        $tooltip = '';
+        $tooltip = "[{$detail->min}, {$detail->max}]\n";
+        $tooltip .= "----------------\n";
 
         $effects = $detail->effects;
         if ($effects->isNotEmpty()) {
             foreach ($effects as $effect) {
                 $typeName = $effect->type === 1 ? 'Fisso' : 'A tempo';
-                $tooltip .= "{$typeName}: {$effect->value}\n";
+                $geneName = $effect->gene ? $effect->gene->name : 'N/A';
+                $tooltip .= "• {$typeName}: {$effect->value} ({$geneName})\n";
             }
+        } else {
+            $tooltip .= "Nessun effetto\n";
         }
 
         return rtrim($tooltip);

@@ -51,7 +51,11 @@ class TestDrawCommand extends Command
 
         ObjectCache::clear($sessionId);
 
-        $entityChimicalElement = EntityChimicalElement::with(['playerRuleChimicalElement.details.effects'])->first();
+        $entityChimicalElement = EntityChimicalElement::query()
+            ->where('id', 4)
+            ->with(['playerRuleChimicalElement.details.effects'])
+            ->first();
+
         if ($entityChimicalElement) {
             $barChimicalElement = new BarChimicalElementDraw($entityChimicalElement);
             $barChimicalElement->setOrigin(50, 50);

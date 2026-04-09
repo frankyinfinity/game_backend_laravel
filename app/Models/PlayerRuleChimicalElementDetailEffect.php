@@ -21,4 +21,9 @@ class PlayerRuleChimicalElementDetailEffect extends Model
     {
         return $this->belongsTo(PlayerRuleChimicalElementDetail::class, 'player_rule_chimical_element_detail_id');
     }
+
+    public function gene(): BelongsTo
+    {
+        return $this->belongsTo(Gene::class, 'gene_id');
+    }
 }
