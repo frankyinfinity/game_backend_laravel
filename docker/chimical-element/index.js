@@ -138,11 +138,57 @@ function callCalculateChimicalElement() {
 async function runCycle() {
   try {
     await callCalculateChimicalElement();
+    await callConsumeChimicalElement();
   } catch (error) {
     console.error(`[ChimicalElement] Cycle error: ${error.message}`);
   }
 
   scheduleNextCycle();
+}
+
+function callConsumeChimicalElement() {
+  return new Promise((resolve, reject) => {
+    if (!sessionCookie) {
+      reject(new Error('No session cookie, skipping consumeChimicalElement'));
+      return;
+    }
+
+    const payload = JSON.stringify({ birth_region_id: birthRegionId });
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: '/api/auth/game/consume_chimical_element',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = data ? JSON.parse(data) : {};
+          console.log('[ChimicalElement] consume_chimical_element response:', response);
+          resolve(response);
+        } catch (error) {
+          reject(new Error(`consumeChimicalElement invalid JSON: ${error.message}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(new Error(`consumeChimicalElement request error: ${error.message}`));
+    });
+
+    req.write(payload);
+    req.end();
+  });
 }
 
 function scheduleNextCycle() {

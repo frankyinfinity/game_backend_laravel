@@ -821,6 +821,18 @@ class GameController extends Controller
         ]);
     }
 
+    public function consumeChimicalElement(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $birthRegionId = (int) $request->input('birth_region_id');
+        Log::info('consume_chimical_element called with birth_region_id: ' . $birthRegionId);
+
+        return response()->json([
+            'success' => true,
+            'birth_region_id' => $birthRegionId,
+            'message' => 'consume_chimical_element called',
+        ]);
+    }
+
     private function findBirthRegionOrError(int $birthRegionId): BirthRegion|\Illuminate\Http\JsonResponse
     {
         $birthRegion = BirthRegion::find($birthRegionId);
