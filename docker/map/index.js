@@ -214,13 +214,23 @@ async function bootstrapAndStartLoop() {
     const initialTiles = await callGetTilesByBirthRegion();
     latestTilesByBirthRegion = initialTiles;
     console.log('[Map] Initial get_tiles_by_birth_region completed.');
-
-    const initialDetails = await callGetBirthRegionDetails();
-    latestBirthRegionDetails = initialDetails;
-    console.log('[Map] Initial get_birth_region_details completed.');
   } catch (error) {
-    console.error(`[Map] Initial bootstrap error: ${error.message}`);
+    console.error(`[Map] Initial get_tiles_by_birth_region error: ${error.message}`);
   }
+
+  setTimeout(() => {
+    callGetBirthRegionDetails()
+      .then((details) => {
+        latestBirthRegionDetails = details;
+        console.log('[Map] Initial get_birth_region_details completed.');
+      })
+      .catch((error) => {
+        console.error(`[Map] Initial get_birth_region_details error: ${error.message}`);
+      })
+      .finally(() => {
+        runBirthRegionDetailsCycle();
+      });
+  }, 2000);
 
   scheduleNextCycle();
 }
@@ -302,18 +312,11 @@ async function runCycle() {
   const results = await Promise.allSettled([
     callSetElementInMap(),
     callGetTilesByBirthRegion(),
-    callGetBirthRegionDetails(),
   ]);
 
   const getTilesResult = results[1];
   if (getTilesResult && getTilesResult.status === 'fulfilled') {
     latestTilesByBirthRegion = getTilesResult.value;
-  }
-
-  const getDetailsResult = results[2];
-  if (getDetailsResult && getDetailsResult.status === 'fulfilled') {
-    latestBirthRegionDetails = getDetailsResult.value;
-    console.log('[Map] Latest Birth Region Details');
   }
 
   for (const result of results) {
@@ -323,6 +326,20 @@ async function runCycle() {
   }
 
   scheduleNextCycle();
+}
+
+function runBirthRegionDetailsCycle() {
+  callGetBirthRegionDetails()
+    .then((details) => {
+      latestBirthRegionDetails = details;
+      console.log('[Map] Latest Birth Region Details');
+    })
+    .catch((error) => {
+      console.error(`[Map] Birth Region Details error: ${error.message}`);
+    })
+    .finally(() => {
+      setTimeout(runBirthRegionDetailsCycle, 2000);
+    });
 }
 
 // Funzione per programmare il prossimo ciclo (ogni 10 secondi)
