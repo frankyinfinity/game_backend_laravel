@@ -96,8 +96,10 @@ function performLogin() {
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
         console.log('Login successful (or redirect received), starting creation loop...');
-        // Avvia il primo ciclo
+        // Avvia i cicli separati
         scheduleNextCycle();
+        scheduleGenesFetch();
+        scheduleChimicalElementsFetch();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         // Try reading body for error
@@ -257,12 +259,30 @@ function fetchCurrentChimicalElements() {
 }
 
 
-// Funzione per programmare il prossimo ciclo
+// Timer per i geni (separato)
+let genesTimer = null;
+function scheduleGenesFetch() {
+  if (genesTimer) clearTimeout(genesTimer);
+  genesTimer = setTimeout(() => {
+    fetchCurrentGenes();
+    scheduleGenesFetch();
+  }, 2000);
+}
+
+// Timer per gli elementi chimici (separato)
+let chimicalElementsTimer = null;
+function scheduleChimicalElementsFetch() {
+  if (chimicalElementsTimer) clearTimeout(chimicalElementsTimer);
+  chimicalElementsTimer = setTimeout(() => {
+    fetchCurrentChimicalElements();
+    scheduleChimicalElementsFetch();
+  }, 2000);
+}
+
+// Funzione per programmare il prossimo ciclo (solo position)
 function scheduleNextCycle() {
   setTimeout(() => {
     fetchCurrentPosition();
-    fetchCurrentGenes();
-    fetchCurrentChimicalElements();
   }, 2000);
 }
 
