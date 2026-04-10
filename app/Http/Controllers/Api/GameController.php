@@ -872,7 +872,44 @@ class GameController extends Controller
                 try {
                     $this->readWebSocketFrame($socket);
                     $reply = $this->queryTileDetails($socket, (int) $entity->tile_i, (int) $entity->tile_j);
-                    Log::info('consume_chimical_element: tile details for entity ' . $entity->uid . ': ' . json_encode($reply));
+                    
+                    $chimicalElements = [];
+                    if (isset($reply['detail']['birth_region_detail_data']) && is_array($reply['detail']['birth_region_detail_data'])) {
+                        foreach ($reply['detail']['birth_region_detail_data'] as $data) {
+                            $chimicalEl = null;
+                            $complexEl = null;
+                            
+                            if (!empty($data['json_chimical_element'])) {
+                                $chimicalEl = is_string($data['json_chimical_element']) 
+                                    ? json_decode($data['json_chimical_element'], true) 
+                                    : $data['json_chimical_element'];
+                            }
+                            if (!empty($data['json_complex_chimical_element'])) {
+                                $complexEl = is_string($data['json_complex_chimical_element']) 
+                                    ? json_decode($data['json_complex_chimical_element'], true) 
+                                    : $data['json_complex_chimical_element'];
+                            }
+                            
+                            if ($chimicalEl) {
+                                $chimicalElements[] = [
+                                    'id' => $chimicalEl['id'] ?? null,
+                                    'name' => $chimicalEl['name'] ?? '',
+                                    'value' => $data['quantity'] ?? 0,
+                                    'type' => 'chimical_element'
+                                ];
+                            }
+                            if ($complexEl) {
+                                $chimicalElements[] = [
+                                    'id' => $complexEl['id'] ?? null,
+                                    'name' => $complexEl['name'] ?? '',
+                                    'value' => $data['quantity'] ?? 0,
+                                    'type' => 'complex_chimical_element'
+                                ];
+                            }
+                        }
+                    }
+                    
+                    Log::info('consume_chimical_element: tile elements for entity ' . $entity->uid . ': ' . json_encode($chimicalElements));
                 } finally {
                     fclose($socket);
                 }
