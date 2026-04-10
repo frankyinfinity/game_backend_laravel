@@ -24,6 +24,7 @@ use App\Models\BirthRegionDetailData;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
 use App\Jobs\CalculateChimicalElementJob;
+use App\Jobs\ConsumeChimicalElementJob;
 use App\Models\GeneratorChimicalElement;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionScore;
@@ -45,6 +46,7 @@ use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Models\PlayerValue;
 use App\Models\EntityChimicalElement;
+use App\Models\PlayerRuleChimicalElement;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -826,157 +828,13 @@ class GameController extends Controller
     public function consumeChimicalElement(Request $request): \Illuminate\Http\JsonResponse
     {
         $birthRegionId = (int) $request->input('birth_region_id');
-        Log::info('consume_chimical_element called with birth_region_id: ' . $birthRegionId);
-
-        $birthRegion = BirthRegion::find($birthRegionId);
-        if ($birthRegion === null) {
-            return response()->json(['success' => false, 'message' => 'Birth region non trovata'], 404);
-        }
-
-        $player = Player::query()->where('birth_region_id', $birthRegionId)->first();
-        if ($player === null) {
-            return response()->json(['success' => false, 'message' => 'Player non trovato'], 404);
-        }
-
-        $entities = Entity::whereHas('specie', fn($q) => $q->where('player_id', $player->id))->get();
-        Log::info('consume_chimical_element: found ' . $entities->count() . ' entities for player ' . $player->id);
-
-        $dockerService = new DockerContainerService();
-        $host = config('remote_docker.docker_host_ip');
-        $gatewayPort = config('remote_docker.websocket_gateway_port', 9001);
-
-        foreach ($entities as $entity) {
-            $container = Container::query()
-                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
-                ->where('parent_id', $entity->id)
-                ->whereNotNull('ws_port')
-                ->first();
-            if ($container === null || !$container->ws_port) {
-                Log::info('consume_chimical_element: entity ' . $entity->uid . ' has no ws_port, skipping');
-                continue;
-            }
-
-            Log::info('consume_chimical_element: entity ' . $entity->uid . ' at position (' . $entity->tile_i . ', ' . $entity->tile_j . ')');
-
-            try {
-                $mapContainer = Container::query()
-                    ->where('parent_type', Container::PARENT_TYPE_MAP)
-                    ->where('parent_id', $birthRegionId)
-                    ->whereNotNull('ws_port')
-                    ->first();
-                if ($mapContainer === null || !$mapContainer->ws_port) {
-                    Log::info('consume_chimical_element: map container not found for birth_region ' . $birthRegionId);
-                    continue;
-                }
-
-                $socket = $this->openMapWebSocket($host, (int) $mapContainer->ws_port);
-                try {
-                    $this->readWebSocketFrame($socket);
-                    $reply = $this->queryTileDetails($socket, (int) $entity->tile_i, (int) $entity->tile_j);
-                    
-                    $tileElements = [];
-                    if (isset($reply['detail']['birth_region_detail_data']) && is_array($reply['detail']['birth_region_detail_data'])) {
-                        foreach ($reply['detail']['birth_region_detail_data'] as $data) {
-                            $chimicalEl = null;
-                            $complexEl = null;
-                            
-                            if (!empty($data['json_chimical_element'])) {
-                                $chimicalEl = is_string($data['json_chimical_element']) 
-                                    ? json_decode($data['json_chimical_element'], true) 
-                                    : $data['json_chimical_element'];
-                            }
-                            if (!empty($data['json_complex_chimical_element'])) {
-                                $complexEl = is_string($data['json_complex_chimical_element']) 
-                                    ? json_decode($data['json_complex_chimical_element'], true) 
-                                    : $data['json_complex_chimical_element'];
-                            }
-                            
-                            if ($chimicalEl) {
-                                $tileElements[] = [
-                                    'id' => $chimicalEl['id'] ?? null,
-                                    'name' => $chimicalEl['name'] ?? '',
-                                    'value' => $data['quantity'] ?? 0,
-                                    'type' => 'chimical_element',
-                                    'detail_data_id' => $data['id']
-                                ];
-                            }
-                            if ($complexEl) {
-                                $tileElements[] = [
-                                    'id' => $complexEl['id'] ?? null,
-                                    'name' => $complexEl['name'] ?? '',
-                                    'value' => $data['quantity'] ?? 0,
-                                    'type' => 'complex_chimical_element',
-                                    'detail_data_id' => $data['id']
-                                ];
-                            }
-                        }
-                    }
-                    
-                    Log::info('consume_chimical_element: tile elements for entity ' . $entity->uid . ': ' . json_encode($tileElements));
-                    
-                    $maxConsume = PlayerValue::getIntegerValue($player->id, PlayerValue::KEY_CHIMICAL_ELEMENT_CONSUME_PER_TICK);
-                    if (empty($tileElements) || $maxConsume <= 0) {
-                        Log::info('consume_chimical_element: no elements or maxConsume=0 for entity ' . $entity->uid);
-                        continue;
-                    }
-                    
-                    $shuffled = $tileElements;
-                    shuffle($shuffled);
-                    $toConsume = array_slice($shuffled, 0, $maxConsume);
-                    
-                    Log::info('consume_chimical_element: consuming ' . count($toConsume) . ' elements for entity ' . $entity->uid);
-                    
-                    foreach ($toConsume as $element) {
-                        $detailData = BirthRegionDetailData::find($element['detail_data_id']);
-                        if ($detailData && $detailData->quantity > 0) {
-                            $entityChimical = EntityChimicalElement::query()
-                                ->where('entity_id', $entity->id)
-                                ->whereHas('playerRuleChimicalElement', function ($q) use ($element, $player) {
-                                    $q->where('player_id', $player->id);
-                                    if ($element['type'] === 'chimical_element') {
-                                        $q->where('chimical_element_id', $element['id']);
-                                    } else {
-                                        $q->where('complex_chimical_element_id', $element['id']);
-                                    }
-                                })
-                                ->first();
-                            
-                            if (!$entityChimical) {
-                                Log::info('consume_chimical_element: element ' . $element['name'] . ' not found in entity, skipping');
-                                continue;
-                            }
-                            
-                            $detailData->quantity--;
-                            if ($detailData->quantity <= 0) {
-                                $detailData->delete();
-                            } else {
-                                $detailData->save();
-                            }
-                            
-                            if ($entityChimical && $entityChimical->playerRuleChimicalElement) {
-                                $maxValue = (int) $entityChimical->playerRuleChimicalElement->max;
-                                if ($entityChimical->value < $maxValue) {
-                                    $entityChimical->value += 1;
-                                    $entityChimical->save();
-                                    Log::info('consume_chimical_element: consumed element ' . $element['name'] . ' (type: ' . $element['type'] . ') for entity ' . $entity->uid);
-                                } else {
-                                    Log::info('consume_chimical_element: element ' . $element['name'] . ' already at max value for entity ' . $entity->uid);
-                                }
-                            }
-                        }
-                    }
-                } finally {
-                    fclose($socket);
-                }
-            } catch (\Throwable $e) {
-                Log::info('consume_chimical_element: error for entity ' . $entity->uid . ': ' . $e->getMessage());
-            }
-        }
+        
+        ConsumeChimicalElementJob::dispatch($birthRegionId);
 
         return response()->json([
             'success' => true,
             'birth_region_id' => $birthRegionId,
-            'message' => 'consume_chimical_element called',
+            'message' => 'Job avviato',
         ]);
     }
 

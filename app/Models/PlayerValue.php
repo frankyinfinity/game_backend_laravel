@@ -19,6 +19,7 @@ class PlayerValue extends Model
     public const KEY_DIVISION_COST = 'division_cost';
     public const KEY_LIFEPOINT_GENERATE_NEW_ENTITY = 'lifepoint_generate_new_entity';
     public const KEY_CHIMICAL_ELEMENT = 'chimical_element';
+    public const KEY_CHIMICAL_ELEMENT_CONSUME = 'chimical_element_consume';
     public const KEY_CHIMICAL_ELEMENT_CONSUME_PER_TICK = 'chimical_element_consume_per_tick';
 
     public const BOOLEAN_KEYS = [
@@ -27,6 +28,7 @@ class PlayerValue extends Model
         self::KEY_ATTACK,
         self::KEY_DIVISION,
         self::KEY_CHIMICAL_ELEMENT,
+        self::KEY_CHIMICAL_ELEMENT_CONSUME,
     ];
 
     public const INTEGER_KEYS = [
