@@ -181,11 +181,45 @@ class ConsumeChimicalElementJob implements ShouldQueue
                         continue;
                     }
                     
-                    $shuffled = $validElements;
-                    shuffle($shuffled);
-                    $toConsume = array_slice($shuffled, 0, $maxConsume);
+                    $groupedByElement = [];
+                    foreach ($validElements as $el) {
+                        $key = $el['type'] . '_' . $el['id'];
+                        if (!isset($groupedByElement[$key])) {
+                            $groupedByElement[$key] = [
+                                'name' => $el['name'],
+                                'type' => $el['type'],
+                                'available' => $el['value'],
+                                'rule_id' => $el['player_rule_chimical_element_id'],
+                                'entity_chimical_id' => $el['entity_chimical_element_id'],
+                                'detail_data_id' => $el['detail_data_id']
+                            ];
+                        }
+                    }
                     
-                    Log::info('[ConsumeChimicalElementJob] consuming ' . count($toConsume) . ' elements for entity ' . $entity->uid);
+                    $toConsume = [];
+                    $remainingSlots = $maxConsume;
+                    $elementKeys = array_keys($groupedByElement);
+                    shuffle($elementKeys);
+                    
+                    while ($remainingSlots > 0 && !empty($elementKeys)) {
+                        $key = array_shift($elementKeys);
+                        $el = $groupedByElement[$key];
+                        
+                        $consumeNow = rand(0, 1);
+                        if ($consumeNow && $el['available'] > 0) {
+                            $toConsume[] = $el;
+                            $el['available']--;
+                            $groupedByElement[$key]['available'] = $el['available'];
+                            $remainingSlots--;
+                        }
+                        
+                        if ($el['available'] > 0 && !in_array($key, $elementKeys)) {
+                            $elementKeys[] = $key;
+                            shuffle($elementKeys);
+                        }
+                    }
+                    
+                    Log::info('[ConsumeChimicalElementJob] consuming ' . count($toConsume) . ' elements for entity ' . $entity->uid . ': ' . json_encode(array_column($toConsume, 'name')));
                     
                     foreach ($toConsume as $element) {
                         $detailData = BirthRegionDetailData::find($element['detail_data_id']);
@@ -197,7 +231,7 @@ class ConsumeChimicalElementJob implements ShouldQueue
                                 $detailData->save();
                             }
                             
-                            $entityChimical = EntityChimicalElement::find($element['entity_chimical_element_id']);
+                            $entityChimical = EntityChimicalElement::find($element['entity_chimical_id']);
                             if ($entityChimical) {
                                 $entityChimical->value += 1;
                                 $entityChimical->save();
