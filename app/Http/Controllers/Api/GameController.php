@@ -44,6 +44,7 @@ use App\Models\PhasePlayer;
 use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Models\PlayerValue;
+use App\Models\EntityChimicalElement;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -873,7 +874,7 @@ class GameController extends Controller
                     $this->readWebSocketFrame($socket);
                     $reply = $this->queryTileDetails($socket, (int) $entity->tile_i, (int) $entity->tile_j);
                     
-                    $chimicalElements = [];
+                    $tileElements = [];
                     if (isset($reply['detail']['birth_region_detail_data']) && is_array($reply['detail']['birth_region_detail_data'])) {
                         foreach ($reply['detail']['birth_region_detail_data'] as $data) {
                             $chimicalEl = null;
@@ -891,25 +892,79 @@ class GameController extends Controller
                             }
                             
                             if ($chimicalEl) {
-                                $chimicalElements[] = [
+                                $tileElements[] = [
                                     'id' => $chimicalEl['id'] ?? null,
                                     'name' => $chimicalEl['name'] ?? '',
                                     'value' => $data['quantity'] ?? 0,
-                                    'type' => 'chimical_element'
+                                    'type' => 'chimical_element',
+                                    'detail_data_id' => $data['id']
                                 ];
                             }
                             if ($complexEl) {
-                                $chimicalElements[] = [
+                                $tileElements[] = [
                                     'id' => $complexEl['id'] ?? null,
                                     'name' => $complexEl['name'] ?? '',
                                     'value' => $data['quantity'] ?? 0,
-                                    'type' => 'complex_chimical_element'
+                                    'type' => 'complex_chimical_element',
+                                    'detail_data_id' => $data['id']
                                 ];
                             }
                         }
                     }
                     
-                    Log::info('consume_chimical_element: tile elements for entity ' . $entity->uid . ': ' . json_encode($chimicalElements));
+                    Log::info('consume_chimical_element: tile elements for entity ' . $entity->uid . ': ' . json_encode($tileElements));
+                    
+                    $maxConsume = PlayerValue::getIntegerValue($player->id, PlayerValue::KEY_CHIMICAL_ELEMENT_CONSUME_PER_TICK);
+                    if (empty($tileElements) || $maxConsume <= 0) {
+                        Log::info('consume_chimical_element: no elements or maxConsume=0 for entity ' . $entity->uid);
+                        continue;
+                    }
+                    
+                    $shuffled = $tileElements;
+                    shuffle($shuffled);
+                    $toConsume = array_slice($shuffled, 0, $maxConsume);
+                    
+                    Log::info('consume_chimical_element: consuming ' . count($toConsume) . ' elements for entity ' . $entity->uid);
+                    
+                    foreach ($toConsume as $element) {
+                        $detailData = BirthRegionDetailData::find($element['detail_data_id']);
+                        if ($detailData && $detailData->quantity > 0) {
+                            $entityChimical = EntityChimicalElement::query()
+                                ->where('entity_id', $entity->id)
+                                ->whereHas('playerRuleChimicalElement', function ($q) use ($element, $player) {
+                                    $q->where('player_id', $player->id);
+                                    if ($element['type'] === 'chimical_element') {
+                                        $q->where('chimical_element_id', $element['id']);
+                                    } else {
+                                        $q->where('complex_chimical_element_id', $element['id']);
+                                    }
+                                })
+                                ->first();
+                            
+                            if (!$entityChimical) {
+                                Log::info('consume_chimical_element: element ' . $element['name'] . ' not found in entity, skipping');
+                                continue;
+                            }
+                            
+                            $detailData->quantity--;
+                            if ($detailData->quantity <= 0) {
+                                $detailData->delete();
+                            } else {
+                                $detailData->save();
+                            }
+                            
+                            if ($entityChimical && $entityChimical->playerRuleChimicalElement) {
+                                $maxValue = (int) $entityChimical->playerRuleChimicalElement->max;
+                                if ($entityChimical->value < $maxValue) {
+                                    $entityChimical->value += 1;
+                                    $entityChimical->save();
+                                    Log::info('consume_chimical_element: consumed element ' . $element['name'] . ' (type: ' . $element['type'] . ') for entity ' . $entity->uid);
+                                } else {
+                                    Log::info('consume_chimical_element: element ' . $element['name'] . ' already at max value for entity ' . $entity->uid);
+                                }
+                            }
+                        }
+                    }
                 } finally {
                     fclose($socket);
                 }
