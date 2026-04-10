@@ -30,6 +30,8 @@ use App\Models\ElementHasPositionScore;
 use App\Models\ElementHasPositionInformation;
 use App\Models\Entity;
 use App\Models\Container;
+use App\Services\DockerContainerService;
+use App\Services\BrainFlowRunner;
 use App\Models\Genome;
 use App\Models\EntityInformation;
 use App\Models\ElementHasGene;
@@ -68,7 +70,6 @@ use App\Jobs\StopPlayerContainersJob;
 use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Complex\EntityDraw;
 use App\Services\BrainScheduleService;
-use App\Services\DockerContainerService;
 use App\Services\ObjectiveService;
 use App\Custom\Draw\Support\ScrollGroup;
 
@@ -826,11 +827,205 @@ class GameController extends Controller
         $birthRegionId = (int) $request->input('birth_region_id');
         Log::info('consume_chimical_element called with birth_region_id: ' . $birthRegionId);
 
+        $birthRegion = BirthRegion::find($birthRegionId);
+        if ($birthRegion === null) {
+            return response()->json(['success' => false, 'message' => 'Birth region non trovata'], 404);
+        }
+
+        $player = Player::query()->where('birth_region_id', $birthRegionId)->first();
+        if ($player === null) {
+            return response()->json(['success' => false, 'message' => 'Player non trovato'], 404);
+        }
+
+        $entities = Entity::whereHas('specie', fn($q) => $q->where('player_id', $player->id))->get();
+        Log::info('consume_chimical_element: found ' . $entities->count() . ' entities for player ' . $player->id);
+
+        $dockerService = new DockerContainerService();
+        $host = config('remote_docker.docker_host_ip');
+        $gatewayPort = config('remote_docker.websocket_gateway_port', 9001);
+
+        foreach ($entities as $entity) {
+            $container = Container::query()
+                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                ->where('parent_id', $entity->id)
+                ->whereNotNull('ws_port')
+                ->first();
+            if ($container === null || !$container->ws_port) {
+                Log::info('consume_chimical_element: entity ' . $entity->uid . ' has no ws_port, skipping');
+                continue;
+            }
+
+            Log::info('consume_chimical_element: entity ' . $entity->uid . ' at position (' . $entity->tile_i . ', ' . $entity->tile_j . ')');
+
+            try {
+                $mapContainer = Container::query()
+                    ->where('parent_type', Container::PARENT_TYPE_MAP)
+                    ->where('parent_id', $birthRegionId)
+                    ->whereNotNull('ws_port')
+                    ->first();
+                if ($mapContainer === null || !$mapContainer->ws_port) {
+                    Log::info('consume_chimical_element: map container not found for birth_region ' . $birthRegionId);
+                    continue;
+                }
+
+                $socket = $this->openMapWebSocket($host, (int) $mapContainer->ws_port);
+                try {
+                    $this->readWebSocketFrame($socket);
+                    $reply = $this->queryTileDetails($socket, (int) $entity->tile_i, (int) $entity->tile_j);
+                    Log::info('consume_chimical_element: tile details for entity ' . $entity->uid . ': ' . json_encode($reply));
+                } finally {
+                    fclose($socket);
+                }
+            } catch (\Throwable $e) {
+                Log::info('consume_chimical_element: error for entity ' . $entity->uid . ': ' . $e->getMessage());
+            }
+        }
+
         return response()->json([
             'success' => true,
             'birth_region_id' => $birthRegionId,
             'message' => 'consume_chimical_element called',
         ]);
+    }
+
+    private function openMapWebSocket(string $host, int $targetPort)
+    {
+        $gatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
+        $socket = @stream_socket_client(
+            "tcp://{$host}:{$gatewayPort}",
+            $errno,
+            $errstr,
+            5
+        );
+        if ($socket === false) {
+            throw new \RuntimeException("Connessione websocket al gateway fallita ({$errno}): {$errstr}");
+        }
+        stream_set_timeout($socket, 5);
+        $this->performWebSocketHandshake($socket, $host, $gatewayPort, $targetPort);
+        return $socket;
+    }
+
+    private function queryTileDetails($socket, int $tileI, int $tileJ): array
+    {
+        $payload = [
+            'command' => 'get_birth_region_details',
+            'params' => [
+                'tile_i' => $tileI,
+                'tile_j' => $tileJ,
+            ],
+        ];
+        $this->writeWebSocketFrame($socket, json_encode($payload));
+        $replyRaw = $this->readWebSocketFrame($socket);
+        if ($replyRaw === null) {
+            return ['success' => false];
+        }
+        $reply = json_decode($replyRaw, true);
+        if (!is_array($reply)) {
+            return ['success' => false];
+        }
+        return $reply;
+    }
+
+    private function performWebSocketHandshake($socket, string $host, int $gatewayPort, int $targetPort): void
+    {
+        $key = base64_encode(random_bytes(16));
+        $headers = "GET /?port={$targetPort} HTTP/1.1\r\n";
+        $headers .= "Host: {$host}:{$gatewayPort}\r\n";
+        $headers .= "Upgrade: websocket\r\n";
+        $headers .= "Connection: Upgrade\r\n";
+        $headers .= "Sec-WebSocket-Key: {$key}\r\n";
+        $headers .= "Sec-WebSocket-Version: 13\r\n\r\n";
+        fwrite($socket, $headers);
+        $response = '';
+        while (!str_contains($response, "\r\n\r\n")) {
+            $chunk = fread($socket, 1024);
+            if ($chunk === false || $chunk === '') {
+                break;
+            }
+            $response .= $chunk;
+        }
+        if (!str_contains($response, ' 101 ')) {
+            throw new \RuntimeException('Handshake websocket fallito: ' . trim($response));
+        }
+    }
+
+    private function writeWebSocketFrame($socket, string $payload): void
+    {
+        $payloadLength = strlen($payload);
+        $frame = chr(0x81);
+        if ($payloadLength <= 125) {
+            $frame .= chr(0x80 | $payloadLength);
+        } elseif ($payloadLength <= 65535) {
+            $frame .= chr(0x80 | 126) . pack('n', $payloadLength);
+        } else {
+            $frame .= chr(0x80 | 127) . pack('NN', 0, $payloadLength);
+        }
+        $mask = random_bytes(4);
+        $frame .= $mask;
+        $maskedPayload = '';
+        for ($i = 0; $i < $payloadLength; $i++) {
+            $maskedPayload .= $payload[$i] ^ $mask[$i % 4];
+        }
+        fwrite($socket, $frame . $maskedPayload);
+    }
+
+    private function readWebSocketFrame($socket): ?string
+    {
+        $header = $this->readExactBytes($socket, 2);
+        if ($header === null) {
+            return null;
+        }
+        $first = ord($header[0]);
+        $second = ord($header[1]);
+        $opcode = $first & 0x0f;
+        $isMasked = ($second & 0x80) !== 0;
+        $payloadLength = $second & 0x7f;
+        if ($payloadLength === 126) {
+            $extended = $this->readExactBytes($socket, 2);
+            if ($extended === null) {
+                return null;
+            }
+            $payloadLength = unpack('n', $extended)[1];
+        } elseif ($payloadLength === 127) {
+            $extended = $this->readExactBytes($socket, 8);
+            if ($extended === null) {
+                return null;
+            }
+            $parts = unpack('N2', $extended);
+            $payloadLength = ($parts[1] << 32) + $parts[2];
+        }
+        $mask = '';
+        if ($isMasked) {
+            $mask = $this->readExactBytes($socket, 4) ?? '';
+        }
+        $payload = $payloadLength > 0 ? $this->readExactBytes($socket, (int) $payloadLength) : '';
+        if ($payload === null) {
+            return null;
+        }
+        if ($isMasked && $mask !== '') {
+            $decoded = '';
+            $len = strlen($payload);
+            for ($i = 0; $i < $len; $i++) {
+                $decoded .= $payload[$i] ^ $mask[$i % 4];
+            }
+            return $decoded;
+        }
+        return $payload;
+    }
+
+    private function readExactBytes($socket, int $length): ?string
+    {
+        $buffer = '';
+        $remaining = $length;
+        while ($remaining > 0) {
+            $chunk = fread($socket, $remaining);
+            if ($chunk === false || $chunk === '') {
+                return null;
+            }
+            $buffer .= $chunk;
+            $remaining -= strlen($chunk);
+        }
+        return $buffer;
     }
 
     private function findBirthRegionOrError(int $birthRegionId): BirthRegion|\Illuminate\Http\JsonResponse

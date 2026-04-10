@@ -359,12 +359,55 @@ function handleWebSocketCommand(data, ws) {
       break;
 
     case 'get_chimical_elements':
-      // Ritorna gli elementi chimici correnti
-      ws.send(JSON.stringify({
-        success: true,
-        command: 'get_chimical_elements',
-        chimical_elements: currentChimicalElements
-      }));
+      // Ritorna gli elementi chimici del tile specificato o della posizione corrente
+      const tileI = data.params?.tile_i ?? currentTileI;
+      const tileJ = data.params?.tile_j ?? currentTileJ;
+      
+      const pathChimical = `/entities/chimical-elements?uid=${entityUid}`;
+      const optionsChimical = {
+        hostname: new URL(backendUrl).hostname,
+        port: new URL(backendUrl).port || 80,
+        path: pathChimical,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cookie': sessionCookie
+        },
+      };
+
+      const reqChimical = http.request(optionsChimical, (resChimical) => {
+        let dataChimical = '';
+        resChimical.on('data', (chunk) => { dataChimical += chunk; });
+        resChimical.on('end', () => {
+          try {
+            const responseChimical = JSON.parse(dataChimical);
+            ws.send(JSON.stringify({
+              success: true,
+              command: 'get_chimical_elements',
+              chimical_elements: responseChimical.chimical_elements || [],
+              tile_i: tileI,
+              tile_j: tileJ
+            }));
+          } catch (error) {
+            ws.send(JSON.stringify({
+              success: false,
+              command: 'get_chimical_elements',
+              error: error.message
+            }));
+          }
+        });
+      });
+
+      reqChimical.on('error', (error) => {
+        ws.send(JSON.stringify({
+          success: false,
+          command: 'get_chimical_elements',
+          error: error.message
+        }));
+      });
+
+      reqChimical.end();
       break;
 
     default:
