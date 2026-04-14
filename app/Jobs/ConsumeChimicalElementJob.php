@@ -232,8 +232,13 @@ class ConsumeChimicalElementJob implements ShouldQueue
                             }
                             
                             $entityChimical = EntityChimicalElement::find($element['entity_chimical_id']);
-                            if ($entityChimical) {
+                            $rule = PlayerRuleChimicalElement::find($element['rule_id']);
+                            if ($entityChimical && $rule) {
                                 $entityChimical->value += 1;
+                                $maxValue = (int) $rule->max;
+                                if ($entityChimical->value > $maxValue) {
+                                    $entityChimical->value = $maxValue;
+                                }
                                 $entityChimical->save();
                                 Log::info('[ConsumeChimicalElementJob] consumed element ' . $element['name'] . ' (type: ' . $element['type'] . ') for entity ' . $entity->uid);
                             }
