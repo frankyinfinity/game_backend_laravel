@@ -42,7 +42,7 @@ class EntityChimicalElementObserver
                 
                 if ($newValue >= $detail->min && $newValue <= $detail->max) {
                     foreach ($detail->effects as $effect) {
-                        $genomeId = $entity->genomes()->first()?->id;
+                        $genomeId = $entity->genomes()->where('gene_id', $effect->gene_id)->first()?->id;
                         
                         if ($effect->type === PlayerRuleChimicalElementDetailEffect::TYPE_FIXED) {
                             $activeFixedEffectIds[] = $effect->id;
