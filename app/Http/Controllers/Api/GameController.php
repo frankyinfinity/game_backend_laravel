@@ -1383,6 +1383,21 @@ class GameController extends Controller
         ]);
     }
 
+    public function checkPlayerModifier(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $playerId = (int) ($request->input('player_id') ?? $request->input('playerId'));
+        if ($playerId <= 0) {
+            return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
+        }
+
+        Log::info('[checkPlayerModifier] player_id: ' . $playerId);
+
+        return response()->json([
+            'success' => true,
+            'player_id' => $playerId,
+        ]);
+    }
+
     /**
      * Gestisce il consumo di un elemento da parte di un'entity
      */

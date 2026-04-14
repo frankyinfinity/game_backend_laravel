@@ -16,12 +16,14 @@ class RuleChimicalElementDetailController extends Controller
             'type' => 'required|integer|in:' . RuleChimicalElementDetailEffect::TYPE_FIXED . ',' . RuleChimicalElementDetailEffect::TYPE_TIMED,
             'gene_id' => 'required|integer|exists:genes,id',
             'value' => 'required|integer',
+            'duration' => 'nullable|integer',
         ]);
 
         $effect = $detail->effects()->create([
             'type' => $request->input('type'),
             'gene_id' => $request->input('gene_id'),
             'value' => $request->input('value'),
+            'duration' => $request->input('duration'),
         ]);
 
         return response()->json(['success' => true, 'effect' => $effect]);
@@ -33,12 +35,14 @@ class RuleChimicalElementDetailController extends Controller
             'type' => 'required|integer|in:' . RuleChimicalElementDetailEffect::TYPE_FIXED . ',' . RuleChimicalElementDetailEffect::TYPE_TIMED,
             'gene_id' => 'required|integer|exists:genes,id',
             'value' => 'required|integer',
+            'duration' => 'nullable|integer',
         ]);
 
         $effect->update([
             'type' => $request->input('type'),
             'gene_id' => $request->input('gene_id'),
             'value' => $request->input('value'),
+            'duration' => $request->input('duration'),
         ]);
 
         return response()->json(['success' => true, 'effect' => $effect]);
@@ -61,6 +65,7 @@ class RuleChimicalElementDetailController extends Controller
                 'gene_id' => $e->gene_id,
                 'gene_name' => $e->gene->name,
                 'value' => $e->value,
+                'duration' => $e->duration,
             ]),
         ]);
     }

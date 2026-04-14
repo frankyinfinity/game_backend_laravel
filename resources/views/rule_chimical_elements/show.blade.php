@@ -213,6 +213,7 @@
                             <th>Tipo</th>
                             <th>Gene</th>
                             <th>Valore</th>
+                            <th>Durata</th>
                             <th style="width: 80px;"></th>
                         </tr>
                     </thead>
@@ -239,7 +240,7 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="effect_type">Tipo <span class="text-danger">*</span></label>
-                        <select class="form-control" id="effect_type" name="type" required>
+                        <select class="form-control" id="effect_type" name="type" required onchange="toggleDurationField()">
                             <option value="">Seleziona Tipo</option>
                             <option value="{{ App\Models\RuleChimicalElementDetailEffect::TYPE_FIXED }}">Fisso</option>
                             <option value="{{ App\Models\RuleChimicalElementDetailEffect::TYPE_TIMED }}">A tempo</option>
@@ -251,6 +252,15 @@
                             <option value="">Seleziona Gene</option>
                             @foreach(\App\Models\Gene::all() as $gene)
                                 <option value="{{ $gene->id }}">{{ $gene->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group" id="duration_field" style="display: none;">
+                        <label for="effect_duration">Durata <span class="text-danger">*</span></label>
+                        <select class="form-control" id="effect_duration" name="duration" required>
+                            <option value="">Seleziona Durata</option>
+                            @foreach(\App\Models\RuleChimicalElementDetailEffect::DURATION_OPTIONS as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -267,6 +277,18 @@
         </form>
     </div>
 </div>
+<script>
+function toggleDurationField() {
+    var typeSelect = document.getElementById('effect_type');
+    var durationField = document.getElementById('duration_field');
+    if (typeSelect.value == '{{ App\Models\RuleChimicalElementDetailEffect::TYPE_TIMED }}') {
+        durationField.style.display = 'block';
+    } else {
+        durationField.style.display = 'none';
+        document.getElementById('effect_duration').value = '';
+    }
+}
+</script>
 @stop
 
 @section('css')
@@ -667,12 +689,14 @@
 
             response.effects.forEach(function (effect) {
                 var typeName = effect.type === {{ App\Models\RuleChimicalElementDetailEffect::TYPE_FIXED }} ? 'Fisso' : 'A tempo';
+                var durationText = effect.duration ? effect.duration + ' min' : '-';
                 var row = '<tr>';
                 row += '<td>' + typeName + '</td>';
                 row += '<td>' + effect.gene_name + '</td>';
                 row += '<td>' + effect.value + '</td>';
+                row += '<td>' + durationText + '</td>';
                 row += '<td>';
-                row += '<button type="button" class="btn btn-sm btn-primary btn-edit-effect mr-1" data-effect-id="' + effect.id + '" data-effect-type="' + effect.type + '" data-effect-gene-id="' + effect.gene_id + '" data-effect-value="' + effect.value + '" title="Modifica">';
+                row += '<button type="button" class="btn btn-sm btn-primary btn-edit-effect mr-1" data-effect-id="' + effect.id + '" data-effect-type="' + effect.type + '" data-effect-gene-id="' + effect.gene_id + '" data-effect-value="' + effect.value + '" data-effect-duration="' + (effect.duration || '') + '" title="Modifica">';
                 row += '<i class="fas fa-edit"></i></button>';
                 row += '<button type="button" class="btn btn-sm btn-danger btn-delete-effect" data-effect-id="' + effect.id + '" title="Elimina">';
                 row += '<i class="fas fa-trash"></i></button>';
@@ -681,13 +705,14 @@
             });
 
             if (response.effects.length === 0) {
-                tbody.append('<tr><td colspan="4" class="text-center text-muted">Nessun effetto inserito</td></tr>');
+                tbody.append('<tr><td colspan="5" class="text-center text-muted">Nessun effetto inserito</td></tr>');
             }
         });
     }
 
     $('#addEffectBtn').on('click', function () {
         $('#effectForm')[0].reset();
+        toggleDurationField();
         $('#addEffectModal').modal('show');
     });
 
@@ -698,10 +723,13 @@
         var type = $(this).data('effect-type');
         var geneId = $(this).data('effect-gene-id');
         var value = $(this).data('effect-value');
+        var duration = $(this).data('effect-duration');
         
         $('#effect_type').val(type);
         $('#effect_gene_id').val(geneId);
         $('#effect_value').val(value);
+        $('#effect_duration').val(duration || '');
+        toggleDurationField();
         $('#addEffectModal').modal('show');
     });
 

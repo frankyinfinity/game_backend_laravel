@@ -212,7 +212,8 @@ class PlayerObserver
                         'player_rule_chimical_element_detail_id' => $playerDetail->id,
                         'type' => $effect->type,
                         'gene_id' => $effect->gene_id,
-                        'value' => $effect->value
+                        'value' => $effect->value,
+                        'duration' => $effect->duration
                     ]);
                 }
             }

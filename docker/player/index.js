@@ -79,8 +79,8 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful, starting player_values/get loop...');
-        scheduleNextCycle();
+        console.log('Login successful, starting timers...');
+        startTimers();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', (d) => console.error(d.toString()));
@@ -99,7 +99,6 @@ function performLogin() {
 function callGetPlayerValues() {
   if (!sessionCookie) {
     console.log('No session cookie, skipping game/player_values/get...');
-    scheduleNextCycle();
     return;
   }
 
@@ -127,7 +126,7 @@ function callGetPlayerValues() {
       data += chunk;
     });
 
-    res.on('end', () => {
+res.on('end', () => {
       try {
         const response = JSON.parse(data);
         if (response && response.success) {
@@ -139,25 +138,64 @@ function callGetPlayerValues() {
         }
       } catch (error) {
         console.error(`[Player ${playerId}] Parse error: ${error.message}`);
-      } finally {
-        scheduleNextCycle();
       }
     });
   });
 
   req.on('error', (error) => {
     console.error(`[Player ${playerId}] Error calling game/player_values/get: ${error.message}`);
-    scheduleNextCycle();
   });
 
   req.write(postData);
   req.end();
 }
 
-function scheduleNextCycle() {
-  setTimeout(() => {
-    callGetPlayerValues();
-  }, 10000);
+function callCheckPlayerModifier() {
+  if (!sessionCookie) {
+    console.log('No session cookie, skipping checkPlayerModifier...');
+    return;
+  }
+
+  const path = '/api/auth/game/check_player_modifier';
+  const postData = JSON.stringify({ player_id: playerId });
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+      Accept: 'application/json',
+      Cookie: sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken,
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        console.log(`[Player ${playerId}] checkPlayerModifier:`, response);
+      } catch (error) {
+        console.error(`[Player ${playerId}] checkPlayerModifier parse error: ${error.message}`);
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`[Player ${playerId}] Error calling checkPlayerModifier: ${error.message}`);
+  });
+
+  req.write(postData);
+  req.end();
 }
 
 const wss = new WebSocket.Server({ port: wsPort });
@@ -214,3 +252,63 @@ function handleWebSocketCommand(data, ws) {
 }
 
 performLogin();
+
+const PLAYER_VALUES_INTERVAL = 10000;
+const PLAYER_MODIFIER_INTERVAL = 10000;
+
+function startTimers() {
+  setInterval(callGetPlayerValues, PLAYER_VALUES_INTERVAL);
+  setInterval(callCheckPlayerModifier, PLAYER_MODIFIER_INTERVAL);
+}
+
+function performLogin() {
+  console.log('Attempting login...');
+
+  const optionsGet = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: '/login',
+    method: 'GET',
+  };
+
+  const reqGet = http.request(optionsGet, (res) => {
+    updateSession(res);
+
+    const postData = new URLSearchParams({
+      email: apiUserEmail,
+      password: apiUserPassword,
+    }).toString();
+
+    const optionsPost = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: '/login',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+        Cookie: sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken,
+      },
+    };
+
+    const reqPost = http.request(optionsPost, (resPost) => {
+      updateSession(resPost);
+
+      if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
+        console.log('Login successful, starting timers...');
+        startTimers();
+      } else {
+        console.error(`Login failed with status: ${resPost.statusCode}`);
+        resPost.on('data', (d) => console.error(d.toString()));
+      }
+    });
+
+    reqPost.on('error', (e) => console.error(`Login POST error: ${e.message}`));
+    reqPost.write(postData);
+    reqPost.end();
+  });
+
+  reqGet.on('error', (e) => console.error(`Initial GET error: ${e.message}`));
+  reqGet.end();
+}

@@ -177,7 +177,7 @@ class BarChimicalElementDraw
         return Colors::LIGHT_GRAY;
     }
 
-    private function buildTooltipText($detail): string
+private function buildTooltipText($detail): string
     {
         $tooltip = "[{$detail->min}, {$detail->max}]\n";
         $tooltip .= "----------------\n";
@@ -187,7 +187,8 @@ class BarChimicalElementDraw
             foreach ($effects as $effect) {
                 $typeName = $effect->type === 1 ? 'Fisso' : 'A tempo';
                 $geneName = $effect->gene ? $effect->gene->name : 'N/A';
-                $tooltip .= "• {$typeName}: {$effect->value} ({$geneName})\n";
+                $durationText = $effect->duration ? " ({$effect->duration} min)" : "";
+                $tooltip .= "• {$typeName}: {$effect->value} ({$geneName}){$durationText}\n";
             }
         } else {
             $tooltip .= "Nessun effetto\n";

@@ -36,6 +36,7 @@ Route::group(['prefix' => 'auth'], function (){
     Route::post('/game/consume_chimical_element', [App\Http\Controllers\Api\GameController::class, 'consumeChimicalElement'])->name('game.consume_chimical_element');
     Route::post('/game/player_values/reset', [App\Http\Controllers\Api\GameController::class, 'resetPlayerValues'])->name('game.player_values.reset');
     Route::post('/game/player_values/get', [App\Http\Controllers\Api\GameController::class, 'getPlayerValues'])->name('game.player_values.get');
+    Route::post('/game/check_player_modifier', [App\Http\Controllers\Api\GameController::class, 'checkPlayerModifier'])->name('game.check_player_modifier');
     Route::post('/game/objective/modal_visibility', [App\Http\Controllers\Api\GameController::class, 'setObjectiveModalVisibility'])->name('game.objective.modal_visibility');
     Route::post('/game/objective/start', [App\Http\Controllers\Api\GameController::class, 'startObjective'])->name('game.objective.start');
     Route::post('/game/objective/check', [App\Http\Controllers\Api\GameController::class, 'checkObjective'])->name('game.objective.check');
