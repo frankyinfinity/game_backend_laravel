@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\PlayerModifier;
 use App\Models\PlayerRuleChimicalElementDetailEffect;
+use App\Models\EntityInformation;
 use Illuminate\Support\Facades\Log;
 
 class PlayerModifierObserver
@@ -20,8 +21,33 @@ class PlayerModifierObserver
             return;
         }
 
+        $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+        if (!$entityInfo) {
+            return;
+        }
+
+        $currentValue = $entityInfo->value;
+        $min = $genome->min;
+        $max = $genome->max + ($genome->modifier ?? 0);
+
+        if ($currentValue > $max) {
+            $entityInfo->value = $max;
+            $entityInfo->save();
+        }
+
         $currentModifier = $genome->modifier ?? 0;
-        $genome->modifier = $currentModifier + $effect->value;
+        $newModifier = $currentModifier + $effect->value;
+
+        $minModifier = $min;
+        $maxModifier = $max;
+
+        if ($newModifier > $maxModifier) {
+            $newModifier = $maxModifier;
+        } elseif ($newModifier < $minModifier) {
+            $newModifier = $minModifier;
+        }
+
+        $genome->modifier = $newModifier;
         $genome->save();
     }
 
@@ -37,8 +63,33 @@ class PlayerModifierObserver
             return;
         }
 
+        $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+        if (!$entityInfo) {
+            return;
+        }
+
+        $currentValue = $entityInfo->value;
+        $min = $genome->min;
+        $max = $genome->max + ($genome->modifier ?? 0);
+
+        if ($currentValue > $max) {
+            $entityInfo->value = $max;
+            $entityInfo->save();
+        }
+
         $currentModifier = $genome->modifier ?? 0;
-        $genome->modifier = $currentModifier - $effect->value;
+        $newModifier = $currentModifier - $effect->value;
+
+        $minModifier = $min;
+        $maxModifier = $max;
+
+        if ($newModifier > $maxModifier) {
+            $newModifier = $maxModifier;
+        } elseif ($newModifier < $minModifier) {
+            $newModifier = $minModifier;
+        }
+
+        $genome->modifier = $newModifier;
         $genome->save();
     }
 }
