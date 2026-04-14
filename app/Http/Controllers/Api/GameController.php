@@ -1399,11 +1399,14 @@ class GameController extends Controller
 
         if ($expiredCount > 0) {
             Log::info('[checkPlayerModifier] Deleting ' . $expiredCount . ' expired modifiers for player ' . $playerId);
-            PlayerModifier::query()
+            $items = PlayerModifier::query()
                 ->where('player_id', $playerId)
                 ->whereNotNull('finished_at')
                 ->where('finished_at', '<', now())
-                ->delete();
+                ->get();
+            foreach ($items as $item) {
+                $item->delete();
+            }
         }
 
         Log::info('[checkPlayerModifier] player_id: ' . $playerId);

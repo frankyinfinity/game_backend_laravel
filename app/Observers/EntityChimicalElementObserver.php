@@ -68,8 +68,8 @@ class EntityChimicalElementObserver
                                 'genome_id' => $genomeId,
                             ];
                             if ($effect->type === PlayerRuleChimicalElementDetailEffect::TYPE_TIMED) {
-                                if ($detail->duration) {
-                                    $fields['finished_at'] = now()->addSeconds($detail->duration);
+                                if ($effect->duration !== null) {
+                                    $fields['finished_at'] = now()->addMinutes($effect->duration);
                                 }
                             }
 
@@ -83,18 +83,26 @@ class EntityChimicalElementObserver
             if (!empty($allFixedEffectIds)) {
                 $toDelete = array_diff($allFixedEffectIds, $activeFixedEffectIds);
                 if (!empty($toDelete)) {
-                    PlayerModifier::where('player_id', $playerId)
+                    $modifiersToDelete = PlayerModifier::query()
+                        ->where('player_id', $playerId)
                         ->whereIn('effect_id', $toDelete)
-                        ->delete();
+                        ->get();
+                    foreach ($modifiersToDelete as $modifier) {
+                        $modifier->delete();
+                    }
                 }
             }
 
             if (!empty($allTimedEffectIds)) {
                 $toDeleteTimed = array_diff($allTimedEffectIds, $activeTimedEffectIds);
                 if (!empty($toDeleteTimed)) {
-                    PlayerModifier::where('player_id', $playerId)
+                    $timedToDelete = PlayerModifier::query()
+                        ->where('player_id', $playerId)
                         ->whereIn('effect_id', $toDeleteTimed)
-                        ->delete();
+                        ->get();
+                    foreach ($timedToDelete as $modifier) {
+                        $modifier->delete();
+                    }
                 }
             }
         }

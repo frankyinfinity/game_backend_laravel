@@ -26,8 +26,8 @@ class PlayerModifierObserver
         }
 
         Log::info('[PlayerModifierObserver] genome found', [
-            'genome_id' => $genome->id, 
-            'min' => $genome->min, 
+            'genome_id' => $genome->id,
+            'min' => $genome->min,
             'max' => $genome->max,
             'modifier' => $genome->modifier
         ]);
@@ -40,43 +40,26 @@ class PlayerModifierObserver
 
         Log::info('[PlayerModifierObserver] entityInfo found', ['value' => $entityInfo->value]);
 
+        $currentModifier = $genome->modifier ?? 0;
+        $newModifier = $currentModifier + $effect->value;
+
         $currentValue = $entityInfo->value;
-        $min = $genome->min;
-        $max = $genome->max + ($genome->modifier ?? 0);
+        $max = $genome->max + $newModifier;
 
         if ($currentValue > $max) {
             $entityInfo->value = $max;
             $entityInfo->save();
         }
 
-        $currentModifier = $genome->modifier ?? 0;
-        $newModifier = $currentModifier + $effect->value;
-
-        $minModifier = $min;
-        $maxModifier = $max;
-
-        if ($newModifier > $maxModifier) {
-            $newModifier = $maxModifier;
-        } elseif ($newModifier < $minModifier) {
-            $newModifier = $minModifier;
-        }
-
-        Log::info('[PlayerModifierObserver] setting modifier', [
-            'current' => $currentModifier, 
-            'effect_value' => $effect->value,
-            'new' => $newModifier,
-            'min' => $minModifier,
-            'max' => $maxModifier
-        ]);
-
         $genome->modifier = $newModifier;
         $genome->save();
         Log::info('[PlayerModifierObserver] saved', ['modifier' => $genome->modifier]);
+
     }
 
-    public function deleted(PlayerModifier $playerModifier): void
+    public function deleting(PlayerModifier $playerModifier): void
     {
-        Log::info('[PlayerModifierObserver] deleted start', ['player_modifier_id' => $playerModifier->id]);
+        Log::info('[PlayerModifierObserver] deleting start', ['player_modifier_id' => $playerModifier->id]);
 
         $effect = $playerModifier->playerRuleChimicalElementDetailEffect;
         if (!$effect) {
@@ -91,8 +74,8 @@ class PlayerModifierObserver
         }
 
         Log::info('[PlayerModifierObserver] genome found on delete', [
-            'genome_id' => $genome->id, 
-            'min' => $genome->min, 
+            'genome_id' => $genome->id,
+            'min' => $genome->min,
             'max' => $genome->max,
             'modifier' => $genome->modifier
         ]);
@@ -102,34 +85,20 @@ class PlayerModifierObserver
             return;
         }
 
+        $currentModifier = $genome->modifier ?? 0;
+        $newModifier = $currentModifier - $effect->value;
+
         $currentValue = $entityInfo->value;
-        $min = $genome->min;
-        $max = $genome->max + ($genome->modifier ?? 0);
+        $max = $genome->max + $newModifier;
 
         if ($currentValue > $max) {
             $entityInfo->value = $max;
             $entityInfo->save();
         }
 
-        $currentModifier = $genome->modifier ?? 0;
-        $newModifier = $currentModifier - $effect->value;
-
-        $minModifier = $min;
-        $maxModifier = $max;
-
-        if ($newModifier > $maxModifier) {
-            $newModifier = $maxModifier;
-        } elseif ($newModifier < $minModifier) {
-            $newModifier = $minModifier;
-        }
-
-        Log::info('[PlayerModifierObserver] setting modifier on delete', [
-            'current' => $currentModifier, 
-            'effect_value' => $effect->value,
-            'new' => $newModifier
-        ]);
-
         $genome->modifier = $newModifier;
         $genome->save();
+        Log::info('[PlayerModifierObserver] saved', ['modifier' => $genome->modifier]);
+
     }
 }
