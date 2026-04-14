@@ -220,30 +220,30 @@ class ProgressBarDraw {
         $bar->addAttributes('progress_max', $this->max);
         $this->drawItems[] = $bar;
 
-        // 2b. Modifier Bar (inside the main bar)
-        if ($this->modifier !== null && $this->modifier !== 0) {
+        // 2b. Modifier Bar (inside the main bar - always drawn for updates)
+        if ($this->modifier !== null) {
             $modifierRange = abs($this->modifier);
             $baseRange = $useModifiedRange ? ($this->max + $this->modifier - $this->min) : ($this->max - $this->min);
             $percent = $baseRange > 0 ? $modifierRange / $baseRange : 0;
             $percent = max(0, min(1, $percent));
             
-            $modifierBarWidth = ($this->width - 4) * $percent;
+            $modifierBarWidth = max(2, ($this->width - 4) * $percent); // min width 2 for visibility
             $modifierBarHeight = $this->height - 6;
             $modifierBarX = $this->x + 2 + ($this->width - 4) - $modifierBarWidth;
             $modifierBarY = $this->y + 3;
             
             $modifierBorder = new Primitive\Rectangle($this->uid . '_modifier_bar');
-            $modifierBorder->setSize(max(0, $modifierBarWidth), $modifierBarHeight);
+            $modifierBorder->setSize(max(2, $modifierBarWidth), $modifierBarHeight);
             $modifierBorder->setOrigin($modifierBarX, $modifierBarY);
-            $modifierBorder->setColor($this->modifier >= 0 ? Colors::FOREST_GREEN : Colors::ORANGE);
+            $modifierBorder->setColor($this->modifier > 0 ? Colors::FOREST_GREEN : ($this->modifier < 0 ? Colors::ORANGE : Colors::DARK_GRAY));
             $modifierBorder->setThickness(2);
             $modifierBorder->setBorderRadius(2);
             $modifierBorder->setRenderable($this->renderable);
             $this->drawItems[] = $modifierBorder;
 
             $modifierText = new Text($this->uid . '_modifier_text');
-            $modifierText->setText($this->modifier >= 0 ? '+' : '-');
-            $modifierText->setOrigin($modifierBarX + (max(0, $modifierBarWidth) / 2), $modifierBarY + ($modifierBarHeight / 2));
+            $modifierText->setText($this->modifier > 0 ? '+' : ($this->modifier < 0 ? '-' : ''));
+            $modifierText->setOrigin($modifierBarX + (max(2, $modifierBarWidth) / 2), $modifierBarY + ($modifierBarHeight / 2));
             $modifierText->setFontSize(14);
             $modifierText->setColor(Colors::WHITE);
             $modifierText->setCenterAnchor(true);

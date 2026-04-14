@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Entity;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class EntityController extends Controller
 {
@@ -70,7 +71,7 @@ class EntityController extends Controller
             $gene = $genome->gene;
             // Prende l'ultimo valore registrato o l'unico disponibile
             $currentValue = $genome->entityInformations->last()->value ?? 0;
-            
+
             $genesData[] = [
                 'id' => $gene->id,
                 'key' => $gene->key,
@@ -78,7 +79,9 @@ class EntityController extends Controller
                 'value' => $currentValue,
                 'min' => $genome->min,
                 'max' => $genome->max,
+                'modifier' => $genome->modifier,
             ];
+            \Log::info('[EntityController] gene: ' . $gene->key . ' modifier: ' . $genome->modifier);
         }
 
         return response()->json([
@@ -116,7 +119,8 @@ class EntityController extends Controller
 
         foreach ($entity->chimicalElements as $entityChimical) {
             $ruleChimical = $entityChimical->playerRuleChimicalElement;
-            if (!$ruleChimical) continue;
+            if (!$ruleChimical)
+                continue;
 
             $chimicalData[] = [
                 'id' => $entityChimical->id,

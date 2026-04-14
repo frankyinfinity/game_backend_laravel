@@ -265,6 +265,7 @@ class EntityDraw
                 $progressBar->setMin($genome->min);
                 $progressBar->setMax($genome->max);
                 $progressBar->setValue($entityInformation->value);
+                $progressBar->setModifier($genome->modifier);
                 $progressBar->setBorderColor(Colors::LIGHT_GRAY);
                 $progressBar->setBarColor(Colors::RED);
                 $progressBar->setOrigin($panelX, $panelY);

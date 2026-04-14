@@ -220,17 +220,69 @@
                                     if (objects[barUid] && objects[borderUid]) {
                                         const min = (gene.min !== undefined) ? gene.min : 0;
                                         const max = (gene.max !== undefined) ? gene.max : 100;
-                                        const range = max - min;
-                                        const percent = range > 0 ? (gene.value - min) / range : 0;
+                                        const modifier = (gene.modifier !== undefined) ? gene.modifier : null;
+                                        
+                                        let useModifiedRange = modifier !== null && modifier > 0;
+                                        let displayMax = useModifiedRange ? max + modifier : max;
+                                        let range = displayMax - min;
+                                        
+                                        let valueToUse = gene.value;
+                                        if (!useModifiedRange && modifier !== null && modifier < 0) {
+                                            valueToUse = Math.min(gene.value, max);
+                                        }
+                                        
+                                        const percent = range > 0 ? (valueToUse - min) / range : 0;
                                         const clampedPercent = Math.max(0, Math.min(1, percent));
-                                        const fullWidth = objects[borderUid].width || 200;
+                                        const fullWidth = (objects[borderUid]?.width || 200);
                                         const newWidth = (fullWidth - 4) * clampedPercent;
                                         objects[barUid].width = Math.max(0, newWidth);
                                         if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(barUid);
+                                        
                                         const rangeUid = baseUid + '_range';
                                         if (objects[rangeUid]) {
-                                            objects[rangeUid].text = "(" + min + " / " + max + ")";
+                                            let rangeText = "[" + min + " / " + max;
+                                            if (modifier !== null && modifier !== 0) {
+                                                rangeText += " (" + (modifier >= 0 ? '+' : '') + modifier + ")";
+                                            }
+                                            rangeText += "]";
+                                            objects[rangeUid].text = rangeText;
                                             if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(rangeUid);
+                                        }
+                                        
+                                        const modifierBarUid = baseUid + '_modifier_bar';
+                                        const modifierTextUid = baseUid + '_modifier_text';
+                                        if (modifier !== null) {
+                                            const modifierRange = Math.abs(modifier);
+                                            const baseRange = useModifiedRange ? (max + modifier - min) : (max - min);
+                                            const modifierPercent = baseRange > 0 ? modifierRange / baseRange : 0;
+                                            const modifierBarWidth = (fullWidth - 4) * Math.min(1, modifierPercent);
+                                            const borderX = objects[borderUid]?.x || 0;
+                                            
+                                            let modifierColor;
+                                            if (modifier > 0) modifierColor = 0x228B22;
+                                            else if (modifier < 0) modifierColor = 0xFFA500;
+                                            else modifierColor = 0x404040;
+                                            
+                                            if (objects[modifierBarUid]) {
+                                                objects[modifierBarUid].x = borderX + 2 + (fullWidth - 4) - modifierBarWidth;
+                                                objects[modifierBarUid].width = Math.max(0, modifierBarWidth);
+                                                if (objects[modifierBarUid].style) {
+                                                    objects[modifierBarUid].style.fill = modifierColor;
+                                                } else {
+                                                    objects[modifierBarUid].color = modifierColor;
+                                                }
+                                                if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(modifierBarUid);
+                                            }
+                                            if (objects[modifierTextUid]) {
+                                                objects[modifierTextUid].text = modifier > 0 ? '+' : (modifier < 0 ? '-' : '');
+                                                objects[modifierTextUid].x = borderX + 2 + (fullWidth - 4) - (modifierBarWidth / 2);
+                                                if (objects[modifierTextUid].style) {
+                                                    objects[modifierTextUid].style.fill = 0xFFFFFF;
+                                                } else {
+                                                    objects[modifierTextUid].color = 0xFFFFFF;
+                                                }
+                                                if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(modifierTextUid);
+                                            }
                                         }
                                     }
                                 });
