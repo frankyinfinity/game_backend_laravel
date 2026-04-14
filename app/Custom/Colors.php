@@ -27,6 +27,8 @@ class Colors
     const TEAL = 0x008080;
     const MAROON = 0x800000;
     const OLIVE = 0x808000;
+    const FOREST_GREEN = 0x228B22;
+    const DARK_GREEN = 0x006400;
     const LIME = 0x00FF00;
     const AQUA = 0x00FFFF;
     const SILVER = 0xC0C0C0;

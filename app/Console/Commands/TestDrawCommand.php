@@ -66,6 +66,7 @@ class TestDrawCommand extends Command
             $progressBar->setMin($genome->min);
             $progressBar->setMax($genome->max);
             $progressBar->setValue($entityInformation ? $entityInformation->value : 0);
+            $progressBar->setModifier($genome->modifier);
             $progressBar->setBorderColor(\App\Custom\Colors::LIGHT_GRAY);
             $progressBar->setBarColor(\App\Custom\Colors::RED);
             $progressBar->setSize(380, 20);

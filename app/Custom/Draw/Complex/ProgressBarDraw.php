@@ -14,6 +14,7 @@ class ProgressBarDraw {
     private $min = 0;
     private $max = 100;
     private $value = 0;
+    private $modifier = null;
     private $borderColor = Colors::BLACK;
     private $barColor = Colors::GREEN;
     private $name = '';
@@ -40,6 +41,10 @@ class ProgressBarDraw {
 
     public function setValue($value): void {
         $this->value = $value;
+    }
+
+    public function setModifier($modifier): void {
+        $this->modifier = $modifier;
     }
 
     public function updateValue($newValue, $sessionId): array {
@@ -183,11 +188,25 @@ class ProgressBarDraw {
 
         // 2. The Progress Bar (Filled part)
         // Calculate width based on value, min, max
-        $range = $this->max - $this->min;
-        $percent = $range > 0 ? ($this->value - $this->min) / $range : 0;
-        $percent = max(0, min(1, $percent)); // Clamp between 0 and 1
+        $useModifiedRange = ($this->modifier !== null && $this->modifier > 0);
+        
+        if ($useModifiedRange) {
+            $modifiedMax = $this->max + $this->modifier;
+            $range = $modifiedMax - $this->min;
+            $percent = $range > 0 ? ($this->value - $this->min) / $range : 0;
+            $percent = max(0, min(1, $percent));
+        } else {
+            $range = $this->max - $this->min;
+            if ($this->modifier !== null && $this->modifier < 0) {
+                $valueToUse = min($this->value, $this->max);
+            } else {
+                $valueToUse = $this->value;
+            }
+            $percent = $range > 0 ? ($valueToUse - $this->min) / $range : 0;
+            $percent = max(0, min(1, $percent));
+        }
 
-        $barWidth = ($this->width - 4) * $percent; // Subtracting a bit for padding inside the border
+        $barWidth = ($this->width - 4) * $percent;
         $barHeight = $this->height - 4;
 
         $bar = new Primitive\Rectangle($this->uid . '_bar');
@@ -200,6 +219,37 @@ class ProgressBarDraw {
         $bar->addAttributes('progress_min', $this->min);
         $bar->addAttributes('progress_max', $this->max);
         $this->drawItems[] = $bar;
+
+        // 2b. Modifier Bar (inside the main bar)
+        if ($this->modifier !== null && $this->modifier !== 0) {
+            $modifierRange = abs($this->modifier);
+            $baseRange = $useModifiedRange ? ($this->max + $this->modifier - $this->min) : ($this->max - $this->min);
+            $percent = $baseRange > 0 ? $modifierRange / $baseRange : 0;
+            $percent = max(0, min(1, $percent));
+            
+            $modifierBarWidth = ($this->width - 4) * $percent;
+            $modifierBarHeight = $this->height - 6;
+            $modifierBarX = $this->x + 2 + ($this->width - 4) - $modifierBarWidth;
+            $modifierBarY = $this->y + 3;
+            
+            $modifierBorder = new Primitive\Rectangle($this->uid . '_modifier_bar');
+            $modifierBorder->setSize(max(0, $modifierBarWidth), $modifierBarHeight);
+            $modifierBorder->setOrigin($modifierBarX, $modifierBarY);
+            $modifierBorder->setColor($this->modifier >= 0 ? Colors::FOREST_GREEN : Colors::ORANGE);
+            $modifierBorder->setThickness(2);
+            $modifierBorder->setBorderRadius(2);
+            $modifierBorder->setRenderable($this->renderable);
+            $this->drawItems[] = $modifierBorder;
+
+            $modifierText = new Text($this->uid . '_modifier_text');
+            $modifierText->setText($this->modifier >= 0 ? '+' : '-');
+            $modifierText->setOrigin($modifierBarX + (max(0, $modifierBarWidth) / 2), $modifierBarY + ($modifierBarHeight / 2));
+            $modifierText->setFontSize(14);
+            $modifierText->setColor(Colors::WHITE);
+            $modifierText->setCenterAnchor(true);
+            $modifierText->setRenderable($this->renderable);
+            $this->drawItems[] = $modifierText;
+        }
 
         // 3. The Name (Label)
         if (!empty($this->name)) {
@@ -214,8 +264,14 @@ class ProgressBarDraw {
         }
 
         // 4. Min / Max (Centered below the bar)
+        $rangeTextStr = "[" . $this->min . " / " . $this->max;
+        if ($this->modifier !== null && $this->modifier !== 0) {
+            $rangeTextStr .= " (" . ($this->modifier >= 0 ? '+' : '') . $this->modifier . ")";
+        }
+        $rangeTextStr .= "]";
+        
         $rangeText = new Text($this->uid . '_range');
-        $rangeText->setText("(" . $this->min . " / " . $this->max . ")");
+        $rangeText->setText($rangeTextStr);
         $rangeText->setOrigin($this->x + ($this->width / 2), $this->y + $this->height + 12);
         $rangeText->setFontSize(14);
         $rangeText->setColor(Colors::BLACK);
