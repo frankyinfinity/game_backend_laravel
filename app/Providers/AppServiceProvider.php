@@ -21,6 +21,8 @@ use App\Models\Entity;
 use App\Observers\EntityObserver;
 use App\Models\EntityChimicalElement;
 use App\Observers\EntityChimicalElementObserver;
+use App\Models\PlayerModifier;
+use App\Observers\PlayerModifierObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
         RuleChimicalElement::observe(RuleChimicalElementObserver::class);
         Entity::observe(EntityObserver::class);
         EntityChimicalElement::observe(EntityChimicalElementObserver::class);
+        PlayerModifier::observe(PlayerModifierObserver::class);
 
     }
 }

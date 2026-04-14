@@ -81,7 +81,6 @@ class EntityController extends Controller
                 'max' => $genome->max,
                 'modifier' => $genome->modifier,
             ];
-            \Log::info('[EntityController] gene: ' . $gene->key . ' modifier: ' . $genome->modifier);
         }
 
         return response()->json([
