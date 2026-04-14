@@ -47,6 +47,7 @@ use App\Models\AgePlayer;
 use App\Models\PlayerValue;
 use App\Models\EntityChimicalElement;
 use App\Models\PlayerRuleChimicalElement;
+use App\Models\PlayerModifier;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -828,7 +829,7 @@ class GameController extends Controller
     public function consumeChimicalElement(Request $request): \Illuminate\Http\JsonResponse
     {
         $birthRegionId = (int) $request->input('birth_region_id');
-        
+
         ConsumeChimicalElementJob::dispatch($birthRegionId);
 
         return response()->json([
@@ -1390,11 +1391,27 @@ class GameController extends Controller
             return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
         }
 
+        $expiredCount = PlayerModifier::query()
+            ->where('player_id', $playerId)
+            ->whereNotNull('finished_at')
+            ->where('finished_at', '<', now())
+            ->count();
+
+        if ($expiredCount > 0) {
+            Log::info('[checkPlayerModifier] Deleting ' . $expiredCount . ' expired modifiers for player ' . $playerId);
+            PlayerModifier::query()
+                ->where('player_id', $playerId)
+                ->whereNotNull('finished_at')
+                ->where('finished_at', '<', now())
+                ->delete();
+        }
+
         Log::info('[checkPlayerModifier] player_id: ' . $playerId);
 
         return response()->json([
             'success' => true,
             'player_id' => $playerId,
+            'expired_deleted' => $expiredCount,
         ]);
     }
 
