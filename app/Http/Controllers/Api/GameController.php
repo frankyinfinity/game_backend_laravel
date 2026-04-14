@@ -1558,7 +1558,9 @@ class GameController extends Controller
                     $newValue = $oldValue + $effect->effect;
 
                     // Clamp value
-                    $newValue = max($genome->min, min($genome->max, $newValue));
+                    $min = $genome->min;
+                    $max = $genome->max + ($genome->modifier ?? 0);
+                    $newValue = max($min, min($max, $newValue));
 
                     if ($newValue !== $oldValue) {
                         $entityInfo->update(['value' => $newValue]);
@@ -2220,7 +2222,7 @@ class GameController extends Controller
                 if ($sourceGenome->gene && $sourceGenome->gene->key === Gene::KEY_LIFEPOINT) {
                     $newValue = $generatedEntityLifepoint;
                 }
-                $newValue = max((int) $sourceGenome->min, min((int) $sourceGenome->max, $newValue));
+                $newValue = max((int) $sourceGenome->min, min((int) ($sourceGenome->max + ($sourceGenome->modifier ?? 0)), $newValue));
 
                 EntityInformation::query()->create([
                     'genome_id' => $newGenome->id,
