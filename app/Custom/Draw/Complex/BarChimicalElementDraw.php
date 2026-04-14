@@ -11,7 +11,7 @@ use App\Custom\Colors;
 class BarChimicalElementDraw
 {
     private const BAR_WIDTH = 300;
-    private const BAR_HEIGHT = 28;
+    private const BAR_HEIGHT = 20;
 
     private EntityChimicalElement $entityChimicalElement;
     private float $x = 0;
