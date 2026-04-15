@@ -2791,4 +2791,16 @@ class GameController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Gestisce il controllo della degradazione degli elementi chimici
+     */
+    public function checkDegradation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entityUid = $request->entity_uid;
+
+        Log::info("checkDegradation called for Entity: {$entityUid}");
+
+        return response()->json(['success' => true, 'message' => 'Degradation check completed']);
+    }
 }

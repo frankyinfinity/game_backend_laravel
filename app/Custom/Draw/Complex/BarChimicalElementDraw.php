@@ -73,6 +73,22 @@ class BarChimicalElementDraw
         $titleText->setRenderable($this->renderable);
         $this->drawItems[] = $titleText;
 
+        if ($playerRuleChimicalElement->degradable) {
+            $degradationText = new Text($uid . '_degradation_icon');
+            $degradationText->setText('⚠');
+            $degradationText->setOrigin($this->x + strlen($title) * 9 + 5, $this->y - 18);
+            $degradationText->setFontSize(14);
+            $degradationText->setColor(Colors::ORANGE);
+            $degradationText->setRenderable($this->renderable);
+            
+            $quantity = $playerRuleChimicalElement->quantity_tick_degradation ?? 0;
+            $percentage = $playerRuleChimicalElement->percentage_degradation ?? 0;
+            $tooltipText = "⚠ Degradabile\n----------------\nQtà per tick: {$quantity}\nProbabilità: {$percentage}%";
+            $degradationText->addAttributes('tooltip_text', $tooltipText);
+            
+            $this->drawItems[] = $degradationText;
+        }
+
         $glassBorder = new Rectangle($uid . '_glass_border');
         $glassBorder->setOrigin($this->x - 1, $this->y - 1);
         $glassBorder->setSize(self::BAR_WIDTH + 2, self::BAR_HEIGHT + 2);

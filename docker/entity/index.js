@@ -100,6 +100,7 @@ function performLogin() {
         scheduleNextCycle();
         scheduleGenesFetch();
         scheduleChimicalElementsFetch();
+        scheduleDegradationCheck();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         // Try reading body for error
@@ -277,6 +278,61 @@ function scheduleChimicalElementsFetch() {
     fetchCurrentChimicalElements();
     scheduleChimicalElementsFetch();
   }, 2000);
+}
+
+// Timer per la degradazione (10 secondi)
+let degradationTimer = null;
+function scheduleDegradationCheck() {
+  if (degradationTimer) clearTimeout(degradationTimer);
+  degradationTimer = setTimeout(() => {
+    checkDegradation();
+    scheduleDegradationCheck();
+  }, 10000);
+}
+
+function checkDegradation() {
+  if (!sessionCookie) return;
+
+  const path = '/api/auth/game/entity/check_degradation';
+  const postData = JSON.stringify({ entity_uid: entityUid });
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: path,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+      'Accept': 'application/json',
+      'Cookie': sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          console.log('[Entity ' + entityUid + '] Degradation check completed');
+        } else {
+          console.error('[Entity ' + entityUid + '] Degradation check failed: ' + (response.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('[Entity ' + entityUid + '] Error parsing degradation response: ' + error.message);
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error('[Entity ' + entityUid + '] Error calling degradation API: ' + error.message);
+  });
+
+  req.write(postData);
+  req.end();
 }
 
 // Funzione per programmare il prossimo ciclo (solo position)
