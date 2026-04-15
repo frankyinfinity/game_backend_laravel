@@ -48,12 +48,15 @@ class RuleChimicalElementController extends Controller
             return back()->withErrors('Seleziona almeno un elemento chimico o elemento chimico complesso');
         }
 
-        $rule = RuleChimicalElement::create([
+$rule = RuleChimicalElement::create([
             'chimical_element_id' => $chimicalElementId,
             'complex_chimical_element_id' => $complexChimicalElementId,
             'min' => $request->input('min'),
             'max' => $request->input('max'),
             'default_value' => $request->input('default_value'),
+            'quantity_tick_degradation' => $request->input('quantity_tick_degradation'),
+            'percentage_degradation' => $request->input('percentage_degradation'),
+            'degradable' => $request->boolean('degradable'),
         ]);
 
         return redirect()->route('rule-chimical-elements.index');
@@ -77,7 +80,20 @@ class RuleChimicalElementController extends Controller
     {
         $ruleChimicalElement->load('details');
         
-        if ($ruleChimicalElement->details->isNotEmpty()) {
+        $basicFields = ['chimical_element_id', 'complex_chimical_element_id', 'min', 'max', 'default_value'];
+        $hasBasicChanges = false;
+        
+        foreach ($basicFields as $field) {
+            $oldValue = $ruleChimicalElement->{$field};
+            $newValue = $request->input($field);
+            
+            if ((string) $oldValue !== (string) $newValue) {
+                $hasBasicChanges = true;
+                break;
+            }
+        }
+        
+        if ($ruleChimicalElement->details->isNotEmpty() && $hasBasicChanges) {
             return back()->withErrors('Non è possibile modificare la regola quando sono presenti dei dettagli. Elimina prima i dettagli.');
         }
 
@@ -102,6 +118,9 @@ class RuleChimicalElementController extends Controller
                 'min' => $request->input('min'),
                 'max' => $request->input('max'),
                 'default_value' => $request->input('default_value'),
+                'quantity_tick_degradation' => $request->input('quantity_tick_degradation'),
+                'percentage_degradation' => $request->input('percentage_degradation'),
+                'degradable' => $request->boolean('degradable'),
             ]);
         } else {
             $complexChimicalElementId = $request->input('complex_chimical_element_id');
@@ -117,6 +136,9 @@ class RuleChimicalElementController extends Controller
                 'min' => $request->input('min'),
                 'max' => $request->input('max'),
                 'default_value' => $request->input('default_value'),
+                'quantity_tick_degradation' => $request->input('quantity_tick_degradation'),
+                'percentage_degradation' => $request->input('percentage_degradation'),
+                'degradable' => $request->boolean('degradable'),
             ]);
         }
 
@@ -156,6 +178,7 @@ class RuleChimicalElementController extends Controller
                     'min' => $rule->min,
                     'max' => $rule->max,
                     'default_value' => $rule->default_value,
+                    'degradable' => $rule->degradable,
                 ];
             }),
         ]);

@@ -196,7 +196,10 @@ class PlayerObserver
                 'min' => $rule->min,
                 'max' => $rule->max,
                 'title' => $rule->title,
-                'default_value' => $rule->default_value
+                'default_value' => $rule->default_value,
+                'quantity_tick_degradation' => $rule->quantity_tick_degradation,
+                'percentage_degradation' => $rule->percentage_degradation,
+                'degradable' => $rule->degradable,
             ]);
 
             foreach ($rule->details as $detail) {

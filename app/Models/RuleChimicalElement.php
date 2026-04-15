@@ -15,6 +15,9 @@ class RuleChimicalElement extends Model
         'min',
         'max',
         'default_value',
+        'quantity_tick_degradation',
+        'percentage_degradation',
+        'degradable',
     ];
 
     protected $casts = [
@@ -22,6 +25,9 @@ class RuleChimicalElement extends Model
         'complex_chimical_element_id' => 'integer',
         'min' => 'integer',
         'max' => 'integer',
+        'quantity_tick_degradation' => 'integer',
+        'percentage_degradation' => 'float',
+        'degradable' => 'boolean',
     ];
 
     public function chimicalElement()

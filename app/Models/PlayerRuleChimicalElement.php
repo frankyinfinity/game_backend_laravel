@@ -20,6 +20,9 @@ class PlayerRuleChimicalElement extends Model
         'max',
         'title',
         'default_value',
+        'quantity_tick_degradation',
+        'percentage_degradation',
+        'degradable',
     ];
 
     protected $casts = [
@@ -27,6 +30,9 @@ class PlayerRuleChimicalElement extends Model
         'complex_chimical_element_id' => 'integer',
         'min' => 'integer',
         'max' => 'integer',
+        'quantity_tick_degradation' => 'integer',
+        'percentage_degradation' => 'float',
+        'degradable' => 'boolean',
     ];
 
     public function player(): BelongsTo
