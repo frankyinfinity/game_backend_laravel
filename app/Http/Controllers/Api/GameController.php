@@ -1797,6 +1797,9 @@ class GameController extends Controller
         }
 
         // === APPLY DAMAGE TO ELEMENT ===
+
+        $updateItems = [];
+
         // Get entity attack from gene
         $attackGenome = Genome::query()
             ->where('entity_id', $entity->id)
@@ -1830,7 +1833,13 @@ class GameController extends Controller
         $elementDied = false;
         if ($elementLifeInfo && $damage > 0) {
             $newHealth = $elementLifeInfo->value - $damage;
-            $elementLifeInfo->update(['value' => $newHealth]);
+
+            $updateItems[] = [
+                'id' => $elementLifeInfo->id,
+                'attributes' => [
+                    'value' => $newHealth,
+                ]
+            ];
 
             Log::info("Element {$elementUid} health: {$elementLifeInfo->value} -> {$newHealth}");
 
@@ -1918,6 +1927,14 @@ class GameController extends Controller
             }
         } else {
             Log::info("Damage NOT applied - elementLifeInfo: " . ($elementLifeInfo ? 'yes' : 'no') . ", damage: {$damage}");
+        }
+
+        // === UPDATE ELEMENT INFORMATION VIA API ===
+        if (!empty($updateItems)) {
+            $updateElementCode = $this->buildUpdateElementCode($updateItems);
+            if (!empty($updateElementCode)) {
+                $drawCommands[] = (new ObjectCode($updateElementCode, 100))->get();
+            }
         }
 
         // === CLEAR ELEMENT FROM UI AND DB BEFORE SECOND PATH ===
@@ -2386,9 +2403,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        return response()->json($result['body'], $result['status']);
-        //return response()->json(['success' => true]);
+        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        //return response()->json($result['body'], $result['status']);
+        return response()->json(['success' => true]);
 
     }
 
@@ -2948,5 +2965,53 @@ class GameController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function updateElementInformation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $updateItemsJson = $request->input('update_items');
+        if (empty($updateItemsJson)) {
+            return response()->json(['success' => false, 'message' => 'update_items is required']);
+        }
+
+        $updateItems = json_decode($updateItemsJson, true);
+        if (!is_array($updateItems)) {
+            return response()->json(['success' => false, 'message' => 'Invalid update_items format']);
+        }
+
+        foreach ($updateItems as $item) {
+            $id = $item['id'] ?? null;
+            $attributes = $item['attributes'] ?? [];
+
+            if ($id === null || empty($attributes)) {
+                continue;
+            }
+
+            $elementInfo = ElementHasPositionInformation::find($id);
+            if ($elementInfo) {
+                $elementInfo->update($attributes);
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    private function buildUpdateElementCode(array $updateItems): string
+    {
+        if (empty($updateItems)) {
+            return '';
+        }
+
+        $updateItemsJson = json_encode($updateItems);
+        $jsPath = resource_path('js/function/element/update_info.blade.php');
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__UPDATE_ITEMS__', $updateItemsJson, $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return '';
     }
 }
