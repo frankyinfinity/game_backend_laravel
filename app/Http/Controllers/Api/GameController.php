@@ -1573,37 +1573,9 @@ class GameController extends Controller
         $elementId = $elementPosition->element_id;
         $elementPosition->delete();
 
-        // --- APPLY GENE EFFECTS ---
-        $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
-        foreach ($elementEffects as $effect) {
-            $gene = Gene::find($effect->gene_id);
-            if (!$gene)
-                continue;
-
-            // Find genome of the entity for this gene
-            $genome = Genome::query()
-                ->where('entity_id', $entity->id)
-                ->where('gene_id', $gene->id)
-                ->first();
-
-            if ($genome) {
-                $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
-                if ($entityInfo) {
-                    $oldValue = $entityInfo->value;
-                    $newValue = $oldValue + $effect->effect;
-
-                    // Clamp value
-                    $min = $genome->min;
-                    $max = $genome->max + ($genome->modifier ?? 0);
-                    $newValue = max($min, min($max, $newValue));
-
-                    if ($newValue !== $oldValue) {
-                        $entityInfo->update(['value' => $newValue]);
-                    }
-                }
-            }
-        }
-        // --------------------------
+        // --- APPLY GENE EFFECTS (via JS) ---
+        $drawCommands[] = (new ObjectCode($this->buildApplyGeneEffectsCode($entityUid, $elementUid, $elementId), 100))->get();
+        // -------------------------------------
 
         foreach ($updateCommands as $update)
             $drawCommands[] = $update;
@@ -2570,6 +2542,22 @@ class GameController extends Controller
         return '';
     }
 
+    private function buildApplyGeneEffectsCode(string $entityUid, string $elementUid, int $elementId): string
+    {
+        $jsPath = resource_path('js/function/entity/apply_gene_effects.blade.php');
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__ENTITY_UID__', $entityUid, $jsContent);
+                $jsContent = str_replace('__ELEMENT_UID__', $elementUid, $jsContent);
+                $jsContent = str_replace('__ELEMENT_ID__', (string) $elementId, $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return '';
+    }
+
     private function buildRefreshRemoteWebSocketsCode(int $playerId): string
     {
         $safePlayerId = max(0, $playerId);
@@ -2786,7 +2774,7 @@ class GameController extends Controller
 
         foreach ($entityChimicalElements as $entityChimicalElement) {
             $playerRule = $entityChimicalElement->playerRuleChimicalElement;
-            
+
             if (!$playerRule || !$playerRule->degradable) {
                 continue;
             }
@@ -2800,15 +2788,165 @@ class GameController extends Controller
                     $min = (int) $playerRule->min;
                     $max = (int) $playerRule->max;
                     $newValue = max($min, min($max, $currentValue - $quantity));
-                    
+
                     $entityChimicalElement->value = $newValue;
                     $entityChimicalElement->save();
-                    
+
                     Log::info("Degradation applied for entity_chimical_element_id: {$entityChimicalElement->id}, old: {$currentValue}, new: {$newValue}");
                 }
             }
         }
 
         return response()->json(['success' => true, 'message' => 'Degradation check completed']);
+    }
+
+    /**
+     * Aggiorna i geni e/o elementi chimici dell'entità
+     */
+    public function updateGenes(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entityUid = $request->entity_uid;
+        $elementId = $request->element_id;
+        $chimicalElementId = $request->chimical_element_id;
+        $actionType = $request->action_type;
+
+        $entity = Entity::query()->where('uid', $entityUid)->first();
+        if (!$entity) {
+            return response()->json(['success' => false, 'message' => 'Entity not found']);
+        }
+
+        if ($elementId) {
+            $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
+            foreach ($elementEffects as $effect) {
+                $gene = Gene::find($effect->gene_id);
+                if (!$gene)
+                    continue;
+
+                $genome = Genome::query()
+                    ->where('entity_id', $entity->id)
+                    ->where('gene_id', $gene->id)
+                    ->first();
+
+                if ($genome) {
+                    $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+                    if ($entityInfo) {
+                        $oldValue = $entityInfo->value;
+                        $newValue = $oldValue + $effect->effect;
+                        $min = $genome->min;
+                        $max = $genome->max + ($genome->modifier ?? 0);
+                        $newValue = max($min, min($max, $newValue));
+
+                        if ($newValue !== $oldValue) {
+                            $entityInfo->update(['value' => $newValue]);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($actionType === 'degradation' && $chimicalElementId) {
+            $entityChimicalElement = EntityChimicalElement::query()
+                ->where('entity_id', $entity->id)
+                ->where('id', $chimicalElementId)
+                ->with('playerRuleChimicalElement')
+                ->first();
+
+            if ($entityChimicalElement && $entityChimicalElement->playerRuleChimicalElement) {
+                $playerRule = $entityChimicalElement->playerRuleChimicalElement;
+                $percentage = $playerRule->percentage_degradation ?? 0;
+                $quantity = $playerRule->quantity_tick_degradation ?? 0;
+
+                if ($quantity > 0 && $percentage > 0 && Helper::chance($percentage)) {
+                    $currentValue = (int) $entityChimicalElement->value;
+                    $min = (int) $playerRule->min;
+                    $max = (int) $playerRule->max;
+                    $newValue = max($min, min($max, $currentValue - $quantity));
+                    $entityChimicalElement->value = $newValue;
+                    $entityChimicalElement->save();
+                }
+            }
+        }
+
+        $genomes = Genome::query()
+            ->where('entity_id', $entity->id)
+            ->with('gene')
+            ->get();
+
+        $genesData = [];
+        foreach ($genomes as $genome) {
+            $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+            $genesData[] = [
+                'key' => $genome->gene->key ?? '',
+                'name' => $genome->gene->name ?? '',
+                'value' => $entityInfo ? $entityInfo->value : $genome->min,
+                'min' => $genome->min,
+                'max' => $genome->max + ($genome->modifier ?? 0),
+            ];
+        }
+
+        $chimicalElementsData = [];
+        if ($actionType === 'degradation') {
+            $entityChimicalElements = EntityChimicalElement::query()
+                ->where('entity_id', $entity->id)
+                ->with('playerRuleChimicalElement')
+                ->get();
+
+            foreach ($entityChimicalElements as $ece) {
+                $prce = $ece->playerRuleChimicalElement;
+                $chimicalElementsData[] = [
+                    'id' => $ece->id,
+                    'value' => (int) $ece->value,
+                    'title' => $prce->title ?? '',
+                    'degradable' => $prce->degradable ?? false,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'genes' => $genesData,
+            'chimical_elements' => $actionType === 'degradation' ? $chimicalElementsData : null
+        ]);
+    }
+
+    public function applyGeneEffects(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entityUid = $request->entity_uid;
+        $elementId = $request->element_id;
+
+        $entity = Entity::query()->where('uid', $entityUid)->first();
+        if (!$entity) {
+            return response()->json(['success' => false, 'message' => 'Entity not found']);
+        }
+
+        $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
+        foreach ($elementEffects as $effect) {
+            $gene = Gene::find($effect->gene_id);
+            if (!$gene)
+                continue;
+
+            $genome = Genome::query()
+                ->where('entity_id', $entity->id)
+                ->where('gene_id', $gene->id)
+                ->first();
+
+            if ($genome) {
+                $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+                if ($entityInfo) {
+                    $oldValue = $entityInfo->value;
+                    $newValue = $oldValue + $effect->effect;
+
+                    $min = $genome->min;
+                    $max = $genome->max + ($genome->modifier ?? 0);
+                    $newValue = max($min, min($max, $newValue));
+
+                    if ($newValue !== $oldValue) {
+                        $entityInfo->update(['value' => $newValue]);
+                    }
+                }
+            }
+        }
+
+        return response()->json(['success' => true]);
     }
 }
