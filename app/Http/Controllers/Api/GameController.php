@@ -1599,33 +1599,6 @@ class GameController extends Controller
 
                     if ($newValue !== $oldValue) {
                         $entityInfo->update(['value' => $newValue]);
-
-                        // Update Progress Bar in UI if it's dynamic
-                        if ($gene->type === Gene::DYNAMIC_MAX) {
-                            $pbUid = $entityUid . '_progress_bar_' . $gene->key;
-                            try {
-                                $pbDraw = new ProgressBarDraw($pbUid);
-                                $pbOps = $pbDraw->updateValue($newValue, $player->actual_session_id);
-                                foreach ($pbOps as $op) {
-                                    if ($op['type'] === 'update') {
-                                        $updateObj = new ObjectUpdate($op['uid'], $player->actual_session_id);
-                                        foreach ($op['attributes'] as $attr => $val) {
-                                            $updateObj->setAttributes($attr, $val);
-                                        }
-                                        foreach ($updateObj->get() as $data)
-                                            $drawCommands[] = $data;
-                                    } elseif ($op['type'] === 'draw') {
-                                        $drawCommands[] = $this->drawMapGroupObject($op['object'], $player->actual_session_id);
-                                    } elseif ($op['type'] === 'clear') {
-                                        $clearObj = new ObjectClear($op['uid'], $player->actual_session_id);
-                                        $drawCommands[] = $clearObj->get();
-                                        ObjectCache::forget($player->actual_session_id, $op['uid']);
-                                    }
-                                }
-                            } catch (\Exception $e) {
-                                Log::warning("Could not update progress bar {$pbUid}: " . $e->getMessage());
-                            }
-                        }
                     }
                 }
             }
