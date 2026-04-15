@@ -2801,6 +2801,41 @@ class GameController extends Controller
 
         Log::info("checkDegradation called for Entity: {$entityUid}");
 
+        $entity = Entity::query()->where('uid', $entityUid)->first();
+        if (!$entity) {
+            return response()->json(['success' => false, 'message' => 'Entity not found']);
+        }
+
+        $entityChimicalElements = EntityChimicalElement::query()
+            ->where('entity_id', $entity->id)
+            ->with('playerRuleChimicalElement')
+            ->get();
+
+        foreach ($entityChimicalElements as $entityChimicalElement) {
+            $playerRule = $entityChimicalElement->playerRuleChimicalElement;
+            
+            if (!$playerRule || !$playerRule->degradable) {
+                continue;
+            }
+
+            $percentage = $playerRule->percentage_degradation ?? 0;
+            $quantity = $playerRule->quantity_tick_degradation ?? 0;
+
+            if ($quantity > 0 && $percentage > 0) {
+                if (Helper::chance($percentage)) {
+                    $currentValue = (int) $entityChimicalElement->value;
+                    $min = (int) $playerRule->min;
+                    $max = (int) $playerRule->max;
+                    $newValue = max($min, min($max, $currentValue - $quantity));
+                    
+                    $entityChimicalElement->value = $newValue;
+                    $entityChimicalElement->save();
+                    
+                    Log::info("Degradation applied for entity_chimical_element_id: {$entityChimicalElement->id}, old: {$currentValue}, new: {$newValue}");
+                }
+            }
+        }
+
         return response()->json(['success' => true, 'message' => 'Degradation check completed']);
     }
 }
