@@ -2422,9 +2422,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 
@@ -3080,5 +3080,43 @@ class GameController extends Controller
         }
 
         return '';
+    }
+
+    public function updateInformation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $updateItemsJson = $request->input('update_items');
+
+        if (empty($updateItemsJson)) {
+            return response()->json(['success' => false, 'message' => 'update_items is required']);
+        }
+
+        $updateItems = json_decode($updateItemsJson, true);
+        if (!is_array($updateItems)) {
+            return response()->json(['success' => false, 'message' => 'Invalid update_items format']);
+        }
+
+        foreach ($updateItems as $item) {
+            $id = $item['id'] ?? null;
+            $type = $item['type'] ?? 'entity';
+            $attributes = $item['attributes'] ?? [];
+
+            if ($id === null || empty($attributes)) {
+                continue;
+            }
+
+            if ($type === 'element') {
+                $elementInfo = ElementHasPositionInformation::find($id);
+                if ($elementInfo) {
+                    $elementInfo->update($attributes);
+                }
+            } else {
+                $entityInfo = EntityInformation::find($id);
+                if ($entityInfo) {
+                    $entityInfo->update($attributes);
+                }
+            }
+        }
+
+        return response()->json(['success' => true]);
     }
 }

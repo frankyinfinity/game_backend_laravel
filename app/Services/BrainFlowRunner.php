@@ -1064,11 +1064,16 @@ class BrainFlowRunner
                 return false;
             }
 
-            $targetLifeInfo->update(['value' => ((int) $targetLifeInfo->value) - $damage]);
-            $newLife = (int) $targetLifeInfo->value;
+            $newLife = ((int) $targetLifeInfo->value) - $damage;
             $targetType = 'entity';
             $targetUid = (string) $targetEntity->uid;
             $targetEntityId = (int) $targetEntity->id;
+
+            $updateItems = [['id' => $targetLifeInfo->id, 'type' => 'entity', 'attributes' => ['value' => $newLife]]];
+            $updateCode = $this->buildUpdateInfoCode($updateItems);
+            if ($updateCode !== '') {
+                $drawCommands[] = (new ObjectCode($updateCode, 500))->get();
+            }
         } else {
             $targetElementPosition = ElementHasPosition::query()
                 ->where('tile_i', (int) $targetTile['i'])
@@ -1089,10 +1094,15 @@ class BrainFlowRunner
                 return false;
             }
 
-            $targetLifeInfo->update(['value' => ((int) $targetLifeInfo->value) - $damage]);
-            $newLife = (int) $targetLifeInfo->value;
+            $newLife = ((int) $targetLifeInfo->value) - $damage;
             $targetType = 'element';
             $targetUid = (string) $targetElementPosition->uid;
+
+            $updateItems = [['id' => $targetLifeInfo->id, 'type' => 'element', 'attributes' => ['value' => $newLife]]];
+            $updateCode = $this->buildUpdateInfoCode($updateItems);
+            if ($updateCode !== '') {
+                $drawCommands[] = (new ObjectCode($updateCode, 500))->get();
+            }
         }
 
 
@@ -1514,6 +1524,31 @@ class BrainFlowRunner
 
         $drawObject = new ObjectDraw($objectArray, $sessionId);
         return $drawObject->get();
+    }
+
+    private function buildUpdateInfoCode(array $updateItems): string
+    {
+        if (empty($updateItems)) {
+            return '';
+        }
+
+        $updateItemsJson = json_encode($updateItems);
+        
+        $firstItem = reset($updateItems);
+        $type = $firstItem['type'] ?? 'entity';
+        
+        $bladeFile = $type === 'element' ? 'element/update_info.blade.php' : 'entity/update_info.blade.php';
+        $jsPath = resource_path('js/function/' . $bladeFile);
+        
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__UPDATE_ITEMS__', $updateItemsJson, $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return '';
     }
 }
 
