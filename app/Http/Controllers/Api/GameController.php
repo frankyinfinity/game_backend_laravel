@@ -2187,9 +2187,15 @@ class GameController extends Controller
         try {
             // 1) Togli i punti vita richiesti all'entity target
             $updatedTargetLife = max(0, $currentLife - $divisionCost);
-            $lifepointInfo->update([
-                'value' => $updatedTargetLife,
-            ]);
+
+            $updateItems = [
+                [
+                    'id' => $lifepointInfo->id,
+                    'attributes' => [
+                        'value' => $updatedTargetLife,
+                    ]
+                ]
+            ];
 
             // 2) Crea nuova entity in una cella adiacente con lifepoint configurato
             $newEntity = Entity::query()->create([
@@ -2246,6 +2252,19 @@ class GameController extends Controller
             // Aggiorna progressbar lifepoint dell'entity target in UI
             // Disegna subito la nuova entity spawnata
             $this->dispatchNewEntitySpawnDraw($request, $player, $newEntity);
+
+            // === UPDATE ENTITY INFORMATION VIA API ===
+            if (!empty($updateItems)) {
+                $updateEntityCode = $this->buildUpdateEntityInfoCode($updateItems);
+                if (!empty($updateEntityCode)) {
+                    DrawRequest::query()->create([
+                        'session_id' => $player->actual_session_id,
+                        'request_id' => Str::random(20),
+                        'player_id' => $player->id,
+                        'items' => json_encode([(new ObjectCode($updateEntityCode, 500))->get()]),
+                    ]);
+                }
+            }
 
             try {
                 $entityContainer = Container::query()
@@ -3004,6 +3023,54 @@ class GameController extends Controller
 
         $updateItemsJson = json_encode($updateItems);
         $jsPath = resource_path('js/function/element/update_info.blade.php');
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__UPDATE_ITEMS__', $updateItemsJson, $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return '';
+    }
+
+    public function updateEntityInformation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $updateItemsJson = $request->input('update_items');
+        if (empty($updateItemsJson)) {
+            return response()->json(['success' => false, 'message' => 'update_items is required']);
+        }
+
+        $updateItems = json_decode($updateItemsJson, true);
+        if (!is_array($updateItems)) {
+            return response()->json(['success' => false, 'message' => 'Invalid update_items format']);
+        }
+
+        foreach ($updateItems as $item) {
+            $id = $item['id'] ?? null;
+            $attributes = $item['attributes'] ?? [];
+
+            if ($id === null || empty($attributes)) {
+                continue;
+            }
+
+            $entityInfo = EntityInformation::find($id);
+            if ($entityInfo) {
+                $entityInfo->update($attributes);
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    private function buildUpdateEntityInfoCode(array $updateItems): string
+    {
+        if (empty($updateItems)) {
+            return '';
+        }
+
+        $updateItemsJson = json_encode($updateItems);
+        $jsPath = resource_path('js/function/entity/update_info.blade.php');
         if (is_file($jsPath)) {
             $jsContent = file_get_contents($jsPath);
             if ($jsContent !== false) {

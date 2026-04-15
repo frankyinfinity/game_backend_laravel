@@ -80,11 +80,14 @@ class EntityChimicalElementObserver
                 }
             }
 
+            $entityGenomeIds = $entity->genomes()->pluck('id')->toArray();
+
             if (!empty($allFixedEffectIds)) {
                 $toDelete = array_diff($allFixedEffectIds, $activeFixedEffectIds);
                 if (!empty($toDelete)) {
                     $modifiersToDelete = PlayerModifier::query()
                         ->where('player_id', $playerId)
+                        ->whereIn('genome_id', $entityGenomeIds)
                         ->whereIn('effect_id', $toDelete)
                         ->get();
                     foreach ($modifiersToDelete as $modifier) {
@@ -98,6 +101,7 @@ class EntityChimicalElementObserver
                 if (!empty($toDeleteTimed)) {
                     $timedToDelete = PlayerModifier::query()
                         ->where('player_id', $playerId)
+                        ->whereIn('genome_id', $entityGenomeIds)
                         ->whereIn('effect_id', $toDeleteTimed)
                         ->get();
                     foreach ($timedToDelete as $modifier) {

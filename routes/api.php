@@ -46,6 +46,7 @@ Route::group(['prefix' => 'auth'], function (){
     Route::post('/game/entity/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkDegradation'])->name('game.entity.check_degradation');
     Route::post('/game/entity/apply_gene_effects', [App\Http\Controllers\Api\GameController::class, 'applyGeneEffects'])->name('game.entity.apply_gene_effects');
     Route::post('/game/element/information/update', [App\Http\Controllers\Api\GameController::class, 'updateElementInformation'])->name('game.element.information.update');
+    Route::post('/game/entity/information/update', [App\Http\Controllers\Api\GameController::class, 'updateEntityInformation'])->name('game.entity.information.update');
 
 });
 Route::post('/game/websocket_info', [App\Http\Controllers\Api\GameController::class, 'websocketInfo'])->name('game.websocket_info');
