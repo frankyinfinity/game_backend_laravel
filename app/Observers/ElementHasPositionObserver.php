@@ -11,6 +11,9 @@ use App\Models\ElementHasScore;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\ElementHasPositionNeuronLink;
 use App\Models\ElementHasPositionScore;
+use App\Models\ElementHasPositionRuleChimicalElement;
+use App\Models\ElementHasPositionRuleChimicalElementDetail;
+use App\Models\ElementHasPositionRuleChimicalElementDetailEffect;
 use App\Models\Container;
 use Docker\Docker;
 use Illuminate\Support\Str;
@@ -96,6 +99,43 @@ class ElementHasPositionObserver
                             'from_element_has_position_neuron_id' => $fromClonedId,
                             'to_element_has_position_neuron_id' => $toClonedId,
                             'condition' => $templateLink->condition,
+                        ]);
+                    }
+                }
+            }
+
+            // Chemical Rules
+            $ruleChimicalElements = $element->ruleChimicalElements()->with('details.effects')->get();
+
+            foreach ($ruleChimicalElements as $templateRule) {
+                $clonedRule = ElementHasPositionRuleChimicalElement::query()->create([
+                    'element_has_position_id' => $elementHasPosition->id,
+                    'chimical_element_id' => $templateRule->chimical_element_id,
+                    'complex_chimical_element_id' => $templateRule->complex_chimical_element_id,
+                    'min' => $templateRule->min,
+                    'max' => $templateRule->max,
+                    'title' => $templateRule->title,
+                    'default_value' => $templateRule->default_value ?? 0,
+                    'quantity_tick_degradation' => $templateRule->quantity_tick_degradation ?? 0,
+                    'percentage_degradation' => $templateRule->percentage_degradation ?? 0,
+                    'degradable' => $templateRule->degradable ?? false,
+                ]);
+
+                foreach ($templateRule->details as $templateDetail) {
+                    $clonedDetail = ElementHasPositionRuleChimicalElementDetail::query()->create([
+                        'element_has_position_rule_chimical_element_id' => $clonedRule->id,
+                        'min' => $templateDetail->min,
+                        'max' => $templateDetail->max,
+                        'color' => $templateDetail->color,
+                    ]);
+
+                    foreach ($templateDetail->effects as $templateEffect) {
+                        ElementHasPositionRuleChimicalElementDetailEffect::query()->create([
+                            'element_has_position_rule_chimical_element_detail_id' => $clonedDetail->id,
+                            'type' => $templateEffect->type,
+                            'gene_id' => $templateEffect->gene_id,
+                            'value' => $templateEffect->value,
+                            'duration' => $templateEffect->duration ?? 0,
                         ]);
                     }
                 }

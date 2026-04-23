@@ -44,4 +44,9 @@ class ElementHasPosition extends Model
     {
         return $this->hasMany(ElementHasPositionInformation::class);
     }
+
+    public function rules()
+    {
+        return $this->hasMany(ElementHasPositionRuleChimicalElement::class);
+    }
 }
