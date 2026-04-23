@@ -17,29 +17,47 @@
                         <h5 class="card-title">Configurazione Base</h5>
                     </div>
                     <div class="card-body">
-                         <div class="form-group">
-                             <label for="element_type">Tipo Elemento</label>
-                             <select class="form-control" id="element_type" name="element_type" onchange="toggleElementSelects()">
-                                 <option value="simple">Elemento Chimico Semplice</option>
-                                 <option value="complex">Elemento Chimico Complesso</option>
+                          <div class="form-group">
+                              <label for="element_type">Tipo Elemento</label>
+                              <select class="form-control" id="element_type" name="element_type" onchange="toggleElementSelects()">
+                                  <option value="simple">Elemento Chimico Semplice</option>
+                                  <option value="complex">Elemento Chimico Complesso</option>
+                              </select>
+                          </div>
+                          <div class="form-group">
+                              <label for="name">Nome Regola <span class="text-danger">*</span></label>
+                              <input type="text"
+                                     class="form-control"
+                                     id="name"
+                                     name="name"
+                                     value="{{ old('name') }}"
+                                     required>
+                          </div>
+                          <div class="form-group" id="chimical_element_group">
+                             <label for="chimical_element_id">Elemento Chimico</label>
+                             <select class="form-control" id="chimical_element_id" name="chimical_element_id">
+                                 <option value="">Seleziona Elemento Chimico</option>
+                                 @foreach($chimicalElements as $ce)
+                                     <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
+                                 @endforeach
+                             </select>
+                         </div>
+                         <div class="form-group" id="complex_chimical_element_group" style="display: none;">
+                             <label for="complex_chimical_element_id">Elemento Chimico Complesso</label>
+                             <select class="form-control" id="complex_chimical_element_id" name="complex_chimical_element_id">
+                                 <option value="">Seleziona Elemento Chimico Complesso</option>
+                                 @foreach($complexChimicalElements as $cce)
+                                     <option value="{{ $cce->id }}">{{ $cce->name }}</option>
+                                 @endforeach
                              </select>
                          </div>
                          <div class="form-group">
-                             <label for="type">Tipo Regola</label>
-                             <select class="form-control" id="type" name="type">
-                                 <option value="entity" {{ old('type') == 'entity' ? 'selected' : '' }}>Entità</option>
-                                 <option value="element" {{ old('type') == 'element' ? 'selected' : '' }}>Elemento</option>
-                             </select>
-                         </div>
-                         <div class="form-group" id="chimical_element_group">
-                            <label for="chimical_element_id">Elemento Chimico</label>
-                            <select class="form-control" id="chimical_element_id" name="chimical_element_id">
-                                <option value="">Seleziona Elemento Chimico</option>
-                                @foreach($chimicalElements as $ce)
-                                    <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
-                                @endforeach
-                            </select>
-                        </div>
+                              <label for="type">Tipo Regola</label>
+                              <select class="form-control" id="type" name="type">
+                                  <option value="entity" {{ old('type') == 'entity' ? 'selected' : '' }}>Entità</option>
+                                  <option value="element" {{ old('type') == 'element' ? 'selected' : '' }}>Elemento</option>
+                              </select>
+                          </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">

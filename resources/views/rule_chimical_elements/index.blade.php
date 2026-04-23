@@ -77,34 +77,38 @@
             <form action="{{ route('rule-chimical-elements.store') }}" method="POST">
                 @csrf
                  <div class="modal-body">
-                     <div class="form-group">
-                         <label for="type_modal">Tipo Regola <span class="text-danger">*</span></label>
-                         <select class="form-control" id="type_modal" name="type" required>
-                             <option value="entity">Entità</option>
-                             <option value="element">Elemento</option>
-                         </select>
-                     </div>
-                     <div class="form-group">
-                         <label for="chimical_element_id_modal">Elemento Chimico <span class="text-danger">*</span></label>
-                         <select class="form-control" id="chimical_element_id_modal" name="chimical_element_id" required>
-                             <option value="">Seleziona Elemento Chimico</option>
-                             @foreach($chimicalElements as $ce)
-                                 <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
-                             @endforeach
-                         </select>
-                     </div>
-                     <div class="form-group">
-                         <label for="min">Min <span class="text-danger">*</span></label>
-                         <input type="number" class="form-control" id="min" name="min" value="0" required>
-                     </div>
-                     <div class="form-group">
-                         <label for="max">Max <span class="text-danger">*</span></label>
-                         <input type="number" class="form-control" id="max" name="max" value="0" required>
-                     </div>
-                     <div class="form-group">
-                         <label for="default_value">Valore Default</label>
-                         <input type="number" class="form-control" id="default_value" name="default_value" value="0">
-                     </div>
+                      <div class="form-group">
+                          <label for="type_modal">Tipo Regola <span class="text-danger">*</span></label>
+                          <select class="form-control" id="type_modal" name="type" required>
+                              <option value="entity">Entità</option>
+                              <option value="element">Elemento</option>
+                          </select>
+                      </div>
+                      <div class="form-group">
+                          <label for="name_modal">Nome Regola <span class="text-danger">*</span></label>
+                          <input type="text" class="form-control" id="name_modal" name="name" required>
+                      </div>
+                      <div class="form-group">
+                          <label for="chimical_element_id_modal">Elemento Chimico <span class="text-danger">*</span></label>
+                          <select class="form-control" id="chimical_element_id_modal" name="chimical_element_id" required>
+                              <option value="">Seleziona Elemento Chimico</option>
+                              @foreach($chimicalElements as $ce)
+                                  <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
+                              @endforeach
+                          </select>
+                      </div>
+                      <div class="form-group">
+                          <label for="min">Min <span class="text-danger">*</span></label>
+                          <input type="number" class="form-control" id="min" name="min" value="0" required>
+                      </div>
+                      <div class="form-group">
+                          <label for="max">Max <span class="text-danger">*</span></label>
+                          <input type="number" class="form-control" id="max" name="max" value="0" required>
+                      </div>
+                      <div class="form-group">
+                          <label for="default_value">Valore Default</label>
+                          <input type="number" class="form-control" id="default_value" name="default_value" value="0">
+                      </div>
                  </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
@@ -127,34 +131,38 @@
             <form action="{{ route('rule-chimical-elements.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="type_modal_complex">Tipo Regola <span class="text-danger">*</span></label>
-                        <select class="form-control" id="type_modal_complex" name="type" required>
-                            <option value="entity">Entità</option>
-                            <option value="element">Elemento</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="complex_chimical_element_id_modal">Elemento Chimico Complesso <span class="text-danger">*</span></label>
-                        <select class="form-control" id="complex_chimical_element_id_modal" name="complex_chimical_element_id" required>
-                            <option value="">Seleziona Elemento Chimico Complesso</option>
-                            @foreach($complexChimicalElements as $cce)
-                                <option value="{{ $cce->id }}">{{ $cce->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="min">Min <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="min" name="min" value="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="max">Max <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="max" name="max" value="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="default_value_modal_complex">Valore Default</label>
-                        <input type="number" class="form-control" id="default_value_modal_complex" name="default_value" value="0">
-                    </div>
+                     <div class="form-group">
+                         <label for="type_modal_complex">Tipo Regola <span class="text-danger">*</span></label>
+                         <select class="form-control" id="type_modal_complex" name="type" required>
+                             <option value="entity">Entità</option>
+                             <option value="element">Elemento</option>
+                         </select>
+                     </div>
+                     <div class="form-group">
+                         <label for="name_modal_complex">Nome Regola <span class="text-danger">*</span></label>
+                         <input type="text" class="form-control" id="name_modal_complex" name="name" required>
+                     </div>
+                     <div class="form-group">
+                         <label for="complex_chimical_element_id_modal">Elemento Chimico Complesso <span class="text-danger">*</span></label>
+                         <select class="form-control" id="complex_chimical_element_id_modal" name="complex_chimical_element_id" required>
+                             <option value="">Seleziona Elemento Chimico Complesso</option>
+                             @foreach($complexChimicalElements as $cce)
+                                 <option value="{{ $cce->id }}">{{ $cce->name }}</option>
+                             @endforeach
+                         </select>
+                     </div>
+                     <div class="form-group">
+                         <label for="min">Min <span class="text-danger">*</span></label>
+                         <input type="number" class="form-control" id="min" name="min" value="0" required>
+                     </div>
+                     <div class="form-group">
+                         <label for="max">Max <span class="text-danger">*</span></label>
+                         <input type="number" class="form-control" id="max" name="max" value="0" required>
+                     </div>
+                     <div class="form-group">
+                         <label for="default_value_modal_complex">Valore Default</label>
+                         <input type="number" class="form-control" id="default_value_modal_complex" name="default_value" value="0">
+                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>

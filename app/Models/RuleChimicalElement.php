@@ -15,6 +15,7 @@ class RuleChimicalElement extends Model
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
     protected $fillable = [
+        'name',
         'title',
         'chimical_element_id',
         'complex_chimical_element_id',

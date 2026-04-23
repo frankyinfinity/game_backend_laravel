@@ -9,11 +9,24 @@ class RuleChimicalElementObserver
     public function saving(RuleChimicalElement $rule)
     {
         $rule->loadMissing(['chimicalElement', 'complexChimicalElement']);
-        
+
+        $elementName = null;
+        $symbol = null;
+
         if ($rule->chimicalElement) {
-            $rule->title = $rule->chimicalElement->name . ' (' . $rule->chimicalElement->symbol . ')';
+            $elementName = $rule->chimicalElement->name;
+            $symbol = $rule->chimicalElement->symbol;
         } elseif ($rule->complexChimicalElement) {
-            $rule->title = $rule->complexChimicalElement->name . ' (' . $rule->complexChimicalElement->symbol . ')';
+            $elementName = $rule->complexChimicalElement->name;
+            $symbol = $rule->complexChimicalElement->symbol;
+        }
+
+        if ($elementName && $symbol) {
+            $rule->title = $rule->name . ' [' . $elementName . ' (' . $symbol . ')]';
+        } elseif ($elementName) {
+            $rule->title = $rule->name . ' [' . $elementName . ']';
+        } else {
+            $rule->title = $rule->name;
         }
     }
 }

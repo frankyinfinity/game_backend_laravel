@@ -26,29 +26,29 @@
                         <h5 class="card-title">Configurazione Base</h5>
                     </div>
                     <div class="card-body">
-                         <div class="form-group">
-                             <label for="element_type">Tipo Elemento</label>
-                             <select class="form-control" id="element_type" name="element_type" onchange="toggleElementSelects()" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                 <option value="simple" {{ $ruleChimicalElement->chimical_element_id ? 'selected' : '' }}>Elemento Chimico Semplice</option>
-                                 <option value="complex" {{ $ruleChimicalElement->complex_chimical_element_id ? 'selected' : '' }}>Elemento Chimico Complesso</option>
-                             </select>
-                             @if($ruleChimicalElement->details->isNotEmpty())
-                                 <input type="hidden" name="element_type" value="{{ $ruleChimicalElement->chimical_element_id ? 'simple' : 'complex' }}">
-                             @endif
-                         </div>
-                         <div class="form-group">
-                             <label for="type">Tipo Regola</label>
-                             <select class="form-control" id="type" name="type" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                 <option value="entity" {{ old('type', $ruleChimicalElement->type) == 'entity' ? 'selected' : '' }}>Entità</option>
-                                 <option value="element" {{ old('type', $ruleChimicalElement->type) == 'element' ? 'selected' : '' }}>Elemento</option>
-                             </select>
-                             @if($ruleChimicalElement->details->isNotEmpty())
-                                 <input type="hidden" name="type" value="{{ $ruleChimicalElement->type }}">
-                             @endif
-                         </div>
-                         <div class="form-group" id="chimical_element_group" style="{{ $ruleChimicalElement->chimical_element_id ? '' : 'display: none;' }}">
-                            <label for="chimical_element_id">Elemento Chimico</label>
-<select class="form-control" id="chimical_element_id" name="chimical_element_id" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
+                          <div class="form-group">
+                              <label for="element_type">Tipo Elemento</label>
+                              <select class="form-control" id="element_type" name="element_type" onchange="toggleElementSelects()" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
+                                  <option value="simple" {{ $ruleChimicalElement->chimical_element_id ? 'selected' : '' }}>Elemento Chimico Semplice</option>
+                                  <option value="complex" {{ $ruleChimicalElement->complex_chimical_element_id ? 'selected' : '' }}>Elemento Chimico Complesso</option>
+                              </select>
+                              @if($ruleChimicalElement->details->isNotEmpty())
+                                  <input type="hidden" name="element_type" value="{{ $ruleChimicalElement->chimical_element_id ? 'simple' : 'complex' }}">
+                              @endif
+                          </div>
+                          <div class="form-group">
+                              <label for="name">Nome Regola <span class="text-danger">*</span></label>
+                              <input type="text"
+                                     class="form-control"
+                                     id="name"
+                                     name="name"
+                                     value="{{ old('name', $ruleChimicalElement->name) }}"
+                                     required
+                                     {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
+                          </div>
+                          <div class="form-group" id="chimical_element_group" style="{{ $ruleChimicalElement->chimical_element_id ? '' : 'display: none;' }}">
+                             <label for="chimical_element_id">Elemento Chimico</label>
+                             <select class="form-control" id="chimical_element_id" name="chimical_element_id" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
                                  <option value="">Seleziona Elemento Chimico</option>
                                  @foreach($chimicalElements as $ce)
                                      <option value="{{ $ce->id }}" {{ old('chimical_element_id', $ruleChimicalElement->chimical_element_id) == $ce->id ? 'selected' : '' }}>{{ $ce->name }} ({{ $ce->symbol }})</option>
@@ -57,16 +57,26 @@
                              @if($ruleChimicalElement->details->isNotEmpty())
                                  <input type="hidden" name="chimical_element_id" value="{{ $ruleChimicalElement->chimical_element_id }}">
                              @endif
-                        </div>
-                        <div class="form-group" id="complex_chimical_element_group" style="{{ $ruleChimicalElement->complex_chimical_element_id ? '' : 'display: none;' }}">
-                            <label for="complex_chimical_element_id">Elemento Chimico Complesso</label>
-                            <select class="form-control" id="complex_chimical_element_id" name="complex_chimical_element_id" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                <option value="">Seleziona Elemento Chimico Complesso</option>
-                                @foreach($complexChimicalElements as $cce)
-                                    <option value="{{ $cce->id }}" {{ old('complex_chimical_element_id', $ruleChimicalElement->complex_chimical_element_id) == $cce->id ? 'selected' : '' }}>{{ $cce->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                         </div>
+                         <div class="form-group" id="complex_chimical_element_group" style="{{ $ruleChimicalElement->complex_chimical_element_id ? '' : 'display: none;' }}">
+                             <label for="complex_chimical_element_id">Elemento Chimico Complesso</label>
+                             <select class="form-control" id="complex_chimical_element_id" name="complex_chimical_element_id" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
+                                 <option value="">Seleziona Elemento Chimico Complesso</option>
+                                 @foreach($complexChimicalElements as $cce)
+                                     <option value="{{ $cce->id }}" {{ old('complex_chimical_element_id', $ruleChimicalElement->complex_chimical_element_id) == $cce->id ? 'selected' : '' }}>{{ $cce->name }}</option>
+                                 @endforeach
+                             </select>
+                         </div>
+                         <div class="form-group">
+                              <label for="type">Tipo Regola</label>
+                              <select class="form-control" id="type" name="type" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}">
+                                  <option value="entity" {{ old('type', $ruleChimicalElement->type) == 'entity' ? 'selected' : '' }}>Entità</option>
+                                  <option value="element" {{ old('type', $ruleChimicalElement->type) == 'element' ? 'selected' : '' }}>Elemento</option>
+                              </select>
+                              @if($ruleChimicalElement->details->isNotEmpty())
+                                  <input type="hidden" name="type" value="{{ $ruleChimicalElement->type }}">
+                              @endif
+                          </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">

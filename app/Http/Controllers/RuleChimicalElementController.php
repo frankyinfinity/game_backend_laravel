@@ -28,6 +28,7 @@ class RuleChimicalElementController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'name' => 'required|string|max:255',
             'min' => 'required|integer',
             'max' => 'required|integer',
             'type' => 'required|string|in:entity,element',
@@ -44,6 +45,7 @@ class RuleChimicalElementController extends Controller
         }
 
         $rule = RuleChimicalElement::create([
+            'name' => $request->input('name'),
             'type' => $request->input('type'),
             'chimical_element_id' => $chimicalElementId,
             'complex_chimical_element_id' => $complexChimicalElementId,
@@ -76,7 +78,7 @@ class RuleChimicalElementController extends Controller
     {
         $ruleChimicalElement->load('details');
 
-        $basicFields = ['chimical_element_id', 'complex_chimical_element_id', 'min', 'max', 'default_value'];
+        $basicFields = ['name', 'chimical_element_id', 'complex_chimical_element_id', 'min', 'max', 'default_value'];
         $hasBasicChanges = false;
 
         foreach ($basicFields as $field) {
@@ -94,6 +96,7 @@ class RuleChimicalElementController extends Controller
         }
 
         $request->validate([
+            'name' => 'required|string|max:255',
             'min' => 'required|integer',
             'max' => 'required|integer',
         ]);
@@ -109,6 +112,7 @@ class RuleChimicalElementController extends Controller
             }
 
             $ruleChimicalElement->update([
+                'name' => $request->input('name'),
                 'type' => $request->type,
                 'chimical_element_id' => $chimicalElementId,
                 'complex_chimical_element_id' => null,
@@ -128,6 +132,7 @@ class RuleChimicalElementController extends Controller
             }
 
             $ruleChimicalElement->update([
+                'name' => $request->input('name'),
                 'type' => RuleChimicalElement::TYPE_ELEMENT,
                 'chimical_element_id' => null,
                 'complex_chimical_element_id' => $complexChimicalElementId,
