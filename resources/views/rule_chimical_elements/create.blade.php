@@ -25,13 +25,22 @@
                               </select>
                           </div>
                           <div class="form-group">
-                              <label for="name">Nome Regola <span class="text-danger">*</span></label>
+                              <label for="name">Nome Interno <span class="text-danger">*</span></label>
                               <input type="text"
                                      class="form-control"
                                      id="name"
                                      name="name"
                                      value="{{ old('name') }}"
                                      required>
+                          </div>
+                          <div class="form-group">
+                              <label for="title">Titolo Visualizzato</label>
+                              <input type="text"
+                                     class="form-control"
+                                     id="title"
+                                     name="title"
+                                     value="{{ old('title') }}"
+                                     placeholder="es: Regola Fertilità Suolo">
                           </div>
                           <div class="form-group" id="chimical_element_group">
                              <label for="chimical_element_id">Elemento Chimico</label>

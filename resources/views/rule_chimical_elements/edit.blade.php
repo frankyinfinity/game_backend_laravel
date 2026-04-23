@@ -7,11 +7,36 @@
 @stop
 
 @section('content')
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="icon fas fa-check"></i>
+            {{ session('success') }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="icon fas fa-ban"></i>
+            <strong>Errore!</strong>
+            <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
+
     @if($ruleChimicalElement->details->isNotEmpty())
-        <div class="alert alert-warning mb-3">
-            <i class="fas fa-exclamation-triangle"></i> 
-            Non è possibile modificare i campi base di questa regola perché contiene dei dettagli. 
-            <a href="{{ route('rule-chimical-elements.show', $ruleChimicalElement) }}">Visualizza i dettagli</a>
+        <div class="alert alert-warning mb-3 border-left">
+            <i class="fas fa-exclamation-triangle mr-2"></i> 
+            <strong>Attenzione:</strong> Questa regola contiene dei dettagli. Alcuni campi strutturali sono bloccati.
+            <a href="{{ route('rule-chimical-elements.show', $ruleChimicalElement) }}" class="alert-link ml-2">Visualizza e gestisci dettagli</a>
         </div>
     @endif
     
@@ -37,14 +62,22 @@
                               @endif
                           </div>
                           <div class="form-group">
-                              <label for="name">Nome Regola <span class="text-danger">*</span></label>
+                              <label for="name">Nome Interno <span class="text-danger">*</span></label>
                               <input type="text"
                                      class="form-control"
                                      id="name"
                                      name="name"
                                      value="{{ old('name', $ruleChimicalElement->name) }}"
-                                     required
-                                     {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
+                                     required>
+                          </div>
+                          <div class="form-group">
+                              <label for="title">Titolo Visualizzato</label>
+                              <input type="text"
+                                     class="form-control"
+                                     id="title"
+                                     name="title"
+                                     value="{{ old('title', $ruleChimicalElement->title) }}"
+                                     placeholder="es: Regola Fertilità Suolo">
                           </div>
                           <div class="form-group" id="chimical_element_group" style="{{ $ruleChimicalElement->chimical_element_id ? '' : 'display: none;' }}">
                              <label for="chimical_element_id">Elemento Chimico</label>
@@ -67,16 +100,13 @@
                                  @endforeach
                              </select>
                          </div>
-                         <div class="form-group">
-                              <label for="type">Tipo Regola</label>
-                              <select class="form-control" id="type" name="type" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}">
-                                  <option value="entity" {{ old('type', $ruleChimicalElement->type) == 'entity' ? 'selected' : '' }}>Entità</option>
-                                  <option value="element" {{ old('type', $ruleChimicalElement->type) == 'element' ? 'selected' : '' }}>Elemento</option>
-                              </select>
-                              @if($ruleChimicalElement->details->isNotEmpty())
-                                  <input type="hidden" name="type" value="{{ $ruleChimicalElement->type }}">
-                              @endif
-                          </div>
+                          <div class="form-group">
+                               <label for="type">Tipo Regola</label>
+                               <select class="form-control" id="type" name="type">
+                                   <option value="entity" {{ old('type', $ruleChimicalElement->type) == 'entity' ? 'selected' : '' }}>Entità</option>
+                                   <option value="element" {{ old('type', $ruleChimicalElement->type) == 'element' ? 'selected' : '' }}>Elemento</option>
+                               </select>
+                           </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">

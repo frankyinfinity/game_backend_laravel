@@ -17,6 +17,7 @@ use App\Models\Score;
 use App\Models\ElementHasGene;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionInformation;
+use App\Models\RuleChimicalElement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -77,7 +78,7 @@ class ElementController extends Controller
     {
         $query = Element::with(['elementType', 'climates'])->get();
         return datatables($query)
-            ->addColumn('graphics', function($row){
+            ->addColumn('graphics', function ($row) {
                 $imagePath = $row->id . '.png';
                 if (\Storage::disk('elements')->exists($imagePath)) {
                     $url = \Storage::disk('elements')->url($imagePath);
@@ -85,13 +86,13 @@ class ElementController extends Controller
                 }
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
-            ->addColumn('element_type_name', function($row){
+            ->addColumn('element_type_name', function ($row) {
                 return $row->elementType ? $row->elementType->name : '-';
             })
-            ->addColumn('climates_list', function($row){
+            ->addColumn('climates_list', function ($row) {
                 return $row->climates->pluck('name')->implode(', ');
             })
-            ->addColumn('characteristic', function($row){
+            ->addColumn('characteristic', function ($row) {
                 return $row->getCharacteristicLabel();
             })
             ->rawColumns(['graphics'])
@@ -120,10 +121,10 @@ class ElementController extends Controller
         ]);
 
         $data = $request->only('name', 'element_type_id', 'characteristic');
-        
+
         $element = Element::create($data);
         $this->syncElementBrain($element, $request);
-        
+
         if ($request->has('climates')) {
             $element->climates()->sync($request->climates);
         }
@@ -146,20 +147,20 @@ class ElementController extends Controller
 
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
-        
+
         // Fetch all tiles for diffusion tab
         $allTiles = Tile::orderBy('name')->get();
-        
+
         // Fetch existing diffusion data
         $existingDiffusion = ElementHasTile::where('element_id', $element->id)->get();
         $diffusionMap = [];
-        foreach($existingDiffusion as $diff) {
+        foreach ($existingDiffusion as $diff) {
             $diffusionMap[$diff->climate_id][$diff->tile_id] = $diff->percentage;
         }
 
         // Fetch Genes
         $allGenes = Gene::query()->where('type', 'dynamic_max')->orderBy('name')->get();
-        
+
         // Fetch Scores for reward tab
         $allScores = Score::orderBy('name')->get();
 
@@ -175,9 +176,15 @@ class ElementController extends Controller
             ->where('type', Gene::DYNAMIC_MAX)
             ->orderBy('name')
             ->get(['id', 'name']);
-        
+
+        // Fetch all RuleChimicalElements of type 'element'
+        $allRuleChimicalElements = RuleChimicalElement::query()
+            ->where('type', RuleChimicalElement::TYPE_ELEMENT)
+            ->orderBy('name')
+            ->get();
+
         // Prepare gene data for JavaScript
-        $geneData = $allGenes->map(function($gene) {
+        $geneData = $allGenes->map(function ($gene) {
             return [
                 'id' => $gene->id,
                 'name' => $gene->name,
@@ -199,7 +206,8 @@ class ElementController extends Controller
             'allScores',
             'brainTargetElements',
             'brainTargetEntities',
-            'brainGenes'
+            'brainGenes',
+            'allRuleChimicalElements'
         ));
     }
 
@@ -227,13 +235,13 @@ class ElementController extends Controller
         } else {
             $element->climates()->detach();
         }
-        
+
         // Save Consumption Genes Effects
         if ($element->isConsumable()) {
             $syncGenes = [];
             if ($request->has('consumption_genes')) {
-                foreach($request->consumption_genes as $g) {
-                    if(!empty($g['gene_id']) && isset($g['effect'])) {
+                foreach ($request->consumption_genes as $g) {
+                    if (!empty($g['gene_id']) && isset($g['effect'])) {
                         $syncGenes[$g['gene_id']] = ['effect' => $g['effect']];
                     }
                 }
@@ -247,8 +255,8 @@ class ElementController extends Controller
         if ($element->isInteractive()) {
             $informations = [];
             if ($request->has('information_genes')) {
-                foreach($request->information_genes as $g) {
-                    if(!empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['value'])) {
+                foreach ($request->information_genes as $g) {
+                    if (!empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['value'])) {
                         $informations[] = [
                             'gene_id' => $g['gene_id'],
                             'min_value' => $g['min_value'],
@@ -260,12 +268,12 @@ class ElementController extends Controller
                     }
                 }
             }
-            
+
             // Delete existing information
             $element->informations()->delete();
-            
+
             // Save new information
-            foreach($informations as $info) {
+            foreach ($informations as $info) {
                 $element->informations()->create($info);
             }
         } else {
@@ -276,8 +284,8 @@ class ElementController extends Controller
         if ($element->isInteractive()) {
             $scores = [];
             if ($request->has('reward_scores')) {
-                foreach($request->reward_scores as $s) {
-                    if(!empty($s['score_id']) && isset($s['amount'])) {
+                foreach ($request->reward_scores as $s) {
+                    if (!empty($s['score_id']) && isset($s['amount'])) {
                         $scores[$s['score_id']] = ['amount' => $s['amount']];
                     }
                 }
@@ -287,12 +295,27 @@ class ElementController extends Controller
             $element->scores()->delete();
         }
 
+        // Save Rules
+        if ($element->isInteractive()) {
+            $syncRules = [];
+            if ($request->has('rule_chimical_elements')) {
+                foreach ($request->rule_chimical_elements as $r) {
+                    if (!empty($r['rule_chimical_element_id'])) {
+                        $syncRules[] = $r['rule_chimical_element_id'];
+                    }
+                }
+            }
+            $element->ruleChimicalElements()->sync($syncRules);
+        } else {
+            $element->ruleChimicalElements()->detach();
+        }
+
         // Save Diffusion Data
         if ($request->has('diffusion')) {
             foreach ($request->diffusion as $climateId => $tilesData) {
                 foreach ($tilesData as $tileId => $percentage) {
-                    $percentage = (int)$percentage;
-                    
+                    $percentage = (int) $percentage;
+
                     if ($percentage <= 0) {
                         ElementHasTile::where('element_id', $element->id)
                             ->where('climate_id', $climateId)
@@ -311,7 +334,7 @@ class ElementController extends Controller
                 }
             }
         }
-        
+
         // Clean up orphaned diffusion records (climates no longer associated)
         $validClimateIds = $element->climates()->pluck('climates.id')->toArray();
         ElementHasTile::where('element_id', $element->id)
@@ -325,7 +348,7 @@ class ElementController extends Controller
             $imageData = str_replace(' ', '+', $imageData);
             $imageName = $element->id . '.png';
             \Storage::disk('uploads')->put('elements/' . $imageName, base64_decode($imageData));
-            
+
             // Also copy to public disk for web access
             \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
         }
@@ -344,10 +367,12 @@ class ElementController extends Controller
             ->with('success', 'Elemento eliminato con successo.');
     }
 
-    public function delete(Request $request){
+    public function delete(Request $request)
+    {
         foreach ($request->ids as $id) {
             $element = Element::find($id);
-            if($element == null) continue;
+            if ($element == null)
+                continue;
             $element->delete();
         }
         return response()->json(['success' => true]);
@@ -365,7 +390,7 @@ class ElementController extends Controller
         $imageName = $element->id . '.png';
 
         \Storage::disk('uploads')->put('elements/' . $imageName, base64_decode($imageData));
-        
+
         // Also copy to public disk for web access
         \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
 
@@ -692,11 +717,13 @@ class ElementController extends Controller
 
         foreach ($decoded as $item) {
             $type = (string) ($item['type'] ?? '');
-            if (!in_array($type, Neuron::TYPES, true)) continue;
+            if (!in_array($type, Neuron::TYPES, true))
+                continue;
 
             $gridI = (int) ($item['grid_i'] ?? -1);
             $gridJ = (int) ($item['grid_j'] ?? -1);
-            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ) continue;
+            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ)
+                continue;
 
             $radius = ($type === Neuron::TYPE_DETECTION || $type === Neuron::TYPE_MOVEMENT)
                 ? max(1, (int) ($item['radius'] ?? 1))
@@ -706,7 +733,8 @@ class ElementController extends Controller
             $geneLifeId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_life_id'] ?? 0) : null;
             $geneAttackId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_attack_id'] ?? 0) : null;
 
-            if ($type === Neuron::TYPE_ATTACK && ($geneLifeId <= 0 || $geneAttackId <= 0)) continue;
+            if ($type === Neuron::TYPE_ATTACK && ($geneLifeId <= 0 || $geneAttackId <= 0))
+                continue;
 
             $clientId = (int) ($item['id'] ?? 0);
             $neuron = null;

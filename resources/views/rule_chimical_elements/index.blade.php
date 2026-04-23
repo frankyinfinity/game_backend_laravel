@@ -5,6 +5,15 @@
 @section('content_header')@stop
 
 @section('content')
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="icon fas fa-check"></i>
+        {{ session('success') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
 <div class="card">
     <div class="card-header pb-0">
         <h4 class="mb-0">Regole Elementi Chimici</h4>
@@ -55,6 +64,7 @@
                             <th>Degradabile</th>
                             <th>Regola</th>
                             <th>Grafico</th>
+                            <th>Clona</th>
                         </tr>
                         </thead>
                         <tbody></tbody>
@@ -190,6 +200,12 @@
                 window.location.href = url;
             });
 
+            $(document).on('click', '.btn-replicate', function (e) {
+                var url="{{ route('rule-chimical-elements.replicate',['_id_']) }}";
+                url = url.replace('_id_',$(this).data('id'));
+                window.location.href = url;
+            });
+
             $(document).on('click', '.btn-graph', function (e) {
                 var url="{{ route('rule-chimical-elements.show',['_id_']) }}";
                 url = url.replace('_id_',$(this).data('id'));
@@ -223,6 +239,7 @@
                     {data:"max", name:"max"},
                     {data:"default_value", name:"default_value"},
                     {data:"degradable", name:"degradable"},
+                    {data:"id", name:"id"},
                     {data:"id", name:"id"},
                     {data:"id", name:"id"},
                 ],
@@ -266,6 +283,12 @@
                             return '<button type="button" class="btn btn-info btn-sm btn-block btn-graph" data-id="'+data+'" title="Grafico Lineare"><i class="fa fa-chart-bar"></i></button>';
                         },
                         targets:   9
+                    },
+                    {
+                        render: function(data, type, row){
+                            return '<button type="button" class="btn btn-success btn-sm btn-block btn-replicate" data-id="'+data+'" title="Clona Regola"><i class="fa fa-copy"></i></button>';
+                        },
+                        targets:   10
                     },
                 ],
             });

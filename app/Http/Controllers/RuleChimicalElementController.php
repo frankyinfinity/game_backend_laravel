@@ -17,6 +17,21 @@ class RuleChimicalElementController extends Controller
         return view('rule_chimical_elements.index', compact('rules', 'chimicalElements', 'complexChimicalElements'));
     }
 
+    public function list()
+    {
+        $rules = RuleChimicalElement::where('type', RuleChimicalElement::TYPE_ELEMENT)
+            ->orderBy('name')
+            ->get();
+            
+        return response()->json($rules->map(function($rule) {
+            return [
+                'id' => $rule->id,
+                'name' => $rule->name,
+                'title' => $rule->title ?? '',
+            ];
+        }));
+    }
+
     public function create()
     {
         $chimicalElements = ChimicalElement::query()->get();
@@ -46,6 +61,7 @@ class RuleChimicalElementController extends Controller
 
         $rule = RuleChimicalElement::create([
             'name' => $request->input('name'),
+            'title' => $request->input('title'),
             'type' => $request->input('type'),
             'chimical_element_id' => $chimicalElementId,
             'complex_chimical_element_id' => $complexChimicalElementId,
@@ -78,21 +94,26 @@ class RuleChimicalElementController extends Controller
     {
         $ruleChimicalElement->load('details');
 
-        $basicFields = ['name', 'chimical_element_id', 'complex_chimical_element_id', 'min', 'max', 'default_value'];
-        $hasBasicChanges = false;
+        $structuralFields = ['chimical_element_id', 'complex_chimical_element_id', 'min', 'max', 'default_value'];
+        $hasStructuralChanges = false;
 
-        foreach ($basicFields as $field) {
+        foreach ($structuralFields as $field) {
+            // Se il campo non è presente nella richiesta (perché disabilitato nella UI), lo ignoriamo dal controllo cambiamenti
+            if (!$request->has($field)) {
+                continue;
+            }
+
             $oldValue = $ruleChimicalElement->{$field};
             $newValue = $request->input($field);
 
             if ((string) $oldValue !== (string) $newValue) {
-                $hasBasicChanges = true;
+                $hasStructuralChanges = true;
                 break;
             }
         }
 
-        if ($ruleChimicalElement->details->isNotEmpty() && $hasBasicChanges) {
-            return back()->withErrors('Non è possibile modificare la regola quando sono presenti dei dettagli. Elimina prima i dettagli.');
+        if ($ruleChimicalElement->details->isNotEmpty() && $hasStructuralChanges) {
+            return back()->withInput()->withErrors('Non è possibile modificare i campi strutturali (Elemento, Min, Max, Default) quando sono presenti dei dettagli. Elimina prima i dettagli.');
         }
 
         $request->validate([
@@ -103,55 +124,62 @@ class RuleChimicalElementController extends Controller
 
         $elementType = $request->input('element_type');
 
-        if ($elementType === 'simple') {
-            $chimicalElementId = $request->input('chimical_element_id');
-            $chimicalElementId = $chimicalElementId ? (int) $chimicalElementId : null;
+        // Campi sempre modificabili
+        $ruleChimicalElement->name = $request->input('name');
+        $ruleChimicalElement->title = $request->input('title');
+        $ruleChimicalElement->type = $request->input('type');
+        $ruleChimicalElement->degradable = $request->has('degradable');
+        $ruleChimicalElement->quantity_tick_degradation = $request->input('quantity_tick_degradation');
+        $ruleChimicalElement->percentage_degradation = $request->input('percentage_degradation');
 
-            if (empty($chimicalElementId)) {
-                return back()->withErrors('Seleziona un elemento chimico');
+        // Campi strutturali (modificabili solo se non ci sono dettagli)
+        if ($ruleChimicalElement->details->isEmpty()) {
+            $ruleChimicalElement->min = $request->input('min');
+            $ruleChimicalElement->max = $request->input('max');
+            $ruleChimicalElement->default_value = $request->input('default_value');
+            
+            if ($elementType === 'simple') {
+                $ruleChimicalElement->chimical_element_id = $request->input('chimical_element_id');
+                $ruleChimicalElement->complex_chimical_element_id = null;
+            } else {
+                $ruleChimicalElement->chimical_element_id = null;
+                $ruleChimicalElement->complex_chimical_element_id = $request->input('complex_chimical_element_id');
             }
-
-            $ruleChimicalElement->update([
-                'name' => $request->input('name'),
-                'type' => $request->type,
-                'chimical_element_id' => $chimicalElementId,
-                'complex_chimical_element_id' => null,
-                'min' => $request->input('min'),
-                'max' => $request->input('max'),
-                'default_value' => $request->input('default_value'),
-                'quantity_tick_degradation' => $request->input('quantity_tick_degradation'),
-                'percentage_degradation' => $request->input('percentage_degradation'),
-                'degradable' => $request->boolean('degradable'),
-            ]);
-        } else {
-            $complexChimicalElementId = $request->input('complex_chimical_element_id');
-            $complexChimicalElementId = $complexChimicalElementId ? (int) $complexChimicalElementId : null;
-
-            if (empty($complexChimicalElementId)) {
-                return back()->withErrors('Seleziona un elemento chimico complesso');
-            }
-
-            $ruleChimicalElement->update([
-                'name' => $request->input('name'),
-                'type' => RuleChimicalElement::TYPE_ELEMENT,
-                'chimical_element_id' => null,
-                'complex_chimical_element_id' => $complexChimicalElementId,
-                'min' => $request->input('min'),
-                'max' => $request->input('max'),
-                'default_value' => $request->input('default_value'),
-                'quantity_tick_degradation' => $request->input('quantity_tick_degradation'),
-                'percentage_degradation' => $request->input('percentage_degradation'),
-                'degradable' => $request->boolean('degradable'),
-            ]);
         }
 
-        return redirect()->route('rule-chimical-elements.index');
+        $ruleChimicalElement->save();
+
+        return back()->with('success', 'Regola aggiornata con successo nel database!');
     }
 
     public function destroy(RuleChimicalElement $ruleChimicalElement)
     {
         $ruleChimicalElement->delete();
         return redirect()->route('rule-chimical-elements.index');
+    }
+
+    public function replicate(RuleChimicalElement $ruleChimicalElement)
+    {
+        // Clona la regola
+        $newRule = $ruleChimicalElement->replicate();
+        $newRule->name = $newRule->name . ' (Copia)';
+        $newRule->save();
+
+        // Clona i dettagli e i relativi effetti
+        foreach ($ruleChimicalElement->details as $detail) {
+            $newDetail = $detail->replicate();
+            $newDetail->rule_chimical_element_id = $newRule->id;
+            $newDetail->save();
+
+            // Clona gli effetti del dettaglio
+            foreach ($detail->effects as $effect) {
+                $newEffect = $effect->replicate();
+                $newEffect->rule_chimical_element_detail_id = $newDetail->id;
+                $newEffect->save();
+            }
+        }
+
+        return redirect()->route('rule-chimical-elements.index')->with('success', 'Regola clonata con successo!');
     }
 
     public function delete(Request $request)

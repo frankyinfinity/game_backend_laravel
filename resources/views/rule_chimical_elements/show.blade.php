@@ -7,14 +7,19 @@
 @stop
 
 @section('content')
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="icon fas fa-check"></i>
+        {{ session('success') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">
-            @if($ruleChimicalElement->chimicalElement)
-                {{ $ruleChimicalElement->chimicalElement->name }} ({{ $ruleChimicalElement->chimicalElement->symbol }})
-            @elseif($ruleChimicalElement->complexChimicalElement)
-                {{ $ruleChimicalElement->complexChimicalElement->name }}
-            @endif
+            {{ $ruleChimicalElement->title ?? $ruleChimicalElement->name }}
         </h3>
         <div class="card-tools">
             <a href="{{ route('rule-chimical-elements.edit', $ruleChimicalElement->id) }}"

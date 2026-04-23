@@ -3,69 +3,81 @@
 @section('title', 'Modifica Elemento')
 
 @section('content_header')
-    <h1>Modifica Elemento</h1>
+<h1>Modifica Elemento</h1>
 @stop
 
 @section('content')
-    <form action="{{ route('elements.update', $element) }}" method="POST">
-        @csrf
-        @method('PUT')
-        
-        <div class="card card-primary card-outline card-tabs">
-            <div class="card-header p-0 pt-1 border-bottom-0">
-                <ul class="nav nav-tabs" id="main-tabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="tab-general-link" data-toggle="pill" href="#tab-general" role="tab" aria-controls="tab-general" aria-selected="true">Dati Generali</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-diffusion-link" data-toggle="pill" href="#tab-diffusion" role="tab" aria-controls="tab-diffusion" aria-selected="false">Diffusione</a>
-                    </li>
-                    @if($element->isConsumable())
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab" aria-controls="tab-consumption" aria-selected="false">Effetti Consumo</a>
-                    </li>
-                    @endif
-                    @if($element->isInteractive())
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-information-link" data-toggle="pill" href="#tab-information" role="tab" aria-controls="tab-information" aria-selected="false">Informazioni</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-reward-link" data-toggle="pill" href="#tab-reward" role="tab" aria-controls="tab-reward" aria-selected="false">Ricompensa</a>
-                    </li>
-                    @endif
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
-                    </li>
-                    @if($element->isInteractive())
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-brain-link" data-toggle="pill" href="#tab-brain" role="tab" aria-controls="tab-brain" aria-selected="false">Cervello</a>
-                    </li>
-                    @endif
-                </ul>
-            </div>
-            
-            <div class="card-body">
-                <div class="tab-content" id="main-tabs-content">
-                    
-                    <!-- TAB DATI GENERALI -->
-                    <div class="tab-pane fade show active" id="tab-general" role="tabpanel" aria-labelledby="tab-general-link">
-                        @include('elements.tabs.general')
-                    </div>
+<form action="{{ route('elements.update', $element) }}" method="POST">
+    @csrf
+    @method('PUT')
 
-                    <!-- TAB DIFFUSIONE -->
-                    <div class="tab-pane fade" id="tab-diffusion" role="tabpanel" aria-labelledby="tab-diffusion-link">
-                        @include('elements.tabs.diffusion')
-                    </div>
+    <div class="card card-primary card-outline card-tabs">
+        <div class="card-header p-0 pt-1 border-bottom-0">
+            <ul class="nav nav-tabs" id="main-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="tab-general-link" data-toggle="pill" href="#tab-general" role="tab"
+                        aria-controls="tab-general" aria-selected="true">Dati Generali</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="tab-diffusion-link" data-toggle="pill" href="#tab-diffusion" role="tab"
+                        aria-controls="tab-diffusion" aria-selected="false">Diffusione</a>
+                </li>
+                @if($element->isConsumable())
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab"
+                            aria-controls="tab-consumption" aria-selected="false">Effetti Consumo</a>
+                    </li>
+                @endif
+                @if($element->isInteractive())
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-information-link" data-toggle="pill" href="#tab-information" role="tab"
+                            aria-controls="tab-information" aria-selected="false">Informazioni</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-reward-link" data-toggle="pill" href="#tab-reward" role="tab"
+                            aria-controls="tab-reward" aria-selected="false">Ricompensa</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-chemical-rules-link" data-toggle="pill" href="#tab-chemical-rules"
+                            role="tab" aria-controls="tab-chemical-rules" aria-selected="false">Elementi Chimici</a>
+                    </li>
+                @endif
+                <li class="nav-item">
+                    <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab"
+                        aria-controls="tab-graphics" aria-selected="false">Grafica</a>
+                </li>
+                @if($element->isInteractive())
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-brain-link" data-toggle="pill" href="#tab-brain" role="tab"
+                            aria-controls="tab-brain" aria-selected="false">Cervello</a>
+                    </li>
+                @endif
+            </ul>
+        </div>
 
-                    <!-- TAB CONSUMPTION -->
-                    @if($element->isConsumable())
+        <div class="card-body">
+            <div class="tab-content" id="main-tabs-content">
+
+                <!-- TAB DATI GENERALI -->
+                <div class="tab-pane fade show active" id="tab-general" role="tabpanel"
+                    aria-labelledby="tab-general-link">
+                    @include('elements.tabs.general')
+                </div>
+
+                <!-- TAB DIFFUSIONE -->
+                <div class="tab-pane fade" id="tab-diffusion" role="tabpanel" aria-labelledby="tab-diffusion-link">
+                    @include('elements.tabs.diffusion')
+                </div>
+
+                <!-- TAB CONSUMPTION -->
+                @if($element->isConsumable())
                     <div class="tab-pane fade" id="tab-consumption" role="tabpanel" aria-labelledby="tab-consumption-link">
                         @include('elements.tabs.consumption')
                     </div>
-                    @endif
+                @endif
 
-                    <!-- TAB INFORMAZIONE -->
-                    @if($element->isInteractive())
+                <!-- TAB INFORMAZIONE -->
+                @if($element->isInteractive())
                     <div class="tab-pane fade" id="tab-information" role="tabpanel" aria-labelledby="tab-information-link">
                         @include('elements.tabs.information')
                     </div>
@@ -74,79 +86,85 @@
                     <div class="tab-pane fade" id="tab-reward" role="tabpanel" aria-labelledby="tab-reward-link">
                         @include('elements.tabs.reward')
                     </div>
-                    @endif
 
-                    <!-- TAB GRAPHICS -->
-                    <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
-                        @include('elements.tabs.graphics')
+                    <!-- TAB ELEMENTI CHIMICI -->
+                    <div class="tab-pane fade" id="tab-chemical-rules" role="tabpanel"
+                        aria-labelledby="tab-chemical-rules-link">
+                        @include('elements.tabs.chemical_elements')
                     </div>
+                @endif
 
-                    <!-- TAB BRAIN -->
-                    @if($element->isInteractive())
+                <!-- TAB GRAPHICS -->
+                <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
+                    @include('elements.tabs.graphics')
+                </div>
+
+                <!-- TAB BRAIN -->
+                @if($element->isInteractive())
                     <div class="tab-pane fade" id="tab-brain" role="tabpanel" aria-labelledby="tab-brain-link">
                         @include('elements.tabs.brain')
                     </div>
-                    @endif
+                @endif
 
-                </div>
-            </div>
-            
-            <div class="card-footer" id="main-form-footer">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Aggiorna
-                </button>
-                <a href="{{ route('elements.index') }}" class="btn btn-secondary">
-                    <i class="fas fa-times"></i> Annulla
-                </a>
             </div>
         </div>
-    </form>
+
+        <div class="card-footer" id="main-form-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Aggiorna
+            </button>
+            <a href="{{ route('elements.index') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Annulla
+            </a>
+        </div>
+    </div>
+</form>
 @stop
 
 @section('js')
-    <script>
-        $(function () {
-            $('[data-toggle="tooltip"]').tooltip();
+<script>
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
 
-            // Gene Rows Management
-            let geneIndex = {{ $element->genes->count() }};
-            
-            function updateGeneOptions() {
-                // Raccogli tutti i valori selezionati
-                let selectedValues = [];
-                $('.gene-selector').each(function() {
-                    let val = $(this).val();
-                    if (val) {
-                        selectedValues.push(val);
-                    }
-                });
+        // Gene Rows Management
+        let geneIndex = {{ $element->genes->count() }};
 
-                // Aggiorna ogni select
-                $('.gene-selector').each(function() {
-                    let currentSelect = $(this);
-                    let currentValue = currentSelect.val();
-                    
-                    currentSelect.find('option').each(function() {
-                        let option = $(this);
-                        let optionValue = option.val();
-                        
-                        // Disabilita se è selezionato altrove (non in questa select)
-                        if (selectedValues.includes(optionValue) && optionValue != currentValue) {
-                            option.prop('disabled', true);
-                        } else {
-                            option.prop('disabled', false);
-                        }
-                    });
-                });
-            }
-
-            // Bind change event
-            $(document).on('change', '.gene-selector', function() {
-                updateGeneOptions();
+        function updateGeneOptions() {
+            // Raccogli tutti i valori selezionati
+            let selectedValues = [];
+            $('.gene-selector').each(function () {
+                let val = $(this).val();
+                if (val) {
+                    selectedValues.push(val);
+                }
             });
 
-            $('#add-gene-row').click(function() {
-                let html = `
+            // Aggiorna ogni select
+            $('.gene-selector').each(function () {
+                let currentSelect = $(this);
+                let currentValue = currentSelect.val();
+
+                currentSelect.find('option').each(function () {
+                    let option = $(this);
+                    let optionValue = option.val();
+
+                    // Disabilita se è selezionato altrove (non in questa select)
+                    if (selectedValues.includes(optionValue) && optionValue != currentValue) {
+                        option.prop('disabled', true);
+                    } else {
+                        option.prop('disabled', false);
+                    }
+                });
+            });
+        }
+
+        // Bind change event
+        $(document).on('change', '.gene-selector', function () {
+            updateGeneOptions();
+        });
+
+        $('#add-gene-row').click(function () {
+            let html = `
                     <tr class="gene-row">
                         <td>
                             <select name="consumption_genes[${geneIndex}][gene_id]" class="form-control gene-selector" required>
@@ -164,92 +182,92 @@
                         </td>
                     </tr>
                 `;
-                $('#genes_table tbody').append(html);
-                geneIndex++;
-                updateGeneOptions();
-            });
-            
-            $(document).on('click', '.remove-gene-row', function() {
-                $(this).closest('tr').remove();
-                updateGeneOptions();
+            $('#genes_table tbody').append(html);
+            geneIndex++;
+            updateGeneOptions();
+        });
+
+        $(document).on('click', '.remove-gene-row', function () {
+            $(this).closest('tr').remove();
+            updateGeneOptions();
+        });
+
+        // Initial call
+        updateGeneOptions();
+
+        // Information Rows Management
+        let informationIndex = {{ $element->informations->count() }};
+
+        function updateInformationOptions() {
+            let selectedValues = [];
+            $('.information-selector').each(function () {
+                let val = $(this).val();
+                if (val) {
+                    selectedValues.push(val);
+                }
             });
 
-            // Initial call
-            updateGeneOptions();
-            
-            // Information Rows Management
-            let informationIndex = {{ $element->informations->count() }};
-            
-            function updateInformationOptions() {
-                let selectedValues = [];
-                $('.information-selector').each(function() {
-                    let val = $(this).val();
-                    if (val) {
-                        selectedValues.push(val);
+            $('.information-selector').each(function () {
+                let currentSelect = $(this);
+                let currentValue = currentSelect.val();
+
+                currentSelect.find('option').each(function () {
+                    let option = $(this);
+                    let optionValue = option.val();
+
+                    if (selectedValues.includes(optionValue) && optionValue != currentValue) {
+                        option.prop('disabled', true);
+                    } else {
+                        option.prop('disabled', false);
                     }
                 });
-                
-                $('.information-selector').each(function() {
-                    let currentSelect = $(this);
-                    let currentValue = currentSelect.val();
-                    
-                    currentSelect.find('option').each(function() {
-                        let option = $(this);
-                        let optionValue = option.val();
-                        
-                        if (selectedValues.includes(optionValue) && optionValue != currentValue) {
-                            option.prop('disabled', true);
-                        } else {
-                            option.prop('disabled', false);
-                        }
-                    });
-                });
-            }
-            
-            $(document).on('change', '.information-selector', function() {
-                updateInformationOptions();
-                
-                // Get the selected gene id
-                const geneId = $(this).val();
-                if (!geneId) {
-                    return;
-                }
-                
-                // Find the corresponding gene data
-                const gene = geneMap[geneId];
-                if (!gene) {
-                    return;
-                }
-                
-                // Update the min, max_from, and max_to fields
-                const row = $(this).closest('tr');
-                const minInput = row.find('input[name$="[min_value]"]');
-                const maxFromInput = row.find('input[name$="[max_from]"]');
-                const maxToInput = row.find('input[name$="[max_to]"]');
-                const valueInput = row.find('input[name$="[value]"]');
-                
-                // Set values
-                minInput.val(gene.min || 0);
-                if (gene.max !== null) {
-                    maxFromInput.val(gene.max);
-                    maxToInput.val(gene.max);
-                } else {
-                    maxFromInput.val(gene.max_from || 0);
-                    maxToInput.val(gene.max_to || 0);
-                }
-                
-                // Set value field constraints
-                valueInput.attr('min', gene.max_from || 0);
-                valueInput.attr('max', gene.max_to || 999999);
-                
-                // Set default value if empty
-                if (!valueInput.val() || valueInput.val() === '') {
-                    valueInput.val(gene.max_from || 0);
-                }
             });
-            
-            $('#add-information-row').click(function() {
-                let html = `
+        }
+
+        $(document).on('change', '.information-selector', function () {
+            updateInformationOptions();
+
+            // Get the selected gene id
+            const geneId = $(this).val();
+            if (!geneId) {
+                return;
+            }
+
+            // Find the corresponding gene data
+            const gene = geneMap[geneId];
+            if (!gene) {
+                return;
+            }
+
+            // Update the min, max_from, and max_to fields
+            const row = $(this).closest('tr');
+            const minInput = row.find('input[name$="[min_value]"]');
+            const maxFromInput = row.find('input[name$="[max_from]"]');
+            const maxToInput = row.find('input[name$="[max_to]"]');
+            const valueInput = row.find('input[name$="[value]"]');
+
+            // Set values
+            minInput.val(gene.min || 0);
+            if (gene.max !== null) {
+                maxFromInput.val(gene.max);
+                maxToInput.val(gene.max);
+            } else {
+                maxFromInput.val(gene.max_from || 0);
+                maxToInput.val(gene.max_to || 0);
+            }
+
+            // Set value field constraints
+            valueInput.attr('min', gene.max_from || 0);
+            valueInput.attr('max', gene.max_to || 999999);
+
+            // Set default value if empty
+            if (!valueInput.val() || valueInput.val() === '') {
+                valueInput.val(gene.max_from || 0);
+            }
+        });
+
+        $('#add-information-row').click(function () {
+            let html = `
                     <tr class="information-row">
                         <td>
                             <select name="information_genes[${informationIndex}][gene_id]" class="form-control information-selector" required>
@@ -276,49 +294,49 @@
                         </td>
                     </tr>
                 `;
-                $('#information_table tbody').append(html);
-                informationIndex++;
-                updateInformationOptions();
-            });
-            
-            $(document).on('click', '.remove-information-row', function() {
-                $(this).closest('tr').remove();
-                updateInformationOptions();
-            });
-            
+            $('#information_table tbody').append(html);
+            informationIndex++;
             updateInformationOptions();
-            
-            // Reward Rows Management
-            let rewardIndex = {{ $element->scores->count() }};
-            
-            function updateRewardOptions() {
-                let selectedValues = [];
-                $('.reward-selector').each(function() {
-                    let val = $(this).val();
-                    if (val) {
-                        selectedValues.push(val);
+        });
+
+        $(document).on('click', '.remove-information-row', function () {
+            $(this).closest('tr').remove();
+            updateInformationOptions();
+        });
+
+        updateInformationOptions();
+
+        // Reward Rows Management
+        let rewardIndex = {{ $element->scores->count() }};
+
+        function updateRewardOptions() {
+            let selectedValues = [];
+            $('.reward-selector').each(function () {
+                let val = $(this).val();
+                if (val) {
+                    selectedValues.push(val);
+                }
+            });
+
+            $('.reward-selector').each(function () {
+                let currentSelect = $(this);
+                let currentValue = currentSelect.val();
+
+                currentSelect.find('option').each(function () {
+                    let option = $(this);
+                    let optionValue = option.val();
+
+                    if (selectedValues.includes(optionValue) && optionValue != currentValue) {
+                        option.prop('disabled', true);
+                    } else {
+                        option.prop('disabled', false);
                     }
                 });
-                
-                $('.reward-selector').each(function() {
-                    let currentSelect = $(this);
-                    let currentValue = currentSelect.val();
-                    
-                    currentSelect.find('option').each(function() {
-                        let option = $(this);
-                        let optionValue = option.val();
-                        
-                        if (selectedValues.includes(optionValue) && optionValue != currentValue) {
-                            option.prop('disabled', true);
-                        } else {
-                            option.prop('disabled', false);
-                        }
-                    });
-                });
-            }
-            
-            $('#add-reward-row').click(function() {
-                let html = `
+            });
+        }
+
+        $('#add-reward-row').click(function () {
+            let html = `
                     <tr class="reward-row">
                         <td>
                             <select name="reward_scores[${rewardIndex}][score_id]" class="form-control reward-selector" required>
@@ -336,33 +354,126 @@
                         </td>
                     </tr>
                 `;
-                $('#reward_table tbody').append(html);
-                rewardIndex++;
-                updateRewardOptions();
-            });
-            
-            $(document).on('click', '.remove-reward-row', function() {
-                $(this).closest('tr').remove();
-                updateRewardOptions();
-            });
-            
+            $('#reward_table tbody').append(html);
+            rewardIndex++;
             updateRewardOptions();
+        });
 
-            function toggleMainFooterByTab() {
-                const footer = document.getElementById('main-form-footer');
-                if (!footer) {
-                    return;
+        $(document).on('click', '.remove-reward-row', function () {
+            $(this).closest('tr').remove();
+            updateRewardOptions();
+        });
+
+        updateRewardOptions();
+
+        // Initialize Select2 for rules modal
+        if (typeof $.fn.select2 !== 'undefined') {
+            $('#modal-rule-selector').select2({
+                theme: 'bootstrap4',
+                dropdownParent: $('#modal-add-rule')
+            });
+        }
+
+        // Rules Rows Management
+        let ruleIndex = {{ $element->ruleChimicalElements->count() }};
+
+        // Refresh rules on modal open
+        $('#modal-add-rule').on('show.bs.modal', function () {
+            const selector = $('#modal-rule-selector');
+            selector.prop('disabled', true);
+
+            $.ajax({
+                url: "{{ route('rule-chimical-elements.list.all') }}",
+                method: "GET",
+                success: function (data) {
+                    // Get current IDs in the table
+                    let currentIds = [];
+                    $('.rule-id-input').each(function () {
+                        currentIds.push($(this).val().toString());
+                    });
+
+                    // Clear current options except placeholder
+                    selector.find('option:not([value=""])').remove();
+
+                    // Add new options
+                    data.forEach(function (rule) {
+                        const titleStr = rule.title;
+                        const isDisabled = currentIds.indexOf(rule.id.toString()) !== -1;
+
+                        selector.append(`<option value="${rule.id}" data-full-name="${titleStr}" ${isDisabled ? 'disabled' : ''}>${titleStr}</option>`);
+                    });
+
+                    selector.prop('disabled', false);
+                    selector.trigger('change');
+                },
+                error: function () {
+                    alert('Errore nel caricamento delle regole');
+                    selector.prop('disabled', false);
                 }
+            });
+        });
 
-                const brainTabPane = document.getElementById('tab-brain');
-                const isBrainActive = brainTabPane && brainTabPane.classList.contains('active') && brainTabPane.classList.contains('show');
-                footer.style.display = isBrainActive ? 'none' : '';
+        $('#confirm-add-rule').click(function () {
+            const selector = $('#modal-rule-selector');
+            const ruleId = selector.val();
+            if (!ruleId) {
+                alert('Seleziona una regola');
+                return;
             }
 
-            toggleMainFooterByTab();
-            $('a[data-toggle="pill"]').on('shown.bs.tab', function () {
-                toggleMainFooterByTab();
+            const ruleName = selector.find('option:selected').data('full-name');
+
+            // Check if already added
+            let alreadyAdded = false;
+            $('.rule-id-input').each(function () {
+                if ($(this).val() == ruleId) {
+                    alreadyAdded = true;
+                }
             });
-        })
-    </script>
+
+            if (alreadyAdded) {
+                alert('Questa regola è già stata aggiunta');
+                return;
+            }
+
+            let html = `
+                    <tr class="rule-row">
+                        <td>
+                            <input type="hidden" name="rule_chimical_elements[${ruleIndex}][rule_chimical_element_id]" value="${ruleId}" class="rule-id-input">
+                            ${ruleName}
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm remove-rule-row"><i class="fa fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            $('#rules_table tbody').append(html);
+            ruleIndex++;
+
+            // Reset and close modal
+            selector.val('').trigger('change');
+            $('#modal-add-rule').modal('hide');
+        });
+
+        $(document).on('click', '.remove-rule-row', function () {
+            $(this).closest('tr').remove();
+        });
+
+        function toggleMainFooterByTab() {
+            const footer = document.getElementById('main-form-footer');
+            if (!footer) {
+                return;
+            }
+
+            const brainTabPane = document.getElementById('tab-brain');
+            const isBrainActive = brainTabPane && brainTabPane.classList.contains('active') && brainTabPane.classList.contains('show');
+            footer.style.display = isBrainActive ? 'none' : '';
+        }
+
+        toggleMainFooterByTab();
+        $('a[data-toggle="pill"]').on('shown.bs.tab', function () {
+            toggleMainFooterByTab();
+        });
+    })
+</script>
 @stop

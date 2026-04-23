@@ -60,6 +60,11 @@ class Element extends Model
         return $this->belongsTo(Brain::class);
     }
 
+    public function ruleChimicalElements()
+    {
+        return $this->belongsToMany(RuleChimicalElement::class, 'element_has_rule_chimical_elements');
+    }
+
     /**
      * Check if the element is consumable
      *

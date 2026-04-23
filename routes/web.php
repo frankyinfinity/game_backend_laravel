@@ -117,6 +117,8 @@ Route::group(['middleware' => ['auth']], function () {
     //Rule Chimical Elements
     Route::resource('rule-chimical-elements', App\Http\Controllers\RuleChimicalElementController::class)->except(['create']);
     Route::post('/rule-chimical-elements/list/table', [App\Http\Controllers\RuleChimicalElementController::class, 'listDataTable'])->name('rule-chimical-elements.datatable');
+    Route::get('/rule-chimical-elements/list/all', [App\Http\Controllers\RuleChimicalElementController::class, 'list'])->name('rule-chimical-elements.list.all');
+    Route::get('/rule-chimical-elements/{ruleChimicalElement}/replicate', [App\Http\Controllers\RuleChimicalElementController::class, 'replicate'])->name('rule-chimical-elements.replicate');
     Route::post('/rule-chimical-elements/delete', [App\Http\Controllers\RuleChimicalElementController::class, 'delete'])->name('rule-chimical-elements.delete');
     Route::post('/rule-chimical-elements/{ruleChimicalElement}/details', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'store'])->name('rule-chimical-elements.detail.store');
     Route::post('/rule-chimical-elements/{ruleChimicalElement}/save-all', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'saveAll'])->name('rule-chimical-elements.detail.saveAll');
