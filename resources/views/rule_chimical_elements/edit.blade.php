@@ -62,22 +62,13 @@
                               @endif
                           </div>
                           <div class="form-group">
-                              <label for="name">Nome Interno <span class="text-danger">*</span></label>
+                              <label for="name">Nome Regola <span class="text-danger">*</span></label>
                               <input type="text"
                                      class="form-control"
                                      id="name"
                                      name="name"
                                      value="{{ old('name', $ruleChimicalElement->name) }}"
                                      required>
-                          </div>
-                          <div class="form-group">
-                              <label for="title">Titolo Visualizzato</label>
-                              <input type="text"
-                                     class="form-control"
-                                     id="title"
-                                     name="title"
-                                     value="{{ old('title', $ruleChimicalElement->title) }}"
-                                     placeholder="es: Regola Fertilità Suolo">
                           </div>
                           <div class="form-group" id="chimical_element_group" style="{{ $ruleChimicalElement->chimical_element_id ? '' : 'display: none;' }}">
                              <label for="chimical_element_id">Elemento Chimico</label>
@@ -116,7 +107,6 @@
                                            id="min"
                                            name="min"
                                            value="{{ old('min', $ruleChimicalElement->min) }}"
-                                           min="0"
                                            required
                                            {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
                                 </div>
@@ -129,7 +119,6 @@
                                            id="max"
                                            name="max"
                                            value="{{ old('max', $ruleChimicalElement->max) }}"
-                                           min="0"
                                            required
                                            {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
                                 </div>

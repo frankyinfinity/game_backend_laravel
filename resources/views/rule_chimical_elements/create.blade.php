@@ -76,7 +76,6 @@
                                            id="min"
                                            name="min"
                                            value="{{ old('min') }}"
-                                           min="0"
                                            required>
                                 </div>
                             </div>
@@ -88,7 +87,6 @@
                                            id="max"
                                            name="max"
                                            value="{{ old('max') }}"
-                                           min="0"
                                            required>
                                 </div>
                             </div>
