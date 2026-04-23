@@ -80,7 +80,11 @@ class RegionController extends Controller
         $selectRegion->build();
 
         // MultiSelect for RuleChimicalElements (with details)
-        $rulesWithDetails = \App\Models\RuleChimicalElement::whereHas('details')->get();
+        $rulesWithDetails = \App\Models\RuleChimicalElement::query()
+            ->where('type', \App\Models\RuleChimicalElement::TYPE_ENTITY)
+            ->whereHas('details')
+            ->get();
+
         $multiSelectOptions = $rulesWithDetails->map(function ($rule) {
             return ['id' => $rule->id, 'name' => $rule->title];
         })->toArray();

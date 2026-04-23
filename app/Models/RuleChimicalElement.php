@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class RuleChimicalElement extends Model
 {
+    const TYPE_ENTITY = 'entity';
+    const TYPE_ELEMENT = 'element';
+
+    const COLOR_ENTITY = '#17a2b8';
+    const COLOR_ELEMENT = '#28a745';
+
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
     protected $fillable = [
@@ -18,6 +24,7 @@ class RuleChimicalElement extends Model
         'quantity_tick_degradation',
         'percentage_degradation',
         'degradable',
+        'type',
     ];
 
     protected $casts = [
@@ -28,6 +35,7 @@ class RuleChimicalElement extends Model
         'quantity_tick_degradation' => 'integer',
         'percentage_degradation' => 'float',
         'degradable' => 'boolean',
+        'type' => 'string',
     ];
 
     public function chimicalElement()
@@ -43,5 +51,22 @@ class RuleChimicalElement extends Model
     public function details()
     {
         return $this->hasMany(RuleChimicalElementDetail::class, 'rule_chimical_element_id')->orderBy('min');
+    }
+
+    public static function getTypes(): array
+    {
+        return [
+            self::TYPE_ENTITY => 'Entità',
+            self::TYPE_ELEMENT => 'Elemento',
+        ];
+    }
+
+    public static function getTypeBadgeClass(string $type): string
+    {
+        return match ($type) {
+            self::TYPE_ENTITY => self::COLOR_ENTITY,
+            self::TYPE_ELEMENT => self::COLOR_ELEMENT,
+            default => '#6c757d',
+        };
     }
 }

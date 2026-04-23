@@ -11,23 +11,17 @@ class RuleChimicalElementController extends Controller
 {
     public function index()
     {
-        $existingChimicalIds = RuleChimicalElement::whereNotNull('chimical_element_id')->pluck('chimical_element_id')->toArray();
-        $existingComplexIds = RuleChimicalElement::whereNotNull('complex_chimical_element_id')->pluck('complex_chimical_element_id')->toArray();
-        
         $rules = RuleChimicalElement::with(['chimicalElement', 'complexChimicalElement'])->get();
-        $chimicalElements = ChimicalElement::whereNotIn('id', $existingChimicalIds)->get();
-        $complexChimicalElements = ComplexChimicalElement::whereNotIn('id', $existingComplexIds)->get();
+        $chimicalElements = ChimicalElement::query()->get();
+        $complexChimicalElements = ComplexChimicalElement::query()->get();
         return view('rule_chimical_elements.index', compact('rules', 'chimicalElements', 'complexChimicalElements'));
     }
 
     public function create()
     {
-        $existingChimicalIds = RuleChimicalElement::whereNotNull('chimical_element_id')->pluck('chimical_element_id')->toArray();
-        $existingComplexIds = RuleChimicalElement::whereNotNull('complex_chimical_element_id')->pluck('complex_chimical_element_id')->toArray();
-        
-        $chimicalElements = ChimicalElement::whereNotIn('id', $existingChimicalIds)->get();
-        $complexChimicalElements = ComplexChimicalElement::whereNotIn('id', $existingComplexIds)->get();
-        
+        $chimicalElements = ChimicalElement::query()->get();
+        $complexChimicalElements = ComplexChimicalElement::query()->get();
+
         return view('rule_chimical_elements.create', compact('chimicalElements', 'complexChimicalElements'));
     }
 
@@ -36,6 +30,7 @@ class RuleChimicalElementController extends Controller
         $request->validate([
             'min' => 'required|integer',
             'max' => 'required|integer',
+            'type' => 'required|string|in:entity,element',
         ]);
 
         $chimicalElementId = $request->input('chimical_element_id');
@@ -48,7 +43,8 @@ class RuleChimicalElementController extends Controller
             return back()->withErrors('Seleziona almeno un elemento chimico o elemento chimico complesso');
         }
 
-$rule = RuleChimicalElement::create([
+        $rule = RuleChimicalElement::create([
+            'type' => $request->input('type'),
             'chimical_element_id' => $chimicalElementId,
             'complex_chimical_element_id' => $complexChimicalElementId,
             'min' => $request->input('min'),
@@ -79,20 +75,20 @@ $rule = RuleChimicalElement::create([
     public function update(Request $request, RuleChimicalElement $ruleChimicalElement)
     {
         $ruleChimicalElement->load('details');
-        
+
         $basicFields = ['chimical_element_id', 'complex_chimical_element_id', 'min', 'max', 'default_value'];
         $hasBasicChanges = false;
-        
+
         foreach ($basicFields as $field) {
             $oldValue = $ruleChimicalElement->{$field};
             $newValue = $request->input($field);
-            
+
             if ((string) $oldValue !== (string) $newValue) {
                 $hasBasicChanges = true;
                 break;
             }
         }
-        
+
         if ($ruleChimicalElement->details->isNotEmpty() && $hasBasicChanges) {
             return back()->withErrors('Non è possibile modificare la regola quando sono presenti dei dettagli. Elimina prima i dettagli.');
         }
@@ -103,16 +99,17 @@ $rule = RuleChimicalElement::create([
         ]);
 
         $elementType = $request->input('element_type');
-        
+
         if ($elementType === 'simple') {
             $chimicalElementId = $request->input('chimical_element_id');
             $chimicalElementId = $chimicalElementId ? (int) $chimicalElementId : null;
-            
+
             if (empty($chimicalElementId)) {
                 return back()->withErrors('Seleziona un elemento chimico');
             }
-            
+
             $ruleChimicalElement->update([
+                'type' => $request->type,
                 'chimical_element_id' => $chimicalElementId,
                 'complex_chimical_element_id' => null,
                 'min' => $request->input('min'),
@@ -125,12 +122,13 @@ $rule = RuleChimicalElement::create([
         } else {
             $complexChimicalElementId = $request->input('complex_chimical_element_id');
             $complexChimicalElementId = $complexChimicalElementId ? (int) $complexChimicalElementId : null;
-            
+
             if (empty($complexChimicalElementId)) {
                 return back()->withErrors('Seleziona un elemento chimico complesso');
             }
-            
+
             $ruleChimicalElement->update([
+                'type' => RuleChimicalElement::TYPE_ELEMENT,
                 'chimical_element_id' => null,
                 'complex_chimical_element_id' => $complexChimicalElementId,
                 'min' => $request->input('min'),
@@ -165,16 +163,25 @@ $rule = RuleChimicalElement::create([
 
     public function listDataTable()
     {
-        $rules = RuleChimicalElement::all();
-        
+        $rules = RuleChimicalElement::with(['chimicalElement', 'complexChimicalElement'])->get();
+
         return response()->json([
             'data' => $rules->map(function ($rule) {
-                $type = $rule->chimicalElement ? 'Semplice' : 'Complesso';
-                
+                // Fallback per compatibilità: se type è null, determina dal fatto che abbia chimicalElement o complexChimicalElement
+                $type = $rule->type;
+                if (is_null($type) || $type === '') {
+                    $type = $rule->chimicalElement ? RuleChimicalElement::TYPE_ENTITY : RuleChimicalElement::TYPE_ELEMENT;
+                }
+
+                $typeLabel = array_key_exists($type, RuleChimicalElement::getTypes())
+                    ? RuleChimicalElement::getTypes()[$type]
+                    : $type;
+
                 return [
                     'id' => $rule->id,
                     'element' => $rule->title ?? '-',
-                    'type' => $type,
+                    'type' => $typeLabel,
+                    'color' => RuleChimicalElement::getTypeBadgeClass($type),
                     'min' => $rule->min,
                     'max' => $rule->max,
                     'default_value' => $rule->default_value,

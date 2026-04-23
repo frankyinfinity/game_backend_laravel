@@ -1,23 +1,14 @@
 @extends('adminlte::page')
 
-@section('title', 'Modifica Regola Elemento Chimico')
+@section('title', 'Crea Regola Elemento Chimico')
 
 @section('content_header')
-    <h1>Modifica Regola Elemento Chimico</h1>
+    <h1>Crea Regola Elemento Chimico</h1>
 @stop
 
 @section('content')
-    @if($ruleChimicalElement->details->isNotEmpty())
-        <div class="alert alert-warning mb-3">
-            <i class="fas fa-exclamation-triangle"></i> 
-            Non è possibile modificare i campi base di questa regola perché contiene dei dettagli. 
-            <a href="{{ route('rule-chimical-elements.show', $ruleChimicalElement) }}">Visualizza i dettagli</a>
-        </div>
-    @endif
-    
-    <form action="{{ route('rule-chimical-elements.update', $ruleChimicalElement) }}" method="POST">
+    <form action="{{ route('rule-chimical-elements.store') }}" method="POST">
         @csrf
-        @method('PUT')
         
         <div class="row">
             <div class="col-md-6">
@@ -28,42 +19,24 @@
                     <div class="card-body">
                          <div class="form-group">
                              <label for="element_type">Tipo Elemento</label>
-                             <select class="form-control" id="element_type" name="element_type" onchange="toggleElementSelects()" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                 <option value="simple" {{ $ruleChimicalElement->chimical_element_id ? 'selected' : '' }}>Elemento Chimico Semplice</option>
-                                 <option value="complex" {{ $ruleChimicalElement->complex_chimical_element_id ? 'selected' : '' }}>Elemento Chimico Complesso</option>
+                             <select class="form-control" id="element_type" name="element_type" onchange="toggleElementSelects()">
+                                 <option value="simple">Elemento Chimico Semplice</option>
+                                 <option value="complex">Elemento Chimico Complesso</option>
                              </select>
-                             @if($ruleChimicalElement->details->isNotEmpty())
-                                 <input type="hidden" name="element_type" value="{{ $ruleChimicalElement->chimical_element_id ? 'simple' : 'complex' }}">
-                             @endif
                          </div>
                          <div class="form-group">
                              <label for="type">Tipo Regola</label>
-                             <select class="form-control" id="type" name="type" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                 <option value="entity" {{ old('type', $ruleChimicalElement->type) == 'entity' ? 'selected' : '' }}>Entità</option>
-                                 <option value="element" {{ old('type', $ruleChimicalElement->type) == 'element' ? 'selected' : '' }}>Elemento</option>
+                             <select class="form-control" id="type" name="type">
+                                 <option value="entity" {{ old('type') == 'entity' ? 'selected' : '' }}>Entità</option>
+                                 <option value="element" {{ old('type') == 'element' ? 'selected' : '' }}>Elemento</option>
                              </select>
-                             @if($ruleChimicalElement->details->isNotEmpty())
-                                 <input type="hidden" name="type" value="{{ $ruleChimicalElement->type }}">
-                             @endif
                          </div>
-                         <div class="form-group" id="chimical_element_group" style="{{ $ruleChimicalElement->chimical_element_id ? '' : 'display: none;' }}">
+                         <div class="form-group" id="chimical_element_group">
                             <label for="chimical_element_id">Elemento Chimico</label>
-<select class="form-control" id="chimical_element_id" name="chimical_element_id" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                 <option value="">Seleziona Elemento Chimico</option>
-                                 @foreach($chimicalElements as $ce)
-                                     <option value="{{ $ce->id }}" {{ old('chimical_element_id', $ruleChimicalElement->chimical_element_id) == $ce->id ? 'selected' : '' }}>{{ $ce->name }} ({{ $ce->symbol }})</option>
-                                 @endforeach
-                             </select>
-                             @if($ruleChimicalElement->details->isNotEmpty())
-                                 <input type="hidden" name="chimical_element_id" value="{{ $ruleChimicalElement->chimical_element_id }}">
-                             @endif
-                        </div>
-                        <div class="form-group" id="complex_chimical_element_group" style="{{ $ruleChimicalElement->complex_chimical_element_id ? '' : 'display: none;' }}">
-                            <label for="complex_chimical_element_id">Elemento Chimico Complesso</label>
-                            <select class="form-control" id="complex_chimical_element_id" name="complex_chimical_element_id" {{ $ruleChimicalElement->details->isNotEmpty() ? 'disabled' : '' }}>
-                                <option value="">Seleziona Elemento Chimico Complesso</option>
-                                @foreach($complexChimicalElements as $cce)
-                                    <option value="{{ $cce->id }}" {{ old('complex_chimical_element_id', $ruleChimicalElement->complex_chimical_element_id) == $cce->id ? 'selected' : '' }}>{{ $cce->name }}</option>
+                            <select class="form-control" id="chimical_element_id" name="chimical_element_id">
+                                <option value="">Seleziona Elemento Chimico</option>
+                                @foreach($chimicalElements as $ce)
+                                    <option value="{{ $ce->id }}">{{ $ce->name }} ({{ $ce->symbol }})</option>
                                 @endforeach
                             </select>
                         </div>
@@ -75,10 +48,9 @@
                                            class="form-control"
                                            id="min"
                                            name="min"
-                                           value="{{ old('min', $ruleChimicalElement->min) }}"
+                                           value="{{ old('min') }}"
                                            min="0"
-                                           required
-                                           {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
+                                           required>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -88,10 +60,9 @@
                                            class="form-control"
                                            id="max"
                                            name="max"
-                                           value="{{ old('max', $ruleChimicalElement->max) }}"
+                                           value="{{ old('max') }}"
                                            min="0"
-                                           required
-                                           {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
+                                           required>
                                 </div>
                             </div>
                         </div>
@@ -101,9 +72,8 @@
                                    class="form-control"
                                    id="default_value"
                                    name="default_value"
-                                   value="{{ old('default_value', $ruleChimicalElement->default_value) }}"
-                                   placeholder="es: 0, 50, 100"
-                                   {{ $ruleChimicalElement->details->isNotEmpty() ? 'readonly' : '' }}>
+                                   value="{{ old('default_value') }}"
+                                   placeholder="es: 0, 50, 100">
                         </div>
                     </div>
                 </div>
@@ -122,11 +92,11 @@
                                        id="degradable"
                                        name="degradable"
                                        value="1"
-                                       {{ old('degradable', $ruleChimicalElement->degradable) ? 'checked' : '' }}>
+                                       {{ old('degradable') ? 'checked' : '' }}>
                                 <label class="form-check-label" for="degradable">Abilitato</label>
                             </div>
                         </div>
-                        <div class="border rounded p-3" id="degradation_container" style="{{ old('degradable', $ruleChimicalElement->degradable) ? '' : 'display:none;' }}">
+                        <div class="border rounded p-3" id="degradation_container" style="{{ old('degradable') ? '' : 'display:none;' }}">
                             <div class="row">
                                 <div class="col-md-12 mb-2">
                                     <small class="text-muted"><i class="fas fa-info-circle"></i> Un tick equivale più o meno a 10 secondi di gioco.</small>
@@ -140,7 +110,7 @@
                                                class="form-control"
                                                id="quantity_tick_degradation"
                                                name="quantity_tick_degradation"
-                                               value="{{ old('quantity_tick_degradation', $ruleChimicalElement->quantity_tick_degradation) }}"
+                                               value="{{ old('quantity_tick_degradation') }}"
                                                min="0"
                                                placeholder="Quantità persa ad ogni tick">
                                     </div>
@@ -152,7 +122,7 @@
                                                class="form-control"
                                                id="percentage_degradation"
                                                name="percentage_degradation"
-                                               value="{{ old('percentage_degradation', $ruleChimicalElement->percentage_degradation) }}"
+                                               value="{{ old('percentage_degradation') }}"
                                                min="0"
                                                max="100"
                                                step="0.01"
