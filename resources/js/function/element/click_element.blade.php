@@ -1,5 +1,5 @@
 <script>
-    window['__name__'] = function() {
+    window['__name__'] = function () {
         let object_uid = object['uid'];
         let panel_uid = object_uid + '_panel';
 
@@ -110,7 +110,7 @@
         }
 
         // --- Gene Polling Management (moved to end to ensure UI is ready) ---
-        if (show && object.attributes && object.attributes.ws_port) {
+        if (show && object.attributes && object.attributes.ws_port && object.attributes.is_interactive) {
             const elementPort = object.attributes.ws_port;
             const elementWsUrl = '__gateway_base__' + elementPort;
             window.gameWebSockets = window.gameWebSockets || {};
@@ -137,23 +137,23 @@
                                         const min = (gene.min !== undefined) ? gene.min : 0;
                                         const max = (gene.max !== undefined) ? gene.max : 100;
                                         const modifier = (gene.modifier !== undefined) ? gene.modifier : null;
-                                        
+
                                         let useModifiedRange = modifier !== null && modifier > 0;
                                         let displayMax = useModifiedRange ? max + modifier : max;
                                         let range = displayMax - min;
-                                        
+
                                         let valueToUse = gene.value;
                                         if (!useModifiedRange && modifier !== null && modifier < 0) {
                                             valueToUse = Math.min(gene.value, max);
                                         }
-                                        
+
                                         const percent = range > 0 ? (valueToUse - min) / range : 0;
                                         const clampedPercent = Math.max(0, Math.min(1, percent));
                                         const fullWidth = (objects[borderUid]?.width || 200);
                                         const newWidth = (fullWidth - 4) * clampedPercent;
                                         objects[barUid].width = Math.max(0, newWidth);
                                         if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(barUid);
-                                        
+
                                         const rangeUid = baseUid + '_range';
                                         if (objects[rangeUid]) {
                                             let rangeText = "[" + min + " / " + max;
@@ -164,7 +164,7 @@
                                             objects[rangeUid].text = rangeText;
                                             if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(rangeUid);
                                         }
-                                        
+
                                         const modifierBarUid = baseUid + '_modifier_bar';
                                         const modifierTextUid = baseUid + '_modifier_text';
                                         if (modifier !== null) {
@@ -173,12 +173,12 @@
                                             const modifierPercent = baseRange > 0 ? modifierRange / baseRange : 0;
                                             const modifierBarWidth = (fullWidth - 4) * Math.min(1, modifierPercent);
                                             const borderX = objects[borderUid]?.x || 0;
-                                            
+
                                             let modifierColor;
                                             if (modifier > 0) modifierColor = 0x228B22;
                                             else if (modifier < 0) modifierColor = 0xFFA500;
                                             else modifierColor = 0x404040;
-                                            
+
                                             if (objects[modifierBarUid]) {
                                                 objects[modifierBarUid].x = borderX + 2 + (fullWidth - 4) - modifierBarWidth;
                                                 objects[modifierBarUid].width = Math.max(0, modifierBarWidth);
@@ -219,10 +219,10 @@
                         ws.send(JSON.stringify({ command: 'get_genes' }));
                     }
                 };
-                
+
                 // Immediate refresh after a small delay to ensure rendering is complete
-                setTimeout(() => fetchGenes(true), 50); 
-                
+                setTimeout(() => fetchGenes(true), 50);
+
                 // Standard 2s cycle
                 AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 2000);
             };
@@ -267,34 +267,34 @@
                                     const valueUid = baseUid + '_value';
                                     const lineUid = baseUid + '_line';
                                     const borderUid = baseUid + '_glass_border';
-                                    
+
                                     if (objects[valueUid]) {
                                         objects[valueUid].text = String(chimical.value);
                                         if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(valueUid);
                                     }
-                                    
+
                                     if (objects[borderUid]) {
                                         let min = parseInt(chimical.min) || 0;
                                         let max = parseInt(chimical.max) || 100;
                                         let value = parseInt(chimical.value) || 0;
-                                        
+
                                         let range = max - min;
                                         if (range <= 0) range = 1;
-                                        
+
                                         let percent = (value - min) / range;
                                         percent = Math.max(0, Math.min(1, percent));
-                                        
+
                                         const borderX = objects[borderUid].x || 0;
                                         const fullWidth = objects[borderUid].width || 300;
                                         const innerX = borderX + 1;
                                         const innerWidth = fullWidth - 2;
                                         const indicatorX = innerX + (percent * innerWidth);
-                                        
+
                                         if (objects[lineUid]) {
                                             objects[lineUid].x = indicatorX - 1;
                                             if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(lineUid);
                                         }
-                                        
+
                                         if (objects[valueUid]) {
                                             objects[valueUid].x = indicatorX;
                                             if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(valueUid);
@@ -318,9 +318,9 @@
                         ws.send(JSON.stringify({ command: 'get_chimical_elements' }));
                     }
                 };
-                
+
                 setTimeout(() => fetchChimical(true), 50);
-                
+
                 AppData._chimicalPollingIntervals[object_uid] = setInterval(() => fetchChimical(false), 2000);
             };
 
