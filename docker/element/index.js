@@ -107,7 +107,7 @@ function performLogin() {
 function callGameBrain() {
   if (!sessionCookie) {
     console.log('No session cookie, skipping game/brain...');
-    scheduleNextCycle();
+    scheduleNextBrainCycle();
     return;
   }
 
@@ -326,7 +326,6 @@ function fetchCurrentChimicalElements() {
     scheduleNextChimicalElementsCycle();
   });
 
-  req.end();
 }
 
 function fetchNeuronBorderUid(neuronId) {

@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ElementHasPositionRuleChimicalElementDetailEffect extends Model
 {
+    const TYPE_FIXED = 1;
+    const TYPE_TIMED = 2;
+
     protected $table = 'element_has_position_rule_chimical_element_detail_effects';
 
     protected $guarded = ['id', 'created_at', 'updated_at'];

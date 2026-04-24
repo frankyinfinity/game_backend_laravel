@@ -150,13 +150,13 @@ res.on('end', () => {
   req.end();
 }
 
-function callCheckPlayerModifier() {
+function callCheckModifier() {
   if (!sessionCookie) {
-    console.log('No session cookie, skipping checkPlayerModifier...');
+    console.log('No session cookie, skipping checkModifier...');
     return;
   }
 
-  const path = '/api/auth/game/check_player_modifier';
+  const path = '/api/auth/game/check_modifier';
   const postData = JSON.stringify({ player_id: playerId });
 
   const options = {
@@ -183,15 +183,15 @@ function callCheckPlayerModifier() {
     res.on('end', () => {
       try {
         const response = JSON.parse(data);
-        console.log(`[Player ${playerId}] checkPlayerModifier:`, response);
+        console.log(`[Player ${playerId}] checkModifier:`, response);
       } catch (error) {
-        console.error(`[Player ${playerId}] checkPlayerModifier parse error: ${error.message}`);
+        console.error(`[Player ${playerId}] checkModifier parse error: ${error.message}`);
       }
     });
   });
 
   req.on('error', (error) => {
-    console.error(`[Player ${playerId}] Error calling checkPlayerModifier: ${error.message}`);
+    console.error(`[Player ${playerId}] Error calling checkModifier: ${error.message}`);
   });
 
   req.write(postData);
@@ -258,7 +258,7 @@ const PLAYER_MODIFIER_INTERVAL = 10000;
 
 function startTimers() {
   setInterval(callGetPlayerValues, PLAYER_VALUES_INTERVAL);
-  setInterval(callCheckPlayerModifier, PLAYER_MODIFIER_INTERVAL);
+  setInterval(callCheckModifier, PLAYER_MODIFIER_INTERVAL);
 }
 
 function performLogin() {

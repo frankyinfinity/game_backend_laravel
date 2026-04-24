@@ -141,6 +141,7 @@ class ElementController extends Controller
             'success' => true,
             'uid' => $elementHasPosition->uid,
             'is_interactive' => $elementHasPosition->element->isInteractive(),
+            'player_id' => $elementHasPosition->player_id,
         ]);
     }
 

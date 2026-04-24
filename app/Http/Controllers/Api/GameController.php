@@ -48,6 +48,7 @@ use App\Models\PlayerValue;
 use App\Models\EntityChimicalElement;
 use App\Models\PlayerRuleChimicalElement;
 use App\Models\PlayerModifier;
+use App\Models\ElementModifier;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
@@ -1384,37 +1385,63 @@ class GameController extends Controller
         ]);
     }
 
-    public function checkPlayerModifier(Request $request): \Illuminate\Http\JsonResponse
+    public function checkModifier(Request $request): \Illuminate\Http\JsonResponse
     {
         $playerId = (int) ($request->input('player_id') ?? $request->input('playerId'));
-        if ($playerId <= 0) {
-            return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
-        }
+        $elementHasPositionId = (int) $request->input('element_has_position_id');
 
-        $expiredCount = PlayerModifier::query()
-            ->where('player_id', $playerId)
-            ->whereNotNull('finished_at')
-            ->where('finished_at', '<', now())
-            ->count();
+        $expiredPlayerDeleted = 0;
+        $expiredElementDeleted = 0;
 
-        if ($expiredCount > 0) {
-            Log::info('[checkPlayerModifier] Deleting ' . $expiredCount . ' expired modifiers for player ' . $playerId);
-            $items = PlayerModifier::query()
+        if ($playerId > 0) {
+            $expiredPlayerDeleted = PlayerModifier::query()
                 ->where('player_id', $playerId)
                 ->whereNotNull('finished_at')
                 ->where('finished_at', '<', now())
-                ->get();
-            foreach ($items as $item) {
-                $item->delete();
+                ->count();
+
+            if ($expiredPlayerDeleted > 0) {
+                Log::info('[checkModifier] Deleting ' . $expiredPlayerDeleted . ' expired modifiers for player ' . $playerId);
+                $items = PlayerModifier::query()
+                    ->where('player_id', $playerId)
+                    ->whereNotNull('finished_at')
+                    ->where('finished_at', '<', now())
+                    ->get();
+                foreach ($items as $item) {
+                    $item->delete();
+                }
+            }
+
+            // Cleanup all ElementModifiers for all elements belonging to this player
+            $expiredElementDeleted = ElementModifier::query()
+                ->whereHas('elementHasPosition', function ($query) use ($playerId) {
+                    $query->where('player_id', $playerId);
+                })
+                ->whereNotNull('finished_at')
+                ->where('finished_at', '<', now())
+                ->count();
+
+            if ($expiredElementDeleted > 0) {
+                Log::info('[checkModifier] Deleting ' . $expiredElementDeleted . ' expired element modifiers for player ' . $playerId);
+                $items = ElementModifier::query()
+                    ->whereHas('elementHasPosition', function ($query) use ($playerId) {
+                        $query->where('player_id', $playerId);
+                    })
+                    ->whereNotNull('finished_at')
+                    ->where('finished_at', '<', now())
+                    ->get();
+                foreach ($items as $item) {
+                    $item->delete();
+                }
             }
         }
-
-        Log::info('[checkPlayerModifier] player_id: ' . $playerId);
 
         return response()->json([
             'success' => true,
             'player_id' => $playerId,
-            'expired_deleted' => $expiredCount,
+            'element_has_position_id' => $elementHasPositionId,
+            'expired_player_deleted' => $expiredPlayerDeleted,
+            'expired_element_deleted' => $expiredElementDeleted,
         ]);
     }
 
