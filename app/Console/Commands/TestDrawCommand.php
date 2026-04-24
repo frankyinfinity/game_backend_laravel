@@ -2,14 +2,13 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Models\DrawRequest;
-use App\Models\EntityInformation;
-use App\Models\Genome;
 use App\Models\Player;
+use App\Models\ElementHasPositionChimicalElement;
+use App\Custom\Draw\Complex\BarChimicalElementDraw;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use function GuzzleHttp\json_encode;
@@ -52,29 +51,17 @@ class TestDrawCommand extends Command
 
         ObjectCache::clear($sessionId);
 
-        $genome = Genome::query()->with('gene')->first();
+        $positionChimicalElement = ElementHasPositionChimicalElement::query()
+            ->where('id', 2)
+            ->first();
 
-        if ($genome) {
-            $entityInformation = EntityInformation::query()
-                ->where('genome_id', $genome->id)
-                ->first();
+        if ($positionChimicalElement) {
+            $barDraw = new BarChimicalElementDraw($positionChimicalElement);
+            $barDraw->setOrigin(50, 150);
+            $barDraw->setRenderable(true);
+            $barDraw->build();
 
-            $geneName = $genome->gene ? $genome->gene->name : 'Genome';
-
-            $progressBar = new ProgressBarDraw('test_progress_bar');
-            $progressBar->setName($geneName);
-            $progressBar->setMin($genome->min);
-            $progressBar->setMax($genome->max);
-            $progressBar->setValue($entityInformation ? $entityInformation->value : 0);
-            $progressBar->setModifier($genome->modifier);
-            $progressBar->setBorderColor(\App\Custom\Colors::LIGHT_GRAY);
-            $progressBar->setBarColor(\App\Custom\Colors::RED);
-            $progressBar->setSize(380, 20);
-            $progressBar->setOrigin(50, 50);
-            $progressBar->setRenderable(true);
-            $progressBar->build();
-
-            foreach ($progressBar->getDrawItems() as $drawItem) {
+            foreach ($barDraw->getDrawItems() as $drawItem) {
                 $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
                 $drawItems[] = $objectDraw->get();
             }

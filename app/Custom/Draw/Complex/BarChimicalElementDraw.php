@@ -3,6 +3,7 @@
 namespace App\Custom\Draw\Complex;
 
 use App\Models\EntityChimicalElement;
+use App\Models\ElementHasPositionChimicalElement;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\Line;
@@ -13,16 +14,16 @@ class BarChimicalElementDraw
     private const BAR_WIDTH = 300;
     private const BAR_HEIGHT = 20;
 
-    private EntityChimicalElement $entityChimicalElement;
+    private EntityChimicalElement|ElementHasPositionChimicalElement $model;
     private float $x = 0;
     private float $y = 0;
     private bool $renderable = true;
 
     private array $drawItems = [];
 
-    public function __construct(EntityChimicalElement $entityChimicalElement)
+    public function __construct(EntityChimicalElement|ElementHasPositionChimicalElement $model)
     {
-        $this->entityChimicalElement = $entityChimicalElement;
+        $this->model = $model;
     }
 
     public function setOrigin(float $x, float $y): void
@@ -49,21 +50,26 @@ class BarChimicalElementDraw
     {
         $this->drawItems = [];
 
-        $playerRuleChimicalElement = $this->entityChimicalElement->playerRuleChimicalElement;
-        if (!$playerRuleChimicalElement) {
+        if ($this->model instanceof EntityChimicalElement) {
+            $rule = $this->model->playerRuleChimicalElement;
+        } else {
+            $rule = $this->model->elementHasPositionRuleChimicalElement;
+        }
+
+        if (!$rule) {
             return;
         }
 
-        $title = $playerRuleChimicalElement->title ?? 'Elemento';
-        $value = (int) $this->entityChimicalElement->value;
-        $min = (int) $playerRuleChimicalElement->min;
-        $max = (int) $playerRuleChimicalElement->max;
+        $title = $rule->title ?? 'Elemento';
+        $value = (int) $this->model->value;
+        $min = (int) $rule->min;
+        $max = (int) $rule->max;
         $range = $max - $min;
         if ($range <= 0) {
             $range = 1;
         }
 
-        $uid = 'bar_chimical_element_' . $this->entityChimicalElement->id;
+        $uid = 'bar_chimical_element_' . $this->model->id;
 
         $titleText = new Text($uid . '_title');
         $titleText->setText($title);
@@ -73,7 +79,7 @@ class BarChimicalElementDraw
         $titleText->setRenderable($this->renderable);
         $this->drawItems[] = $titleText;
 
-        if ($playerRuleChimicalElement->degradable) {
+        if ($rule->degradable) {
             $degradationText = new Text($uid . '_degradation_icon');
             $degradationText->setText('⚠');
             $degradationText->setOrigin($this->x + strlen($title) * 9 + 5, $this->y - 18);
@@ -81,8 +87,8 @@ class BarChimicalElementDraw
             $degradationText->setColor(Colors::ORANGE);
             $degradationText->setRenderable($this->renderable);
             
-            $quantity = $playerRuleChimicalElement->quantity_tick_degradation ?? 0;
-            $percentage = $playerRuleChimicalElement->percentage_degradation ?? 0;
+            $quantity = $rule->quantity_tick_degradation ?? 0;
+            $percentage = $rule->percentage_degradation ?? 0;
             $tooltipText = "⚠ Degradabile\n----------------\nQtà per tick: {$quantity}\nProbabilità: {$percentage}%";
             $degradationText->addAttributes('tooltip_text', $tooltipText);
             
@@ -103,7 +109,7 @@ class BarChimicalElementDraw
         $glassInner->setRenderable($this->renderable);
         $this->drawItems[] = $glassInner;
 
-        $details = $playerRuleChimicalElement->details()->with('effects.gene')->orderBy('min')->get();
+        $details = $rule->details()->with('effects.gene')->orderBy('min')->get();
         $innerWidth = self::BAR_WIDTH;
         $innerHeight = self::BAR_HEIGHT;
         $innerX = $this->x;
