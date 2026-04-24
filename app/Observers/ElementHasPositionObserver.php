@@ -14,6 +14,7 @@ use App\Models\ElementHasPositionScore;
 use App\Models\ElementHasPositionRuleChimicalElement;
 use App\Models\ElementHasPositionRuleChimicalElementDetail;
 use App\Models\ElementHasPositionRuleChimicalElementDetailEffect;
+use App\Models\ElementHasPositionChimicalElement;
 use App\Models\Container;
 use Docker\Docker;
 use Illuminate\Support\Str;
@@ -30,126 +31,153 @@ class ElementHasPositionObserver
         $element = $elementHasPosition->element;
 
         if ($element->isInteractive()) {
-            //Information
-            $elementHasInformations = ElementInformation::query()
-                ->where('element_id', $element->id)
-                ->get();
+            $this->initializeInformation($elementHasPosition);
+            $this->initializeScore($elementHasPosition);
+            $this->initializeBrain($elementHasPosition);
+            $this->initializeChemicalRules($elementHasPosition);
+            $this->initializeContainer($elementHasPosition);
+        }
+    }
 
-            foreach ($elementHasInformations as $elementHasInformation) {
-                ElementHasPositionInformation::query()->create([
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'gene_id' => $elementHasInformation->gene_id,
-                    'min' => $elementHasInformation->min_value,
-                    'max' => $elementHasInformation->value,
-                    'value' => $elementHasInformation->value
+    private function initializeInformation(ElementHasPosition $elementHasPosition): void
+    {
+        $element = $elementHasPosition->element;
+        $elementHasInformations = ElementInformation::query()
+            ->where('element_id', $element->id)
+            ->get();
+
+        foreach ($elementHasInformations as $elementHasInformation) {
+            ElementHasPositionInformation::query()->create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'gene_id' => $elementHasInformation->gene_id,
+                'min' => $elementHasInformation->min_value,
+                'max' => $elementHasInformation->value,
+                'value' => $elementHasInformation->value
+            ]);
+        }
+    }
+
+    private function initializeScore(ElementHasPosition $elementHasPosition): void
+    {
+        $element = $elementHasPosition->element;
+        $elementHasScores = ElementHasScore::query()
+            ->where('element_id', $element->id)
+            ->get();
+
+        foreach ($elementHasScores as $elementHasScore) {
+            ElementHasPositionScore::query()->create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'score_id' => $elementHasScore->score_id,
+                'amount' => $elementHasScore->amount,
+            ]);
+        }
+    }
+
+    private function initializeBrain(ElementHasPosition $elementHasPosition): void
+    {
+        $element = $elementHasPosition->element;
+        $templateBrain = $element->brain;
+
+        if ($templateBrain !== null) {
+            $templateBrain->load('neurons.outgoingLinks');
+
+            $clonedBrain = ElementHasPositionBrain::query()->create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'uid' => (string) Str::uuid(),
+                'grid_width' => (int) ($templateBrain->grid_width ?? 5),
+                'grid_height' => (int) ($templateBrain->grid_height ?? 5),
+            ]);
+
+            $templateToClonedNeuronId = [];
+            foreach ($templateBrain->neurons as $templateNeuron) {
+                $clonedNeuron = ElementHasPositionNeuron::query()->create([
+                    'element_has_position_brain_id' => $clonedBrain->id,
+                    'type' => $templateNeuron->type,
+                    'grid_i' => (int) $templateNeuron->grid_i,
+                    'grid_j' => (int) $templateNeuron->grid_j,
+                    'radius' => $templateNeuron->radius,
+                    'target_type' => $templateNeuron->target_type,
+                    'target_element_id' => $templateNeuron->target_element_id,
+                    'gene_life_id' => $templateNeuron->gene_life_id,
+                    'gene_attack_id' => $templateNeuron->gene_attack_id,
                 ]);
+
+                $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;
             }
 
-            //Score
-            $elementHasScores = ElementHasScore::query()
-                ->where('element_id', $element->id)
-                ->get();
-
-            foreach ($elementHasScores as $elementHasScore) {
-                ElementHasPositionScore::query()->create([
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'score_id' => $elementHasScore->score_id,
-                    'amount' => $elementHasScore->amount,
-                ]);
-            }
-
-            // Clone Brain -> Neuron -> NeuronLink structure from element template
-            $templateBrain = $element->brain;
-            if ($templateBrain !== null) {
-                $templateBrain->load('neurons.outgoingLinks');
-
-                $clonedBrain = ElementHasPositionBrain::query()->create([
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'uid' => (string) Str::uuid(),
-                    'grid_width' => (int) ($templateBrain->grid_width ?? 5),
-                    'grid_height' => (int) ($templateBrain->grid_height ?? 5),
-                ]);
-
-                $templateToClonedNeuronId = [];
-                foreach ($templateBrain->neurons as $templateNeuron) {
-                    $clonedNeuron = ElementHasPositionNeuron::query()->create([
-                        'element_has_position_brain_id' => $clonedBrain->id,
-                        'type' => $templateNeuron->type,
-                        'grid_i' => (int) $templateNeuron->grid_i,
-                        'grid_j' => (int) $templateNeuron->grid_j,
-                        'radius' => $templateNeuron->radius,
-                        'target_type' => $templateNeuron->target_type,
-                        'target_element_id' => $templateNeuron->target_element_id,
-                        'gene_life_id' => $templateNeuron->gene_life_id,
-                        'gene_attack_id' => $templateNeuron->gene_attack_id,
-                    ]);
-
-                    $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;
-                }
-
-                foreach ($templateBrain->neurons as $templateNeuron) {
-                    foreach ($templateNeuron->outgoingLinks as $templateLink) {
-                        $fromClonedId = $templateToClonedNeuronId[(int) $templateLink->from_neuron_id] ?? null;
-                        $toClonedId = $templateToClonedNeuronId[(int) $templateLink->to_neuron_id] ?? null;
-                        if ($fromClonedId === null || $toClonedId === null) {
-                            continue;
-                        }
-
-                        ElementHasPositionNeuronLink::query()->firstOrCreate([
-                            'from_element_has_position_neuron_id' => $fromClonedId,
-                            'to_element_has_position_neuron_id' => $toClonedId,
-                            'condition' => $templateLink->condition,
-                        ]);
+            foreach ($templateBrain->neurons as $templateNeuron) {
+                foreach ($templateNeuron->outgoingLinks as $templateLink) {
+                    $fromClonedId = $templateToClonedNeuronId[(int) $templateLink->from_neuron_id] ?? null;
+                    $toClonedId = $templateToClonedNeuronId[(int) $templateLink->to_neuron_id] ?? null;
+                    if ($fromClonedId === null || $toClonedId === null) {
+                        continue;
                     }
-                }
-            }
 
-            // Chemical Rules
-            $ruleChimicalElements = $element->ruleChimicalElements()->with('details.effects')->get();
-
-            foreach ($ruleChimicalElements as $templateRule) {
-                $clonedRule = ElementHasPositionRuleChimicalElement::query()->create([
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'chimical_element_id' => $templateRule->chimical_element_id,
-                    'complex_chimical_element_id' => $templateRule->complex_chimical_element_id,
-                    'min' => $templateRule->min,
-                    'max' => $templateRule->max,
-                    'title' => $templateRule->title,
-                    'default_value' => $templateRule->default_value ?? 0,
-                    'quantity_tick_degradation' => $templateRule->quantity_tick_degradation ?? 0,
-                    'percentage_degradation' => $templateRule->percentage_degradation ?? 0,
-                    'degradable' => $templateRule->degradable ?? false,
-                ]);
-
-                foreach ($templateRule->details as $templateDetail) {
-                    $clonedDetail = ElementHasPositionRuleChimicalElementDetail::query()->create([
-                        'element_has_position_rule_chimical_element_id' => $clonedRule->id,
-                        'min' => $templateDetail->min,
-                        'max' => $templateDetail->max,
-                        'color' => $templateDetail->color,
+                    ElementHasPositionNeuronLink::query()->firstOrCreate([
+                        'from_element_has_position_neuron_id' => $fromClonedId,
+                        'to_element_has_position_neuron_id' => $toClonedId,
+                        'condition' => $templateLink->condition,
                     ]);
-
-                    foreach ($templateDetail->effects as $templateEffect) {
-                        ElementHasPositionRuleChimicalElementDetailEffect::query()->create([
-                            'element_has_position_rule_chimical_element_detail_id' => $clonedDetail->id,
-                            'type' => $templateEffect->type,
-                            'gene_id' => $templateEffect->gene_id,
-                            'value' => $templateEffect->value,
-                            'duration' => $templateEffect->duration ?? 0,
-                        ]);
-                    }
                 }
             }
+        }
+    }
 
-            // Create and start a dedicated element container (only for interactive)
-            try {
-                app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, true);
-            } catch (\Throwable $e) {
-                Log::error('Unable to create element container', [
-                    'element_has_position_id' => $elementHasPosition->id,
-                    'error' => $e->getMessage(),
+    private function initializeChemicalRules(ElementHasPosition $elementHasPosition): void
+    {
+        $element = $elementHasPosition->element;
+        $ruleChimicalElements = $element->ruleChimicalElements()->with('details.effects')->get();
+
+        foreach ($ruleChimicalElements as $templateRule) {
+            $clonedRule = ElementHasPositionRuleChimicalElement::query()->create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'chimical_element_id' => $templateRule->chimical_element_id,
+                'complex_chimical_element_id' => $templateRule->complex_chimical_element_id,
+                'min' => $templateRule->min,
+                'max' => $templateRule->max,
+                'title' => $templateRule->title,
+                'default_value' => $templateRule->default_value ?? 0,
+                'quantity_tick_degradation' => $templateRule->quantity_tick_degradation ?? 0,
+                'percentage_degradation' => $templateRule->percentage_degradation ?? 0,
+                'degradable' => $templateRule->degradable ?? false,
+            ]);
+
+            ElementHasPositionChimicalElement::query()->create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'element_has_position_rule_chimical_element_id' => $clonedRule->id,
+                'value' => $templateRule->default_value ?? 0,
+            ]);
+
+            foreach ($templateRule->details as $templateDetail) {
+                $clonedDetail = ElementHasPositionRuleChimicalElementDetail::query()->create([
+                    'element_has_position_rule_chimical_element_id' => $clonedRule->id,
+                    'min' => $templateDetail->min,
+                    'max' => $templateDetail->max,
+                    'color' => $templateDetail->color,
                 ]);
+
+                foreach ($templateDetail->effects as $templateEffect) {
+                    ElementHasPositionRuleChimicalElementDetailEffect::query()->create([
+                        'element_has_position_rule_chimical_element_detail_id' => $clonedDetail->id,
+                        'type' => $templateEffect->type,
+                        'gene_id' => $templateEffect->gene_id,
+                        'value' => $templateEffect->value,
+                        'duration' => $templateEffect->duration ?? 0,
+                    ]);
+                }
             }
+        }
+    }
+
+    private function initializeContainer(ElementHasPosition $elementHasPosition): void
+    {
+        try {
+            app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, true);
+        } catch (\Throwable $e) {
+            Log::error('Unable to create element container', [
+                'element_has_position_id' => $elementHasPosition->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
