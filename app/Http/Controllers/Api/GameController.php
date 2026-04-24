@@ -45,11 +45,13 @@ use App\Models\PhasePlayer;
 use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Models\PlayerValue;
-use App\Models\EntityChimicalElement;
-use App\Models\PlayerRuleChimicalElement;
-use App\Models\PlayerModifier;
-use App\Models\ElementModifier;
-use App\Custom\Draw\Primitive\Square;
+ use App\Models\EntityChimicalElement;
+ use App\Models\PlayerRuleChimicalElement;
+ use App\Models\PlayerModifier;
+ use App\Models\ElementModifier;
+ use App\Models\ElementHasPositionChimicalElement;
+ use App\Models\ElementHasPositionRuleChimicalElement;
+ use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Manipulation\ObjectUpdate;
@@ -2817,13 +2819,13 @@ class GameController extends Controller
     }
 
     /**
-     * Gestisce il controllo della degradazione degli elementi chimici
-     */
-    public function checkDegradation(Request $request): \Illuminate\Http\JsonResponse
-    {
-        $entityUid = $request->entity_uid;
+      * Rinomina checkDegradation in checkEntityDegradation
+      */
+     public function checkEntityDegradation(Request $request): \Illuminate\Http\JsonResponse
+     {
+         $entityUid = $request->entity_uid;
 
-        Log::info("checkDegradation called for Entity: {$entityUid}");
+         Log::info("checkEntityDegradation called for Entity: {$entityUid}");
 
         $entity = Entity::query()->where('uid', $entityUid)->first();
         if (!$entity) {
@@ -2861,6 +2863,53 @@ class GameController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => 'Degradation check completed']);
+    }
+
+    /**
+     * Gestisce il controllo della degradazione per gli elementi
+     */
+    public function checkElementDegradation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $elementHasPositionUid = $request->element_has_position_uid;
+
+        Log::info("checkElementDegradation called for ElementHasPosition: {$elementHasPositionUid}");
+
+        $elementHasPosition = ElementHasPosition::query()->where('uid', $elementHasPositionUid)->first();
+        if (!$elementHasPosition) {
+            return response()->json(['success' => false, 'message' => 'ElementHasPosition not found']);
+        }
+
+        $elementChimicalElements = ElementHasPositionChimicalElement::query()
+            ->where('element_has_position_id', $elementHasPosition->id)
+            ->with('elementHasPositionRuleChimicalElement')
+            ->get();
+
+        foreach ($elementChimicalElements as $elementChimicalElement) {
+            $rule = $elementChimicalElement->elementHasPositionRuleChimicalElement;
+
+            if (!$rule || !$rule->degradable) {
+                continue;
+            }
+
+            $percentage = $rule->percentage_degradation ?? 0;
+            $quantity = $rule->quantity_tick_degradation ?? 0;
+
+            if ($quantity > 0 && $percentage > 0) {
+                if (Helper::chance($percentage)) {
+                    $currentValue = (float) $elementChimicalElement->value;
+                    $min = (int) $rule->min;
+                    $max = (int) $rule->max;
+                    $newValue = max($min, min($max, $currentValue - $quantity));
+
+                    $elementChimicalElement->value = $newValue;
+                    $elementChimicalElement->save();
+
+                    Log::info("Element degradation applied for element_chimical_element_id: {$elementChimicalElement->id}, old: {$currentValue}, new: {$newValue}");
+                }
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => 'Element degradation check completed']);
     }
 
     /**

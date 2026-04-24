@@ -14,10 +14,11 @@ console.log('Element service started.');
 console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
 console.log(`ElementHasPosition ID: ${elementHasPositionId || 'MISSING'}`);
 
-let sessionCookie = null;
-let xsrfToken = null;
-let currentGenes = [];
-let currentChimicalElements = [];
+ let sessionCookie = null;
+ let xsrfToken = null;
+ let currentGenes = [];
+ let currentChimicalElements = [];
+ let degradationTimer = null;
 
 function parseCookies(response) {
   const list = {};
@@ -81,12 +82,13 @@ function performLogin() {
     const reqPost = http.request(optionsPost, (resPost) => {
       updateSession(resPost);
 
-      if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful, starting cycles...');
-        callGameBrain();
-        fetchCurrentGenes();
-        fetchCurrentChimicalElements();
-      } else {
+       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
+         console.log('Login successful, starting cycles...');
+         callGameBrain();
+         fetchCurrentGenes();
+         fetchCurrentChimicalElements();
+         scheduleElementDegradationCheck();
+       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', (d) => console.error(d.toString()));
       }
@@ -175,11 +177,66 @@ function scheduleNextGenesCycle() {
   }, GENES_WAIT_SECONDS * 1000);
 }
 
-function scheduleNextChimicalElementsCycle() {
-  setTimeout(() => {
-    fetchCurrentChimicalElements();
-  }, CHIMICAL_WAIT_SECONDS * 1000);
+ function scheduleNextChimicalElementsCycle() {
+   setTimeout(() => {
+     fetchCurrentChimicalElements();
+   }, CHIMICAL_WAIT_SECONDS * 1000);
+ }
+
+// Timer per la degradazione (10 secondi)
+ function scheduleElementDegradationCheck() {
+   if (degradationTimer) clearTimeout(degradationTimer);
+   degradationTimer = setTimeout(() => {
+     checkElementDegradation();
+     scheduleElementDegradationCheck();
+   }, 10000);
+ }
+
+function checkElementDegradation() {
+  if (!sessionCookie) return;
+
+  const path = '/api/auth/game/element/check_degradation';
+  const postData = JSON.stringify({ element_has_position_uid: elementHasPositionUid });
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: path,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+      Accept: 'application/json',
+      Cookie: sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          console.log('[Element ' + elementHasPositionUid + '] Element degradation check completed');
+        } else {
+          console.error('[Element ' + elementHasPositionUid + '] Element degradation check failed: ' + (response.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('[Element ' + elementHasPositionUid + '] Error parsing element degradation response: ' + error.message);
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error('[Element ' + elementHasPositionUid + '] Error calling element degradation API: ' + error.message);
+  });
+
+  req.write(postData);
+  req.end();
 }
+
 
 
 function fetchCurrentGenes() {

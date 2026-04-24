@@ -95,12 +95,12 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful (or redirect received), starting creation loop...');
-        // Avvia i cicli separati
-        scheduleNextCycle();
-        scheduleGenesFetch();
-        scheduleChimicalElementsFetch();
-        scheduleDegradationCheck();
+         console.log('Login successful (or redirect received), starting creation loop...');
+         // Avvia i cicli separati
+         scheduleNextCycle();
+         scheduleGenesFetch();
+         scheduleChimicalElementsFetch();
+         scheduleEntityDegradationCheck();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         // Try reading body for error
@@ -282,19 +282,19 @@ function scheduleChimicalElementsFetch() {
 
 // Timer per la degradazione (10 secondi)
 let degradationTimer = null;
-function scheduleDegradationCheck() {
-  if (degradationTimer) clearTimeout(degradationTimer);
-  degradationTimer = setTimeout(() => {
-    checkDegradation();
-    scheduleDegradationCheck();
-  }, 10000);
-}
+ function scheduleEntityDegradationCheck() {
+   if (degradationTimer) clearTimeout(degradationTimer);
+   degradationTimer = setTimeout(() => {
+     checkEntityDegradation();
+     scheduleEntityDegradationCheck();
+   }, 10000);
+ }
 
-function checkDegradation() {
-  if (!sessionCookie) return;
+ function checkEntityDegradation() {
+   if (!sessionCookie) return;
 
-  const path = '/api/auth/game/entity/check_degradation';
-  const postData = JSON.stringify({ entity_uid: entityUid });
+   const path = '/api/auth/game/entity/check_degradation';
+   const postData = JSON.stringify({ entity_uid: entityUid });
 
   const options = {
     hostname: new URL(backendUrl).hostname,
@@ -317,19 +317,19 @@ function checkDegradation() {
       try {
         const response = JSON.parse(data);
         if (response.success) {
-          console.log('[Entity ' + entityUid + '] Degradation check completed');
-        } else {
-          console.error('[Entity ' + entityUid + '] Degradation check failed: ' + (response.message || 'Unknown error'));
-        }
-      } catch (error) {
-        console.error('[Entity ' + entityUid + '] Error parsing degradation response: ' + error.message);
+           console.log('[Entity ' + entityUid + '] Entity degradation check completed');
+         } else {
+           console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
+         }
+       } catch (error) {
+         console.error('[Entity ' + entityUid + '] Error parsing entity degradation response: ' + error.message);
       }
     });
   });
 
-  req.on('error', (error) => {
-    console.error('[Entity ' + entityUid + '] Error calling degradation API: ' + error.message);
-  });
+   req.on('error', (error) => {
+     console.error('[Entity ' + entityUid + '] Error calling entity degradation API: ' + error.message);
+   });
 
   req.write(postData);
   req.end();
