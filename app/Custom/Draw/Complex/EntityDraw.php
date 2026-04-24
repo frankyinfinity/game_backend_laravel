@@ -123,7 +123,7 @@ class EntityDraw
         $panel = new Rectangle($dbEntity->uid.'_panel');
         $panel->setOrigin($panelX, y: $panelY);
         $panel->setSize(400, 800);
-        $panel->setColor(0xFFFFFF);
+        $panel->setColor(Colors::WHITE);
         $panel->setRenderable(false);
 
         //Text
@@ -283,6 +283,7 @@ class EntityDraw
         
         foreach($chimicalElements as $entityChimicalElement) {
             $barChimicalElement = new BarChimicalElementDraw($entityChimicalElement);
+            $barChimicalElement->setWidth(380);
             $barChimicalElement->setOrigin($panelX, $panelY);
             $barChimicalElement->setRenderable(false);
             $barChimicalElement->build();

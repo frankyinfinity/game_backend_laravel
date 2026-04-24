@@ -15,6 +15,7 @@ use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Complex\Element\BrainPanelDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\ProgressBarDraw;
+use App\Custom\Draw\Complex\BarChimicalElementDraw;
 use App\Custom\Draw\Support\ScrollGroup;
 use App\Custom\Colors;
 use App\Helper\Helper;
@@ -135,8 +136,8 @@ class ElementDraw
 
         $panel = new Rectangle($uid . '_panel');
         $panel->setOrigin($panelX, $panelY);
-        $panel->setSize(240, 200);
-        $panel->setColor(0xFFFFFF);
+        $panel->setSize(400, 200);
+        $panel->setColor(Colors::WHITE);
         $panel->setRenderable(false);
         $image->addChild($panel);
 
@@ -177,8 +178,17 @@ class ElementDraw
             $geneProgressBarCount = count($geneProgressBarItems) / 3; // Each progress bar has ~3 draw items
         }
 
-        // Attack Button position (after gene progress bars)
-        $attackBtnY = $brainPanelBottomY + 24 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
+        // Chemical Bars (only for interactive elements)
+        $chemicalBarItems = [];
+        $chemicalBarCount = 0;
+        if ($this->element->isInteractive() && $elementHasPosition) {
+            $chemicalBarStartY = $brainPanelBottomY + 24 + ($geneProgressBarCount * self::PROGRESS_BAR_VERTICAL_STEP);
+            $chemicalBarItems = $this->addChemicalBars($panel, $panelX, $chemicalBarStartY, $elementHasPosition);
+            $chemicalBarCount = count($chemicalBarItems) / 7; // Approximate items per chemical bar
+        }
+
+        // Attack Button position (after gene progress bars and chemical bars)
+        $attackBtnY = $brainPanelBottomY + 24 + (($geneProgressBarCount + $chemicalBarCount) * self::PROGRESS_BAR_VERTICAL_STEP) + 25;
         
         // Consumable Button (encapsulated in function)
         $btnItems = [];
@@ -214,6 +224,11 @@ class ElementDraw
         
         // Add gene progress bar items to draw items
         foreach ($geneProgressBarItems as $item) {
+            $this->drawItems[] = $item->buildJson();
+        }
+
+        // Add chemical bar items to draw items
+        foreach ($chemicalBarItems as $item) {
             $this->drawItems[] = $item->buildJson();
         }
 
@@ -266,7 +281,7 @@ class ElementDraw
         
         if ($informationCount > 0) {
             // Increase panel height to accommodate progress bars
-            $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), max(200, ($informationCount * 105) + 200));
+            $panel->setSize(max(400, $panel->buildJson()['width'] ?? 400), max(200, ($informationCount * 105) + 200));
             
             $progressBarY = $startY; // Start below the brain panel
             
@@ -284,7 +299,7 @@ class ElementDraw
                 $progressBar->setMax($elementHasPositionInformation->max);
                 $progressBar->setBorderColor(Colors::LIGHT_GRAY);
                 $progressBar->setBarColor(Colors::RED);
-                $progressBar->setSize(180, 20);
+                $progressBar->setSize(380, 20);
                 $progressBar->setOrigin($panelX + 10, $progressBarY);
                 $progressBar->setRenderable(false);
                 
@@ -299,6 +314,47 @@ class ElementDraw
         }
         
         return $geneProgressBarItems;
+    }
+
+    /**
+     * Add chemical bars to the panel
+     * 
+     * @return array Array of chemical bar draw items
+     */
+    private function addChemicalBars(Rectangle $panel, $panelX, $startY, $elementHasPosition): array
+    {
+        $chemicalBarItems = [];
+        
+        $elementHasPositionChimicalElements = $elementHasPosition->chimicalElements()
+            ->with(['elementHasPositionRuleChimicalElement.details.effects.gene'])
+            ->get();
+        
+        $chimicalCount = $elementHasPositionChimicalElements->count();
+        
+        if ($chimicalCount > 0) {
+            // Increase panel height to accommodate chemical bars
+            $currentHeight = $panel->buildJson()['height'] ?? 200;
+            $panel->setSize(max(240, $panel->buildJson()['width'] ?? 240), $currentHeight + ($chimicalCount * self::PROGRESS_BAR_VERTICAL_STEP));
+            
+            $barY = $startY;
+            
+            foreach ($elementHasPositionChimicalElements as $chimicalElement) {
+                $barDraw = new BarChimicalElementDraw($chimicalElement);
+                $barDraw->setWidth(380);
+                $barDraw->setOrigin($panelX + 10, $barY + 20); // Add offset for title
+                $barDraw->setRenderable(false);
+                
+                $barDraw->build();
+                foreach ($barDraw->getDrawItems() as $item) {
+                    $panel->addChild($item);
+                    $chemicalBarItems[] = $item;
+                }
+                
+                $barY += self::PROGRESS_BAR_VERTICAL_STEP;
+            }
+        }
+        
+        return $chemicalBarItems;
     }
     
     /**

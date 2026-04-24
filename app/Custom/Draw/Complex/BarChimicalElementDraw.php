@@ -17,6 +17,7 @@ class BarChimicalElementDraw
     private EntityChimicalElement|ElementHasPositionChimicalElement $model;
     private float $x = 0;
     private float $y = 0;
+    private int $width = self::BAR_WIDTH;
     private bool $renderable = true;
 
     private array $drawItems = [];
@@ -36,6 +37,11 @@ class BarChimicalElementDraw
     public function setRenderable(bool $renderable): void
     {
         $this->renderable = $renderable;
+    }
+
+    public function setWidth(int $width): void
+    {
+        $this->width = $width;
     }
 
     public function getDrawItems(): array
@@ -97,20 +103,20 @@ class BarChimicalElementDraw
 
         $glassBorder = new Rectangle($uid . '_glass_border');
         $glassBorder->setOrigin($this->x - 1, $this->y - 1);
-        $glassBorder->setSize(self::BAR_WIDTH + 2, self::BAR_HEIGHT + 2);
+        $glassBorder->setSize($this->width + 2, self::BAR_HEIGHT + 2);
         $glassBorder->setColor(Colors::BLACK);
         $glassBorder->setRenderable($this->renderable);
         $this->drawItems[] = $glassBorder;
 
         $glassInner = new Rectangle($uid . '_glass_inner');
         $glassInner->setOrigin($this->x, $this->y);
-        $glassInner->setSize(self::BAR_WIDTH, self::BAR_HEIGHT);
+        $glassInner->setSize($this->width, self::BAR_HEIGHT);
         $glassInner->setColor(Colors::SILVER);
         $glassInner->setRenderable($this->renderable);
         $this->drawItems[] = $glassInner;
 
         $details = $rule->details()->with('effects.gene')->orderBy('min')->get();
-        $innerWidth = self::BAR_WIDTH;
+        $innerWidth = $this->width;
         $innerHeight = self::BAR_HEIGHT;
         $innerX = $this->x;
         $innerY = $this->y;
@@ -179,7 +185,7 @@ class BarChimicalElementDraw
 
         $maxText = new Text($uid . '_max');
         $maxText->setText((string) $max);
-        $maxText->setOrigin($this->x + self::BAR_WIDTH - 4, $this->y + self::BAR_HEIGHT + 14);
+        $maxText->setOrigin($this->x + $this->width - 4, $this->y + self::BAR_HEIGHT + 14);
         $maxText->setFontSize(14);
         $maxText->setColor(Colors::DARK_GRAY);
         $maxText->setCenterAnchor(true);
