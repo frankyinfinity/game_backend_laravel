@@ -298,6 +298,7 @@ class ElementDraw
                 $progressBar->setValue($elementHasPositionInformation->value); 
                 $progressBar->setMin($elementHasPositionInformation->min);
                 $progressBar->setMax($elementHasPositionInformation->max);
+                $progressBar->setModifier($elementHasPositionInformation->modifier ?? null);
                 $progressBar->setBorderColor(Colors::LIGHT_GRAY);
                 $progressBar->setBarColor(Colors::RED);
                 $progressBar->setSize(380, 20);

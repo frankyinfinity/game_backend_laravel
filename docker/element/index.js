@@ -18,7 +18,6 @@ let sessionCookie = null;
 let xsrfToken = null;
 let currentGenes = [];
 let currentChimicalElements = [];
-let isInteractive = false;
 
 function parseCookies(response) {
   const list = {};
@@ -83,12 +82,10 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful, checking interactivity and starting cycles...');
+        console.log('Login successful, starting cycles...');
         callGameBrain();
-        checkInteractivity(() => {
-          fetchCurrentGenes();
-          fetchCurrentChimicalElements();
-        });
+        fetchCurrentGenes();
+        fetchCurrentChimicalElements();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', (d) => console.error(d.toString()));
@@ -184,53 +181,10 @@ function scheduleNextChimicalElementsCycle() {
   }, CHIMICAL_WAIT_SECONDS * 1000);
 }
 
-function checkInteractivity(callback) {
-  if (!sessionCookie) return;
-
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: `/elements/status?uid=${elementHasPositionUid}`,
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cookie': sessionCookie,
-      'X-XSRF-TOKEN': xsrfToken,
-    },
-  };
-
-  const req = http.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => data += chunk);
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success) {
-          isInteractive = !!response.is_interactive;
-          console.log(`[Element ${elementHasPositionUid}] Interactivity Status: ${isInteractive}`);
-        }
-      } catch (error) {
-        console.error(`[Element ${elementHasPositionUid}] Error parsing status: ${error.message}`);
-      }
-      if (callback) callback();
-    });
-  });
-
-  req.on('error', (error) => {
-    console.error(`[Element ${elementHasPositionUid}] Error checking status: ${error.message}`);
-    if (callback) callback();
-  });
-
-  req.end();
-}
 
 function fetchCurrentGenes() {
   if (!sessionCookie) return;
-  if (!isInteractive) {
-    console.log(`[Element ${elementHasPositionUid}] Skipping gene polling: not interactive.`);
-    return;
-  }
+
 
   const path = `/elements/genes?uid=${elementHasPositionUid}`;
 
@@ -279,10 +233,7 @@ function fetchCurrentGenes() {
 
 function fetchCurrentChimicalElements() {
   if (!sessionCookie) return;
-  if (!isInteractive) {
-    console.log(`[Element ${elementHasPositionUid}] Skipping chimical polling: not interactive.`);
-    return;
-  }
+
 
   const path = `/elements/chimical-elements?uid=${elementHasPositionUid}`;
 
@@ -326,6 +277,7 @@ function fetchCurrentChimicalElements() {
     scheduleNextChimicalElementsCycle();
   });
 
+  req.end();
 }
 
 function fetchNeuronBorderUid(neuronId) {
@@ -601,20 +553,14 @@ if (wsPort > 0) {
             updateNeuron(data.params, ws);
             break;
           case 'get_genes':
-            if (!isInteractive) {
-              ws.send(JSON.stringify({ command: 'get_genes', success: false, message: 'Not interactive' }));
-              return;
-            }
+
             ws.send(JSON.stringify({
               command: 'get_genes',
               genes: currentGenes
             }));
             break;
           case 'get_chimical_elements':
-            if (!isInteractive) {
-              ws.send(JSON.stringify({ command: 'get_chimical_elements', success: false, message: 'Not interactive' }));
-              return;
-            }
+
             ws.send(JSON.stringify({
               command: 'get_chimical_elements',
               chimical_elements: currentChimicalElements

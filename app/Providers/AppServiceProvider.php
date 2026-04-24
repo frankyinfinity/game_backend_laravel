@@ -25,6 +25,8 @@ use App\Models\PlayerModifier;
 use App\Observers\PlayerModifierObserver;
 use App\Models\ElementHasPositionChimicalElement;
 use App\Observers\ElementHasPositionChimicalElementObserver;
+use App\Models\ElementModifier;
+use App\Observers\ElementModifierObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -52,6 +54,7 @@ class AppServiceProvider extends ServiceProvider
         EntityChimicalElement::observe(EntityChimicalElementObserver::class);
         PlayerModifier::observe(PlayerModifierObserver::class);
         ElementHasPositionChimicalElement::observe(ElementHasPositionChimicalElementObserver::class);
+        ElementModifier::observe(ElementModifierObserver::class);
 
     }
 }

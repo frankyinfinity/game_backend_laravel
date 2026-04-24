@@ -110,7 +110,7 @@
         }
 
         // --- Gene Polling Management (moved to end to ensure UI is ready) ---
-        if (show && object.attributes && object.attributes.ws_port && object.attributes.is_interactive) {
+        if (show && object.attributes && object.attributes.ws_port) {
             const elementPort = object.attributes.ws_port;
             const elementWsUrl = '__gateway_base__' + elementPort;
             window.gameWebSockets = window.gameWebSockets || {};
@@ -136,24 +136,132 @@
                                     if (objects[barUid] && objects[borderUid]) {
                                         const min = (gene.min !== undefined) ? gene.min : 0;
                                         const max = (gene.max !== undefined) ? gene.max : 100;
-                                        const range = max - min;
-                                        const percent = range > 0 ? (gene.value - min) / range : 0;
+                                        const modifier = (gene.modifier !== undefined) ? gene.modifier : null;
+                                        
+                                        let useModifiedRange = modifier !== null && modifier > 0;
+                                        let displayMax = useModifiedRange ? max + modifier : max;
+                                        let range = displayMax - min;
+                                        
+                                        let valueToUse = gene.value;
+                                        if (!useModifiedRange && modifier !== null && modifier < 0) {
+                                            valueToUse = Math.min(gene.value, max);
+                                        }
+                                        
+                                        const percent = range > 0 ? (valueToUse - min) / range : 0;
                                         const clampedPercent = Math.max(0, Math.min(1, percent));
-                                        const fullWidth = objects[borderUid].width || 200;
+                                        const fullWidth = (objects[borderUid]?.width || 200);
                                         const newWidth = (fullWidth - 4) * clampedPercent;
                                         objects[barUid].width = Math.max(0, newWidth);
                                         if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(barUid);
+                                        
                                         const rangeUid = baseUid + '_range';
                                         if (objects[rangeUid]) {
-                                            objects[rangeUid].text = "(" + min + " / " + max + ")";
+                                            let rangeText = "[" + min + " / " + max;
+                                            if (modifier !== null && modifier !== 0) {
+                                                rangeText += " (" + (modifier >= 0 ? '+' : '') + modifier + ")";
+                                            }
+                                            rangeText += "]";
+                                            objects[rangeUid].text = rangeText;
                                             if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(rangeUid);
+                                        }
+                                        
+                                        const modifierBarUid = baseUid + '_modifier_bar';
+                                        const modifierTextUid = baseUid + '_modifier_text';
+                                        if (modifier !== null) {
+                                            const modifierRange = Math.abs(modifier);
+                                            const baseRange = useModifiedRange ? (max + modifier - min) : (max - min);
+                                            const modifierPercent = baseRange > 0 ? modifierRange / baseRange : 0;
+                                            const modifierBarWidth = (fullWidth - 4) * Math.min(1, modifierPercent);
+                                            const borderX = objects[borderUid]?.x || 0;
+                                            
+                                            let modifierColor;
+                                            if (modifier > 0) modifierColor = 0x228B22;
+                                            else if (modifier < 0) modifierColor = 0xFFA500;
+                                            else modifierColor = 0x404040;
+                                            
+                                            if (objects[modifierBarUid]) {
+                                                objects[modifierBarUid].x = borderX + 2 + (fullWidth - 4) - modifierBarWidth;
+                                                objects[modifierBarUid].width = Math.max(0, modifierBarWidth);
+                                                if (objects[modifierBarUid].style) {
+                                                    objects[modifierBarUid].style.fill = modifierColor;
+                                                } else {
+                                                    objects[modifierBarUid].color = modifierColor;
+                                                }
+                                                if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(modifierBarUid);
+                                            }
+                                            if (objects[modifierTextUid]) {
+                                                objects[modifierTextUid].text = modifier > 0 ? '+' : (modifier < 0 ? '-' : '');
+                                                objects[modifierTextUid].x = borderX + 2 + (fullWidth - 4) - (modifierBarWidth / 2);
+                                                if (objects[modifierTextUid].style) {
+                                                    objects[modifierTextUid].style.fill = 0xFFFFFF;
+                                                } else {
+                                                    objects[modifierTextUid].color = 0xFFFFFF;
+                                                }
+                                                if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(modifierTextUid);
+                                            }
                                         }
                                     }
                                 });
                                 if (app && app.stage) app.stage.sortChildren();
                             }
-                        } else if (response.command === 'get_chimical_elements') {
+                        }
+                    } catch (e) {
+                        console.error('[Element WS] Parse Error:', e);
+                    }
+                };
+            };
+
+            const startPolling = (ws) => {
+                console.log('[Gene Polling] Starting cycle for:', object_uid);
+                const fetchGenes = (isImmediate = false) => {
+                    if (ws && ws.readyState === 1) {
+                        if (isImmediate) console.log('[Gene Polling] Sending IMMEDIATE refresh call...');
+                        ws.send(JSON.stringify({ command: 'get_genes' }));
+                    }
+                };
+                
+                // Immediate refresh after a small delay to ensure rendering is complete
+                setTimeout(() => fetchGenes(true), 50); 
+                
+                // Standard 2s cycle
+                AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 2000);
+            };
+
+            if (!elementWs || elementWs.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
+                elementWs = new WebSocket(elementWsUrl);
+                window.gameWebSockets[elementWsKey] = elementWs;
+                elementWs.onopen = () => {
+                    bindMessageHandler(elementWs);
+                    startPolling(elementWs);
+                };
+            } else if (elementWs.readyState === 1) {
+                bindMessageHandler(elementWs);
+                startPolling(elementWs);
+            } else if (elementWs.readyState === 0) { // 0 = CONNECTING
+                elementWs.addEventListener('open', () => {
+                    bindMessageHandler(elementWs);
+                    startPolling(elementWs);
+                }, { once: true });
+            }
+        } else {
+            console.log('[Gene Polling] Polling state inactive for:', object_uid);
+        }
+
+        // --- Chimical Elements Polling Management ---
+        if (show && object.attributes && object.attributes.ws_port) {
+            const elementPort = object.attributes.ws_port;
+            const elementWsUrl = '__gateway_base__' + elementPort;
+            window.gameWebSockets = window.gameWebSockets || {};
+            const chimicalWsKey = 'element_chimical_' + elementPort;
+            let chimicalWs = window.gameWebSockets[chimicalWsKey];
+
+            const bindChimicalMessageHandler = (ws) => {
+                ws.onmessage = (event) => {
+                    try {
+                        const response = JSON.parse(event.data);
+                        if (response.command === 'get_chimical_elements') {
                             if (response.chimical_elements && Array.isArray(response.chimical_elements)) {
+                                window.__currentChimicalData = response.chimical_elements;
                                 response.chimical_elements.forEach(chimical => {
                                     const baseUid = 'bar_chimical_element_' + chimical.id;
                                     const valueUid = baseUid + '_value';
@@ -197,25 +305,9 @@
                             }
                         }
                     } catch (e) {
-                        console.error('[Element WS] Parse Error:', e);
+                        console.error('[Element WS] Chimical Parse Error:', e);
                     }
                 };
-            };
-
-            const startPolling = (ws) => {
-                console.log('[Gene Polling] Starting cycle for:', object_uid);
-                const fetchGenes = (isImmediate = false) => {
-                    if (ws && ws.readyState === 1) {
-                        if (isImmediate) console.log('[Gene Polling] Sending IMMEDIATE refresh call...');
-                        ws.send(JSON.stringify({ command: 'get_genes' }));
-                    }
-                };
-                
-                // Immediate refresh after a small delay to ensure rendering is complete
-                setTimeout(() => fetchGenes(true), 50); 
-                
-                // Standard 2s cycle
-                AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 2000);
             };
 
             const startChimicalPolling = (ws) => {
@@ -232,27 +324,24 @@
                 AppData._chimicalPollingIntervals[object_uid] = setInterval(() => fetchChimical(false), 2000);
             };
 
-            if (!elementWs || elementWs.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
-                elementWs = new WebSocket(elementWsUrl);
-                window.gameWebSockets[elementWsKey] = elementWs;
-                elementWs.onopen = () => {
-                    bindMessageHandler(elementWs);
-                    startPolling(elementWs);
-                    startChimicalPolling(elementWs);
+            if (!chimicalWs || chimicalWs.readyState > 1) {
+                chimicalWs = new WebSocket(elementWsUrl);
+                window.gameWebSockets[chimicalWsKey] = chimicalWs;
+                chimicalWs.onopen = () => {
+                    bindChimicalMessageHandler(chimicalWs);
+                    startChimicalPolling(chimicalWs);
                 };
-            } else if (elementWs.readyState === 1) {
-                bindMessageHandler(elementWs);
-                startPolling(elementWs);
-                startChimicalPolling(elementWs);
-            } else if (elementWs.readyState === 0) { // 0 = CONNECTING
-                elementWs.addEventListener('open', () => {
-                    bindMessageHandler(elementWs);
-                    startPolling(elementWs);
-                    startChimicalPolling(elementWs);
+            } else if (chimicalWs.readyState === 1) {
+                bindChimicalMessageHandler(chimicalWs);
+                startChimicalPolling(chimicalWs);
+            } else if (chimicalWs.readyState === 0) {
+                chimicalWs.addEventListener('open', () => {
+                    bindChimicalMessageHandler(chimicalWs);
+                    startChimicalPolling(chimicalWs);
                 }, { once: true });
             }
         } else {
-            console.log('[Gene Polling] Polling state inactive for:', object_uid);
+            console.log('[Chimical Polling] Polling state inactive for:', object_uid);
         }
     }
     window['__name__']();

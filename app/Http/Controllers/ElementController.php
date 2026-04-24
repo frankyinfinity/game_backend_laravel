@@ -58,6 +58,7 @@ class ElementController extends Controller
                 'value' => $info->value,
                 'min' => $info->min,
                 'max' => $info->max,
+                'modifier' => $info->modifier ?? null,
             ];
         }
 
