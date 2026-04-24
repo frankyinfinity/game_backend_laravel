@@ -86,6 +86,8 @@ Route::group(['middleware' => ['auth']], function () {
 
     //Element
     Route::get('elements/genes', [App\Http\Controllers\ElementController::class, 'genes']);
+    Route::get('elements/chimical-elements', [App\Http\Controllers\ElementController::class, 'chimicalElements']);
+    Route::get('elements/status', [App\Http\Controllers\ElementController::class, 'status']);
 
     //Element Types
     Route::resource('element-types', App\Http\Controllers\ElementTypeController::class);

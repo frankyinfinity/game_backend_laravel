@@ -116,6 +116,7 @@ class ElementDraw
         $image->addAttributes('j', (int) $this->tileJ);
         $image->addAttributes('ws_port', $wsPort);
         $image->addAttributes('player_port', $playerPort);
+        $image->addAttributes('is_interactive', $this->element->isInteractive());
 
         // Interactivity
         $jsPathClickElement = resource_path('js/function/element/click_element.blade.php');

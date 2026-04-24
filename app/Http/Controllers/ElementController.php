@@ -67,6 +67,83 @@ class ElementController extends Controller
             'genes' => $genesData
         ]);
     }
+
+    /**
+     * Recupera i valori attuali degli elementi chimici di un'elemento tramite uid (ElementHasPosition)
+     */
+    public function chimicalElements(Request $request)
+    {
+        $uid = $request->query('uid');
+
+        if (!$uid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'UID non fornito'
+            ], 400);
+        }
+
+        $elementHasPosition = ElementHasPosition::where('uid', $uid)->first();
+
+        if (!$elementHasPosition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ElementHasPosition non trovato'
+            ], 404);
+        }
+
+        $chimicalData = [];
+        $elementHasPosition->load(['chimicalElements.elementHasPositionRuleChimicalElement']);
+
+        foreach ($elementHasPosition->chimicalElements as $elementChimical) {
+            $ruleChimical = $elementChimical->elementHasPositionRuleChimicalElement;
+            if (!$ruleChimical)
+                continue;
+
+            $chimicalData[] = [
+                'id' => $elementChimical->id,
+                'value' => (int) $elementChimical->value,
+                'min' => (int) $ruleChimical->min,
+                'max' => (int) $ruleChimical->max,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'uid' => $elementHasPosition->uid,
+            'chimical_elements' => $chimicalData
+        ]);
+    }
+
+    /**
+     * Recupera lo stato di un'elemento tramite uid (ElementHasPosition)
+     */
+    public function status(Request $request)
+    {
+        $uid = $request->query('uid');
+
+        if (!$uid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'UID non fornito'
+            ], 400);
+        }
+
+        $elementHasPosition = ElementHasPosition::where('uid', $uid)->with('element')->first();
+
+        if (!$elementHasPosition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ElementHasPosition non trovato'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'uid' => $elementHasPosition->uid,
+            'is_interactive' => $elementHasPosition->element->isInteractive(),
+        ]);
+    }
+
     // ... index, listDataTable, create, store methods remain unchanged ...
 
     public function index()

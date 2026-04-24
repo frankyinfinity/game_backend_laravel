@@ -66,6 +66,11 @@
                 delete window.AppData._genePollingIntervals[otherUid];
                 console.log('[Gene Polling] Stopped for other element:', otherUid);
             }
+            if (window.AppData && window.AppData._chimicalPollingIntervals && window.AppData._chimicalPollingIntervals[otherUid]) {
+                clearInterval(window.AppData._chimicalPollingIntervals[otherUid]);
+                delete window.AppData._chimicalPollingIntervals[otherUid];
+                console.log('[Chimical Polling] Stopped for other element:', otherUid);
+            }
         }
 
         // Toggle this panel
@@ -88,6 +93,13 @@
             delete AppData._genePollingIntervals[object_uid];
         }
 
+        // --- Chimical Elements Polling Management ---
+        AppData._chimicalPollingIntervals = AppData._chimicalPollingIntervals || {};
+        if (AppData._chimicalPollingIntervals[object_uid]) {
+            clearInterval(AppData._chimicalPollingIntervals[object_uid]);
+            delete AppData._chimicalPollingIntervals[object_uid];
+        }
+
         // --- Gene Polling Management is moved to the end of the function ---
         // ------------------------------
 
@@ -98,7 +110,7 @@
         }
 
         // --- Gene Polling Management (moved to end to ensure UI is ready) ---
-        if (show && object.attributes && object.attributes.ws_port) {
+        if (show && object.attributes && object.attributes.ws_port && object.attributes.is_interactive) {
             const elementPort = object.attributes.ws_port;
             const elementWsUrl = '__gateway_base__' + elementPort;
             window.gameWebSockets = window.gameWebSockets || {};
@@ -140,6 +152,49 @@
                                 });
                                 if (app && app.stage) app.stage.sortChildren();
                             }
+                        } else if (response.command === 'get_chimical_elements') {
+                            if (response.chimical_elements && Array.isArray(response.chimical_elements)) {
+                                response.chimical_elements.forEach(chimical => {
+                                    const baseUid = 'bar_chimical_element_' + chimical.id;
+                                    const valueUid = baseUid + '_value';
+                                    const lineUid = baseUid + '_line';
+                                    const borderUid = baseUid + '_glass_border';
+                                    
+                                    if (objects[valueUid]) {
+                                        objects[valueUid].text = String(chimical.value);
+                                        if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(valueUid);
+                                    }
+                                    
+                                    if (objects[borderUid]) {
+                                        let min = parseInt(chimical.min) || 0;
+                                        let max = parseInt(chimical.max) || 100;
+                                        let value = parseInt(chimical.value) || 0;
+                                        
+                                        let range = max - min;
+                                        if (range <= 0) range = 1;
+                                        
+                                        let percent = (value - min) / range;
+                                        percent = Math.max(0, Math.min(1, percent));
+                                        
+                                        const borderX = objects[borderUid].x || 0;
+                                        const fullWidth = objects[borderUid].width || 300;
+                                        const innerX = borderX + 1;
+                                        const innerWidth = fullWidth - 2;
+                                        const indicatorX = innerX + (percent * innerWidth);
+                                        
+                                        if (objects[lineUid]) {
+                                            objects[lineUid].x = indicatorX - 1;
+                                            if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(lineUid);
+                                        }
+                                        
+                                        if (objects[valueUid]) {
+                                            objects[valueUid].x = indicatorX;
+                                            if (typeof redrawShapeFromObject === 'function') redrawShapeFromObject(valueUid);
+                                        }
+                                    }
+                                });
+                                if (app && app.stage) app.stage.sortChildren();
+                            }
                         }
                     } catch (e) {
                         console.error('[Element WS] Parse Error:', e);
@@ -163,20 +218,37 @@
                 AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 2000);
             };
 
+            const startChimicalPolling = (ws) => {
+                console.log('[Chimical Polling] Starting cycle for:', object_uid);
+                const fetchChimical = (isImmediate = false) => {
+                    if (ws && ws.readyState === 1) {
+                        if (isImmediate) console.log('[Chimical Polling] Sending IMMEDIATE refresh call...');
+                        ws.send(JSON.stringify({ command: 'get_chimical_elements' }));
+                    }
+                };
+                
+                setTimeout(() => fetchChimical(true), 50);
+                
+                AppData._chimicalPollingIntervals[object_uid] = setInterval(() => fetchChimical(false), 2000);
+            };
+
             if (!elementWs || elementWs.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
                 elementWs = new WebSocket(elementWsUrl);
                 window.gameWebSockets[elementWsKey] = elementWs;
                 elementWs.onopen = () => {
                     bindMessageHandler(elementWs);
                     startPolling(elementWs);
+                    startChimicalPolling(elementWs);
                 };
             } else if (elementWs.readyState === 1) {
                 bindMessageHandler(elementWs);
                 startPolling(elementWs);
+                startChimicalPolling(elementWs);
             } else if (elementWs.readyState === 0) { // 0 = CONNECTING
                 elementWs.addEventListener('open', () => {
                     bindMessageHandler(elementWs);
                     startPolling(elementWs);
+                    startChimicalPolling(elementWs);
                 }, { once: true });
             }
         } else {

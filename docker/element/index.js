@@ -17,6 +17,8 @@ console.log(`ElementHasPosition ID: ${elementHasPositionId || 'MISSING'}`);
 let sessionCookie = null;
 let xsrfToken = null;
 let currentGenes = [];
+let currentChimicalElements = [];
+let isInteractive = false;
 
 function parseCookies(response) {
   const list = {};
@@ -81,9 +83,12 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful, starting game/brain and genes cycles...');
+        console.log('Login successful, checking interactivity and starting cycles...');
         callGameBrain();
-        fetchCurrentGenes();
+        checkInteractivity(() => {
+          fetchCurrentGenes();
+          fetchCurrentChimicalElements();
+        });
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', (d) => console.error(d.toString()));
@@ -159,6 +164,7 @@ function callGameBrain() {
 
 const BRAIN_WAIT_SECONDS = 10;
 const GENES_WAIT_SECONDS = 2;
+const CHIMICAL_WAIT_SECONDS = 2;
 
 function scheduleNextBrainCycle() {
   setTimeout(() => {
@@ -172,8 +178,59 @@ function scheduleNextGenesCycle() {
   }, GENES_WAIT_SECONDS * 1000);
 }
 
+function scheduleNextChimicalElementsCycle() {
+  setTimeout(() => {
+    fetchCurrentChimicalElements();
+  }, CHIMICAL_WAIT_SECONDS * 1000);
+}
+
+function checkInteractivity(callback) {
+  if (!sessionCookie) return;
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: `/elements/status?uid=${elementHasPositionUid}`,
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Cookie': sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken,
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => data += chunk);
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        if (response.success) {
+          isInteractive = !!response.is_interactive;
+          console.log(`[Element ${elementHasPositionUid}] Interactivity Status: ${isInteractive}`);
+        }
+      } catch (error) {
+        console.error(`[Element ${elementHasPositionUid}] Error parsing status: ${error.message}`);
+      }
+      if (callback) callback();
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`[Element ${elementHasPositionUid}] Error checking status: ${error.message}`);
+    if (callback) callback();
+  });
+
+  req.end();
+}
+
 function fetchCurrentGenes() {
   if (!sessionCookie) return;
+  if (!isInteractive) {
+    console.log(`[Element ${elementHasPositionUid}] Skipping gene polling: not interactive.`);
+    return;
+  }
 
   const path = `/elements/genes?uid=${elementHasPositionUid}`;
 
@@ -220,6 +277,58 @@ function fetchCurrentGenes() {
   req.end();
 }
 
+function fetchCurrentChimicalElements() {
+  if (!sessionCookie) return;
+  if (!isInteractive) {
+    console.log(`[Element ${elementHasPositionUid}] Skipping chimical polling: not interactive.`);
+    return;
+  }
+
+  const path = `/elements/chimical-elements?uid=${elementHasPositionUid}`;
+
+  const options = {
+    hostname: new URL(backendUrl).hostname,
+    port: new URL(backendUrl).port || 80,
+    path: path,
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Cookie': sessionCookie,
+      'X-XSRF-TOKEN': xsrfToken,
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        if (!data) {
+          console.warn(`[Element ${elementHasPositionUid}] Empty response from chimical elements API.`);
+          return;
+        }
+        const response = JSON.parse(data);
+        if (response.success) {
+          currentChimicalElements = response.chimical_elements;
+          console.log(`[Element ${elementHasPositionUid}] Current Chimical Elements:`, JSON.stringify(currentChimicalElements));
+        }
+      } catch (error) {
+        console.error(`[Element ${elementHasPositionUid}] Error parsing chimical elements: ${error.message}`);
+      } finally {
+        scheduleNextChimicalElementsCycle();
+      }
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error(`[Element ${elementHasPositionUid}] Error fetching chimical elements: ${error.message}`);
+    scheduleNextChimicalElementsCycle();
+  });
+
+  req.end();
+}
+
 function fetchNeuronBorderUid(neuronId) {
   return new Promise((resolve, reject) => {
     if (!sessionCookie) {
@@ -259,7 +368,7 @@ function fetchNeuronBorderUid(neuronId) {
     });
 
     req.on('error', (e) => {
-      console.error(`[Element ${elementHasPositionId}] fetchNeuronBorderUid request error:`, e.message);
+      console.error(`[Element ${elementHasPositionId}] fetchNeuronBorderUid request error: ${e.message}`);
       resolve(null);
     });
     req.end();
@@ -320,7 +429,7 @@ function broadcastNeuronUpdate(borderUid, fileData, playerId) {
     });
 
     req.on('error', (e) => {
-      console.error(`[Element ${elementHasPositionId}] broadcastNeuronUpdate request error:`, e.message);
+      console.error(`[Element ${elementHasPositionId}] broadcastNeuronUpdate request error: ${e.message}`);
       resolve(false);
     });
     req.write(postData);
@@ -493,11 +602,23 @@ if (wsPort > 0) {
             updateNeuron(data.params, ws);
             break;
           case 'get_genes':
+            if (!isInteractive) {
+              ws.send(JSON.stringify({ command: 'get_genes', success: false, message: 'Not interactive' }));
+              return;
+            }
             ws.send(JSON.stringify({
-              success: true,
               command: 'get_genes',
-              genes: currentGenes,
-              uid: elementHasPositionUid
+              genes: currentGenes
+            }));
+            break;
+          case 'get_chimical_elements':
+            if (!isInteractive) {
+              ws.send(JSON.stringify({ command: 'get_chimical_elements', success: false, message: 'Not interactive' }));
+              return;
+            }
+            ws.send(JSON.stringify({
+              command: 'get_chimical_elements',
+              chimical_elements: currentChimicalElements
             }));
             break;
           default:

@@ -11,6 +11,9 @@ use App\Models\Entity;
 use App\Models\Container;
 use App\Models\EntityChimicalElement;
 use App\Models\PlayerRuleChimicalElement;
+use App\Models\ElementHasPosition;
+use App\Models\ElementHasPositionChimicalElement;
+use App\Models\Element;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -79,6 +82,11 @@ class ConsumeChimicalElementJob implements ShouldQueue
 
         $entities = Entity::whereHas('specie', fn($q) => $q->where('player_id', $playerId))->get();
         Log::info('[ConsumeChimicalElementJob] found ' . $entities->count() . ' entities for player ' . $playerId);
+
+        $interactiveElements = ElementHasPosition::where('player_id', $playerId)
+            ->whereHas('element', fn($q) => $q->where('characteristic', Element::INTERACTIVE))
+            ->get();
+        Log::info('[ConsumeChimicalElementJob] found ' . $interactiveElements->count() . ' interactive elements for player ' . $playerId);
 
         $playerRules = PlayerRuleChimicalElement::query()
             ->where('player_id', $playerId)
@@ -249,6 +257,171 @@ class ConsumeChimicalElementJob implements ShouldQueue
                 }
             } catch (\Throwable $e) {
                 Log::info('[ConsumeChimicalElementJob] error for entity ' . $entity->uid . ': ' . $e->getMessage());
+            }
+        }
+
+        foreach ($interactiveElements as $elementPosition) {
+            Log::info('[ConsumeChimicalElementJob] interactive element ' . $elementPosition->uid . ' at position (' . $elementPosition->tile_i . ', ' . $elementPosition->tile_j . ')');
+
+            try {
+                $mapContainer = Container::query()
+                    ->where('parent_type', Container::PARENT_TYPE_MAP)
+                    ->where('parent_id', $birthRegionId)
+                    ->whereNotNull('ws_port')
+                    ->first();
+                if ($mapContainer === null || !$mapContainer->ws_port) {
+                    Log::info('[ConsumeChimicalElementJob] map container not found for birth_region ' . $birthRegionId);
+                    continue;
+                }
+
+                $socket = $this->openMapWebSocket($host, (int) $mapContainer->ws_port);
+                try {
+                    $this->readWebSocketFrame($socket);
+                    $reply = $this->queryTileDetails($socket, (int) $elementPosition->tile_i, (int) $elementPosition->tile_j);
+                    
+                    $tileElements = [];
+                    if (isset($reply['detail']['birth_region_detail_data']) && is_array($reply['detail']['birth_region_detail_data'])) {
+                        foreach ($reply['detail']['birth_region_detail_data'] as $data) {
+                            $chimicalEl = null;
+                            $complexEl = null;
+                            
+                            if (!empty($data['json_chimical_element'])) {
+                                $chimicalEl = is_string($data['json_chimical_element']) 
+                                    ? json_decode($data['json_chimical_element'], true) 
+                                    : $data['json_chimical_element'];
+                            }
+                            if (!empty($data['json_complex_chimical_element'])) {
+                                $complexEl = is_string($data['json_complex_chimical_element']) 
+                                    ? json_decode($data['json_complex_chimical_element'], true) 
+                                    : $data['json_complex_chimical_element'];
+                            }
+                            
+                            if ($chimicalEl) {
+                                $tileElements[] = [
+                                    'id' => $chimicalEl['id'] ?? null,
+                                    'name' => $chimicalEl['name'] ?? '',
+                                    'value' => $data['quantity'] ?? 0,
+                                    'type' => 'chimical_element',
+                                    'detail_data_id' => $data['id']
+                                ];
+                            }
+                            if ($complexEl) {
+                                $tileElements[] = [
+                                    'id' => $complexEl['id'] ?? null,
+                                    'name' => $complexEl['name'] ?? '',
+                                    'value' => $data['quantity'] ?? 0,
+                                    'type' => 'complex_chimical_element',
+                                    'detail_data_id' => $data['id']
+                                ];
+                            }
+                        }
+                    }
+                    
+                    Log::info('[ConsumeChimicalElementJob] tile elements for interactive element ' . $elementPosition->uid . ': ' . json_encode($tileElements));
+                    
+                    $validElements = [];
+                    foreach ($tileElements as $element) {
+                        $rule = $elementPosition->rules()
+                            ->where('chimical_element_id', $element['type'] === 'chimical_element' ? $element['id'] : null)
+                            ->where('complex_chimical_element_id', $element['type'] === 'complex_chimical_element' ? $element['id'] : null)
+                            ->first();
+
+                        if (!$rule) {
+                            continue;
+                        }
+                        
+                        $positionChimical = ElementHasPositionChimicalElement::query()
+                            ->where('element_has_position_id', $elementPosition->id)
+                            ->where('element_has_position_rule_chimical_element_id', $rule->id)
+                            ->first();
+                        
+                        if (!$positionChimical) {
+                            continue;
+                        }
+                        
+                        $maxValue = (int) $rule->max;
+                        if ($positionChimical->value < $maxValue) {
+                            $validElements[] = array_merge($element, [
+                                'element_has_position_rule_chimical_element_id' => $rule->id,
+                                'element_has_position_chimical_element_id' => $positionChimical->id
+                            ]);
+                        }
+                    }
+                    
+                    $maxConsume = PlayerValue::getIntegerValue($playerId, PlayerValue::KEY_CHIMICAL_ELEMENT_CONSUME_PER_TICK);
+                    if (empty($validElements) || $maxConsume <= 0) {
+                        Log::info('[ConsumeChimicalElementJob] no valid elements or maxConsume=0 for interactive element ' . $elementPosition->uid);
+                        continue;
+                    }
+                    
+                    $groupedByElement = [];
+                    foreach ($validElements as $el) {
+                        $key = $el['type'] . '_' . $el['id'];
+                        if (!isset($groupedByElement[$key])) {
+                            $groupedByElement[$key] = [
+                                'name' => $el['name'],
+                                'type' => $el['type'],
+                                'available' => $el['value'],
+                                'rule_id' => $el['element_has_position_rule_chimical_element_id'],
+                                'position_chimical_id' => $el['element_has_position_chimical_element_id'],
+                                'detail_data_id' => $el['detail_data_id']
+                            ];
+                        }
+                    }
+                    
+                    $toConsume = [];
+                    $remainingSlots = $maxConsume;
+                    $elementKeys = array_keys($groupedByElement);
+                    shuffle($elementKeys);
+                    
+                    while ($remainingSlots > 0 && !empty($elementKeys)) {
+                        $key = array_shift($elementKeys);
+                        $el = $groupedByElement[$key];
+                        
+                        $consumeNow = rand(0, 1);
+                        if ($consumeNow && $el['available'] > 0) {
+                            $toConsume[] = $el;
+                            $el['available']--;
+                            $groupedByElement[$key]['available'] = $el['available'];
+                            $remainingSlots--;
+                        }
+                        
+                        if ($el['available'] > 0 && !in_array($key, $elementKeys)) {
+                            $elementKeys[] = $key;
+                            shuffle($elementKeys);
+                        }
+                    }
+                    
+                    Log::info('[ConsumeChimicalElementJob] consuming ' . count($toConsume) . ' elements for interactive element ' . $elementPosition->uid . ': ' . json_encode(array_column($toConsume, 'name')));
+                    
+                    foreach ($toConsume as $element) {
+                        $detailData = BirthRegionDetailData::find($element['detail_data_id']);
+                        if ($detailData && $detailData->quantity > 0) {
+                            $detailData->quantity--;
+                            if ($detailData->quantity <= 0) {
+                                $detailData->delete();
+                            } else {
+                                $detailData->save();
+                            }
+                            
+                            $positionChimical = ElementHasPositionChimicalElement::find($element['position_chimical_id']);
+                            $rule = \App\Models\ElementHasPositionRuleChimicalElement::find($element['rule_id']);
+                            if ($positionChimical && $rule) {
+                                $positionChimical->value += 1;
+                                $maxValue = (int) $rule->max;
+                                if ($positionChimical->value > $maxValue) {
+                                    $positionChimical->value = $maxValue;
+                                }
+                                $positionChimical->save();
+                                Log::info('[ConsumeChimicalElementJob] consumed element ' . $element['name'] . ' (type: ' . $element['type'] . ') for interactive element ' . $elementPosition->uid);
+                            }
+                        }
+                    }
+                } finally {
+                    fclose($socket);
+                }
+            } catch (\Throwable $e) {
+                Log::info('[ConsumeChimicalElementJob] error for interactive element ' . $elementPosition->uid . ': ' . $e->getMessage());
             }
         }
     }
