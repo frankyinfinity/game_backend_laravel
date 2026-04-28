@@ -307,8 +307,8 @@
                 // Immediate refresh after a small delay to ensure rendering is complete
                 setTimeout(() => fetchGenes(true), 50); 
                 
-                // Standard 2s cycle
-                AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 2000);
+                 // Standard 1s cycle
+                 AppData._genePollingIntervals[object_uid] = setInterval(() => fetchGenes(false), 1000);
             };
 
             if (!entityWs || entityWs.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
@@ -407,7 +407,7 @@
                 
                 setTimeout(() => fetchChimical(true), 50);
                 
-                AppData._chimicalPollingIntervals[object_uid] = setInterval(() => fetchChimical(false), 2000);
+                 AppData._chimicalPollingIntervals[object_uid] = setInterval(() => fetchChimical(false), 1000);
             };
 
             if (!chimicalWs || chimicalWs.readyState > 1) {

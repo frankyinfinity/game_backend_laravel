@@ -12,6 +12,9 @@ const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
 const wsPort = process.env.WS_PORT || 8080;
 
+const GENES_WAIT_SECONDS = 1;
+const CHIMICAL_WAIT_SECONDS = 1;
+
 console.log(`Entity service started.`);
 console.log(`Entity UID: ${entityUid}`);
 console.log(`Tile Position: (${entityTileI}, ${entityTileJ})`);
@@ -95,12 +98,12 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-         console.log('Login successful (or redirect received), starting creation loop...');
-         // Avvia i cicli separati
-         scheduleNextCycle();
-         scheduleGenesFetch();
-         scheduleChimicalElementsFetch();
-         scheduleEntityDegradationCheck();
+        console.log('Login successful (or redirect received), starting creation loop...');
+        // Avvia i cicli separati
+        scheduleNextCycle();
+        scheduleGenesFetch();
+        scheduleChimicalElementsFetch();
+        scheduleEntityDegradationCheck();
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         // Try reading body for error
@@ -267,7 +270,7 @@ function scheduleGenesFetch() {
   genesTimer = setTimeout(() => {
     fetchCurrentGenes();
     scheduleGenesFetch();
-  }, 2000);
+  }, GENES_WAIT_SECONDS * 1000);
 }
 
 // Timer per gli elementi chimici (separato)
@@ -277,24 +280,24 @@ function scheduleChimicalElementsFetch() {
   chimicalElementsTimer = setTimeout(() => {
     fetchCurrentChimicalElements();
     scheduleChimicalElementsFetch();
-  }, 2000);
+  }, CHIMICAL_WAIT_SECONDS * 1000);
 }
 
 // Timer per la degradazione (10 secondi)
 let degradationTimer = null;
- function scheduleEntityDegradationCheck() {
-   if (degradationTimer) clearTimeout(degradationTimer);
-   degradationTimer = setTimeout(() => {
-     checkEntityDegradation();
-     scheduleEntityDegradationCheck();
-   }, 10000);
- }
+function scheduleEntityDegradationCheck() {
+  if (degradationTimer) clearTimeout(degradationTimer);
+  degradationTimer = setTimeout(() => {
+    checkEntityDegradation();
+    scheduleEntityDegradationCheck();
+  }, 10000);
+}
 
- function checkEntityDegradation() {
-   if (!sessionCookie) return;
+function checkEntityDegradation() {
+  if (!sessionCookie) return;
 
-   const path = '/api/auth/game/entity/check_degradation';
-   const postData = JSON.stringify({ entity_uid: entityUid });
+  const path = '/api/auth/game/entity/check_degradation';
+  const postData = JSON.stringify({ entity_uid: entityUid });
 
   const options = {
     hostname: new URL(backendUrl).hostname,
@@ -317,19 +320,19 @@ let degradationTimer = null;
       try {
         const response = JSON.parse(data);
         if (response.success) {
-           console.log('[Entity ' + entityUid + '] Entity degradation check completed');
-         } else {
-           console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
-         }
-       } catch (error) {
-         console.error('[Entity ' + entityUid + '] Error parsing entity degradation response: ' + error.message);
+          console.log('[Entity ' + entityUid + '] Entity degradation check completed');
+        } else {
+          console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('[Entity ' + entityUid + '] Error parsing entity degradation response: ' + error.message);
       }
     });
   });
 
-   req.on('error', (error) => {
-     console.error('[Entity ' + entityUid + '] Error calling entity degradation API: ' + error.message);
-   });
+  req.on('error', (error) => {
+    console.error('[Entity ' + entityUid + '] Error calling entity degradation API: ' + error.message);
+  });
 
   req.write(postData);
   req.end();
@@ -418,7 +421,7 @@ function handleWebSocketCommand(data, ws) {
       // Ritorna gli elementi chimici del tile specificato o della posizione corrente
       const tileI = data.params?.tile_i ?? currentTileI;
       const tileJ = data.params?.tile_j ?? currentTileJ;
-      
+
       const pathChimical = `/entities/chimical-elements?uid=${entityUid}`;
       const optionsChimical = {
         hostname: new URL(backendUrl).hostname,

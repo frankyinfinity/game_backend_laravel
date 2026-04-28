@@ -10,15 +10,19 @@ const elementHasPositionId = process.env.ELEMENT_HAS_POSITION_ID;
 const elementHasPositionUid = process.env.ELEMENT_HAS_POSITION_UID;
 const wsPort = Number(process.env.WS_PORT || 0);
 
+const BRAIN_WAIT_SECONDS = 10;
+const GENES_WAIT_SECONDS = 1;
+const CHIMICAL_WAIT_SECONDS = 1;
+
 console.log('Element service started.');
 console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
 console.log(`ElementHasPosition ID: ${elementHasPositionId || 'MISSING'}`);
 
- let sessionCookie = null;
- let xsrfToken = null;
- let currentGenes = [];
- let currentChimicalElements = [];
- let degradationTimer = null;
+let sessionCookie = null;
+let xsrfToken = null;
+let currentGenes = [];
+let currentChimicalElements = [];
+let degradationTimer = null;
 
 function parseCookies(response) {
   const list = {};
@@ -82,13 +86,13 @@ function performLogin() {
     const reqPost = http.request(optionsPost, (resPost) => {
       updateSession(resPost);
 
-       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-         console.log('Login successful, starting cycles...');
-         callGameBrain();
-         fetchCurrentGenes();
-         fetchCurrentChimicalElements();
-         scheduleElementDegradationCheck();
-       } else {
+      if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
+        console.log('Login successful, starting cycles...');
+        callGameBrain();
+        fetchCurrentGenes();
+        fetchCurrentChimicalElements();
+        scheduleElementDegradationCheck();
+      } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
         resPost.on('data', (d) => console.error(d.toString()));
       }
@@ -161,10 +165,6 @@ function callGameBrain() {
   req.end();
 }
 
-const BRAIN_WAIT_SECONDS = 10;
-const GENES_WAIT_SECONDS = 2;
-const CHIMICAL_WAIT_SECONDS = 2;
-
 function scheduleNextBrainCycle() {
   setTimeout(() => {
     callGameBrain();
@@ -177,20 +177,20 @@ function scheduleNextGenesCycle() {
   }, GENES_WAIT_SECONDS * 1000);
 }
 
- function scheduleNextChimicalElementsCycle() {
-   setTimeout(() => {
-     fetchCurrentChimicalElements();
-   }, CHIMICAL_WAIT_SECONDS * 1000);
- }
+function scheduleNextChimicalElementsCycle() {
+  setTimeout(() => {
+    fetchCurrentChimicalElements();
+  }, CHIMICAL_WAIT_SECONDS * 1000);
+}
 
 // Timer per la degradazione (10 secondi)
- function scheduleElementDegradationCheck() {
-   if (degradationTimer) clearTimeout(degradationTimer);
-   degradationTimer = setTimeout(() => {
-     checkElementDegradation();
-     scheduleElementDegradationCheck();
-   }, 10000);
- }
+function scheduleElementDegradationCheck() {
+  if (degradationTimer) clearTimeout(degradationTimer);
+  degradationTimer = setTimeout(() => {
+    checkElementDegradation();
+    scheduleElementDegradationCheck();
+  }, 10000);
+}
 
 function checkElementDegradation() {
   if (!sessionCookie) return;
