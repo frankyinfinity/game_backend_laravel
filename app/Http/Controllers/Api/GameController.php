@@ -45,13 +45,13 @@ use App\Models\PhasePlayer;
 use App\Models\PhaseColumnPlayer;
 use App\Models\AgePlayer;
 use App\Models\PlayerValue;
- use App\Models\EntityChimicalElement;
- use App\Models\PlayerRuleChimicalElement;
- use App\Models\PlayerModifier;
- use App\Models\ElementModifier;
- use App\Models\ElementHasPositionChimicalElement;
- use App\Models\ElementHasPositionRuleChimicalElement;
- use App\Custom\Draw\Primitive\Square;
+use App\Models\EntityChimicalElement;
+use App\Models\PlayerRuleChimicalElement;
+use App\Models\PlayerModifier;
+use App\Models\ElementModifier;
+use App\Models\ElementHasPositionChimicalElement;
+use App\Models\ElementHasPositionRuleChimicalElement;
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Manipulation\ObjectUpdate;
@@ -2819,13 +2819,13 @@ class GameController extends Controller
     }
 
     /**
-      * Rinomina checkDegradation in checkEntityDegradation
-      */
-     public function checkEntityDegradation(Request $request): \Illuminate\Http\JsonResponse
-     {
-         $entityUid = $request->entity_uid;
+     * Rinomina checkDegradation in checkEntityDegradation
+     */
+    public function checkEntityDegradation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entityUid = $request->entity_uid;
 
-         Log::info("checkEntityDegradation called for Entity: {$entityUid}");
+        Log::info("checkEntityDegradation called for Entity: {$entityUid}");
 
         $entity = Entity::query()->where('uid', $entityUid)->first();
         if (!$entity) {
@@ -3196,6 +3196,30 @@ class GameController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Get tiles for a player's birth region.
+     */
+    public function getBirthRegionTiles(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer', 'exists:players,id'],
+        ]);
+
+        $player = Player::with('birthRegion')->find($validated['player_id']);
+        if (!$player || !$player->birthRegion) {
+            return response()->json(['success' => false, 'message' => 'Player or Birth Region not found'], 404);
+        }
+
+        $tiles = Helper::getBirthRegionTiles($player->birthRegion);
+
+        return response()->json([
+            'success' => true,
+            'tiles' => $tiles->values()->toArray(),
+            'width' => (int) $player->birthRegion->width,
+            'height' => (int) $player->birthRegion->height
+        ]);
+    }
+
     public function createElementHasPosition(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
@@ -3216,6 +3240,24 @@ class GameController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Elemento non valido o non interattivo.'
+            ], 422);
+        }
+
+        // Check that the tile is within the player's birth region
+        $player = \App\Models\Player::find($playerId);
+        if (!$player || !$player->birthRegion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Player o regione di nascita non trovati.'
+            ], 422);
+        }
+
+        $birthRegionTiles = \App\Helper\Helper::getBirthRegionTiles($player->birthRegion);
+        $validTile = $birthRegionTiles->where('i', $tileI)->where('j', $tileJ)->first();
+        if (!$validTile) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La posizione specificata non è valida per la regione di nascita.'
             ], 422);
         }
 
@@ -3242,6 +3284,7 @@ class GameController extends Controller
             'uid' => (string) \Illuminate\Support\Str::uuid(),
             'tile_i' => $tileI,
             'tile_j' => $tileJ,
+            'is_manual' => true
         ]);
 
         return response()->json([

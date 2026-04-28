@@ -34,11 +34,12 @@ Route::group(['middleware' => ['auth']], function () {
     //Container
     Route::get('/containers', [App\Http\Controllers\ContainerController::class, 'index'])->name('containers.index');
     Route::post('/containers/list/table', [App\Http\Controllers\ContainerController::class, 'listPlayersDataTable'])->name('containers.players.datatable');
-Route::get('/containers/{player}', [App\Http\Controllers\ContainerController::class, 'show'])->name('containers.show')->whereNumber('player');
-Route::get('/containers/{player}/snapshot', [App\Http\Controllers\ContainerController::class, 'snapshot'])->name('containers.snapshot')->whereNumber('player');
-Route::get('/containers/{player}/volume-file', [App\Http\Controllers\ContainerController::class, 'volumeFile'])->name('containers.volume-file')->whereNumber('player');
-Route::post('/containers/{player}/list/table', [App\Http\Controllers\ContainerController::class, 'listDataTable'])->name('containers.datatable')->whereNumber('player');
-Route::post('/game/element-has-position/create', [App\Http\Controllers\Api\GameController::class, 'createElementHasPosition'])->name('game.element-has-position.create');
+    Route::get('/containers/{player}', [App\Http\Controllers\ContainerController::class, 'show'])->name('containers.show')->whereNumber('player');
+    Route::get('/containers/{player}/snapshot', [App\Http\Controllers\ContainerController::class, 'snapshot'])->name('containers.snapshot')->whereNumber('player');
+    Route::get('/containers/{player}/volume-file', [App\Http\Controllers\ContainerController::class, 'volumeFile'])->name('containers.volume-file')->whereNumber('player');
+    Route::post('/containers/{player}/list/table', [App\Http\Controllers\ContainerController::class, 'listDataTable'])->name('containers.datatable')->whereNumber('player');
+    Route::get('/game/birth-region/tiles', [App\Http\Controllers\Api\GameController::class, 'getBirthRegionTiles'])->name('game.birth-region.tiles');
+    Route::post('/game/element-has-position/create', [App\Http\Controllers\Api\GameController::class, 'createElementHasPosition'])->name('game.element-has-position.create');
     Route::post('/containers/{container}/start', [App\Http\Controllers\ContainerController::class, 'start'])->name('containers.start')->whereNumber('container');
     Route::post('/containers/{container}/stop', [App\Http\Controllers\ContainerController::class, 'stop'])->name('containers.stop')->whereNumber('container');
     Route::post('/containers/{container}/restart', [App\Http\Controllers\ContainerController::class, 'restart'])->name('containers.restart')->whereNumber('container');
@@ -128,7 +129,7 @@ Route::post('/game/element-has-position/create', [App\Http\Controllers\Api\GameC
     Route::post('/rule-chimical-elements/{ruleChimicalElement}/details/{detail}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'update'])->name('rule-chimical-elements.detail.update');
     Route::get('/rule-chimical-elements/{ruleChimicalElement}/reload', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'reload'])->name('rule-chimical-elements.detail.reload');
     Route::delete('/rule-chimical-elements/{ruleChimicalElement}/details/{detail}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'destroy'])->name('rule-chimical-elements.detail.destroy');
-    
+
     //Rule Chimical Element Detail Effects
     Route::get('/rule-chimical-elements/details/{detail}/effects', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'listEffects'])->name('rule-chimical-elements.detail.effects.list');
     Route::post('/rule-chimical-elements/details/{detail}/effects', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'storeEffect'])->name('rule-chimical-elements.detail.effects.store');

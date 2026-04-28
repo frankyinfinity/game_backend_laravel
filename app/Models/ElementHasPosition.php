@@ -13,6 +13,7 @@ class ElementHasPosition extends Model
         'uid',
         'tile_i',
         'tile_j',
+        'is_manual',
     ];
 
     public function player()

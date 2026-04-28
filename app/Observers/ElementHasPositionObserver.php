@@ -172,9 +172,13 @@ class ElementHasPositionObserver
     private function initializeContainer(ElementHasPosition $elementHasPosition): void
     {
         try {
-            app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, true);
+            $container = app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, false);
+
+            if (! $elementHasPosition->is_manual) {
+                app(DockerContainerService::class)->startContainer($container);
+            }
         } catch (\Throwable $e) {
-            Log::error('Unable to create element container', [
+            Log::error('Unable to create/start element container', [
                 'element_has_position_id' => $elementHasPosition->id,
                 'error' => $e->getMessage(),
             ]);

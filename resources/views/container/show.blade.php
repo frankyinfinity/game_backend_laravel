@@ -695,7 +695,14 @@
                                 <select class="form-control" id="elementSelect" required>
                                     <option value="">-- Seleziona un elemento interattivo --</option>
                                     @foreach($interactiveElements as $element)
-                                        <option value="{{ $element->id }}" data-color="{{ $element->color ?? '#64748b' }}">
+                                        @php
+                                            $imageUrl = null;
+                                            $imagePath = $element->id . '.png';
+                                            if (\Storage::disk('elements')->exists($imagePath)) {
+                                                $imageUrl = \Storage::disk('elements')->url($imagePath);
+                                            }
+                                        @endphp
+                                        <option value="{{ $element->id }}" data-color="{{ $element->color ?? '#64748b' }}" data-image="{{ $imageUrl }}">
                                             {{ $element->name }} ({{ $element->elementType->name ?? 'N/D' }})
                                         </option>
                                     @endforeach
@@ -705,21 +712,12 @@
                                 <label class="text-muted">Posizione</label>
                                 <div class="input-group">
                                     <span class="input-group-text">Tile I</span>
-                                    <input type="number" class="form-control" id="tileI" min="0" max="{{ $regionWidth - 1 }}" value="0" required>
+                                    <input type="number" class="form-control" id="tileI" min="0" max="{{ $regionHeight - 1 }}" value="0" required>
                                     <span class="input-group-text">Tile J</span>
-                                    <input type="number" class="form-control" id="tileJ" min="0" max="{{ $regionHeight - 1 }}" value="0" required>
+                                    <input type="number" class="form-control" id="tileJ" min="0" max="{{ $regionWidth - 1 }}" value="0" required>
                                 </div>
-                                <small class="form-text text-muted">Dimensioni mappa: {{ $regionWidth }} x {{ $regionHeight }} tile</small>
+                                <small class="form-text text-muted">Dimensioni mappa: {{ $regionWidth }} (W) x {{ $regionHeight }} (H) tile</small>
                             </div>
-                            @if($regionWidth > 0 && $regionHeight > 0)
-                                <div class="form-group mt-3">
-                                    <h6 class="text-bold mb-3">
-                                        <i class="fas fa-map-marked-alt mr-1"></i> 
-                                        Mappa (clicca su un tile per selezionare la posizione)
-                                    </h6>
-                                    <div id="selectionMap" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; display: inline-block;"></div>
-                                </div>
-                            @endif
                         </div>
                         <div class="col-md-7">
                             <h6 class="text-bold mb-3"><i class="fas fa-info-circle mr-1"></i> Anteprima Elemento</h6>
@@ -731,6 +729,21 @@
                             </div>
                         </div>
                     </div>
+                    @if($regionWidth > 0 && $regionHeight > 0)
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6 class="text-bold mb-3">
+                                    <i class="fas fa-map-marked-alt mr-1"></i> 
+                                    Mappa (clicca su un tile per selezionare la posizione)
+                                </h6>
+                                <div id="selectionMap" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: auto; display: block; width: 100%; background: #f8fafc;"></div>
+                                <div class="mt-2 text-muted small">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Usa la barra di scorrimento se la mappa è più grande della visualizzazione.
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
@@ -2303,60 +2316,139 @@
             let selectionApp = null;
             let selectionGraphics = {};
 
-            // Initialize selection map
-            function initSelectionMap() {
-                if (!REGION_WIDTH || !REGION_HEIGHT || REGION_WIDTH <= 0 || REGION_HEIGHT <= 0) {
-                    $('#selectionMap').html('<div class="p-3 text-danger">Mappa non disponibile</div>');
-                    return;
-                }
+             // Initialize selection map
+             function initSelectionMap() {
+                 if (!REGION_WIDTH || !REGION_HEIGHT || REGION_WIDTH <= 0 || REGION_HEIGHT <= 0) {
+                     $('#selectionMap').html('<div class="p-3 text-danger">Mappa non disponibile</div>');
+                     return;
+                 }
+ 
+                 const container = document.getElementById('selectionMap');
+                 if (!container) return;
+                 container.innerHTML = '';
+ 
+                 const width = REGION_WIDTH * TILE_SIZE;
+                 const height = REGION_HEIGHT * TILE_SIZE;
+                 container.style.width = '100%';
+                 container.style.maxWidth = '100%';
+                 container.style.height = Math.min(height, 400) + 'px';
+                 container.style.overflow = 'auto';
+                 container.style.display = 'block';
 
-                const container = document.getElementById('selectionMap');
-                if (!container) return;
+                 selectionApp = new PIXI.Application({
+                     width: width,
+                     height: height,
+                     antialias: false,
+                     backgroundAlpha: 0
+                 });
+                 container.appendChild(selectionApp.view);
+                  selectionApp.view.style.display = 'block';
+                  selectionApp.view.style.margin = '0 auto'; // Center it if smaller
+                  selectionApp.view.style.cursor = 'pointer';
+ 
+                 const gridLayer = new PIXI.Container();
+                 selectionApp.stage.addChild(gridLayer);
+ 
+                 // Make the whole stage clickable
+                 selectionApp.stage.eventMode = 'static';
+                 selectionApp.stage.hitArea = new PIXI.Rectangle(0, 0, width, height);
+                 selectionApp.stage.on('pointertap', function (event) {
+                     const pos = event.getLocalPosition(selectionApp.stage);
+                     const j = Math.floor(pos.x / TILE_SIZE);
+                     const i = Math.floor(pos.y / TILE_SIZE);
+                     if (i >= 0 && i < REGION_HEIGHT && j >= 0 && j < REGION_WIDTH) {
+                         selectTile(i, j);
+                     }
+                 });
 
-                const width = REGION_WIDTH * TILE_SIZE;
-                const height = REGION_HEIGHT * TILE_SIZE;
-                container.style.width = width + 'px';
-                container.style.height = Math.min(height, 300) + 'px';
+                 // Show loading state
+                 const loadingText = new PIXI.Text('Caricamento colori tile...', {
+                     fontFamily: 'Arial',
+                     fontSize: 14,
+                     fill: 0xffffff
+                 });
+                 loadingText.x = width / 2 - loadingText.width / 2;
+                 loadingText.y = height / 2 - loadingText.height / 2;
+                 selectionApp.stage.addChild(loadingText);
+ 
+                 // Fetch actual tiles from birth region
+                 $.ajax({
+                     url: '{{ route('game.birth-region.tiles') }}',
+                     type: 'GET',
+                     dataType: 'json',
+                     data: {
+                         player_id: PLAYER_ID
+                     },
+                     success: function(response) {
+                         // Remove loading text
+                         selectionApp.stage.removeChild(loadingText);
+                         
+                         if (!response.success || !response.tiles) {
+                             console.error('Failed to load tiles:', response.message);
+                             return;
+                         }
 
-                selectionApp = new PIXI.Application({
-                    width: width,
-                    height: height,
-                    antialias: false,
-                    backgroundAlpha: 0
-                });
-                container.appendChild(selectionApp.view);
+                         const tiles = response.tiles;
+                         const borderColor = 0xe2e8f0;
+                         const defaultTileColor = 0xf8fafc;
 
-                const gridLayer = new PIXI.Container();
-                selectionApp.stage.addChild(gridLayer);
+                         tiles.forEach(function(tileData) {
+                             const i = tileData.i;
+                             const j = tileData.j;
+                             const tile = tileData.tile;
+                             
+                             // Get color from tile data, fallback to default
+                             let tileColor = defaultTileColor;
+                             if (tile && tile.color) {
+                                 const hex = tile.color.replace('#', '');
+                                 tileColor = parseInt(hex, 16);
+                             }
 
-                const tileColor = 0xf8fafc;
-                const borderColor = 0xe2e8f0;
+                             const g = new PIXI.Graphics();
+                             g.beginFill(tileColor);
+                             g.lineStyle(1, borderColor, 1);
+                             g.drawRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                             g.endFill();
+                             gridLayer.addChild(g);
+                         });
+                     },
+                     error: function() {
+                         // Remove loading text
+                         selectionApp.stage.removeChild(loadingText);
+                         
+                         // Fallback to default colors if AJAX fails
+                         const tileColor = 0xf8fafc;
+                         const borderColor = 0xe2e8f0;
 
-                for (let i = 0; i < REGION_HEIGHT; i++) {
-                    for (let j = 0; j < REGION_WIDTH; j++) {
-                        const g = new PIXI.Graphics();
-                        g.beginFill(tileColor);
-                        g.lineStyle(1, borderColor, 1);
-                        g.drawRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                        g.endFill();
-                        g.cursor = 'pointer';
-                        g.eventMode = 'static';
-                        g.on('click', function () {
-                            selectTile(i, j);
-                        });
-                        gridLayer.addChild(g);
-                    }
-                }
-
-                // Draw initial selection
-                updateSelectionHighlight();
-            }
+                         for (let i = 0; i < REGION_HEIGHT; i++) {
+                             for (let j = 0; j < REGION_WIDTH; j++) {
+                                 const g = new PIXI.Graphics();
+                                 g.beginFill(tileColor);
+                                 g.lineStyle(1, borderColor, 1);
+                                 g.drawRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                                 g.endFill();
+                                 gridLayer.addChild(g);
+                             }
+                         }
+                     }
+                 });
+ 
+                 // Sync inputs with map selection
+                 $('#tileI, #tileJ').on('input change', function () {
+                     selectedTileI = parseInt($('#tileI').val(), 10) || 0;
+                     selectedTileJ = parseInt($('#tileJ').val(), 10) || 0;
+                     updateSelectionHighlight();
+                 });
+ 
+                 // Draw initial selection
+                 updateSelectionHighlight();
+             }
 
             function selectTile(i, j) {
                 selectedTileI = i;
                 selectedTileJ = j;
-                $('#tileI').val(i);
-                $('#tileJ').val(j);
+                $('#tileI').val(i).trigger('change');
+                $('#tileJ').val(j).trigger('change');
                 updateSelectionHighlight();
             }
 
@@ -2390,13 +2482,21 @@
                 const option = $(this).find('option:selected');
                 const elementName = option.text();
                 const color = option.data('color') || '#64748b';
+                const imageUrl = option.data('image');
+
+                let previewGraphic = '';
+                if (imageUrl) {
+                    previewGraphic = '<img src="' + imageUrl + '" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">';
+                } else {
+                    previewGraphic = '<div class="d-inline-block p-3 rounded-circle" style="background: ' + color + '; opacity: 0.3;">' +
+                                    '  <i class="fas fa-cube fa-2x" style="color: ' + color + ';"></i>' +
+                                    '</div>';
+                }
 
                 $('#elementPreview').html(
                     '<div class="text-center">' +
                     '  <div class="mb-3">' +
-                    '    <div class="d-inline-block p-3 rounded-circle" style="background: ' + color + '; opacity: 0.3;">' +
-                    '      <i class="fas fa-cube fa-2x" style="color: ' + color + ';"></i>' +
-                    '    </div>' +
+                    previewGraphic +
                     '  </div>' +
                     '  <h5 class="mb-1">' + elementName + '</h5>' +
                     '  <p class="text-muted small mb-0">Elemento Interattivo</p>' +
@@ -2449,9 +2549,12 @@
                                 timer: 1500,
                                 showConfirmButton: false
                             }).then(function () {
-                                $('#addElementModal').modal('hide');
-                                location.reload();
-                            });
+                                 $('#addElementModal').modal('hide');
+                                 $('#addElementForm')[0].reset();
+                                 $('#elementPreview').html('<div class="text-center text-muted py-4"><i class="fas fa-search fa-2x mb-2"></i><div>Seleziona un elemento per vedere l\'anteprima</div></div>');
+                                 refreshContainers(false);
+                                 btn.html('<i class="fa fa-plus"></i> Crea Elemento').prop('disabled', false);
+                             });
                         } else {
                             Swal.fire({
                                 icon: 'error',
