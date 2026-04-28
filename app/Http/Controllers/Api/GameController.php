@@ -3195,4 +3195,66 @@ class GameController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    public function createElementHasPosition(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'player_id' => 'required|integer|exists:players,id',
+            'element_id' => 'required|integer|exists:elements,id',
+            'tile_i' => 'required|integer|min:0',
+            'tile_j' => 'required|integer|min:0',
+        ]);
+
+        $playerId = $request->input('player_id');
+        $elementId = $request->input('element_id');
+        $tileI = $request->input('tile_i');
+        $tileJ = $request->input('tile_j');
+
+        // Check that the element is interactive
+        $element = \App\Models\Element::find($elementId);
+        if (!$element || !$element->isInteractive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Elemento non valido o non interattivo.'
+            ], 422);
+        }
+
+        // Check if an ElementHasPosition already exists at this tile for this player
+        $existing = \App\Models\ElementHasPosition::query()
+            ->where('player_id', $playerId)
+            ->where('element_id', $elementId)
+            ->where('tile_i', $tileI)
+            ->where('tile_j', $tileJ)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Un elemento interattivo esiste già in questa posizione.'
+            ], 422);
+        }
+
+        // Create the ElementHasPosition
+        $elementHasPosition = \App\Models\ElementHasPosition::create([
+            'player_id' => $playerId,
+            'session_id' => 'session_' . time(),
+            'element_id' => $elementId,
+            'uid' => (string) \Illuminate\Support\Str::uuid(),
+            'tile_i' => $tileI,
+            'tile_j' => $tileJ,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Elemento interattivo creato con successo.',
+            'data' => [
+                'id' => $elementHasPosition->id,
+                'uid' => $elementHasPosition->uid,
+                'player_id' => $elementHasPosition->player_id,
+                'element_id' => $elementHasPosition->element_id,
+                'tile_i' => $elementHasPosition->tile_i,
+                'tile_j' => $elementHasPosition->tile_j,
+            ],
+        ]);
+    }
 }

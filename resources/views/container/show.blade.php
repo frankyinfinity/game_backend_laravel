@@ -662,11 +662,83 @@
                 <button type="button" class="btn btn-primary btn-sm ml-2" id="bulk-recreate-all">
                     <i class="fa fa-sync"></i> Ricrea tutti
                 </button>
+                <button type="button" class="btn btn-success btn-sm ml-2" id="btn-add-element" data-toggle="modal" data-target="#addElementModal">
+                    <i class="fa fa-plus"></i> Nuovo Elemento Interattivo
+                </button>
                 <span class="ml-auto text-muted small" id="visible-count">0 visibili</span>
             </div>
             <div class="card-body p-2">
                 <div id="container-pixi"></div>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- Modal Aggiungi Elemento Interattivo --}}
+<div class="modal fade" id="addElementModal" tabindex="-1" role="dialog" aria-labelledby="addElementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addElementModalLabel"><i class="fas fa-plus-circle mr-2"></i> Aggiungi Elemento Interattivo</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="addElementForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <h6 class="text-bold mb-3"><i class="fas fa-cubes mr-1"></i> Seleziona Elemento</h6>
+                            <div class="form-group">
+                                <label for="elementSelect" class="text-muted">Elemento Interattivo</label>
+                                <select class="form-control" id="elementSelect" required>
+                                    <option value="">-- Seleziona un elemento interattivo --</option>
+                                    @foreach($interactiveElements as $element)
+                                        <option value="{{ $element->id }}" data-color="{{ $element->color ?? '#64748b' }}">
+                                            {{ $element->name }} ({{ $element->elementType->name ?? 'N/D' }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="text-muted">Posizione</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tile I</span>
+                                    <input type="number" class="form-control" id="tileI" min="0" max="{{ $regionWidth - 1 }}" value="0" required>
+                                    <span class="input-group-text">Tile J</span>
+                                    <input type="number" class="form-control" id="tileJ" min="0" max="{{ $regionHeight - 1 }}" value="0" required>
+                                </div>
+                                <small class="form-text text-muted">Dimensioni mappa: {{ $regionWidth }} x {{ $regionHeight }} tile</small>
+                            </div>
+                            @if($regionWidth > 0 && $regionHeight > 0)
+                                <div class="form-group mt-3">
+                                    <h6 class="text-bold mb-3">
+                                        <i class="fas fa-map-marked-alt mr-1"></i> 
+                                        Mappa (clicca su un tile per selezionare la posizione)
+                                    </h6>
+                                    <div id="selectionMap" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; display: inline-block;"></div>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="col-md-7">
+                            <h6 class="text-bold mb-3"><i class="fas fa-info-circle mr-1"></i> Anteprima Elemento</h6>
+                            <div id="elementPreview" class="border rounded p-3 bg-light" style="min-height: 200px;">
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-search fa-2x mb-2"></i>
+                                    <div>Seleziona un elemento per vedere l'anteprima</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success" id="btnCreateElement">
+                        <i class="fa fa-plus"></i> Crea Elemento
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -2217,6 +2289,197 @@
                     clearInterval(refreshTimer);
                 }
                 stopLogsRefresh();
+            });
+        });
+
+        // ============ MODAL: Aggiungi Elemento Interattivo ============
+        $(document).ready(function () {
+            const PLAYER_ID = {{ $player->id }};
+            const REGION_WIDTH = {{ $regionWidth ?? 0 }};
+            const REGION_HEIGHT = {{ $regionHeight ?? 0 }};
+            const TILE_SIZE = 28;
+            let selectedTileI = 0;
+            let selectedTileJ = 0;
+            let selectionApp = null;
+            let selectionGraphics = {};
+
+            // Initialize selection map
+            function initSelectionMap() {
+                if (!REGION_WIDTH || !REGION_HEIGHT || REGION_WIDTH <= 0 || REGION_HEIGHT <= 0) {
+                    $('#selectionMap').html('<div class="p-3 text-danger">Mappa non disponibile</div>');
+                    return;
+                }
+
+                const container = document.getElementById('selectionMap');
+                if (!container) return;
+
+                const width = REGION_WIDTH * TILE_SIZE;
+                const height = REGION_HEIGHT * TILE_SIZE;
+                container.style.width = width + 'px';
+                container.style.height = Math.min(height, 300) + 'px';
+
+                selectionApp = new PIXI.Application({
+                    width: width,
+                    height: height,
+                    antialias: false,
+                    backgroundAlpha: 0
+                });
+                container.appendChild(selectionApp.view);
+
+                const gridLayer = new PIXI.Container();
+                selectionApp.stage.addChild(gridLayer);
+
+                const tileColor = 0xf8fafc;
+                const borderColor = 0xe2e8f0;
+
+                for (let i = 0; i < REGION_HEIGHT; i++) {
+                    for (let j = 0; j < REGION_WIDTH; j++) {
+                        const g = new PIXI.Graphics();
+                        g.beginFill(tileColor);
+                        g.lineStyle(1, borderColor, 1);
+                        g.drawRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        g.endFill();
+                        g.cursor = 'pointer';
+                        g.eventMode = 'static';
+                        g.on('click', function () {
+                            selectTile(i, j);
+                        });
+                        gridLayer.addChild(g);
+                    }
+                }
+
+                // Draw initial selection
+                updateSelectionHighlight();
+            }
+
+            function selectTile(i, j) {
+                selectedTileI = i;
+                selectedTileJ = j;
+                $('#tileI').val(i);
+                $('#tileJ').val(j);
+                updateSelectionHighlight();
+            }
+
+            function updateSelectionHighlight() {
+                // Remove existing highlights
+                if (selectionApp) {
+                    selectionApp.stage.children.forEach(function (child) {
+                        if (child._isHighlight) {
+                            child.parent.removeChild(child);
+                        }
+                    });
+                }
+
+                // Add new highlight
+                if (selectionApp && selectedTileI >= 0 && selectedTileJ >= 0) {
+                    const g = new PIXI.Graphics();
+                    g.lineStyle(3, 0x10b981, 1);
+                    g.drawRect(selectedTileJ * TILE_SIZE, selectedTileI * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    g._isHighlight = true;
+                    selectionApp.stage.addChild(g);
+                }
+            }
+
+            $('#elementSelect').on('change', function () {
+                const selectedId = $(this).val();
+                if (!selectedId) {
+                    $('#elementPreview').html('<div class="text-center text-muted py-4"><i class="fas fa-search fa-2x mb-2"></i><div>Seleziona un elemento per vedere l\'anteprima</div></div>');
+                    return;
+                }
+
+                const option = $(this).find('option:selected');
+                const elementName = option.text();
+                const color = option.data('color') || '#64748b';
+
+                $('#elementPreview').html(
+                    '<div class="text-center">' +
+                    '  <div class="mb-3">' +
+                    '    <div class="d-inline-block p-3 rounded-circle" style="background: ' + color + '; opacity: 0.3;">' +
+                    '      <i class="fas fa-cube fa-2x" style="color: ' + color + ';"></i>' +
+                    '    </div>' +
+                    '  </div>' +
+                    '  <h5 class="mb-1">' + elementName + '</h5>' +
+                    '  <p class="text-muted small mb-0">Elemento Interattivo</p>' +
+                    '</div>'
+                );
+
+                // Auto-select center tile
+                if (REGION_WIDTH > 0 && REGION_HEIGHT > 0) {
+                    const centerI = Math.floor(REGION_HEIGHT / 2);
+                    const centerJ = Math.floor(REGION_WIDTH / 2);
+                    selectTile(centerI, centerJ);
+                }
+            });
+
+            $('#addElementForm').on('submit', function (e) {
+                e.preventDefault();
+
+                const elementId = $('#elementSelect').val();
+                const tileI = parseInt($('#tileI').val(), 10);
+                const tileJ = parseInt($('#tileJ').val(), 10);
+
+                if (!elementId) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Attenzione',
+                        text: 'Seleziona un elemento interattivo.'
+                    });
+                    return;
+                }
+
+                const btn = $('#btnCreateElement');
+                btn.html('<i class="fa fa-spinner fa-spin"></i> Creazione...').prop('disabled', true);
+
+                $.ajax({
+                    url: '{{ route('game.element-has-position.create') }}',
+                    type: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        player_id: PLAYER_ID,
+                        element_id: elementId,
+                        tile_i: tileI,
+                        tile_j: tileJ
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Successo!',
+                                text: response.message,
+                                timer: 1500,
+                                showConfirmButton: false
+                            }).then(function () {
+                                $('#addElementModal').modal('hide');
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Errore',
+                                text: response.message || 'Si è verificato un errore.'
+                            });
+                            btn.html('<i class="fa fa-plus"></i> Crea Elemento').prop('disabled', false);
+                        }
+                    },
+                    error: function (xhr) {
+                        const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Errore di connessione.';
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Errore',
+                            text: message
+                        });
+                        btn.html('<i class="fa fa-plus"></i> Crea Elemento').prop('disabled', false);
+                    }
+                });
+            });
+
+            $('#addElementModal').on('shown.bs.modal', function () {
+                initSelectionMap();
+                setTimeout(function () {
+                    if (selectionApp) {
+                        selectionApp.renderer.resize(selectionApp.view.width, selectionApp.view.height);
+                    }
+                }, 100);
             });
         });
     </script>

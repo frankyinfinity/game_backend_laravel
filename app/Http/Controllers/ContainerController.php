@@ -6,6 +6,8 @@ use App\Models\Container as DockerContainer;
 use App\Models\ElementHasPosition;
 use App\Models\Entity;
 use App\Models\Player;
+use App\Models\Element;
+use App\Models\Region;
 use App\Custom\Manipulation\ObjectCache;
 use App\Services\DockerContainerService;
 use Illuminate\Http\Request;
@@ -43,7 +45,21 @@ class ContainerController extends Controller
         $volume = $this->buildPlayerVolumePayload($player, $containerService);
         $containerTypes = DockerContainer::parentTypeMeta();
 
-        return view('container.show', compact('player', 'containers', 'volume', 'containerTypes'));
+        // Get interactive elements for the modal select
+        $interactiveElements = Element::where('characteristic', Element::INTERACTIVE)
+            ->with(['elementType'])
+            ->orderBy('name')
+            ->get();
+
+        // Get birth region dimensions for the selection map
+        $regionWidth = 0;
+        $regionHeight = 0;
+        if ($player->birthRegion) {
+            $regionWidth = $player->birthRegion->width;
+            $regionHeight = $player->birthRegion->height;
+        }
+
+        return view('container.show', compact('player', 'containers', 'volume', 'containerTypes', 'interactiveElements', 'regionWidth', 'regionHeight'));
     }
 
     public function snapshot(Player $player, DockerContainerService $containerService): JsonResponse
