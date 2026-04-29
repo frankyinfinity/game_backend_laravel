@@ -242,6 +242,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const portDetectionSuccess = @json(\App\Models\NeuronLink::PORT_DETECTION_SUCCESS);
     const portDetectionFailure = @json(\App\Models\NeuronLink::PORT_DETECTION_FAILURE);
     const portTrigger = @json(\App\Models\NeuronLink::PORT_TRIGGER);
+    const portColors = @json(\App\Models\NeuronLink::PORT_COLORS);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
@@ -462,9 +463,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            let lineColor = 0x16a34a; // Green (main)
+            let lineColor = portColors[portTrigger]; // Standard Green
             if (linkCondition === portDetectionFailure) {
-                lineColor = 0xf97316; // Orange (else)
+                lineColor = portColors[portDetectionFailure]; // Orange
             }
             const line = new PIXI.Graphics();
             line.lineStyle(3, lineColor, 1);
@@ -667,8 +668,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     const topAnchorY = baseY + (cellSize * 0.3);
                     const bottomAnchorY = baseY + (cellSize * 0.7);
                     const anchorConfigs = [
-                        { y: topAnchorY, condition: portDetectionSuccess, color: 0x16a34a },
-                        { y: bottomAnchorY, condition: portDetectionFailure, color: 0xf97316 },
+                        { y: topAnchorY, condition: portDetectionSuccess, color: portColors[portDetectionSuccess] },
+                        { y: bottomAnchorY, condition: portDetectionFailure, color: portColors[portDetectionFailure] },
                     ];
 
                     for (const anchorConfig of anchorConfigs) {
@@ -695,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 } else {
                     const rightAnchor = new PIXI.Graphics();
-                    rightAnchor.beginFill(0x16a34a);
+                    rightAnchor.beginFill(portColors[portTrigger]);
                     rightAnchor.lineStyle(2, 0xffffff, 1);
                     rightAnchor.drawCircle(baseX, baseY + (cellSize / 2), 8);
                     rightAnchor.endFill();
@@ -1004,9 +1005,9 @@ document.addEventListener('DOMContentLoaded', function () {
             
             let endX = x;
             let endY = y;
-            let lineColor = 0x16a34a; // Green (main)
+            let lineColor = portColors[portTrigger];
             if (resolvedCondition === portDetectionFailure) {
-                lineColor = 0xf97316; // Orange (else)
+                lineColor = portColors[portDetectionFailure];
             }
             let isOverValidTarget = false;
 

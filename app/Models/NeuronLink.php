@@ -21,6 +21,20 @@ class NeuronLink extends Model
         self::PORT_TRIGGER,
     ];
 
+    public const PORT_COLORS = [
+        self::PORT_DETECTION_SUCCESS => 0x16A34A, // Green
+        self::PORT_DETECTION_FAILURE => 0xF97316, // Orange
+        self::PORT_TRIGGER => 0x16A34A,           // Green
+    ];
+
+    public static function getColorByCondition(?string $condition): int
+    {
+        return match ($condition) {
+            self::PORT_DETECTION_FAILURE, 'else', 'not_found' => self::PORT_COLORS[self::PORT_DETECTION_FAILURE],
+            default => self::PORT_COLORS[self::PORT_DETECTION_SUCCESS],
+        };
+    }
+
     protected $fillable = [
         'from_neuron_id',
         'to_neuron_id',

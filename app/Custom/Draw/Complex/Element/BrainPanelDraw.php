@@ -243,11 +243,7 @@ class BrainPanelDraw
 
     private function getLinkColor(string $condition): int
     {
-        return match ($condition) {
-            'else' => 0xF97316,
-            'main' => 0x16A34A,
-            default => 0x16A34A,
-        };
+        return \App\Models\NeuronLink::getColorByCondition($condition);
     }
 
     private function buildNeuronTooltip(ElementHasPositionNeuron $neuron): string
