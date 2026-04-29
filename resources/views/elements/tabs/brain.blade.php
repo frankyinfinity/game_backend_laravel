@@ -219,6 +219,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const typePath = @json(\App\Models\Neuron::TYPE_PATH);
     const typeAttack = @json(\App\Models\Neuron::TYPE_ATTACK);
     const typeMovement = @json(\App\Models\Neuron::TYPE_MOVEMENT);
+    const typeStart = @json(\App\Models\Neuron::TYPE_START);
+    const typeEnd = @json(\App\Models\Neuron::TYPE_END);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
@@ -589,8 +591,8 @@ document.addEventListener('DOMContentLoaded', function () {
             text.y = (i * cellSize) + (cellSize / 2) - (text.height / 2);
             layer.addChild(text);
 
-            const hasLeftAnchor = neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement;
-            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath;
+            const hasLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd;
+            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement;
 
             if (hasLeftAnchor) {
                 const leftAnchor = new PIXI.Graphics();
@@ -952,7 +954,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let isOverValidTarget = false;
 
             if (hoveredNeuron && Number(hoveredNeuron.id) !== Number(fromNeuronId)) {
-                const hasLeftAnchor = hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack || hoveredNeuron.type === typeMovement;
+                const hasLeftAnchor = hoveredNeuron.type === typeDetection || hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack || hoveredNeuron.type === typeMovement || hoveredNeuron.type === typeEnd;
                 if (hasLeftAnchor) {
                     isOverValidTarget = true;
                     lineColor = resolvedCondition === linkConditionElse ? 0xf59e0b : 0x22c55e; // Orange/Green (valid target)
@@ -1092,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const toNeuron = findNeuronAtCell(i, j);
 
                 if (toNeuron && Number(toNeuron.id) !== Number(fromNeuronId)) {
-                    const hasLeftAnchor = toNeuron.type === typePath || toNeuron.type === typeAttack || toNeuron.type === typeMovement;
+                    const hasLeftAnchor = toNeuron.type === typeDetection || toNeuron.type === typePath || toNeuron.type === typeAttack || toNeuron.type === typeMovement || toNeuron.type === typeEnd;
                     if (hasLeftAnchor) {
                         try {
                             const fromNeuron = findNeuronById(fromNeuronId);

@@ -10,12 +10,16 @@ class Neuron extends Model
     public const TYPE_PATH = 'path';
     public const TYPE_ATTACK = 'attack';
     public const TYPE_MOVEMENT = 'movement';
+    public const TYPE_START = 'start';
+    public const TYPE_END = 'end';
 
     public const TYPES = [
         self::TYPE_DETECTION,
         self::TYPE_PATH,
         self::TYPE_ATTACK,
         self::TYPE_MOVEMENT,
+        self::TYPE_START,
+        self::TYPE_END,
     ];
 
     public const TYPE_LABELS = [
@@ -23,13 +27,17 @@ class Neuron extends Model
         self::TYPE_PATH => 'Percorso',
         self::TYPE_ATTACK => 'Attacco',
         self::TYPE_MOVEMENT => 'Movimento',
+        self::TYPE_START => 'Inizio',
+        self::TYPE_END => 'Fine',
     ];
 
     public const TYPE_SYMBOLS = [
         self::TYPE_DETECTION => '👁',
         self::TYPE_PATH => '➔',
         self::TYPE_ATTACK => '⚔',
-        self::TYPE_MOVEMENT => '⚔',
+        self::TYPE_MOVEMENT => '👣',
+        self::TYPE_START => '►',
+        self::TYPE_END => '■',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';

@@ -262,6 +262,9 @@ class BrainFlowRunner
 
         $neuron['is_active'] = true;
         switch ($neuron['type'] ?? null) {
+            case Neuron::TYPE_START:
+            case Neuron::TYPE_END:
+                break;
             case Neuron::TYPE_DETECTION:
                 $this->handleDetectionNeuron($neuron);
                 break;
