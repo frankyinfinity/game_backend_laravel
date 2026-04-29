@@ -18,6 +18,8 @@ use App\Models\ElementHasGene;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionInformation;
 use App\Models\RuleChimicalElement;
+use App\Models\NeuronCircuit;
+use App\Models\NeuronCircuitDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -571,6 +573,7 @@ class ElementController extends Controller
                     'gene_life_id' => $geneLifeId,
                     'gene_attack_id' => $geneAttackId,
                 ]);
+                $this->updateBrainCircuit($brain);
 
                 return response()->json([
                     'success' => true,
@@ -605,6 +608,8 @@ class ElementController extends Controller
             ]
         );
 
+        $this->updateBrainCircuit($brain);
+
         return response()->json([
             'success' => true,
             'neuron' => [
@@ -637,6 +642,8 @@ class ElementController extends Controller
             ->where('grid_i', (int) $request->input('grid_i'))
             ->where('grid_j', (int) $request->input('grid_j'))
             ->delete();
+
+        $this->updateBrainCircuit($element->brain);
 
         return response()->json(['success' => true]);
     }
@@ -701,6 +708,8 @@ class ElementController extends Controller
             $link->update(['condition' => $condition]);
         }
 
+        $this->updateBrainCircuit($element->brain);
+
         return response()->json([
             'success' => true,
             'link' => [
@@ -736,6 +745,8 @@ class ElementController extends Controller
                 $q->where('brain_id', $element->brain->id);
             })
             ->delete();
+
+        $this->updateBrainCircuit($element->brain);
 
         return response()->json(['success' => true]);
     }
@@ -938,6 +949,127 @@ class ElementController extends Controller
 
         foreach ($validPairs as $pair) {
             NeuronLink::query()->create($pair);
+        }
+
+        $this->updateBrainCircuit($brain);
+    }
+
+    private function updateBrainCircuit(Brain $brain): void
+    {
+        $startNeurons = $brain->neurons()->where('type', Neuron::TYPE_START)->get();
+        $legacyMode = $startNeurons->isEmpty();
+
+        if ($legacyMode) {
+            // Legacy mode: One single circuit containing all neurons (with start_neuron_id = null)
+            $circuit = $brain->circuits()->whereNull('start_neuron_id')->first();
+            
+            // Delete any orphaned start-neuron circuits
+            $brain->circuits()->whereNotNull('start_neuron_id')->delete();
+
+            if (!$circuit && $brain->neurons()->exists()) {
+                $circuit = $brain->circuits()->create([
+                    'uid' => Str::uuid()->toString(),
+                    'state' => NeuronCircuit::STATE_CLOSED,
+                    'start_neuron_id' => null,
+                ]);
+            }
+            
+            if ($circuit) {
+                $existingIds = $circuit->details()->pluck('neuron_id')->toArray();
+                $currentIds = $brain->neurons()->pluck('id')->toArray();
+                
+                $toAdd = array_diff($currentIds, $existingIds);
+                $toRemove = array_diff($existingIds, $currentIds);
+                
+                if (!empty($toRemove)) {
+                    $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
+                }
+                foreach($toAdd as $nId) {
+                    NeuronCircuitDetail::create(['neuron_circuit_id' => $circuit->id, 'neuron_id' => $nId]);
+                }
+                
+                if ($circuit->state !== NeuronCircuit::STATE_CLOSED) {
+                    $circuit->update(['state' => NeuronCircuit::STATE_CLOSED]);
+                }
+            }
+            return;
+        }
+
+        // NEW MODE: One circuit per START neuron.
+        // Delete any legacy circuit (where start_neuron_id is null)
+        $brain->circuits()->whereNull('start_neuron_id')->delete();
+
+        // Delete any circuit whose start_neuron_id is not in our list of current start neurons
+        $startNeuronIds = $startNeurons->pluck('id')->toArray();
+        $brain->circuits()->whereNotNull('start_neuron_id')
+            ->whereNotIn('start_neuron_id', $startNeuronIds)
+            ->delete();
+
+        $allNeurons = $brain->neurons()->with('outgoingLinks')->get()->keyBy('id');
+
+        foreach ($startNeurons as $startNeuron) {
+            $circuit = $brain->circuits()->firstOrCreate(
+                ['start_neuron_id' => $startNeuron->id],
+                [
+                    'uid' => Str::uuid()->toString(),
+                    'state' => NeuronCircuit::STATE_CREATED,
+                ]
+            );
+
+            $visited = [];
+            $queue = [$startNeuron->id];
+            
+            while (!empty($queue)) {
+                $currId = array_shift($queue);
+                if (isset($visited[$currId])) continue;
+                
+                $visited[$currId] = true;
+                
+                $currNode = $allNeurons->get($currId);
+                if ($currNode) {
+                    foreach ($currNode->outgoingLinks as $link) {
+                        if (!isset($visited[$link->to_neuron_id])) {
+                            $queue[] = $link->to_neuron_id;
+                        }
+                    }
+                }
+            }
+            
+            // Sync details for this circuit
+            $existingIds = $circuit->details()->pluck('neuron_id')->toArray();
+            $currentIds = array_keys($visited);
+            
+            $toAdd = array_diff($currentIds, $existingIds);
+            $toRemove = array_diff($existingIds, $currentIds);
+            
+            if (!empty($toRemove)) {
+                $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
+            }
+            foreach ($toAdd as $nId) {
+                NeuronCircuitDetail::create(['neuron_circuit_id' => $circuit->id, 'neuron_id' => $nId]);
+            }
+            
+            // Determine state for this circuit
+            $isClosed = true;
+            foreach ($visited as $nId => $val) {
+                $node = $allNeurons->get($nId);
+                if ($node && $node->outgoingLinks->isEmpty()) {
+                    if ($node->type !== Neuron::TYPE_END) {
+                        $isClosed = false;
+                        break;
+                    }
+                }
+            }
+            
+            // A circuit of just START without END is not closed
+            if (count($visited) === 1 && $startNeuron->type !== Neuron::TYPE_END) {
+                $isClosed = false;
+            }
+            
+            $newState = $isClosed ? NeuronCircuit::STATE_CLOSED : NeuronCircuit::STATE_CREATED;
+            if ($circuit->state !== $newState) {
+                $circuit->update(['state' => $newState]);
+            }
         }
     }
 }

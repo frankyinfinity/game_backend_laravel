@@ -34,4 +34,9 @@ class Brain extends Model
             'id'
         );
     }
+
+    public function circuits()
+    {
+        return $this->hasMany(NeuronCircuit::class);
+    }
 }
