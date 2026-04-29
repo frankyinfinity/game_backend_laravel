@@ -260,6 +260,7 @@ class ElementController extends Controller
 
         // Fetch all RuleChimicalElements of type 'element'
         $allRuleChimicalElements = RuleChimicalElement::query()
+            ->with('details')
             ->where('type', RuleChimicalElement::TYPE_ELEMENT)
             ->orderBy('name')
             ->get();
@@ -499,6 +500,7 @@ class ElementController extends Controller
             'target_element_id' => 'nullable|integer|min:1',
             'gene_life_id' => 'nullable|integer|exists:genes,id',
             'gene_attack_id' => 'nullable|integer|exists:genes,id',
+            'element_has_rule_chimical_element_id' => 'nullable|integer|exists:rule_chimical_elements,id',
         ]);
 
         $gridWidth = max(1, (int) $request->input('brain_grid_width', $element->brain->grid_width ?? 5));
@@ -527,6 +529,7 @@ class ElementController extends Controller
         $targetElementId = null;
         $geneLifeId = null;
         $geneAttackId = null;
+        $elementHasRuleChimicalElementId = null;
 
         if ($type === Neuron::TYPE_DETECTION) {
             $radius = max(1, (int) $request->input('radius', 1));
@@ -559,6 +562,18 @@ class ElementController extends Controller
             }
         }
 
+        if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            $candidateRuleId = (int) $request->input('element_has_rule_chimical_element_id', 0);
+            $elementHasRuleChimicalElementId = $candidateRuleId > 0 ? $candidateRuleId : null;
+
+            if ($elementHasRuleChimicalElementId === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Devi selezionare una Regola Elemento Chimico',
+                ], 422);
+            }
+        }
+
         $neuronId = $request->input('id');
         if ($neuronId) {
             $neuron = Neuron::query()->where('brain_id', $brain->id)->find($neuronId);
@@ -572,6 +587,7 @@ class ElementController extends Controller
                     'target_element_id' => $targetElementId,
                     'gene_life_id' => $geneLifeId,
                     'gene_attack_id' => $geneAttackId,
+                    'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
                 ]);
                 $this->updateBrainCircuit($brain);
 
@@ -587,6 +603,7 @@ class ElementController extends Controller
                         'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
                         'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                         'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
+                        'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
                     ],
                     'circuits' => $this->getCircuitsArray($brain),
                 ]);
@@ -606,6 +623,7 @@ class ElementController extends Controller
                 'target_element_id' => $targetElementId,
                 'gene_life_id' => $geneLifeId,
                 'gene_attack_id' => $geneAttackId,
+                'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
             ]
         );
 
@@ -623,6 +641,7 @@ class ElementController extends Controller
                 'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
                 'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                 'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
+                'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
             ],
             'circuits' => $this->getCircuitsArray($brain),
         ]);
@@ -666,6 +685,7 @@ class ElementController extends Controller
             'from_neuron_id' => 'required|integer|min:1',
             'to_neuron_id' => 'required|integer|min:1|different:from_neuron_id',
             'condition' => 'nullable|string',
+            'color' => 'nullable|string',
         ]);
 
         $fromNeuron = Neuron::query()
@@ -697,9 +717,13 @@ class ElementController extends Controller
             } else {
                 $condition = NeuronLink::PORT_DETECTION_SUCCESS;
             }
+        } elseif ($fromNeuron->type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            $condition = (string) $request->input('condition');
         } else {
             $condition = NeuronLink::PORT_TRIGGER;
         }
+
+        $color = $request->input('color');
 
         $link = NeuronLink::query()->firstOrCreate(
             [
@@ -708,11 +732,15 @@ class ElementController extends Controller
             ],
             [
                 'condition' => $condition,
+                'color' => $color,
             ]
         );
 
-        if ($link->condition !== $condition) {
-            $link->update(['condition' => $condition]);
+        if ($link->condition !== $condition || $link->color !== $color) {
+            $link->update([
+                'condition' => $condition,
+                'color' => $color,
+            ]);
         }
 
         $this->updateBrainCircuit($element->brain);
@@ -724,6 +752,7 @@ class ElementController extends Controller
                 'from_neuron_id' => (int) $link->from_neuron_id,
                 'to_neuron_id' => (int) $link->to_neuron_id,
                 'condition' => $link->condition,
+                'color' => $link->color,
             ],
             'circuits' => $this->getCircuitsArray($element->brain),
         ]);
@@ -833,8 +862,12 @@ class ElementController extends Controller
             $targetElementId = ($type === Neuron::TYPE_DETECTION && $targetType === Neuron::TARGET_TYPE_ELEMENT) ? (int) ($item['target_element_id'] ?? 0) : null;
             $geneLifeId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_life_id'] ?? 0) : null;
             $geneAttackId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_attack_id'] ?? 0) : null;
+            $elementHasRuleChimicalElementId = $type === Neuron::TYPE_READ_CHIMICAL_ELEMENT ? (int) ($item['element_has_rule_chimical_element_id'] ?? 0) : null;
 
             if ($type === Neuron::TYPE_ATTACK && ($geneLifeId <= 0 || $geneAttackId <= 0))
+                continue;
+
+            if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT && $elementHasRuleChimicalElementId <= 0)
                 continue;
 
             $clientId = (int) ($item['id'] ?? 0);
@@ -853,6 +886,7 @@ class ElementController extends Controller
                     'target_element_id' => $targetElementId ?: null,
                     'gene_life_id' => $geneLifeId ?: null,
                     'gene_attack_id' => $geneAttackId ?: null,
+                    'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId ?: null,
                 ]);
             } else {
                 $neuron = Neuron::query()->create([
@@ -865,6 +899,7 @@ class ElementController extends Controller
                     'target_element_id' => $targetElementId ?: null,
                     'gene_life_id' => $geneLifeId ?: null,
                     'gene_attack_id' => $geneAttackId ?: null,
+                    'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId ?: null,
                 ]);
             }
 
@@ -939,6 +974,8 @@ class ElementController extends Controller
                 } else {
                     $condition = NeuronLink::PORT_DETECTION_SUCCESS;
                 }
+            } elseif ($fromNeuron->type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+                $condition = (string) ($link['condition'] ?? '');
             } else {
                 $condition = NeuronLink::PORT_TRIGGER;
             }

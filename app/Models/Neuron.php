@@ -12,6 +12,7 @@ class Neuron extends Model
     public const TYPE_MOVEMENT = 'movement';
     public const TYPE_START = 'start';
     public const TYPE_END = 'end';
+    public const TYPE_READ_CHIMICAL_ELEMENT = 'read_chimical_element';
 
     public const TYPES = [
         self::TYPE_DETECTION,
@@ -20,6 +21,7 @@ class Neuron extends Model
         self::TYPE_MOVEMENT,
         self::TYPE_START,
         self::TYPE_END,
+        self::TYPE_READ_CHIMICAL_ELEMENT,
     ];
 
     public const TYPE_LABELS = [
@@ -29,6 +31,7 @@ class Neuron extends Model
         self::TYPE_MOVEMENT => 'Movimento',
         self::TYPE_START => 'Inizio',
         self::TYPE_END => 'Fine',
+        self::TYPE_READ_CHIMICAL_ELEMENT => 'Lettura Elemento Chimico',
     ];
 
     public const TYPE_SYMBOLS = [
@@ -38,6 +41,7 @@ class Neuron extends Model
         self::TYPE_MOVEMENT => '👣',
         self::TYPE_START => '►',
         self::TYPE_END => '■',
+        self::TYPE_READ_CHIMICAL_ELEMENT => '🧪',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
@@ -63,6 +67,7 @@ class Neuron extends Model
         'target_element_id' => 'integer',
         'gene_life_id' => 'integer',
         'gene_attack_id' => 'integer',
+        'element_has_rule_chimical_element_id' => 'integer',
     ];
 
     public function brain()
@@ -78,6 +83,11 @@ class Neuron extends Model
     public function incomingLinks()
     {
         return $this->hasMany(NeuronLink::class, 'to_neuron_id');
+    }
+
+    public function chemicalRule()
+    {
+        return $this->belongsTo(RuleChimicalElement::class, 'element_has_rule_chimical_element_id');
     }
 }
 

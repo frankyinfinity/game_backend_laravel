@@ -16,6 +16,7 @@ class ElementHasPositionNeuron extends Model
         'target_element_id' => 'integer',
         'gene_life_id' => 'integer',
         'gene_attack_id' => 'integer',
+        'element_has_rule_chimical_element_id' => 'integer',
         'active' => 'boolean',
     ];
 
@@ -32,5 +33,10 @@ class ElementHasPositionNeuron extends Model
     public function incomingLinks()
     {
         return $this->hasMany(ElementHasPositionNeuronLink::class, 'to_element_has_position_neuron_id');
+    }
+
+    public function chemicalRule()
+    {
+        return $this->belongsTo(RuleChimicalElement::class, 'element_has_rule_chimical_element_id');
     }
 }

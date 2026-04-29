@@ -22,7 +22,7 @@ class BrainPanelDraw
     private int $width = 220;
     private int $height = 120;
     private bool $renderable = true;
-    private int $cellSize = 20;
+    private int $cellSize = 60;
     private int $padding = 12;
 
     public function __construct(string $uid)
@@ -131,7 +131,7 @@ class BrainPanelDraw
 
     private function addConnections(): void
     {
-        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron'])->orderBy('grid_i')->orderBy('grid_j')->get();
+        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
 
         foreach ($neurons as $neuron) {
             /** @var ElementHasPositionNeuron $neuron */
@@ -151,7 +151,7 @@ class BrainPanelDraw
                 $line = new MultiLine($this->uid . '_link_' . $neuron->id . '_' . $link->id . '_' . $linkIndex);
                 $line->setPoint($start['x'], $start['y']);
                 $line->setPoint($end['x'], $end['y']);
-                $line->setColor($this->getLinkColor((string) $link->condition));
+                $line->setColor($this->getLinkColorForNeuron($neuron, $link));
                 $line->setThickness(2);
                 $line->setRenderable($this->renderable);
                 $line->addAttributes('z_index', 20008);
@@ -246,6 +246,27 @@ class BrainPanelDraw
         return \App\Models\NeuronLink::getColorByCondition($condition);
     }
 
+    private function getLinkColorForNeuron(ElementHasPositionNeuron $neuron, ElementHasPositionNeuronLink $link): int
+    {
+        if ($link->color) {
+            return (int) hexdec(ltrim($link->color, '#'));
+        }
+
+        $condition = (string) $link->condition;
+        if ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            $rule = $neuron->chemicalRule;
+            if ($rule && $rule->details) {
+                foreach ($rule->details as $detail) {
+                    if ("[{$detail->min}/{$detail->max}]" === $condition) {
+                        return (int) hexdec(ltrim($detail->color, '#'));
+                    }
+                }
+            }
+        }
+
+        return $this->getLinkColor($condition);
+    }
+
     private function buildNeuronTooltip(ElementHasPositionNeuron $neuron): string
     {
         $label = \App\Models\Neuron::TYPE_LABELS[(string) $neuron->type] ?? ucfirst((string) $neuron->type);
@@ -266,6 +287,8 @@ class BrainPanelDraw
             $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');
         } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_MOVEMENT) {
             $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
+        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            // Regola info here if needed
         }
 
         return implode("\n", $lines);

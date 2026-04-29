@@ -106,6 +106,7 @@ class ElementHasPositionObserver
                     'target_element_id' => $templateNeuron->target_element_id,
                     'gene_life_id' => $templateNeuron->gene_life_id,
                     'gene_attack_id' => $templateNeuron->gene_attack_id,
+                    'element_has_rule_chimical_element_id' => $templateNeuron->element_has_rule_chimical_element_id,
                 ]);
 
                 $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;

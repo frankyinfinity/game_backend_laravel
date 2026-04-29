@@ -14,6 +14,7 @@
                 'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
                 'gene_life_id' => $n->gene_life_id !== null ? (int) $n->gene_life_id : null,
                 'gene_attack_id' => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
+                'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
             ];
         })->values()->all()
         : [];
@@ -25,6 +26,7 @@
                     'from_neuron_id' => (int) $l->from_neuron_id,
                     'to_neuron_id' => (int) $l->to_neuron_id,
                     'condition' => $l->condition,
+                    'color' => $l->color,
                 ];
             });
         })->unique(function ($l) {
@@ -176,6 +178,15 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="form-group" id="neuron_rule_chimical_element_group" style="display:none;">
+                    <label for="neuron_element_has_rule_chimical_element_id">Regola Elemento Chimico</label>
+                    <select class="form-control" id="neuron_element_has_rule_chimical_element_id">
+                        <option value="">-- Seleziona Regola --</option>
+                        @foreach(($allRuleChimicalElements ?? collect()) as $rule)
+                            <option value="{{ $rule->id }}">{{ $rule->title }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger mr-auto" id="btn_delete_neuron">Rimuovi</button>
@@ -213,11 +224,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const neuronGeneLifeIdInput = document.getElementById('neuron_gene_life_id');
     const neuronGeneAttackGroup = document.getElementById('neuron_gene_attack_group');
     const neuronGeneAttackIdInput = document.getElementById('neuron_gene_attack_id');
+    const neuronRuleChimicalElementGroup = document.getElementById('neuron_rule_chimical_element_group');
+    const neuronRuleChimicalElementIdInput = document.getElementById('neuron_element_has_rule_chimical_element_id');
     const selectedCellLabel = document.getElementById('selected_cell_label');
     const saveNeuronBtn = document.getElementById('btn_save_neuron');
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl) {
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl) {
         console.warn('One or more required elements for the brain tab are missing.');
         return;
     }
@@ -227,13 +240,14 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    const fixedCellSize = 36;
+    const fixedCellSize = 60;
     const typeDetection = @json(\App\Models\Neuron::TYPE_DETECTION);
     const typePath = @json(\App\Models\Neuron::TYPE_PATH);
     const typeAttack = @json(\App\Models\Neuron::TYPE_ATTACK);
     const typeMovement = @json(\App\Models\Neuron::TYPE_MOVEMENT);
     const typeStart = @json(\App\Models\Neuron::TYPE_START);
     const typeEnd = @json(\App\Models\Neuron::TYPE_END);
+    const typeReadChimicalElement = @json(\App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
@@ -248,6 +262,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
     const deleteNeuronLinkUrl = @json(route('elements.brain.neuron-links.delete', $element));
     const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
+    const allRuleChimicalElements = @json($allRuleChimicalElements);
 
     let app = null;
     let selectedCell = null;
@@ -351,6 +366,9 @@ document.addEventListener('DOMContentLoaded', function () {
             if (link.condition === 'not_found' || link.condition === 'else' || link.condition === portDetectionFailure) return portDetectionFailure;
             return link.condition;
         }
+        if (fromNeuron.type === typeReadChimicalElement) {
+            return link.condition || portTrigger;
+        }
         return portTrigger;
     }
 
@@ -367,6 +385,20 @@ document.addEventListener('DOMContentLoaded', function () {
             return { x: baseX, y: useBottom ? bottomY : topY };
         }
 
+        if (neuron.type === typeReadChimicalElement) {
+            const ruleId = neuron.element_has_rule_chimical_element_id;
+            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+            if (rule && rule.details && rule.details.length > 0) {
+                const details = rule.details;
+                const count = details.length;
+                const index = details.findIndex(d => `[${d.min}/${d.max}]` === condition);
+                if (index !== -1) {
+                    const step = cellSize / (count + 1);
+                    return { x: baseX + 2, y: topLeftY + (step * (index + 1)) };
+                }
+            }
+        }
+
         return { x: baseX, y: topLeftY + (cellSize / 2) };
     }
 
@@ -381,10 +413,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const isDetection = neuronTypeInput.value === typeDetection;
         const isMovement = neuronTypeInput.value === typeMovement;
         const isAttack = neuronTypeInput.value === typeAttack;
+        const isReadChimicalElement = neuronTypeInput.value === typeReadChimicalElement;
         neuronRadiusGroup.style.display = (isDetection || isMovement) ? '' : 'none';
         neuronTargetTypeGroup.style.display = isDetection ? '' : 'none';
         neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
         neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
+        neuronRuleChimicalElementGroup.style.display = isReadChimicalElement ? '' : 'none';
         if (!isDetection) {
             neuronTargetElementGroup.style.display = 'none';
             return;
@@ -410,6 +444,7 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronTargetElementIdInput.value = existing.target_element_id != null ? String(existing.target_element_id) : '';
             neuronGeneLifeIdInput.value = existing.gene_life_id != null ? String(existing.gene_life_id) : '';
             neuronGeneAttackIdInput.value = existing.gene_attack_id != null ? String(existing.gene_attack_id) : '';
+            neuronRuleChimicalElementIdInput.value = existing.element_has_rule_chimical_element_id != null ? String(existing.element_has_rule_chimical_element_id) : '';
             deleteNeuronBtn.style.display = '';
         } else {
             currentNeuronId = null;
@@ -420,6 +455,7 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronTargetElementIdInput.value = '';
             neuronGeneLifeIdInput.value = '';
             neuronGeneAttackIdInput.value = '';
+            neuronRuleChimicalElementIdInput.value = '';
             deleteNeuronBtn.style.display = 'none';
         }
 
@@ -463,9 +499,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            let lineColor = portColors[portTrigger]; // Standard Green
-            if (linkCondition === portDetectionFailure) {
-                lineColor = portColors[portDetectionFailure]; // Orange
+            let lineColor = portColors[portTrigger];
+            if (link.color) {
+                lineColor = link.color.startsWith('#') ? parseInt(link.color.replace('#', '0x'), 16) : Number(link.color);
+            } else if (linkCondition === portDetectionFailure) {
+                lineColor = portColors[portDetectionFailure];
+            } else if (fromN.type === typeReadChimicalElement) {
+                const ruleId = fromN.element_has_rule_chimical_element_id;
+                const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+                if (rule && rule.details) {
+                    const detail = rule.details.find(d => `[${d.min}/${d.max}]` === linkCondition);
+                    if (detail && detail.color) {
+                        lineColor = parseInt(detail.color.replace('#', '0x'), 16);
+                    }
+                }
             }
             const line = new PIXI.Graphics();
             line.lineStyle(3, lineColor, 1);
@@ -548,6 +595,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             neuronBorder.eventMode = 'static';
             neuronBorder.cursor = 'grab';
+            neuronBorder.isInteractiveElement = true;
             neuronBorder.on('pointerdown', (e) => {
                 e.stopPropagation();
                 isNeuronDragging = true;
@@ -575,6 +623,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     lines.push(`Gene Attacco: ${neuron.gene_attack_id != null ? neuron.gene_attack_id : '-'}`);
                 } else if (neuron.type === typeMovement) {
                     lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
+                } else if (neuron.type === typeReadChimicalElement) {
+                    const ruleId = neuron.element_has_rule_chimical_element_id;
+                    const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+                    lines.push(`Regola: ${rule ? rule.title : '-'}`);
                 }
 
                 tooltipText.text = lines.join('\n');
@@ -645,8 +697,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            const hasLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd;
-            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement;
+            const hasLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement;
+            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement;
 
             if (hasLeftAnchor) {
                 const leftAnchor = new PIXI.Graphics();
@@ -680,7 +732,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         rightAnchor.endFill();
                         rightAnchor.alpha = isDragging ? 0.5 : 1;
                         rightAnchor.eventMode = 'static';
-                        rightAnchor.cursor = 'crosshair';
+                        rightAnchor.cursor = 'pointer';
+                        rightAnchor.isInteractiveElement = true;
 
                         rightAnchor.on('pointerdown', (e) => {
                             e.stopPropagation();
@@ -692,7 +745,51 @@ document.addEventListener('DOMContentLoaded', function () {
                                 layer.addChild(tempLineGraphics);
                             }
                         });
+
                         layer.addChild(rightAnchor);
+                    }
+                } else if (neuron.type === typeReadChimicalElement) {
+                    const ruleId = neuron.element_has_rule_chimical_element_id;
+                    const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+                    if (rule && rule.details && rule.details.length > 0) {
+                        const details = rule.details;
+                        const count = details.length;
+                        const step = cellSize / (count + 1);
+                        
+                        // Calcolo raggio dinamico per evitare sovrapposizioni
+                        // Con cellSize 36, se abbiamo 4 ancore lo step è 7.2px. 
+                        // Un raggio di 3 (diametro 6) ci sta bene con un po' di margine.
+                        const dynamicRadius = Math.max(3, Math.min(8, Math.floor(step / 2) + 1));
+
+                        details.forEach((detail, index) => {
+                            const anchorY = baseY + (step * (index + 1));
+                            const anchorCondition = `[${detail.min}/${detail.max}]`;
+                            const color = parseInt(detail.color.replace('#', '0x'), 16);
+
+                            const rightAnchor = new PIXI.Graphics();
+                            rightAnchor.beginFill(color);
+                            rightAnchor.lineStyle(1, 0xffffff, 1);
+                            // Spostiamo leggermente all'esterno (baseX + 2) per chiarezza
+                            rightAnchor.drawCircle(baseX + 2, anchorY, dynamicRadius);
+                            rightAnchor.endFill();
+                            rightAnchor.alpha = isDragging ? 0.5 : 1;
+                            rightAnchor.eventMode = 'static';
+                            rightAnchor.cursor = 'pointer';
+                            rightAnchor.isInteractiveElement = true;
+
+                            rightAnchor.on('pointerdown', (e) => {
+                                e.stopPropagation();
+                                fromNeuronId = neuron.id;
+                                fromAnchorCondition = anchorCondition;
+                                isLinkDragging = true;
+                                if (!tempLineGraphics) {
+                                    tempLineGraphics = new PIXI.Graphics();
+                                    layer.addChild(tempLineGraphics);
+                                }
+                            });
+
+                            layer.addChild(rightAnchor);
+                        });
                     }
                 } else {
                     const rightAnchor = new PIXI.Graphics();
@@ -702,7 +799,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     rightAnchor.endFill();
                     rightAnchor.alpha = isDragging ? 0.5 : 1;
                     rightAnchor.eventMode = 'static';
-                    rightAnchor.cursor = 'crosshair';
+                    rightAnchor.cursor = 'pointer';
+                    rightAnchor.isInteractiveElement = true;
 
                     rightAnchor.on('pointerdown', (e) => {
                         e.stopPropagation();
@@ -714,6 +812,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             layer.addChild(tempLineGraphics);
                         }
                     });
+
                     layer.addChild(rightAnchor);
                 }
             }
@@ -744,7 +843,8 @@ document.addEventListener('DOMContentLoaded', function () {
             app.stage.hitArea = new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight);
 
             app.stage.on('pointerdown', async (event) => {
-                if (isLinkDragging || isNeuronDragging) return;
+                // Se abbiamo cliccato su un'ancora o su un neurone, non aprire la modale qui
+                if (isLinkDragging || isNeuronDragging || (event.target && event.target.isInteractiveElement)) return;
                 
                 const i = Math.floor(event.global.y / fixedCellSize);
                 const j = Math.floor(event.global.x / fixedCellSize);
@@ -891,6 +991,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let targetElementId = null;
         let geneLifeId = null;
         let geneAttackId = null;
+        let elementHasRuleChimicalElementId = null;
         if (type === typeDetection) {
             radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
             if (neuronTargetTypeEntityInput.checked) targetType = targetTypeEntity;
@@ -910,6 +1011,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Per il neurone Attacco devi selezionare Gene Vita e Gene Attacco');
                 return;
             }
+        } else if (type === typeReadChimicalElement) {
+            const parsedRule = parseInt(neuronRuleChimicalElementIdInput.value, 10);
+            elementHasRuleChimicalElementId = Number.isNaN(parsedRule) ? null : parsedRule;
+            if (elementHasRuleChimicalElementId == null) {
+                alert('Per il neurone Lettura Elemento Chimico devi selezionare una Regola');
+                return;
+            }
         }
 
         saveNeuronBtn.disabled = true;
@@ -926,6 +1034,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 target_element_id: targetElementId,
                 gene_life_id: geneLifeId,
                 gene_attack_id: geneAttackId,
+                element_has_rule_chimical_element_id: elementHasRuleChimicalElementId,
             });
             neuronItems = neuronItems.filter((item) => !(Number(item.grid_i) === i && Number(item.grid_j) === j));
             neuronItems.push(savedNeuron);
@@ -1008,11 +1117,20 @@ document.addEventListener('DOMContentLoaded', function () {
             let lineColor = portColors[portTrigger];
             if (resolvedCondition === portDetectionFailure) {
                 lineColor = portColors[portDetectionFailure];
+            } else if (fromN && fromN.type === typeReadChimicalElement) {
+                const ruleId = fromN.element_has_rule_chimical_element_id;
+                const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+                if (rule && rule.details) {
+                    const detail = rule.details.find(d => `[${d.min}/${d.max}]` === fromAnchorCondition);
+                    if (detail && detail.color) {
+                        lineColor = parseInt(detail.color.replace('#', '0x'), 16);
+                    }
+                }
             }
             let isOverValidTarget = false;
 
             if (hoveredNeuron && Number(hoveredNeuron.id) !== Number(fromNeuronId)) {
-                const hasLeftAnchor = hoveredNeuron.type === typeDetection || hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack || hoveredNeuron.type === typeMovement || hoveredNeuron.type === typeEnd;
+                const hasLeftAnchor = hoveredNeuron.type === typeDetection || hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack || hoveredNeuron.type === typeMovement || hoveredNeuron.type === typeEnd || hoveredNeuron.type === typeReadChimicalElement;
                 if (hasLeftAnchor) {
                     isOverValidTarget = true;
                     lineColor = resolvedCondition === linkConditionElse ? 0xf59e0b : 0x22c55e; // Orange/Green (valid target)
@@ -1023,14 +1141,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (isOverValidTarget) {
+                // Highlight target cell
+                tempLineGraphics.lineStyle(2, lineColor, 1);
+                tempLineGraphics.beginFill(lineColor, 0.1);
+                tempLineGraphics.drawRect(Number(hoveredNeuron.grid_j) * fixedCellSize, Number(hoveredNeuron.grid_i) * fixedCellSize, fixedCellSize, fixedCellSize);
+                tempLineGraphics.endFill();
+
                 // Draw a solid line when snapped
-                tempLineGraphics.lineStyle(4, lineColor, 1);
+                tempLineGraphics.lineStyle(5, lineColor, 1);
                 tempLineGraphics.moveTo(startX, startY);
                 tempLineGraphics.lineTo(endX, endY);
                 
-                // Add a small pulse effect circle at target
-                tempLineGraphics.beginFill(lineColor, 0.3);
-                tempLineGraphics.drawCircle(endX, endY, 12);
+                // Add a larger pulse effect circle at target
+                tempLineGraphics.lineStyle(2, 0xffffff, 1);
+                tempLineGraphics.beginFill(lineColor, 0.5);
+                tempLineGraphics.drawCircle(endX, endY, 14);
                 tempLineGraphics.endFill();
             } else {
                 // Draw dashed line when searching
@@ -1124,7 +1249,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             target_type: neuron.target_type,
                             target_element_id: neuron.target_element_id,
                             gene_life_id: neuron.gene_life_id,
-                            gene_attack_id: neuron.gene_attack_id
+                            gene_attack_id: neuron.gene_attack_id,
+                            element_has_rule_chimical_element_id: neuron.element_has_rule_chimical_element_id
                         });
                         
                         // ID remains the same, but we update the local grid coordinates
@@ -1152,14 +1278,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 const toNeuron = findNeuronAtCell(i, j);
 
                 if (toNeuron && Number(toNeuron.id) !== Number(fromNeuronId)) {
-                    const hasLeftAnchor = toNeuron.type === typeDetection || toNeuron.type === typePath || toNeuron.type === typeAttack || toNeuron.type === typeMovement || toNeuron.type === typeEnd;
+                    const hasLeftAnchor = toNeuron.type === typeDetection || toNeuron.type === typePath || toNeuron.type === typeAttack || toNeuron.type === typeMovement || toNeuron.type === typeEnd || toNeuron.type === typeReadChimicalElement;
                     if (hasLeftAnchor) {
                         try {
-                            const fromNeuron = findNeuronById(fromNeuronId);
+                            const fromN = findNeuronById(fromNeuronId);
+                            const resolvedCondition = resolveLinkCondition({ condition: fromAnchorCondition }, fromN);
+                            let linkColorHex = null;
+                            
+                            // Determinazione del colore da inviare al server
+                            if (fromN.type === typeReadChimicalElement) {
+                                const ruleId = fromN.element_has_rule_chimical_element_id;
+                                const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+                                if (rule && rule.details) {
+                                    const detail = rule.details.find(d => `[${d.min}/${d.max}]` === fromAnchorCondition);
+                                    if (detail && detail.color) {
+                                        linkColorHex = detail.color;
+                                    }
+                                }
+                            } else if (resolvedCondition === portDetectionFailure) {
+                                linkColorHex = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
+                            } else {
+                                linkColorHex = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
+                            }
+
                             const payload = {
                                 from_neuron_id: Number(fromNeuronId),
                                 to_neuron_id: Number(toNeuron.id),
-                                condition: fromAnchorCondition || (fromNeuron && fromNeuron.type === typeDetection ? portDetectionSuccess : portTrigger)
+                                condition: fromAnchorCondition || (fromN && fromN.type === typeDetection ? portDetectionSuccess : portTrigger),
+                                color: linkColorHex
                             };
                             const savedLink = await requestSaveNeuronLink(payload);
                             const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));

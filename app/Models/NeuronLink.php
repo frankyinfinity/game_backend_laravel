@@ -39,6 +39,7 @@ class NeuronLink extends Model
         'from_neuron_id',
         'to_neuron_id',
         'condition',
+        'color',
     ];
 
     public function fromNeuron()
