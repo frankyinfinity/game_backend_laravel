@@ -15,6 +15,9 @@ use App\Models\ElementHasPositionRuleChimicalElement;
 use App\Models\ElementHasPositionRuleChimicalElementDetail;
 use App\Models\ElementHasPositionRuleChimicalElementDetailEffect;
 use App\Models\ElementHasPositionChimicalElement;
+use App\Models\ElementHasPositionNeuronCircuit;
+use App\Models\ElementHasPositionNeuronCircuitDetail;
+use App\Models\NeuronCircuit;
 use App\Models\Container;
 use Docker\Docker;
 use Illuminate\Support\Str;
@@ -33,7 +36,8 @@ class ElementHasPositionObserver
         if ($element->isInteractive()) {
             $this->initializeInformation($elementHasPosition);
             $this->initializeScore($elementHasPosition);
-            $this->initializeBrain($elementHasPosition);
+            $neuronMap = $this->initializeBrain($elementHasPosition);
+            $this->initializeCircuits($elementHasPosition, $neuronMap);
             $this->initializeChemicalRules($elementHasPosition);
             $this->initializeContainer($elementHasPosition);
         }
@@ -73,10 +77,12 @@ class ElementHasPositionObserver
         }
     }
 
-    private function initializeBrain(ElementHasPosition $elementHasPosition): void
+
+    private function initializeBrain(ElementHasPosition $elementHasPosition): array
     {
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
+        $templateToClonedNeuronId = [];
 
         if ($templateBrain !== null) {
             $templateBrain->load('neurons.outgoingLinks');
@@ -118,6 +124,39 @@ class ElementHasPositionObserver
                         'to_element_has_position_neuron_id' => $toClonedId,
                         'condition' => $templateLink->condition,
                     ]);
+                }
+            }
+        }
+        return $templateToClonedNeuronId;
+    }
+
+    private function initializeCircuits(ElementHasPosition $elementHasPosition, array $neuronMap): void
+    {
+        $element = $elementHasPosition->element;
+        $templateBrain = $element->brain;
+
+        if ($templateBrain !== null) {
+            $templateBrain->load('circuits.details');
+
+            foreach ($templateBrain->circuits as $templateCircuit) {
+                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED) {
+                    continue;
+                }
+
+                $clonedCircuit = ElementHasPositionNeuronCircuit::query()->create([
+                    'element_has_position_id' => $elementHasPosition->id,
+                    'uid' => (string) Str::uuid(),
+                    'start_element_has_position_neuron_id' => $neuronMap[(int) $templateCircuit->start_neuron_id] ?? null,
+                ]);
+
+                foreach ($templateCircuit->details as $templateDetail) {
+                    $clonedNeuronId = $neuronMap[(int) $templateDetail->neuron_id] ?? null;
+                    if ($clonedNeuronId) {
+                        ElementHasPositionNeuronCircuitDetail::query()->create([
+                            'element_has_position_neuron_circuit_id' => $clonedCircuit->id,
+                            'element_has_position_neuron_id' => $clonedNeuronId,
+                        ]);
+                    }
                 }
             }
         }

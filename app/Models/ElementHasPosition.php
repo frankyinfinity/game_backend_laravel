@@ -55,4 +55,9 @@ class ElementHasPosition extends Model
     {
         return $this->hasMany(ElementHasPositionChimicalElement::class);
     }
+
+    public function circuits()
+    {
+        return $this->hasMany(ElementHasPositionNeuronCircuit::class);
+    }
 }
