@@ -124,6 +124,7 @@ class ElementHasPositionObserver
                         'from_element_has_position_neuron_id' => $fromClonedId,
                         'to_element_has_position_neuron_id' => $toClonedId,
                         'condition' => $templateLink->condition,
+                        'color' => $templateLink->color,
                     ]);
                 }
             }

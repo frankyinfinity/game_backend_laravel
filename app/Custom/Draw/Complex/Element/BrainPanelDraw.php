@@ -22,7 +22,7 @@ class BrainPanelDraw
     private int $width = 220;
     private int $height = 120;
     private bool $renderable = true;
-    private int $cellSize = 60;
+    private int $cellSize = 20;
     private int $padding = 12;
 
     public function __construct(string $uid)
@@ -92,9 +92,29 @@ class BrainPanelDraw
         $this->addGridLines();
 
         if ($this->brain) {
-            $this->addConnections();
-            $this->addNodes();
+            $circuitNeuronIds = $this->getCircuitNeuronIds();
+            $this->addConnections($circuitNeuronIds);
+            $this->addNodes($circuitNeuronIds);
         }
+    }
+
+    private function getCircuitNeuronIds(): array
+    {
+        if (!$this->brain) {
+            return [];
+        }
+
+        $elementHasPosition = $this->brain->elementHasPosition;
+        if (!$elementHasPosition) {
+            return [];
+        }
+
+        return \App\Models\ElementHasPositionNeuronCircuitDetail::query()
+            ->whereHas('circuit', fn($q) => $q->where('element_has_position_id', $elementHasPosition->id))
+            ->pluck('element_has_position_neuron_id')
+            ->unique()
+            ->values()
+            ->toArray();
     }
 
     private function addGridLines(): void
@@ -129,9 +149,13 @@ class BrainPanelDraw
         }
     }
 
-    private function addConnections(): void
+    private function addConnections(array $circuitNeuronIds = []): void
     {
         $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
+
+        if (!empty($circuitNeuronIds)) {
+            $neurons = $neurons->filter(fn($n) => in_array((int) $n->id, $circuitNeuronIds));
+        }
 
         foreach ($neurons as $neuron) {
             /** @var ElementHasPositionNeuron $neuron */
@@ -139,6 +163,10 @@ class BrainPanelDraw
                 /** @var ElementHasPositionNeuronLink $link */
                 $toNeuron = $link->toNeuron;
                 if (!$toNeuron) {
+                    continue;
+                }
+
+                if (!empty($circuitNeuronIds) && !in_array((int) $toNeuron->id, $circuitNeuronIds)) {
                     continue;
                 }
 
@@ -160,17 +188,21 @@ class BrainPanelDraw
         }
     }
 
-    private function addNodes(): void
+    private function addNodes(array $circuitNeuronIds = []): void
     {
         if (!$this->brain) {
             return;
         }
 
         $neurons = $this->brain->neurons()
-            ->with(['outgoingLinks', 'incomingLinks'])
+            ->with(['outgoingLinks', 'incomingLinks', 'chemicalRule.details'])
             ->orderBy('grid_i')
             ->orderBy('grid_j')
             ->get();
+
+        if (!empty($circuitNeuronIds)) {
+            $neurons = $neurons->filter(fn($n) => in_array((int) $n->id, $circuitNeuronIds));
+        }
 
         foreach ($neurons as $index => $neuron) {
             $position = $this->cellOrigin((int) $neuron->grid_j, (int) $neuron->grid_i);
@@ -202,6 +234,34 @@ class BrainPanelDraw
             $icon->setRenderable($this->renderable);
             $icon->addAttributes('z_index', 20010);
             $this->drawItems[] = $icon;
+
+            // Per il neurone Lettura Elemento Chimico: disegna le N ancore colorate sul bordo destro
+            if ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+                $rule = $neuron->chemicalRule;
+                if ($rule && $rule->details && $rule->details->count() > 0) {
+                    $details = $rule->details;
+                    $count = $details->count();
+                    $step = $this->cellSize / ($count + 1);
+                    $anchorRadius = max(3, min(6, (int) floor($step / 2)));
+                    $rightX = $position['x'] + $this->cellSize;
+
+                    foreach ($details as $dIdx => $detail) {
+                        $anchorY = $position['y'] + (int) round($step * ($dIdx + 1));
+                        $color = (int) hexdec(ltrim($detail->color, '#'));
+
+                        $anchor = new Rectangle($this->uid . '_anchor_' . $index . '_' . $dIdx);
+                        $anchor->setOrigin($rightX - $anchorRadius, $anchorY - $anchorRadius);
+                        $anchor->setSize($anchorRadius * 2, $anchorRadius * 2);
+                        $anchor->setColor($color);
+                        $anchor->setBorderColor(Colors::WHITE);
+                        $anchor->setThickness(1);
+                        $anchor->setBorderRadius($anchorRadius);
+                        $anchor->setRenderable($this->renderable);
+                        $anchor->addAttributes('z_index', 20011);
+                        $this->drawItems[] = $anchor;
+                    }
+                }
+            }
         }
     }
 
