@@ -31,6 +31,17 @@
             return $l['from_neuron_id'] . '_' . $l['to_neuron_id'];
         })->values()->all()
         : [];
+    $existingCircuits = $element->brain && $element->brain->circuits
+        ? $element->brain->circuits->map(function ($c) {
+            return [
+                'id' => $c->id,
+                'uid' => $c->uid,
+                'state' => $c->state,
+                'start_neuron_id' => $c->start_neuron_id,
+                'neuron_ids' => $c->details->pluck('neuron_id')->toArray(),
+            ];
+        })->values()->all()
+        : [];
 @endphp
 
 <div class="row">
@@ -75,6 +86,7 @@
 
 <input type="hidden" id="neuron_items" name="neuron_items" value="{{ old('neuron_items', json_encode($existingNeuronItems)) }}">
 <input type="hidden" id="neuron_links" name="neuron_links" value="{{ old('neuron_links', json_encode($existingNeuronLinks)) }}">
+<input type="hidden" id="neuron_circuits" name="neuron_circuits" value="{{ json_encode($existingCircuits) }}">
 
 <div class="row mb-3">
     <div class="col-12">
@@ -188,6 +200,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const container = document.getElementById('brain-grid-pixi');
     const neuronItemsInput = document.getElementById('neuron_items');
     const neuronLinksInput = document.getElementById('neuron_links');
+    const neuronCircuitsInput = document.getElementById('neuron_circuits');
     const neuronTypeInput = document.getElementById('neuron_type');
     const neuronRadiusInput = document.getElementById('neuron_radius');
     const neuronRadiusGroup = document.getElementById('neuron_radius_group');
@@ -249,6 +262,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentNeuronId = null;
     let tooltipText = null;
     let tooltipBg = null;
+    let neuronCircuits = [];
 
     try {
         const parsed = JSON.parse(neuronItemsInput.value || '[]');
@@ -260,6 +274,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!Array.isArray(neuronLinks)) {
         neuronLinks = [];
     }
+    
+    try {
+        const parsedCircuits = JSON.parse(neuronCircuitsInput ? neuronCircuitsInput.value : '[]');
+        neuronCircuits = Array.isArray(parsedCircuits) ? parsedCircuits : [];
+    } catch (e) {
+        neuronCircuits = [];
+    }
+
+    const circuitColors = [0x3b82f6, 0x8b5cf6, 0xec4899, 0x10b981, 0xf59e0b, 0xef4444, 0x06b6d4, 0x84cc16];
 
     function normalize(value) {
         const parsed = parseInt(value, 10);
@@ -497,9 +520,23 @@ document.addEventListener('DOMContentLoaded', function () {
             
             const isSelectedFrom = Number(neuron.id) === Number(fromNeuronId);
             
+            // Find circuits this neuron belongs to
+            const belongsToCircuits = neuronCircuits.filter(c => c.neuron_ids && c.neuron_ids.includes(Number(neuron.id)));
+            
+            // Draw circuit indicators (concentric colored borders)
+            belongsToCircuits.forEach((circuit, index) => {
+                const colorIdx = neuronCircuits.indexOf(circuit) % circuitColors.length;
+                const cColor = circuitColors[colorIdx];
+                const offset = 3 + (index * 4);
+                const cBorder = new PIXI.Graphics();
+                cBorder.lineStyle(2, cColor, 0.8);
+                cBorder.drawRect((j * cellSize) + 1 - offset, (i * cellSize) + 1 - offset, cellSize - 2 + (offset * 2), cellSize - 2 + (offset * 2));
+                layer.addChild(cBorder);
+            });
+
             const neuronBorder = new PIXI.Graphics();
             neuronBorder.lineStyle(2, isSelectedFrom ? 0xdc2626 : 0x111827, 1);
-            neuronBorder.beginFill(0xFFFFFF, 0.001);
+            neuronBorder.beginFill(0xFFFFFF, 1);
             neuronBorder.drawRect((j * cellSize) + 1, (i * cellSize) + 1, cellSize - 2, cellSize - 2);
             neuronBorder.endFill();
 
@@ -590,6 +627,19 @@ document.addEventListener('DOMContentLoaded', function () {
             text.x = (j * cellSize) + (cellSize / 2) - (text.width / 2);
             text.y = (i * cellSize) + (cellSize / 2) - (text.height / 2);
             layer.addChild(text);
+
+            if (neuron.type === typeStart) {
+                const startCircuit = neuronCircuits.find(c => Number(c.start_neuron_id) === Number(neuron.id));
+                if (startCircuit) {
+                    const badge = new PIXI.Graphics();
+                    const bColor = startCircuit.state === 'closed' ? 0x10b981 : 0xf59e0b; // Green/Orange
+                    badge.beginFill(bColor);
+                    badge.lineStyle(1, 0xffffff, 1);
+                    badge.drawCircle((j * cellSize) + 8, (i * cellSize) + 8, 5);
+                    badge.endFill();
+                    layer.addChild(badge);
+                }
+            }
 
             const hasLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd;
             const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement;
@@ -764,6 +814,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         const data = await response.json();
         if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante il salvataggio neurone');
+        if (data.circuits) neuronCircuits = data.circuits;
         return data.neuron;
     }
 
@@ -779,6 +830,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         const data = await response.json();
         if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante la rimozione neurone');
+        if (data.circuits) neuronCircuits = data.circuits;
     }
 
     async function requestSaveNeuronLink(payload) {
@@ -793,6 +845,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         const data = await response.json();
         if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante il salvataggio collegamento');
+        if (data.circuits) neuronCircuits = data.circuits;
         return data.link;
     }
 
@@ -808,6 +861,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         const data = await response.json();
         if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante la rimozione collegamento');
+        if (data.circuits) neuronCircuits = data.circuits;
     }
 
     widthInput.addEventListener('input', renderGrid);

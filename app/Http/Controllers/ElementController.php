@@ -224,7 +224,7 @@ class ElementController extends Controller
      */
     public function edit(Element $element)
     {
-        $element->load('brain.neurons.outgoingLinks', 'brain.neurons.incomingLinks');
+        $element->load('brain.neurons.outgoingLinks', 'brain.neurons.incomingLinks', 'brain.circuits.details');
 
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
@@ -588,6 +588,7 @@ class ElementController extends Controller
                         'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                         'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
                     ],
+                    'circuits' => $this->getCircuitsArray($brain),
                 ]);
             }
         }
@@ -623,6 +624,7 @@ class ElementController extends Controller
                 'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                 'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
             ],
+            'circuits' => $this->getCircuitsArray($brain),
         ]);
     }
 
@@ -645,7 +647,10 @@ class ElementController extends Controller
 
         $this->updateBrainCircuit($element->brain);
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'circuits' => $this->getCircuitsArray($element->brain)
+        ]);
     }
 
     public function saveNeuronLink(Request $request, Element $element)
@@ -718,6 +723,7 @@ class ElementController extends Controller
                 'to_neuron_id' => (int) $link->to_neuron_id,
                 'condition' => $link->condition,
             ],
+            'circuits' => $this->getCircuitsArray($element->brain),
         ]);
     }
 
@@ -748,7 +754,10 @@ class ElementController extends Controller
 
         $this->updateBrainCircuit($element->brain);
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'circuits' => $this->getCircuitsArray($element->brain)
+        ]);
     }
 
     private function syncElementBrain(Element $element, Request $request): void
@@ -952,6 +961,19 @@ class ElementController extends Controller
         }
 
         $this->updateBrainCircuit($brain);
+    }
+
+    private function getCircuitsArray(Brain $brain): array
+    {
+        return $brain->circuits()->with('details')->get()->map(function($c) {
+            return [
+                'id' => $c->id,
+                'uid' => $c->uid,
+                'state' => $c->state,
+                'start_neuron_id' => $c->start_neuron_id,
+                'neuron_ids' => $c->details->pluck('neuron_id')->toArray(),
+            ];
+        })->values()->toArray();
     }
 
     private function updateBrainCircuit(Brain $brain): void
