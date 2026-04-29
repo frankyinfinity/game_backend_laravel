@@ -11,6 +11,7 @@ use App\Models\EntityInformation;
 use App\Models\ElementHasPositionInformation;
 use App\Models\Gene;
 use App\Models\BrainSchedule;
+use App\Models\BrainScheduleDetail;
 use App\Models\Neuron;
 use App\Models\NeuronLink;
 use App\Models\Tile;
@@ -45,14 +46,20 @@ class BrainFlowRunner
         $this->websocketGatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
 
         $item = ElementHasPosition::query()
-            ->with([
-                'brain.neurons.outgoingLinks',
-                'brain.neurons.incomingLinks',
-            ])
+            ->with(['brain'])
             ->find($elementHasPositionId);
 
         if ($item === null) {
             throw new \RuntimeException("ElementHasPosition {$elementHasPositionId} non trovato.");
+        }
+
+        $brainSchedule = BrainSchedule::where('element_has_position_id', $elementHasPositionId)
+            ->where('state', BrainSchedule::STATE_IN_PROGRESS)
+            ->with(['details.elementHasPositionNeuronCircuit.details'])
+            ->first();
+
+        if (!$brainSchedule) {
+            return [];
         }
 
         $this->processedNeuronsById = [];
@@ -60,109 +67,130 @@ class BrainFlowRunner
         $terminalReached = false;
         $processedFlow = [];
 
-        $brain = $item->brain;
-        if ($brain === null) {
-            return [];
-        }
-
-        $neurons = $brain->neurons->values();
-        $neuronsById = $neurons->keyBy('id');
-
-        $incomingCount = [];
-        $incomingById = [];
-        $outgoingById = [];
-        foreach ($neurons as $neuron) {
-            $incomingById[$neuron->id] = $neuron->incomingLinks->sortBy('id')->values();
-            $outgoingById[$neuron->id] = $neuron->outgoingLinks->sortBy('id')->values();
-            $incomingCount[$neuron->id] = (int) $incomingById[$neuron->id]->count();
-        }
-
-        $queue = [];
-        foreach ($neurons as $neuron) {
-            if (($incomingCount[$neuron->id] ?? 0) === 0) {
-                $queue[] = [
-                    'id' => (int) $neuron->id,
-                    'from' => null,
-                ];
+        foreach ($brainSchedule->details as $detail) {
+            $circuit = $detail->elementHasPositionNeuronCircuit;
+            if (!$circuit) {
+                continue;
             }
-        }
 
-        if (empty($queue)) {
+            $neuronIds = $circuit->details->pluck('element_has_position_neuron_id');
+            $neurons = ElementHasPositionNeuron::query()
+                ->whereIn('id', $neuronIds)
+                ->with(['outgoingLinks', 'incomingLinks'])
+                ->get()
+                ->values();
+
+            if ($neurons->isEmpty()) {
+                continue;
+            }
+
+            $neuronsById = $neurons->keyBy('id');
+            $incomingCount = [];
+            $incomingById = [];
+            $outgoingById = [];
+
             foreach ($neurons as $neuron) {
+                $incomingById[$neuron->id] = $neuron->incomingLinks
+                    ->filter(fn($link) => $neuronIds->contains($link->from_element_has_position_neuron_id))
+                    ->sortBy('id')->values();
+
+                $outgoingById[$neuron->id] = $neuron->outgoingLinks
+                    ->filter(fn($link) => $neuronIds->contains($link->to_element_has_position_neuron_id))
+                    ->sortBy('id')->values();
+
+                $incomingCount[$neuron->id] = (int) $incomingById[$neuron->id]->count();
+            }
+
+            $queue = [];
+            $startNeuronId = (int) $circuit->start_element_has_position_neuron_id;
+
+            if ($startNeuronId > 0 && $neuronsById->has($startNeuronId)) {
                 $queue[] = [
-                    'id' => (int) $neuron->id,
+                    'id' => $startNeuronId,
                     'from' => null,
                 ];
-            }
-        }
-
-        $seen = [];
-        $terminalNeuronId = null;
-        while (!empty($queue)) {
-            $entry = array_shift($queue);
-            $currentId = (int) ($entry['id'] ?? 0);
-            if ($currentId <= 0 || isset($seen[$currentId])) {
-                continue;
-            }
-
-            $model = $neuronsById->get($currentId);
-            if ($model === null) {
-                continue;
-            }
-
-            $neuron = $model->attributesToArray();
-            $neuron['neuron_from'] = $entry['from'];
-
-            $this->setNeuronActiveState($model, true);
-
-            try {
-                $this->handleNeuronByType($neuron, $item);
-                $this->processedNeuronsById[$currentId] = $neuron;
-                $processedFlow[] = $neuron;
-                $seen[$currentId] = true;
-
-                $hasActiveOutgoing = false;
-                foreach ($outgoingById[$currentId] ?? [] as $link) {
-                    if (!$this->isLinkActiveFromNeuron($neuron, $link)) {
-                        continue;
-                    }
-
-                    $hasActiveOutgoing = true;
-                    $toId = (int) $link->to_element_has_position_neuron_id;
-                    if ($toId > 0 && !isset($seen[$toId])) {
+            } else {
+                foreach ($neurons as $neuron) {
+                    if (($incomingCount[$neuron->id] ?? 0) === 0) {
                         $queue[] = [
-                            'id' => $toId,
-                            'from' => [
-                                'id' => (int) $currentId,
-                                'type' => $neuron['type'] ?? null,
-                                'condition' => $link->condition ?? null,
-                            ],
+                            'id' => (int) $neuron->id,
+                            'from' => null,
                         ];
                     }
                 }
-
-                if (($neuron['is_active'] ?? false) === true && !$hasActiveOutgoing) {
-                    $terminalReached = true;
-                    $terminalNeuronId = $currentId;
-                }
-            } finally {
-                $this->setNeuronActiveState($model, false);
             }
-        }
 
-        if ($terminalNeuronId !== null) {
-            $terminalModel = $neuronsById->get($terminalNeuronId);
-            if ($terminalModel !== null) {
-                $terminalModel->refresh();
-                $this->setNeuronActiveState($terminalModel, false);
+            $seen = [];
+            $terminalNeuronIdInCircuit = null;
+
+            while (!empty($queue)) {
+                $entry = array_shift($queue);
+                $currentId = (int) ($entry['id'] ?? 0);
+                if ($currentId <= 0 || isset($seen[$currentId])) {
+                    continue;
+                }
+
+                $model = $neuronsById->get($currentId);
+                if ($model === null) {
+                    continue;
+                }
+
+                $neuronData = $model->attributesToArray();
+                $neuronData['neuron_from'] = $entry['from'];
+
+                $this->setNeuronActiveState($model, true);
+
+                try {
+                    $this->handleNeuronByType($neuronData, $item);
+                    $this->processedNeuronsById[$currentId] = $neuronData;
+                    $processedFlow[] = $neuronData;
+                    $seen[$currentId] = true;
+
+                    $hasActiveOutgoing = false;
+                    foreach ($outgoingById[$currentId] ?? [] as $link) {
+                        if (!$this->isLinkActiveFromNeuron($neuronData, $link)) {
+                            continue;
+                        }
+
+                        $hasActiveOutgoing = true;
+                        $toId = (int) $link->to_element_has_position_neuron_id;
+                        if ($toId > 0 && !isset($seen[$toId])) {
+                            $queue[] = [
+                                'id' => $toId,
+                                'from' => [
+                                    'id' => (int) $currentId,
+                                    'type' => $neuronData['type'] ?? null,
+                                    'condition' => $link->condition ?? null,
+                                ],
+                            ];
+                        }
+                    }
+
+                    if (($neuronData['is_active'] ?? false) === true && !$hasActiveOutgoing) {
+                        $terminalReached = true;
+                        $terminalNeuronIdInCircuit = $currentId;
+                    }
+                } finally {
+                    $this->setNeuronActiveState($model, false);
+                }
+            }
+
+            if ($terminalNeuronIdInCircuit !== null) {
+                $terminalModel = $neuronsById->get($terminalNeuronIdInCircuit);
+                if ($terminalModel !== null) {
+                    $terminalModel->refresh();
+                    $this->setNeuronActiveState($terminalModel, false);
+                }
             }
         }
 
         $this->queueCodeAtEndOfQueuedDraws($this->getEndOfTestBrainCode());
         $this->dispatchQueuedDrawRequests();
+
         if ($terminalReached) {
             $this->markBrainScheduleFinished($this->elementHasPositionId);
         }
+
         return $processedFlow;
     }
 

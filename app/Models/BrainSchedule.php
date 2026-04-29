@@ -19,4 +19,9 @@ class BrainSchedule extends Model
     {
         return $this->belongsTo(ElementHasPosition::class);
     }
+
+    public function details()
+    {
+        return $this->hasMany(BrainScheduleDetail::class);
+    }
 }
