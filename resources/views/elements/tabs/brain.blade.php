@@ -238,6 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
     const typeLabels = @json(\App\Models\Neuron::TYPE_LABELS);
+    const targetTypeLabels = @json(\App\Models\Neuron::TARGET_TYPE_LABELS);
     const linkConditionMain = @json(\App\Models\NeuronLink::CONDITION_MAIN);
     const linkConditionElse = @json(\App\Models\NeuronLink::CONDITION_ELSE);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
@@ -558,9 +559,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const lines = [label];
                 lines.push(`Cella: (${Number(neuron.grid_i)}, ${Number(neuron.grid_j)})`);
                 if (neuron.type === typeDetection) {
-                    const targetLabel = neuron.target_type === targetTypeEntity
-                        ? 'Entity'
-                        : (neuron.target_type === targetTypeElement ? 'Element' : '-');
+                    const targetLabel = targetTypeLabels[neuron.target_type] || '-';
                     lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
                     lines.push(`Target: ${targetLabel}`);
                     if (neuron.target_type === targetTypeElement) {

@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\BrainSchedule;
+use App\Models\BrainScheduleDetail;
+use App\Models\ElementHasPositionNeuronCircuit;
 use App\Services\BrainFlowRunner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,6 +34,16 @@ class ExecuteBrainScheduleJob implements ShouldQueue
         $brainSchedule->update([
             'state' => BrainSchedule::STATE_IN_PROGRESS,
         ]);
+
+        $brainSchedule->details()->delete();
+
+        $circuits = ElementHasPositionNeuronCircuit::where('element_has_position_id', $brainSchedule->element_has_position_id)->get();
+        foreach ($circuits as $circuit) {
+            BrainScheduleDetail::create([
+                'brain_schedule_id' => $brainSchedule->id,
+                'element_has_position_neuron_circuit_id' => $circuit->id,
+            ]);
+        }
 
         try {
             $runner->run((int) $brainSchedule->element_has_position_id);

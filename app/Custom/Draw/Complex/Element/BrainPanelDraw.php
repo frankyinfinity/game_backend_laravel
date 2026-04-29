@@ -238,13 +238,7 @@ class BrainPanelDraw
 
     private function getNeuronIcon(string $type): string
     {
-        return match ($type) {
-            'detection' => '◉',
-            'path' => '➜',
-            'attack' => '⚔',
-            'movement' => '↕',
-            default => '•',
-        };
+        return \App\Models\Neuron::TYPE_SYMBOLS[$type] ?? '•';
     }
 
     private function getLinkColor(string $condition): int
@@ -258,31 +252,23 @@ class BrainPanelDraw
 
     private function buildNeuronTooltip(ElementHasPositionNeuron $neuron): string
     {
-        $label = match ((string) $neuron->type) {
-            'detection' => 'Individuazione',
-            'path' => 'Percorso',
-            'attack' => 'Attacco',
-            'movement' => 'Movimento',
-            default => ucfirst((string) $neuron->type),
-        };
+        $label = \App\Models\Neuron::TYPE_LABELS[(string) $neuron->type] ?? ucfirst((string) $neuron->type);
 
         $lines = [];
         $lines[] = $label;
         $lines[] = 'Cella: (' . (int) $neuron->grid_i . ', ' . (int) $neuron->grid_j . ')';
 
-        if ((string) $neuron->type === 'detection') {
-            $targetLabel = $neuron->target_type === 'entity'
-                ? 'Entity'
-                : ($neuron->target_type === 'element' ? 'Element' : '-');
+        if ((string) $neuron->type === \App\Models\Neuron::TYPE_DETECTION) {
+            $targetLabel = \App\Models\Neuron::TARGET_TYPE_LABELS[$neuron->target_type] ?? '-';
             $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
             $lines[] = 'Target: ' . $targetLabel;
-            if ($neuron->target_type === 'element') {
+            if ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_ELEMENT) {
                 $lines[] = 'Id Element: ' . ($neuron->target_element_id !== null ? (int) $neuron->target_element_id : '-');
             }
-        } elseif ((string) $neuron->type === 'attack') {
+        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_ATTACK) {
             $lines[] = 'Gene Vita: ' . ($neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : '-');
             $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');
-        } elseif ((string) $neuron->type === 'movement') {
+        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_MOVEMENT) {
             $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
         }
 
