@@ -9,9 +9,16 @@ class NeuronLink extends Model
     public const CONDITION_MAIN = 'main';
     public const CONDITION_ELSE = 'else';
 
+    public const PORT_DETECTION_SUCCESS = 'success_detection';
+    public const PORT_DETECTION_FAILURE = 'failure_detection';
+    public const PORT_TRIGGER = 'trigger';
+
     public const CONDITIONS = [
         self::CONDITION_MAIN,
         self::CONDITION_ELSE,
+        self::PORT_DETECTION_SUCCESS,
+        self::PORT_DETECTION_FAILURE,
+        self::PORT_TRIGGER,
     ];
 
     protected $fillable = [

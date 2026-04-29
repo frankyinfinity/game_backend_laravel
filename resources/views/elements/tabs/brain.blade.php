@@ -239,8 +239,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
     const typeLabels = @json(\App\Models\Neuron::TYPE_LABELS);
     const targetTypeLabels = @json(\App\Models\Neuron::TARGET_TYPE_LABELS);
-    const linkConditionMain = @json(\App\Models\NeuronLink::CONDITION_MAIN);
-    const linkConditionElse = @json(\App\Models\NeuronLink::CONDITION_ELSE);
+    const portDetectionSuccess = @json(\App\Models\NeuronLink::PORT_DETECTION_SUCCESS);
+    const portDetectionFailure = @json(\App\Models\NeuronLink::PORT_DETECTION_FAILURE);
+    const portTrigger = @json(\App\Models\NeuronLink::PORT_TRIGGER);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
@@ -342,11 +343,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function resolveLinkCondition(link, fromNeuron) {
-        if (!fromNeuron || fromNeuron.type !== typeDetection) return null;
-        if (!link || !link.condition) return linkConditionMain;
-        if (link.condition === 'found') return linkConditionMain;
-        if (link.condition === 'not_found') return linkConditionElse;
-        return link.condition;
+        if (!fromNeuron) return null;
+        if (fromNeuron.type === typeDetection) {
+            if (!link || !link.condition) return portDetectionSuccess;
+            if (link.condition === 'found' || link.condition === 'main' || link.condition === portDetectionSuccess) return portDetectionSuccess;
+            if (link.condition === 'not_found' || link.condition === 'else' || link.condition === portDetectionFailure) return portDetectionFailure;
+            return link.condition;
+        }
+        return portTrigger;
     }
 
     function getRightAnchorPoint(neuron, cellSize, condition, overrideTopLeft = null) {
@@ -358,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (neuron.type === typeDetection) {
             const topY = topLeftY + (cellSize * 0.3);
             const bottomY = topLeftY + (cellSize * 0.7);
-            const useBottom = condition === linkConditionElse;
+            const useBottom = condition === portDetectionFailure;
             return { x: baseX, y: useBottom ? bottomY : topY };
         }
 
@@ -459,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             let lineColor = 0x16a34a; // Green (main)
-            if (linkCondition === linkConditionElse) {
+            if (linkCondition === portDetectionFailure) {
                 lineColor = 0xf97316; // Orange (else)
             }
             const line = new PIXI.Graphics();
@@ -663,8 +667,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     const topAnchorY = baseY + (cellSize * 0.3);
                     const bottomAnchorY = baseY + (cellSize * 0.7);
                     const anchorConfigs = [
-                        { y: topAnchorY, condition: linkConditionMain, color: 0x16a34a },
-                        { y: bottomAnchorY, condition: linkConditionElse, color: 0xf97316 },
+                        { y: topAnchorY, condition: portDetectionSuccess, color: 0x16a34a },
+                        { y: bottomAnchorY, condition: portDetectionFailure, color: 0xf97316 },
                     ];
 
                     for (const anchorConfig of anchorConfigs) {
@@ -702,7 +706,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     rightAnchor.on('pointerdown', (e) => {
                         e.stopPropagation();
                         fromNeuronId = neuron.id;
-                        fromAnchorCondition = null;
+                        fromAnchorCondition = portTrigger;
                         isLinkDragging = true;
                         if (!tempLineGraphics) {
                             tempLineGraphics = new PIXI.Graphics();
@@ -1001,7 +1005,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let endX = x;
             let endY = y;
             let lineColor = 0x16a34a; // Green (main)
-            if (resolvedCondition === linkConditionElse) {
+            if (resolvedCondition === portDetectionFailure) {
                 lineColor = 0xf97316; // Orange (else)
             }
             let isOverValidTarget = false;
@@ -1154,10 +1158,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             const payload = {
                                 from_neuron_id: Number(fromNeuronId),
                                 to_neuron_id: Number(toNeuron.id),
+                                condition: fromAnchorCondition || (fromNeuron && fromNeuron.type === typeDetection ? portDetectionSuccess : portTrigger)
                             };
-                            if (fromNeuron && fromNeuron.type === typeDetection) {
-                                payload.condition = fromAnchorCondition || linkConditionMain;
-                            }
                             const savedLink = await requestSaveNeuronLink(payload);
                             const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));
                             if (!exists) neuronLinks.push(savedLink);

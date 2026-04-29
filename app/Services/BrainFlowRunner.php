@@ -505,9 +505,9 @@ class BrainFlowRunner
         if ($condition === null || $condition === '') {
             return true;
         }
-        if ($condition === 'found') {
+        if ($condition === 'found' || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
             $condition = NeuronLink::CONDITION_MAIN;
-        } elseif ($condition === 'not_found') {
+        } elseif ($condition === 'not_found' || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
             $condition = NeuronLink::CONDITION_ELSE;
         }
 
@@ -527,10 +527,10 @@ class BrainFlowRunner
         $detectionResult = $fromNeuron['detection_result'] ?? null;
         $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
 
-        if ($condition === NeuronLink::CONDITION_MAIN) {
+        if ($condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_TRIGGER) {
             return $hasDetection;
         }
-        if ($condition === NeuronLink::CONDITION_ELSE) {
+        if ($condition === NeuronLink::CONDITION_ELSE || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
             return !$hasDetection;
         }
 
@@ -549,20 +549,20 @@ class BrainFlowRunner
 
         foreach ($outgoingLinks as $link) {
             $condition = $link->condition ?? null;
-            if ($condition === 'found') {
+            if ($condition === 'found' || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
                 $condition = NeuronLink::CONDITION_MAIN;
-            } elseif ($condition === 'not_found') {
+            } elseif ($condition === 'not_found' || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
                 $condition = NeuronLink::CONDITION_ELSE;
             }
 
             if ($type === Neuron::TYPE_DETECTION) {
-                if ($condition === NeuronLink::CONDITION_MAIN && $hasDetection) {
+                if (($condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_DETECTION_SUCCESS) && $hasDetection) {
                     return true;
                 }
-                if ($condition === NeuronLink::CONDITION_ELSE && !$hasDetection) {
+                if (($condition === NeuronLink::CONDITION_ELSE || $condition === NeuronLink::PORT_DETECTION_FAILURE) && !$hasDetection) {
                     return true;
                 }
-                if ($condition === null || $condition === '') {
+                if ($condition === null || $condition === '' || $condition === NeuronLink::PORT_TRIGGER) {
                     return true;
                 }
                 continue;
@@ -581,23 +581,23 @@ class BrainFlowRunner
         $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
 
         $condition = $link->condition ?? null;
-        if ($condition === 'found') {
+        if ($condition === 'found' || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
             $condition = NeuronLink::CONDITION_MAIN;
-        } elseif ($condition === 'not_found') {
+        } elseif ($condition === 'not_found' || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
             $condition = NeuronLink::CONDITION_ELSE;
         }
 
         if ($type === Neuron::TYPE_DETECTION) {
-            if ($condition === NeuronLink::CONDITION_MAIN) {
+            if ($condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
                 return $hasDetection;
             }
-            if ($condition === NeuronLink::CONDITION_ELSE) {
+            if ($condition === NeuronLink::CONDITION_ELSE || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
                 return !$hasDetection;
             }
             return true;
         }
 
-        return true;
+        return $condition === null || $condition === '' || $condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_TRIGGER;
     }
 
     private function findDetectionTargetAroundElementHasPosition(

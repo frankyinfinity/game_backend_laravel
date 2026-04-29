@@ -687,16 +687,18 @@ class ElementController extends Controller
         $condition = null;
         if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
             $candidateCondition = (string) $request->input('condition', '');
-            if ($candidateCondition === 'found') {
-                $candidateCondition = NeuronLink::CONDITION_MAIN;
-            } elseif ($candidateCondition === 'not_found') {
-                $candidateCondition = NeuronLink::CONDITION_ELSE;
+            if ($candidateCondition === 'found' || $candidateCondition === 'main' || $candidateCondition === NeuronLink::PORT_DETECTION_SUCCESS) {
+                $candidateCondition = NeuronLink::PORT_DETECTION_SUCCESS;
+            } elseif ($candidateCondition === 'not_found' || $candidateCondition === 'else' || $candidateCondition === NeuronLink::PORT_DETECTION_FAILURE) {
+                $candidateCondition = NeuronLink::PORT_DETECTION_FAILURE;
             }
             if (in_array($candidateCondition, NeuronLink::CONDITIONS, true)) {
                 $condition = $candidateCondition;
             } else {
-                $condition = NeuronLink::CONDITION_MAIN;
+                $condition = NeuronLink::PORT_DETECTION_SUCCESS;
             }
+        } else {
+            $condition = NeuronLink::PORT_TRIGGER;
         }
 
         $link = NeuronLink::query()->firstOrCreate(
@@ -927,16 +929,18 @@ class ElementController extends Controller
             $condition = null;
             if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
                 $candidateCondition = (string) ($link['condition'] ?? '');
-                if ($candidateCondition === 'found') {
-                    $candidateCondition = NeuronLink::CONDITION_MAIN;
-                } elseif ($candidateCondition === 'not_found') {
-                    $candidateCondition = NeuronLink::CONDITION_ELSE;
+                if ($candidateCondition === 'found' || $candidateCondition === 'main' || $candidateCondition === NeuronLink::PORT_DETECTION_SUCCESS) {
+                    $candidateCondition = NeuronLink::PORT_DETECTION_SUCCESS;
+                } elseif ($candidateCondition === 'not_found' || $candidateCondition === 'else' || $candidateCondition === NeuronLink::PORT_DETECTION_FAILURE) {
+                    $candidateCondition = NeuronLink::PORT_DETECTION_FAILURE;
                 }
                 if (in_array($candidateCondition, NeuronLink::CONDITIONS, true)) {
                     $condition = $candidateCondition;
                 } else {
-                    $condition = NeuronLink::CONDITION_MAIN;
+                    $condition = NeuronLink::PORT_DETECTION_SUCCESS;
                 }
+            } else {
+                $condition = NeuronLink::PORT_TRIGGER;
             }
 
             $pairKey = ((int) $fromNeuron->id) . '_' . ((int) $toNeuron->id);
