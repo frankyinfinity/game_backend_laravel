@@ -235,33 +235,10 @@ class BrainPanelDraw
             $icon->addAttributes('z_index', 20010);
             $this->drawItems[] = $icon;
 
-            // Per il neurone Lettura Elemento Chimico: disegna le N ancore colorate sul bordo destro
-            if ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
-                $rule = $neuron->chemicalRule;
-                if ($rule && $rule->details && $rule->details->count() > 0) {
-                    $details = $rule->details;
-                    $count = $details->count();
-                    $step = $this->cellSize / ($count + 1);
-                    $anchorRadius = max(3, min(6, (int) floor($step / 2)));
-                    $rightX = $position['x'] + $this->cellSize;
-
-                    foreach ($details as $dIdx => $detail) {
-                        $anchorY = $position['y'] + (int) round($step * ($dIdx + 1));
-                        $color = (int) hexdec(ltrim($detail->color, '#'));
-
-                        $anchor = new Rectangle($this->uid . '_anchor_' . $index . '_' . $dIdx);
-                        $anchor->setOrigin($rightX - $anchorRadius, $anchorY - $anchorRadius);
-                        $anchor->setSize($anchorRadius * 2, $anchorRadius * 2);
-                        $anchor->setColor($color);
-                        $anchor->setBorderColor(Colors::WHITE);
-                        $anchor->setThickness(1);
-                        $anchor->setBorderRadius($anchorRadius);
-                        $anchor->setRenderable($this->renderable);
-                        $anchor->addAttributes('z_index', 20011);
-                        $this->drawItems[] = $anchor;
-                    }
-                }
-            }
+             // Per il neurone Lettura Elemento Chimico: disegna le N ancore colorate sul bordo destro
+             if ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+                 // Anchors removed as requested
+             }
         }
     }
 

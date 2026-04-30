@@ -116,7 +116,7 @@
 </div>
 
 <div class="modal fade" id="brainNeuronModal" tabindex="-1" role="dialog" aria-labelledby="brainNeuronModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="brainNeuronModalLabel">Configura Neurone</h5>
@@ -125,6 +125,16 @@
                 </button>
             </div>
             <div class="modal-body">
+                <ul class="nav nav-tabs" id="neuronModalTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="edit-tab" data-toggle="tab" href="#edit" role="tab" aria-controls="edit" aria-selected="true">Modifica Neurone</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="links-tab" data-toggle="tab" href="#links" role="tab" aria-controls="links" aria-selected="false">Collegamenti</a>
+                    </li>
+                </ul>
+                <div class="tab-content" id="neuronModalTabContent">
+                    <div class="tab-pane fade show active" id="edit" role="tabpanel" aria-labelledby="edit-tab">
                 <div class="mb-2 text-muted">
                     Cella selezionata: <strong id="selected_cell_label">-</strong>
                 </div>
@@ -187,6 +197,13 @@
                         @endforeach
                     </select>
                 </div>
+                    </div>
+                    <div class="tab-pane fade" id="links" role="tabpanel" aria-labelledby="links-tab">
+                        <div id="neuron-links-container">
+                            <!-- Links will be populated here -->
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger mr-auto" id="btn_delete_neuron">Rimuovi</button>
@@ -240,7 +257,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    const fixedCellSize = 60;
+     const fixedCellSize = 40;
     const typeDetection = @json(\App\Models\Neuron::TYPE_DETECTION);
     const typePath = @json(\App\Models\Neuron::TYPE_PATH);
     const typeAttack = @json(\App\Models\Neuron::TYPE_ATTACK);
@@ -255,8 +272,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const targetTypeLabels = @json(\App\Models\Neuron::TARGET_TYPE_LABELS);
     const portDetectionSuccess = @json(\App\Models\NeuronLink::PORT_DETECTION_SUCCESS);
     const portDetectionFailure = @json(\App\Models\NeuronLink::PORT_DETECTION_FAILURE);
-    const portTrigger = @json(\App\Models\NeuronLink::PORT_TRIGGER);
-    const portColors = @json(\App\Models\NeuronLink::PORT_COLORS);
+     const portTrigger = @json(\App\Models\NeuronLink::PORT_TRIGGER);
+     const DEFAULT_CHIMICAL_ELEMENT = @json(\App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT);
+     const portColors = @json(\App\Models\NeuronLink::PORT_COLORS);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
@@ -268,15 +286,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let selectedCell = null;
     let neuronItems = [];
     let neuronLinks = [];
-    let isLinkDragging = false;
-    let isNeuronDragging = false;
-    let draggedNeuronId = null;
-    let dragStartCell = null;
-    let dragStartMousePos = null;
-    let currentDragPos = null;
-    let tempLineGraphics = null;
-    let fromNeuronId = null;
-    let fromAnchorCondition = null;
     let currentNeuronId = null;
     let tooltipText = null;
     let tooltipBg = null;
@@ -358,24 +367,179 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function resolveLinkCondition(link, fromNeuron) {
-        if (!fromNeuron) return null;
-        if (fromNeuron.type === typeDetection) {
-            if (!link || !link.condition) return portDetectionSuccess;
-            if (link.condition === 'found' || link.condition === 'main' || link.condition === portDetectionSuccess) return portDetectionSuccess;
-            if (link.condition === 'not_found' || link.condition === 'else' || link.condition === portDetectionFailure) return portDetectionFailure;
-            return link.condition;
+    function populateLinksTab(neuronId) {
+        const neuron = findNeuronById(neuronId);
+        if (!neuron) return;
+
+        const container = document.getElementById('neuron-links-container');
+        container.innerHTML = '';
+
+        const outputConditions = getOutputConditions(neuron);
+
+        for (let i = 0; i < outputConditions.length; i++) {
+            const condition = outputConditions[i];
+            const link = neuronLinks.find(l => l.from_neuron_id === neuronId && l.condition === condition);
+
+            const div = document.createElement('div');
+            div.className = 'form-group';
+
+            const label = document.createElement('label');
+            label.textContent = condition;
+            div.appendChild(label);
+
+            const select = document.createElement('select');
+            select.className = 'form-control link-target';
+            select.setAttribute('data-condition', condition);
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '-- Nessun collegamento --';
+            select.appendChild(defaultOption);
+
+            for (let j = 0; j < neuronItems.length; j++) {
+                const n = neuronItems[j];
+                if (n.id === neuronId) continue;
+
+                const option = document.createElement('option');
+                option.value = n.id;
+                option.textContent = `#${n.id} (${n.grid_i},${n.grid_j}) - ${typeLabels[n.type] || n.type}`;
+                if (link && link.to_neuron_id == n.id) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            }
+
+            div.appendChild(select);
+            container.appendChild(div);
         }
-        if (fromNeuron.type === typeReadChimicalElement) {
-            return link.condition || portTrigger;
-        }
-        return portTrigger;
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.id = 'btn_save_links';
+        saveBtn.className = 'btn btn-primary mt-3';
+        saveBtn.textContent = 'Salva Collegamenti';
+        saveBtn.onclick = function() { saveLinks(neuronId); };
+        container.appendChild(saveBtn);
     }
 
-    function getRightAnchorPoint(neuron, cellSize, condition, overrideTopLeft = null) {
+    function getOutputConditions(neuron) {
+        if (neuron.type === typeDetection) {
+            return [portDetectionSuccess, portDetectionFailure];
+        } else if (neuron.type === typeReadChimicalElement) {
+            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(neuron.element_has_rule_chimical_element_id));
+            if (rule && rule.details) {
+                const conditions = rule.details.map(d => `[${d.min}/${d.max}]`);
+                conditions.push(DEFAULT_CHIMICAL_ELEMENT);
+                return conditions;
+            }
+            return [DEFAULT_CHIMICAL_ELEMENT];
+        } else {
+            return [portTrigger];
+        }
+    }
+
+    function saveLinks(neuronId) {
+        const selects = document.querySelectorAll('.link-target');
+        const operations = [];
+
+        // Find source neuron to determine default color for new links
+        const sourceNeuron = neuronItems.find(n => n.id === neuronId);
+
+        selects.forEach(select => {
+            const condition = select.dataset.condition;
+            const targetId = select.value ? Number(select.value) : null;
+            const existingLink = neuronLinks.find(l => l.from_neuron_id == neuronId && l.condition === condition);
+
+            if (targetId) {
+                if (existingLink) {
+                    if (existingLink.to_neuron_id !== targetId) {
+                        // Update existing link
+                        operations.push(
+                            requestSaveNeuronLink({
+                                from_neuron_id: neuronId,
+                                to_neuron_id: targetId,
+                                condition: condition,
+                                color: existingLink.color
+                            }).then(response => {
+                                if (response && response.link) {
+                                    Object.assign(existingLink, response.link);
+                                } else {
+                                    existingLink.to_neuron_id = targetId;
+                                }
+                            })
+                        );
+                    }
+                } else {
+                    // Create new link
+                    let linkColor = null;
+                    if (sourceNeuron && sourceNeuron.type === typeReadChimicalElement) {
+                        const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(sourceNeuron.element_has_rule_chimical_element_id));
+                        if (rule && rule.details) {
+                            const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
+                            if (detail && detail.color) linkColor = detail.color;
+                        }
+                        if (condition === DEFAULT_CHIMICAL_ELEMENT) linkColor = '#6b7280';
+                    } else if (condition === portDetectionFailure) {
+                        linkColor = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
+                    } else {
+                        linkColor = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
+                    }
+
+                    operations.push(
+                        requestSaveNeuronLink({
+                            from_neuron_id: neuronId,
+                            to_neuron_id: targetId,
+                            condition: condition,
+                            color: linkColor
+                        }).then(response => {
+                            if (response && response.link) {
+                                neuronLinks.push(response.link);
+                            } else {
+                                neuronLinks.push({
+                                    from_neuron_id: neuronId,
+                                    to_neuron_id: targetId,
+                                    condition: condition,
+                                    color: linkColor,
+                                });
+                            }
+                        })
+                    );
+                }
+            } else {
+                if (existingLink) {
+                    operations.push(
+                        requestDeleteNeuronLink({
+                            from_neuron_id: neuronId,
+                            to_neuron_id: existingLink.to_neuron_id
+                        }).then(() => {
+                            neuronLinks = neuronLinks.filter(l => l !== existingLink);
+                        })
+                    );
+                }
+            }
+        });
+
+        const saveBtn = document.getElementById('btn_save_links');
+        if (saveBtn) saveBtn.disabled = true;
+
+        Promise.all(operations)
+            .then(() => {
+                updateNeuronLinksHiddenInput();
+                renderGrid();
+                $(neuronModalEl).modal('hide');
+            })
+            .catch(error => {
+                alert(error.message || 'Errore durante il salvataggio dei collegamenti');
+            })
+            .finally(() => {
+                if (saveBtn) saveBtn.disabled = false;
+            });
+    }
+
+    function getRightAnchorPoint(neuron, cellSize, condition) {
         if (!neuron) return { x: 0, y: 0 };
-        const topLeftX = overrideTopLeft ? overrideTopLeft.x : (Number(neuron.grid_j) * cellSize);
-        const topLeftY = overrideTopLeft ? overrideTopLeft.y : (Number(neuron.grid_i) * cellSize);
+        const topLeftX = (Number(neuron.grid_j) * cellSize);
+        const topLeftY = (Number(neuron.grid_i) * cellSize);
         const baseX = topLeftX + cellSize;
 
         if (neuron.type === typeDetection) {
@@ -386,6 +550,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (neuron.type === typeReadChimicalElement) {
+            if (condition === DEFAULT_CHIMICAL_ELEMENT) {
+                return { x: baseX, y: topLeftY + cellSize };
+            }
             const ruleId = neuron.element_has_rule_chimical_element_id;
             const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
             if (rule && rule.details && rule.details.length > 0) {
@@ -402,10 +569,10 @@ document.addEventListener('DOMContentLoaded', function () {
         return { x: baseX, y: topLeftY + (cellSize / 2) };
     }
 
-    function getLeftAnchorPoint(neuron, cellSize, overrideTopLeft = null) {
+    function getLeftAnchorPoint(neuron, cellSize) {
         if (!neuron) return { x: 0, y: 0 };
-        const topLeftX = overrideTopLeft ? overrideTopLeft.x : (Number(neuron.grid_j) * cellSize);
-        const topLeftY = overrideTopLeft ? overrideTopLeft.y : (Number(neuron.grid_i) * cellSize);
+        const topLeftX = (Number(neuron.grid_j) * cellSize);
+        const topLeftY = (Number(neuron.grid_i) * cellSize);
         return { x: topLeftX, y: topLeftY + (cellSize / 2) };
     }
 
@@ -446,6 +613,9 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronGeneAttackIdInput.value = existing.gene_attack_id != null ? String(existing.gene_attack_id) : '';
             neuronRuleChimicalElementIdInput.value = existing.element_has_rule_chimical_element_id != null ? String(existing.element_has_rule_chimical_element_id) : '';
             deleteNeuronBtn.style.display = '';
+
+            // Populate links tab
+            populateLinksTab(existing.id);
         } else {
             currentNeuronId = null;
             neuronTypeInput.value = typeDetection;
@@ -457,6 +627,9 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronGeneAttackIdInput.value = '';
             neuronRuleChimicalElementIdInput.value = '';
             deleteNeuronBtn.style.display = 'none';
+
+            // Clear links tab
+            document.getElementById('neuron-links-container').innerHTML = '';
         }
 
         toggleDetectionFieldsByType();
@@ -469,35 +642,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const toN = findNeuronById(link.to_neuron_id);
             if (!fromN || !toN) continue;
 
-            const linkCondition = resolveLinkCondition(link, fromN);
-            let fromPoint = getRightAnchorPoint(fromN, cellSize, linkCondition);
-            let toPoint = getLeftAnchorPoint(toN, cellSize);
-            let x1 = fromPoint.x;
-            let y1 = fromPoint.y;
-            let x2 = toPoint.x;
-            let y2 = toPoint.y;
-
-            if (isNeuronDragging && currentDragPos && draggedNeuronId) {
-                if (Number(fromN.id) === Number(draggedNeuronId)) {
-                    const overridePoint = getRightAnchorPoint(
-                        fromN,
-                        cellSize,
-                        linkCondition,
-                        { x: currentDragPos.x, y: currentDragPos.y }
-                    );
-                    x1 = overridePoint.x;
-                    y1 = overridePoint.y;
-                }
-                if (Number(toN.id) === Number(draggedNeuronId)) {
-                    const overridePoint = getLeftAnchorPoint(
-                        toN,
-                        cellSize,
-                        { x: currentDragPos.x, y: currentDragPos.y }
-                    );
-                    x2 = overridePoint.x;
-                    y2 = overridePoint.y;
-                }
-            }
+            const linkCondition = link.condition;
+            const fromPoint = getRightAnchorPoint(fromN, cellSize, linkCondition);
+            const toPoint = getLeftAnchorPoint(toN, cellSize);
 
             let lineColor = portColors[portTrigger];
             if (link.color) {
@@ -513,22 +660,27 @@ document.addEventListener('DOMContentLoaded', function () {
                         lineColor = parseInt(detail.color.replace('#', '0x'), 16);
                     }
                 }
+                // If condition is 'default_chimical_element', use gray
+                if (linkCondition === 'default_chimical_element') {
+                    lineColor = 0x6b7280; // Gray
+                }
             }
             const line = new PIXI.Graphics();
             line.lineStyle(3, lineColor, 1);
-            line.moveTo(x1, y1);
-            line.lineTo(x2, y2);
+            line.moveTo(fromPoint.x, fromPoint.y);
+            line.lineTo(toPoint.x, toPoint.y);
             layer.addChild(line);
 
-            const mx = (x1 + x2) / 2;
-            const my = (y1 + y2) / 2;
+            const mx = (fromPoint.x + toPoint.x) / 2;
+            const my = (fromPoint.y + toPoint.y) / 2;
 
             const deleteBtn = new PIXI.Graphics();
             deleteBtn.beginFill(0xdc3545);
+            deleteBtn.lineStyle(2, 0xffffff, 1);
             deleteBtn.drawCircle(0, 0, 9);
             deleteBtn.endFill();
-            
-            deleteBtn.lineStyle(2, 0xffffff, 1);
+
+            // Draw white X
             deleteBtn.moveTo(-4, -4);
             deleteBtn.lineTo(4, 4);
             deleteBtn.moveTo(4, -4);
@@ -538,6 +690,7 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteBtn.y = my;
             deleteBtn.eventMode = 'static';
             deleteBtn.cursor = 'pointer';
+            deleteBtn.isInteractiveElement = true;
 
             deleteBtn.on('pointerdown', async (e) => {
                 e.stopPropagation();
@@ -560,23 +713,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function drawNeuronSymbols(layer, cellSize) {
         for (const neuron of neuronItems) {
-            let i = Number(neuron.grid_i);
-            let j = Number(neuron.grid_j);
-            const isDragging = Number(neuron.id) === Number(draggedNeuronId);
-
-            if (isDragging && currentDragPos) {
-                j = currentDragPos.x / cellSize;
-                i = currentDragPos.y / cellSize;
-            }
+            const i = Number(neuron.grid_i);
+            const j = Number(neuron.grid_j);
 
             const symbol = typeSymbols[neuron.type] || '?';
-            
-            const isSelectedFrom = Number(neuron.id) === Number(fromNeuronId);
-            
-            // Find circuits this neuron belongs to
+
+            // Circuit borders
             const belongsToCircuits = neuronCircuits.filter(c => c.neuron_ids && c.neuron_ids.includes(Number(neuron.id)));
-            
-            // Draw circuit indicators (concentric colored borders)
             belongsToCircuits.forEach((circuit, index) => {
                 const colorIdx = neuronCircuits.indexOf(circuit) % circuitColors.length;
                 const cColor = circuitColors[colorIdx];
@@ -587,25 +730,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 layer.addChild(cBorder);
             });
 
+            // Neuron cell border (clickable)
             const neuronBorder = new PIXI.Graphics();
-            neuronBorder.lineStyle(2, isSelectedFrom ? 0xdc2626 : 0x111827, 1);
+            neuronBorder.lineStyle(2, 0x111827, 1);
             neuronBorder.beginFill(0xFFFFFF, 1);
             neuronBorder.drawRect((j * cellSize) + 1, (i * cellSize) + 1, cellSize - 2, cellSize - 2);
             neuronBorder.endFill();
-
             neuronBorder.eventMode = 'static';
-            neuronBorder.cursor = 'grab';
+            neuronBorder.cursor = 'pointer';
             neuronBorder.isInteractiveElement = true;
             neuronBorder.on('pointerdown', (e) => {
                 e.stopPropagation();
-                isNeuronDragging = true;
-                draggedNeuronId = neuron.id;
-                dragStartCell = { i: Number(neuron.grid_i), j: Number(neuron.grid_j) };
-                
-                dragStartMousePos = { x: e.global.x, y: e.global.y };
-                app.view.style.cursor = 'grabbing';
-                renderGrid(); // Redraw immediately to show ghost effect
+                openNeuronModal(i, j);
             });
+            // Tooltip
             neuronBorder.on('pointerover', () => {
                 if (!tooltipText || !tooltipBg) return;
                 const label = typeLabels[neuron.type] || neuron.type || 'Neurone';
@@ -628,16 +766,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
                     lines.push(`Regola: ${rule ? rule.title : '-'}`);
                 }
-
                 tooltipText.text = lines.join('\n');
                 tooltipText.visible = true;
                 tooltipBg.visible = true;
-                const paddingX = 6;
-                const paddingY = 4;
+                const paddingX = 6, paddingY = 4;
                 tooltipBg.clear();
                 tooltipBg.lineStyle(1, 0x000000, 1);
                 tooltipBg.beginFill(0xFFFFFF, 1);
-                tooltipBg.drawRect(0, 0, tooltipText.width + (paddingX * 2), tooltipText.height + (paddingY * 2));
+                tooltipBg.drawRect(0, 0, tooltipText.width + paddingX*2, tooltipText.height + paddingY*2);
                 tooltipBg.endFill();
                 tooltipBg.x = tooltipText.x - paddingX;
                 tooltipBg.y = tooltipText.y - paddingY;
@@ -648,21 +784,17 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             neuronBorder.on('pointermove', (e) => {
                 if (!tooltipText || !tooltipText.visible || !tooltipBg) return;
-                const paddingX = 6;
-                const paddingY = 4;
-                const offsetX = 12;
-                const offsetY = 12;
+                const paddingX = 6, paddingY = 4;
+                const offsetX = 12, offsetY = 12;
                 const rect = app && app.view ? app.view.getBoundingClientRect() : null;
                 const maxX = rect ? rect.width : (app ? app.renderer.width : Infinity);
                 const maxY = rect ? rect.height : (app ? app.renderer.height : Infinity);
-                const tooltipW = tooltipText.width + (paddingX * 2);
-                const tooltipH = tooltipText.height + (paddingY * 2);
-
+                const tooltipW = tooltipText.width + paddingX*2;
+                const tooltipH = tooltipText.height + paddingY*2;
                 let x = e.global.x + offsetX;
                 let y = e.global.y + offsetY;
                 if (x + tooltipW > maxX) x = Math.max(0, maxX - tooltipW);
                 if (y + tooltipH > maxY) y = Math.max(0, maxY - tooltipH);
-
                 tooltipText.x = x;
                 tooltipText.y = y;
                 tooltipBg.x = tooltipText.x - paddingX;
@@ -671,6 +803,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             layer.addChild(neuronBorder);
 
+            // Neuron symbol text
             const text = new PIXI.Text(symbol, {
                 fill: 0x1f2937,
                 fontSize: Math.max(16, Math.floor(cellSize * 0.55)),
@@ -678,17 +811,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 fontFamily: 'Consolas',
                 align: 'center',
             });
-            text.eventMode = 'none'; // Ensure clicks pass through to border
-            text.alpha = 1;
+            text.eventMode = 'none';
             text.x = (j * cellSize) + (cellSize / 2) - (text.width / 2);
             text.y = (i * cellSize) + (cellSize / 2) - (text.height / 2);
             layer.addChild(text);
 
+            // Start circuit badge
             if (neuron.type === typeStart) {
                 const startCircuit = neuronCircuits.find(c => Number(c.start_neuron_id) === Number(neuron.id));
                 if (startCircuit) {
                     const badge = new PIXI.Graphics();
-                    const bColor = startCircuit.state === 'closed' ? 0x10b981 : 0xf59e0b; // Green/Orange
+                    const bColor = startCircuit.state === 'closed' ? 0x10b981 : 0xf59e0b;
                     badge.beginFill(bColor);
                     badge.lineStyle(1, 0xffffff, 1);
                     badge.drawCircle((j * cellSize) + 8, (i * cellSize) + 8, 5);
@@ -697,6 +830,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
+            // Anchors (static visualization)
             const hasLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement;
             const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement;
 
@@ -706,9 +840,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 leftAnchor.lineStyle(2, 0xffffff, 1);
                 leftAnchor.drawCircle((j * cellSize), (i * cellSize) + (cellSize / 2), 8);
                 leftAnchor.endFill();
-                leftAnchor.alpha = isDragging ? 0.5 : 1;
-                leftAnchor.eventMode = 'static';
-                leftAnchor.cursor = 'default';
+                leftAnchor.eventMode = 'none';
                 layer.addChild(leftAnchor);
             }
 
@@ -717,103 +849,58 @@ document.addEventListener('DOMContentLoaded', function () {
                 const baseY = i * cellSize;
 
                 if (neuron.type === typeDetection) {
-                    const topAnchorY = baseY + (cellSize * 0.3);
-                    const bottomAnchorY = baseY + (cellSize * 0.7);
-                    const anchorConfigs = [
-                        { y: topAnchorY, condition: portDetectionSuccess, color: portColors[portDetectionSuccess] },
-                        { y: bottomAnchorY, condition: portDetectionFailure, color: portColors[portDetectionFailure] },
+                    const topY = baseY + (cellSize * 0.3);
+                    const bottomY = baseY + (cellSize * 0.7);
+                    const anchors = [
+                        { y: topY, color: portColors[portDetectionSuccess] },
+                        { y: bottomY, color: portColors[portDetectionFailure] },
                     ];
-
-                    for (const anchorConfig of anchorConfigs) {
-                        const rightAnchor = new PIXI.Graphics();
-                        rightAnchor.beginFill(anchorConfig.color);
-                        rightAnchor.lineStyle(2, 0xffffff, 1);
-                        rightAnchor.drawCircle(baseX, anchorConfig.y, 8);
-                        rightAnchor.endFill();
-                        rightAnchor.alpha = isDragging ? 0.5 : 1;
-                        rightAnchor.eventMode = 'static';
-                        rightAnchor.cursor = 'pointer';
-                        rightAnchor.isInteractiveElement = true;
-
-                        rightAnchor.on('pointerdown', (e) => {
-                            e.stopPropagation();
-                            fromNeuronId = neuron.id;
-                            fromAnchorCondition = anchorConfig.condition;
-                            isLinkDragging = true;
-                            if (!tempLineGraphics) {
-                                tempLineGraphics = new PIXI.Graphics();
-                                layer.addChild(tempLineGraphics);
-                            }
-                        });
-
-                        layer.addChild(rightAnchor);
-                    }
+                    anchors.forEach(ac => {
+                        const a = new PIXI.Graphics();
+                        a.beginFill(ac.color);
+                        a.lineStyle(2, 0xffffff, 1);
+                        a.drawCircle(baseX, ac.y, 8);
+                        a.endFill();
+                        a.eventMode = 'none';
+                        layer.addChild(a);
+                    });
                 } else if (neuron.type === typeReadChimicalElement) {
                     const ruleId = neuron.element_has_rule_chimical_element_id;
                     const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+                    const dynamicRadius = 10;
                     if (rule && rule.details && rule.details.length > 0) {
                         const details = rule.details;
                         const count = details.length;
                         const step = cellSize / (count + 1);
-                        
-                        // Calcolo raggio dinamico per evitare sovrapposizioni
-                        // Con cellSize 36, se abbiamo 4 ancore lo step è 7.2px. 
-                        // Un raggio di 3 (diametro 6) ci sta bene con un po' di margine.
-                        const dynamicRadius = Math.max(3, Math.min(8, Math.floor(step / 2) + 1));
-
-                        details.forEach((detail, index) => {
-                            const anchorY = baseY + (step * (index + 1));
-                            const anchorCondition = `[${detail.min}/${detail.max}]`;
+                        details.forEach((detail, idx) => {
+                            const anchorY = baseY + (step * (idx + 1));
                             const color = parseInt(detail.color.replace('#', '0x'), 16);
-
-                            const rightAnchor = new PIXI.Graphics();
-                            rightAnchor.beginFill(color);
-                            rightAnchor.lineStyle(1, 0xffffff, 1);
-                            // Spostiamo leggermente all'esterno (baseX + 2) per chiarezza
-                            rightAnchor.drawCircle(baseX + 2, anchorY, dynamicRadius);
-                            rightAnchor.endFill();
-                            rightAnchor.alpha = isDragging ? 0.5 : 1;
-                            rightAnchor.eventMode = 'static';
-                            rightAnchor.cursor = 'pointer';
-                            rightAnchor.isInteractiveElement = true;
-
-                            rightAnchor.on('pointerdown', (e) => {
-                                e.stopPropagation();
-                                fromNeuronId = neuron.id;
-                                fromAnchorCondition = anchorCondition;
-                                isLinkDragging = true;
-                                if (!tempLineGraphics) {
-                                    tempLineGraphics = new PIXI.Graphics();
-                                    layer.addChild(tempLineGraphics);
-                                }
-                            });
-
-                            layer.addChild(rightAnchor);
+                            const a = new PIXI.Graphics();
+                            a.beginFill(color);
+                            a.lineStyle(1, 0xffffff, 1);
+                            a.drawCircle(baseX + 2, anchorY, dynamicRadius);
+                            a.endFill();
+                            a.eventMode = 'none';
+                            layer.addChild(a);
                         });
                     }
+                    // Default gray anchor
+                    const defaultAnchorY = baseY + cellSize;
+                    const defaultAnchor = new PIXI.Graphics();
+                    defaultAnchor.beginFill(0x6b7280);
+                    defaultAnchor.lineStyle(1, 0xffffff, 1);
+                    defaultAnchor.drawCircle(baseX + 2, defaultAnchorY, dynamicRadius);
+                    defaultAnchor.endFill();
+                    defaultAnchor.eventMode = 'none';
+                    layer.addChild(defaultAnchor);
                 } else {
-                    const rightAnchor = new PIXI.Graphics();
-                    rightAnchor.beginFill(portColors[portTrigger]);
-                    rightAnchor.lineStyle(2, 0xffffff, 1);
-                    rightAnchor.drawCircle(baseX, baseY + (cellSize / 2), 8);
-                    rightAnchor.endFill();
-                    rightAnchor.alpha = isDragging ? 0.5 : 1;
-                    rightAnchor.eventMode = 'static';
-                    rightAnchor.cursor = 'pointer';
-                    rightAnchor.isInteractiveElement = true;
-
-                    rightAnchor.on('pointerdown', (e) => {
-                        e.stopPropagation();
-                        fromNeuronId = neuron.id;
-                        fromAnchorCondition = portTrigger;
-                        isLinkDragging = true;
-                        if (!tempLineGraphics) {
-                            tempLineGraphics = new PIXI.Graphics();
-                            layer.addChild(tempLineGraphics);
-                        }
-                    });
-
-                    layer.addChild(rightAnchor);
+                    const a = new PIXI.Graphics();
+                    a.beginFill(portColors[portTrigger]);
+                    a.lineStyle(2, 0xffffff, 1);
+                    a.drawCircle(baseX, baseY + (cellSize / 2), 8);
+                    a.endFill();
+                    a.eventMode = 'none';
+                    layer.addChild(a);
                 }
             }
         }
@@ -842,10 +929,7 @@ document.addEventListener('DOMContentLoaded', function () {
             app.stage.eventMode = 'static';
             app.stage.hitArea = new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight);
 
-            app.stage.on('pointerdown', async (event) => {
-                // Se abbiamo cliccato su un'ancora o su un neurone, non aprire la modale qui
-                if (isLinkDragging || isNeuronDragging || (event.target && event.target.isInteractiveElement)) return;
-                
+            app.stage.on('pointerdown', (event) => {
                 const i = Math.floor(event.global.y / fixedCellSize);
                 const j = Math.floor(event.global.x / fixedCellSize);
                 const maxRows = normalize(heightInput.value || 5);
@@ -858,7 +942,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             app.renderer.resize(canvasWidth, canvasHeight);
             app.stage.removeChildren();
-            tempLineGraphics = null;
         }
 
         // Draw background rectangle to ensure it's not transparent
@@ -1080,249 +1163,26 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Simplified pointer move for hover cursor only (drag&drop removed)
     window.addEventListener('pointermove', (event) => {
         if (!app || !app.view) return;
         const rect = app.view.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
         
-        let hoveredNeuron = null;
         if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
             const i = Math.floor(y / fixedCellSize);
             const j = Math.floor(x / fixedCellSize);
-            hoveredNeuron = findNeuronAtCell(i, j);
-            app.view.style.cursor = (!isLinkDragging && hoveredNeuron) ? 'crosshair' : 'default';
+            const hoveredNeuron = findNeuronAtCell(i, j);
+            app.view.style.cursor = hoveredNeuron ? 'pointer' : 'default';
         } else {
             app.view.style.cursor = 'default';
         }
-
-        if (isLinkDragging && fromNeuronId) {
-            const fromN = findNeuronById(fromNeuronId);
-            if (!fromN) return;
-
-            const resolvedCondition = resolveLinkCondition({ condition: fromAnchorCondition }, fromN);
-            const startPoint = getRightAnchorPoint(fromN, fixedCellSize, resolvedCondition);
-            const startX = startPoint.x;
-            const startY = startPoint.y;
-
-            if (!tempLineGraphics) {
-                tempLineGraphics = new PIXI.Graphics();
-                app.stage.addChild(tempLineGraphics);
-            }
-            
-            tempLineGraphics.clear();
-            
-            let endX = x;
-            let endY = y;
-            let lineColor = portColors[portTrigger];
-            if (resolvedCondition === portDetectionFailure) {
-                lineColor = portColors[portDetectionFailure];
-            } else if (fromN && fromN.type === typeReadChimicalElement) {
-                const ruleId = fromN.element_has_rule_chimical_element_id;
-                const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-                if (rule && rule.details) {
-                    const detail = rule.details.find(d => `[${d.min}/${d.max}]` === fromAnchorCondition);
-                    if (detail && detail.color) {
-                        lineColor = parseInt(detail.color.replace('#', '0x'), 16);
-                    }
-                }
-            }
-            let isOverValidTarget = false;
-
-            if (hoveredNeuron && Number(hoveredNeuron.id) !== Number(fromNeuronId)) {
-                const hasLeftAnchor = hoveredNeuron.type === typeDetection || hoveredNeuron.type === typePath || hoveredNeuron.type === typeAttack || hoveredNeuron.type === typeMovement || hoveredNeuron.type === typeEnd || hoveredNeuron.type === typeReadChimicalElement;
-                if (hasLeftAnchor) {
-                    isOverValidTarget = true;
-                    lineColor = resolvedCondition === linkConditionElse ? 0xf59e0b : 0x22c55e; // Orange/Green (valid target)
-                    // Snap to the left anchor of the target neuron
-                    endX = Number(hoveredNeuron.grid_j) * fixedCellSize;
-                    endY = (Number(hoveredNeuron.grid_i) * fixedCellSize) + (fixedCellSize / 2);
-                }
-            }
-
-            if (isOverValidTarget) {
-                // Highlight target cell
-                tempLineGraphics.lineStyle(2, lineColor, 1);
-                tempLineGraphics.beginFill(lineColor, 0.1);
-                tempLineGraphics.drawRect(Number(hoveredNeuron.grid_j) * fixedCellSize, Number(hoveredNeuron.grid_i) * fixedCellSize, fixedCellSize, fixedCellSize);
-                tempLineGraphics.endFill();
-
-                // Draw a solid line when snapped
-                tempLineGraphics.lineStyle(5, lineColor, 1);
-                tempLineGraphics.moveTo(startX, startY);
-                tempLineGraphics.lineTo(endX, endY);
-                
-                // Add a larger pulse effect circle at target
-                tempLineGraphics.lineStyle(2, 0xffffff, 1);
-                tempLineGraphics.beginFill(lineColor, 0.5);
-                tempLineGraphics.drawCircle(endX, endY, 14);
-                tempLineGraphics.endFill();
-            } else {
-                // Draw dashed line when searching
-                tempLineGraphics.lineStyle(3, lineColor, 0.8);
-                drawDashedLine(tempLineGraphics, startX, startY, endX, endY, 8, 8);
-            }
-        }
-
-        if (isNeuronDragging && draggedNeuronId) {
-            const dragN = findNeuronById(draggedNeuronId);
-            if (!dragN) return;
-
-            const targetI = Math.floor(y / fixedCellSize);
-            const targetJ = Math.floor(x / fixedCellSize);
-            
-            // Move visuals: exact mouse snap minus center offset
-            currentDragPos = { 
-                x: x - (fixedCellSize / 2), 
-                y: y - (fixedCellSize / 2) 
-            };
-
-            if (!tempLineGraphics) {
-                tempLineGraphics = new PIXI.Graphics();
-                app.stage.addChild(tempLineGraphics);
-            }
-            tempLineGraphics.clear();
-
-            const maxRows = normalize(heightInput.value || 5);
-            const maxCols = normalize(widthInput.value || 5);
-
-            // Draw placement helper
-            if (targetI >= 0 && targetJ >= 0 && targetI < maxRows && targetJ < maxCols) {
-                const isOccupied = findNeuronAtCell(targetI, targetJ) && (targetI !== dragStartCell.i || targetJ !== dragStartCell.j);
-                tempLineGraphics.lineStyle(2, isOccupied ? 0xdc3545 : 0x28a745, 1);
-                tempLineGraphics.beginFill(isOccupied ? 0xdc3545 : 0x28a745, 0.15);
-                tempLineGraphics.drawRect(targetJ * fixedCellSize + 2, targetI * fixedCellSize + 2, fixedCellSize - 4, fixedCellSize - 4);
-                tempLineGraphics.endFill();
-            }
-            
-            // Re-draw everything to move the neuron and its links live
-            renderGrid();
-        }
     });
     
-    window.addEventListener('pointerup', async (event) => {
-        const wasDraggingLink = isLinkDragging;
-        const wasDraggingNeuron = isNeuronDragging;
-        const oldId = draggedNeuronId;
-        const startCell = dragStartCell;
+    // Pointerup handler removed (drag&drop not used)
+    // window.addEventListener('pointerup', async (event) => { ... });
 
-        isLinkDragging = false;
-        isNeuronDragging = false;
-        currentDragPos = null;
-        draggedNeuronId = null;
-        dragStartCell = null;
-        
-        if (app && app.view) {
-            app.view.style.cursor = 'default';
-        }
-        
-        if (tempLineGraphics) {
-            tempLineGraphics.clear();
-        }
-
-        if (!app || !app.view) return;
-        const rect = app.view.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        // Handle dropping a neuron
-        if (wasDraggingNeuron && oldId) {
-            const targetI = Math.floor(y / fixedCellSize);
-            const targetJ = Math.floor(x / fixedCellSize);
-            const maxRows = normalize(heightInput.value || 5);
-            const maxCols = normalize(widthInput.value || 5);
-            
-            const dist = dragStartMousePos ? Math.sqrt(Math.pow(x - dragStartMousePos.x, 2) + Math.pow(y - dragStartMousePos.y, 2)) : 0;
-            const shifted = targetI !== startCell.i || targetJ !== startCell.j;
-
-            if (shifted && targetI >= 0 && targetJ >= 0 && targetI < maxRows && targetJ < maxCols && !findNeuronAtCell(targetI, targetJ)) {
-                const neuron = findNeuronById(oldId);
-                if (neuron) {
-                    try {
-                        // Persist immediately by updating the existing record
-                        const savedN = await requestSaveNeuron({
-                            id: oldId, // Pass the ID to perform an update
-                            grid_i: targetI,
-                            grid_j: targetJ,
-                            type: neuron.type,
-                            radius: neuron.radius,
-                            target_type: neuron.target_type,
-                            target_element_id: neuron.target_element_id,
-                            gene_life_id: neuron.gene_life_id,
-                            gene_attack_id: neuron.gene_attack_id,
-                            element_has_rule_chimical_element_id: neuron.element_has_rule_chimical_element_id
-                        });
-                        
-                        // ID remains the same, but we update the local grid coordinates
-                        neuron.grid_i = targetI;
-                        neuron.grid_j = targetJ;
-
-                        updateNeuronHiddenInput();
-                        updateNeuronLinksHiddenInput();
-                    } catch (error) {
-                        alert(error.message || 'Errore durante lo spostamento del neurone');
-                    }
-                }
-            } else if (!shifted || dist < 5) {
-                openNeuronModal(startCell.i, startCell.j);
-            }
-            dragStartMousePos = null;
-            renderGrid();
-            return;
-        }
-        // Handle dropping a link
-        if (wasDraggingLink && fromNeuronId) {
-            if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-                const i = Math.floor(y / fixedCellSize);
-                const j = Math.floor(x / fixedCellSize);
-                const toNeuron = findNeuronAtCell(i, j);
-
-                if (toNeuron && Number(toNeuron.id) !== Number(fromNeuronId)) {
-                    const hasLeftAnchor = toNeuron.type === typeDetection || toNeuron.type === typePath || toNeuron.type === typeAttack || toNeuron.type === typeMovement || toNeuron.type === typeEnd || toNeuron.type === typeReadChimicalElement;
-                    if (hasLeftAnchor) {
-                        try {
-                            const fromN = findNeuronById(fromNeuronId);
-                            const resolvedCondition = resolveLinkCondition({ condition: fromAnchorCondition }, fromN);
-                            let linkColorHex = null;
-                            
-                            // Determinazione del colore da inviare al server
-                            if (fromN.type === typeReadChimicalElement) {
-                                const ruleId = fromN.element_has_rule_chimical_element_id;
-                                const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-                                if (rule && rule.details) {
-                                    const detail = rule.details.find(d => `[${d.min}/${d.max}]` === fromAnchorCondition);
-                                    if (detail && detail.color) {
-                                        linkColorHex = detail.color;
-                                    }
-                                }
-                            } else if (resolvedCondition === portDetectionFailure) {
-                                linkColorHex = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
-                            } else {
-                                linkColorHex = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
-                            }
-
-                            const payload = {
-                                from_neuron_id: Number(fromNeuronId),
-                                to_neuron_id: Number(toNeuron.id),
-                                condition: fromAnchorCondition || (fromN && fromN.type === typeDetection ? portDetectionSuccess : portTrigger),
-                                color: linkColorHex
-                            };
-                            const savedLink = await requestSaveNeuronLink(payload);
-                            const exists = neuronLinks.some((l) => Number(l.from_neuron_id) === Number(savedLink.from_neuron_id) && Number(l.to_neuron_id) === Number(savedLink.to_neuron_id));
-                            if (!exists) neuronLinks.push(savedLink);
-                            updateNeuronLinksHiddenInput();
-                        } catch (error) {
-                            alert(error.message || 'Errore durante il collegamento');
-                        }
-                    }
-                }
-            }
-            fromNeuronId = null;
-            fromAnchorCondition = null;
-            renderGrid();
-            return;
-        }
-    });
 
     toggleDetectionFieldsByType();
     updateNeuronLinksHiddenInput();

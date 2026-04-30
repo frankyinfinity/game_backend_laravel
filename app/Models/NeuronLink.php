@@ -12,6 +12,7 @@ class NeuronLink extends Model
     public const PORT_DETECTION_SUCCESS = 'success_detection';
     public const PORT_DETECTION_FAILURE = 'failure_detection';
     public const PORT_TRIGGER = 'trigger';
+    public const DEFAULT_CHIMICAL_ELEMENT = 'default_chimical_element';
 
     public const CONDITIONS = [
         self::CONDITION_MAIN,
@@ -19,6 +20,7 @@ class NeuronLink extends Model
         self::PORT_DETECTION_SUCCESS,
         self::PORT_DETECTION_FAILURE,
         self::PORT_TRIGGER,
+        self::DEFAULT_CHIMICAL_ELEMENT,
     ];
 
     public const PORT_COLORS = [

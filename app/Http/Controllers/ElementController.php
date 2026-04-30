@@ -995,17 +995,14 @@ class ElementController extends Controller
                 }
             } elseif ($fromNeuron->type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
                 $condition = (string) ($link['condition'] ?? '');
-                // Load chemicalRule if not loaded
-                if (!$fromNeuron->relationLoaded('chemicalRule')) {
-                    $fromNeuron->load('chemicalRule.details');
-                }
-                // Find the matching detail
-                if ($fromNeuron->chemicalRule && $fromNeuron->chemicalRule->details) {
-                    foreach ($fromNeuron->chemicalRule->details as $detail) {
+                // Find matching rule detail
+                $rule = $fromNeuron->chemicalRule;
+                if ($rule && $rule->details) {
+                    foreach ($rule->details as $detail) {
                         $targetCondition = "[{$detail->min}/{$detail->max}]";
                         if ($detail->min . '_' . $detail->max === $condition || $targetCondition === $condition) {
                             $ruleDetailId = $detail->id;
-                            $condition = $targetCondition; // Update to new format
+                            $condition = $targetCondition;
                             break;
                         }
                     }
