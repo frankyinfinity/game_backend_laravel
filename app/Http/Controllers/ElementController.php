@@ -779,6 +779,53 @@ class ElementController extends Controller
         ]);
     }
 
+    public function toggleCircuitActive(Request $request, Element $element, NeuronCircuit $circuit)
+    {
+        if (!$element->brain || $circuit->brain_id !== $element->brain->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Circuito non trovato per questo elemento',
+            ], 404);
+        }
+
+        $circuit->active = !$circuit->active;
+        $circuit->save();
+
+        return response()->json([
+            'success' => true,
+            'active' => (bool) $circuit->active,
+            'circuits' => $this->getCircuitsArray($element->brain),
+        ]);
+    }
+
+    public function deleteBrainCircuit(Request $request, Element $element, NeuronCircuit $circuit)
+    {
+        if (!$element->brain || $circuit->brain_id !== $element->brain->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Circuito non trovato per questo elemento',
+            ], 404);
+        }
+
+        // Retrieve all neuron IDs associated with this circuit
+        $neuronIds = $circuit->details()->pluck('neuron_id')->toArray();
+
+        // Delete the neurons (cascade will handle the details and links)
+        if (!empty($neuronIds)) {
+            $element->brain->neurons()->whereIn('id', $neuronIds)->delete();
+        }
+
+        // Finally delete the circuit record
+        $circuit->delete();
+
+        return response()->json([
+            'success' => true,
+            'neurons' => $this->getNeuronsArray($element->brain),
+            'links' => $this->getLinksArray($element->brain),
+            'circuits' => $this->getCircuitsArray($element->brain),
+        ]);
+    }
+
     public function deleteNeuronLink(Request $request, Element $element)
     {
         if (!$element->isInteractive() || !$element->brain) {
@@ -1046,10 +1093,45 @@ class ElementController extends Controller
                 'id' => $c->id,
                 'uid' => $c->uid,
                 'state' => $c->state,
+                'active' => (bool) $c->active,
+                'color' => $c->color,
                 'start_neuron_id' => $c->start_neuron_id,
                 'neuron_ids' => $c->details->pluck('neuron_id')->toArray(),
             ];
         })->values()->toArray();
+    }
+
+    private function getNeuronsArray(Brain $brain): array
+    {
+        return $brain->neurons()->get()->map(function ($n) {
+            return [
+                'id' => $n->id,
+                'type' => $n->type,
+                'grid_i' => (int) $n->grid_i,
+                'grid_j' => (int) $n->grid_j,
+                'radius' => $n->radius,
+                'target_type' => $n->target_type,
+                'target_element_id' => $n->target_element_id,
+                'gene_life_id' => $n->gene_life_id,
+                'gene_attack_id' => $n->gene_attack_id,
+                'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id,
+            ];
+        })->toArray();
+    }
+
+    private function getLinksArray(Brain $brain): array
+    {
+        return NeuronLink::whereHas('fromNeuron', function ($q) use ($brain) {
+            $q->where('brain_id', $brain->id);
+        })->get()->map(function ($l) {
+            return [
+                'id' => $l->id,
+                'from_neuron_id' => (int) $l->from_neuron_id,
+                'to_neuron_id' => (int) $l->to_neuron_id,
+                'condition' => $l->condition,
+                'color' => $l->color,
+            ];
+        })->toArray();
     }
 
     private function updateBrainCircuit(Brain $brain): void
@@ -1069,6 +1151,7 @@ class ElementController extends Controller
                     'uid' => Str::uuid()->toString(),
                     'state' => NeuronCircuit::STATE_CLOSED,
                     'start_neuron_id' => null,
+                    'color' => NeuronCircuit::PALETTE[0],
                 ]);
             }
 
@@ -1105,12 +1188,13 @@ class ElementController extends Controller
 
         $allNeurons = $brain->neurons()->with('outgoingLinks')->get()->keyBy('id');
 
-        foreach ($startNeurons as $startNeuron) {
+        foreach ($startNeurons as $index => $startNeuron) {
             $circuit = $brain->circuits()->firstOrCreate(
                 ['start_neuron_id' => $startNeuron->id],
                 [
                     'uid' => Str::uuid()->toString(),
                     'state' => NeuronCircuit::STATE_CREATED,
+                    'color' => NeuronCircuit::PALETTE[$index % count(NeuronCircuit::PALETTE)],
                 ]
             );
 

@@ -39,6 +39,8 @@
                 'id' => $c->id,
                 'uid' => $c->uid,
                 'state' => $c->state,
+                'active' => (bool) $c->active,
+                'color' => $c->color,
                 'start_neuron_id' => $c->start_neuron_id,
                 'neuron_ids' => $c->details->pluck('neuron_id')->toArray(),
             ];
@@ -109,14 +111,36 @@
                 <h3 class="card-title">Anteprima Griglia (PIXI.js)</h3>
             </div>
             <div class="card-body">
-                <div id="brain-grid-pixi" style="display:inline-block; border:1px solid #b0b0b0; border-radius:4px;"></div>
+                <div class="row">
+                    <div class="col-md-8 text-center">
+                        <div id="brain-grid-pixi" style="display:inline-block; border:1px solid #b0b0b0; border-radius:4px;"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <h5><i class="fas fa-network-wired"></i> Circuiti</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover border" id="circuits-table">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>UID</th>
+                                        <th class="text-center">Stato</th>
+                                        <th class="text-center">Colore</th>
+                                        <th class="text-right">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="circuits-table-body">
+                                    <!-- Popolato via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="brainNeuronModal" tabindex="-1" role="dialog" aria-labelledby="brainNeuronModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="brainNeuronModalLabel">Configura Neurone</h5>
@@ -125,81 +149,75 @@
                 </button>
             </div>
             <div class="modal-body">
-                <ul class="nav nav-tabs" id="neuronModalTabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="edit-tab" data-toggle="tab" href="#edit" role="tab" aria-controls="edit" aria-selected="true">Modifica Neurone</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="links-tab" data-toggle="tab" href="#links" role="tab" aria-controls="links" aria-selected="false">Collegamenti</a>
-                    </li>
-                </ul>
-                <div class="tab-content" id="neuronModalTabContent">
-                    <div class="tab-pane fade show active" id="edit" role="tabpanel" aria-labelledby="edit-tab">
-                <div class="mb-2 text-muted">
-                    Cella selezionata: <strong id="selected_cell_label">-</strong>
-                </div>
-                <div class="form-group">
-                    <label for="neuron_type">Tipologia</label>
-                    <select class="form-control" id="neuron_type">
-                        @foreach(\App\Models\Neuron::TYPE_LABELS as $typeKey => $typeLabel)
-                            <option value="{{ $typeKey }}">{{ $typeLabel }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="form-group" id="neuron_radius_group">
-                    <label for="neuron_radius">Raggio (in celle)</label>
-                    <input type="number" class="form-control" id="neuron_radius" min="1" step="1" value="1">
-                </div>
-                <div class="form-group" id="neuron_target_type_group">
-                    <label>Target da individuare</label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="neuron_target_type_element">
-                        <label class="form-check-label" for="neuron_target_type_element">Element</label>
+                <div class="row">
+                    <div class="col-md-6 border-right">
+                        <h6 class="font-weight-bold mb-3"><i class="fas fa-cog"></i> Configurazione Neurone</h6>
+                        <div class="mb-2 text-muted">
+                            Cella selezionata: <strong id="selected_cell_label">-</strong>
+                        </div>
+                        <div class="form-group">
+                            <label for="neuron_type">Tipologia</label>
+                            <select class="form-control" id="neuron_type">
+                                @foreach(\App\Models\Neuron::TYPE_LABELS as $typeKey => $typeLabel)
+                                    <option value="{{ $typeKey }}">{{ $typeLabel }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" id="neuron_radius_group">
+                            <label for="neuron_radius">Raggio (in celle)</label>
+                            <input type="number" class="form-control" id="neuron_radius" min="1" step="1" value="1">
+                        </div>
+                        <div class="form-group" id="neuron_target_type_group">
+                            <label>Target da individuare</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="neuron_target_type_element">
+                                <label class="form-check-label" for="neuron_target_type_element">Element</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="neuron_target_type_entity">
+                                <label class="form-check-label" for="neuron_target_type_entity">Entity</label>
+                            </div>
+                        </div>
+                        <div class="form-group" id="neuron_target_element_group">
+                            <label for="neuron_target_element_id">Seleziona Element</label>
+                            <select class="form-control" id="neuron_target_element_id">
+                                <option value="">-- Seleziona --</option>
+                                @foreach(($brainTargetElements ?? collect()) as $targetElement)
+                                    <option value="{{ $targetElement->id }}">{{ $targetElement->name }} (#{{ $targetElement->id }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" id="neuron_gene_life_group" style="display:none;">
+                            <label for="neuron_gene_life_id">Gene Vita</label>
+                            <select class="form-control" id="neuron_gene_life_id">
+                                <option value="">-- Seleziona Gene Vita --</option>
+                                @foreach(($brainGenes ?? collect()) as $brainGene)
+                                    <option value="{{ $brainGene->id }}">{{ $brainGene->name }} (#{{ $brainGene->id }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" id="neuron_gene_attack_group" style="display:none;">
+                            <label for="neuron_gene_attack_id">Gene Attacco</label>
+                            <select class="form-control" id="neuron_gene_attack_id">
+                                <option value="">-- Seleziona Gene Attacco --</option>
+                                @foreach(($brainGenes ?? collect()) as $brainGene)
+                                    <option value="{{ $brainGene->id }}">{{ $brainGene->name }} (#{{ $brainGene->id }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" id="neuron_rule_chimical_element_group" style="display:none;">
+                            <label for="neuron_element_has_rule_chimical_element_id">Regola Elemento Chimico</label>
+                            <select class="form-control" id="neuron_element_has_rule_chimical_element_id">
+                                <option value="">-- Seleziona Regola --</option>
+                                @foreach(($allRuleChimicalElements ?? collect()) as $rule)
+                                    <option value="{{ $rule->id }}">{{ $rule->title }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="neuron_target_type_entity">
-                        <label class="form-check-label" for="neuron_target_type_entity">Entity</label>
-                    </div>
-                </div>
-                <div class="form-group" id="neuron_target_element_group">
-                    <label for="neuron_target_element_id">Seleziona Element</label>
-                    <select class="form-control" id="neuron_target_element_id">
-                        <option value="">-- Seleziona --</option>
-                        @foreach(($brainTargetElements ?? collect()) as $targetElement)
-                            <option value="{{ $targetElement->id }}">{{ $targetElement->name }} (#{{ $targetElement->id }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="form-group" id="neuron_gene_life_group" style="display:none;">
-                    <label for="neuron_gene_life_id">Gene Vita</label>
-                    <select class="form-control" id="neuron_gene_life_id">
-                        <option value="">-- Seleziona Gene Vita --</option>
-                        @foreach(($brainGenes ?? collect()) as $brainGene)
-                            <option value="{{ $brainGene->id }}">{{ $brainGene->name }} (#{{ $brainGene->id }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="form-group" id="neuron_gene_attack_group" style="display:none;">
-                    <label for="neuron_gene_attack_id">Gene Attacco</label>
-                    <select class="form-control" id="neuron_gene_attack_id">
-                        <option value="">-- Seleziona Gene Attacco --</option>
-                        @foreach(($brainGenes ?? collect()) as $brainGene)
-                            <option value="{{ $brainGene->id }}">{{ $brainGene->name }} (#{{ $brainGene->id }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="form-group" id="neuron_rule_chimical_element_group" style="display:none;">
-                    <label for="neuron_element_has_rule_chimical_element_id">Regola Elemento Chimico</label>
-                    <select class="form-control" id="neuron_element_has_rule_chimical_element_id">
-                        <option value="">-- Seleziona Regola --</option>
-                        @foreach(($allRuleChimicalElements ?? collect()) as $rule)
-                            <option value="{{ $rule->id }}">{{ $rule->title }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                    </div>
-                    <div class="tab-pane fade" id="links" role="tabpanel" aria-labelledby="links-tab">
-                        <div id="neuron-links-container">
+                    <div class="col-md-6">
+                        <h6 class="font-weight-bold mb-3"><i class="fas fa-link"></i> Collegamenti in uscita</h6>
+                        <div id="neuron-links-container" style="max-height: 400px; overflow-y: auto;">
                             <!-- Links will be populated here -->
                         </div>
                     </div>
@@ -247,7 +265,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveNeuronBtn = document.getElementById('btn_save_neuron');
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl) {
+    const circuitsTableBody = document.getElementById('circuits-table-body');
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !circuitsTableBody) {
         console.warn('One or more required elements for the brain tab are missing.');
         return;
     }
@@ -297,6 +316,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let draggedOffsetX = 0;
     let draggedOffsetY = 0;
     let dragStarted = false;
+    let highlightedCircuitId = null;
+    let circuitsDataTable = null;
 
     try {
         const parsed = JSON.parse(neuronItemsInput.value || '[]');
@@ -322,6 +343,152 @@ document.addEventListener('DOMContentLoaded', function () {
         const parsed = parseInt(value, 10);
         if (Number.isNaN(parsed) || parsed < 1) return 1;
         return parsed;
+    }
+
+    function renderCircuitsTable() {
+        if (!circuitsTableBody) return;
+        
+        if ($.fn.DataTable.isDataTable('#circuits-table')) {
+            $('#circuits-table').DataTable().destroy();
+        }
+
+        circuitsTableBody.innerHTML = '';
+
+        neuronCircuits.forEach((circuit, index) => {
+            const cColorHex = circuit.color || '#' + (circuitColors[index % circuitColors.length].toString(16).padStart(6, '0'));
+            
+            const tr = document.createElement('tr');
+            tr.dataset.circuitId = circuit.id;
+            
+            const tdUid = document.createElement('td');
+            tdUid.innerHTML = `<small class="text-monospace">${circuit.uid.substring(0, 8)}...</small>`;
+            tdUid.title = circuit.uid;
+            tr.appendChild(tdUid);
+
+            const tdStatus = document.createElement('td');
+            tdStatus.className = 'text-center';
+            const badgeClass = circuit.state === 'closed' ? 'badge-success' : 'badge-warning';
+            tdStatus.innerHTML = `<span class="badge ${badgeClass}">${circuit.state}</span>`;
+            tr.appendChild(tdStatus);
+
+            const tdColor = document.createElement('td');
+            tdColor.className = 'text-center';
+            tdColor.innerHTML = `<div style="width: 20px; height: 20px; background-color: ${cColorHex}; border-radius: 4px; margin: 0 auto; border: 1px solid #ccc;"></div>`;
+            tr.appendChild(tdColor);
+
+            const tdActions = document.createElement('td');
+            tdActions.className = 'text-right';
+            const btnToggle = document.createElement('button');
+            btnToggle.type = 'button';
+            btnToggle.className = `btn btn-xs ${circuit.active ? 'btn-success' : 'btn-secondary'} btn-toggle-circuit`;
+            btnToggle.dataset.id = circuit.id;
+            btnToggle.innerHTML = circuit.active ? '<i class="fas fa-check-circle"></i> Attivo' : '<i class="fas fa-times-circle"></i> Disattivo';
+
+            const btnDelete = document.createElement('button');
+            btnDelete.type = 'button';
+            btnDelete.className = 'btn btn-xs btn-danger ml-1 btn-delete-circuit';
+            btnDelete.dataset.id = circuit.id;
+            btnDelete.innerHTML = '<i class="fas fa-trash"></i>';
+            btnDelete.title = 'Elimina Circuito';
+            
+            tdActions.appendChild(btnToggle);
+            tdActions.appendChild(btnDelete);
+            tr.appendChild(tdActions);
+
+            circuitsTableBody.appendChild(tr);
+        });
+
+        $('#circuits-table').DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: true,
+            autoWidth: false,
+            destroy: true,
+            language: {
+                emptyTable: "Nessun circuito rilevato"
+            }
+        });
+    }
+
+    // Event delegation for DataTable rows
+    $(document).on('mouseenter', '#circuits-table-body tr', function() {
+        const circuitId = $(this).data('circuit-id');
+        if (circuitId) {
+            highlightedCircuitId = circuitId;
+            renderGrid();
+        }
+    });
+
+    $(document).on('mouseleave', '#circuits-table-body tr', function() {
+        highlightedCircuitId = null;
+        renderGrid();
+    });
+
+    $(document).on('click', '.btn-toggle-circuit', function(e) {
+        e.stopPropagation();
+        const circuitId = $(this).data('id');
+        toggleCircuitActive(circuitId);
+    });
+
+    $(document).on('click', '.btn-delete-circuit', function(e) {
+        e.stopPropagation();
+        const circuitId = $(this).data('id');
+        if (confirm('Sei sicuro di voler eliminare questo circuito?')) {
+            deleteCircuit(circuitId);
+        }
+    });
+
+    // Clear highlight when leaving the table area
+    $(document).on('mouseleave', '#circuits-table', function() {
+        highlightedCircuitId = null;
+        renderGrid();
+    });
+
+    async function toggleCircuitActive(circuitId) {
+        const url = `/elements/${@json($element->id)}/brain/circuits/` + circuitId + `/toggle-active`;
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                neuronCircuits = data.circuits;
+                renderGrid();
+                renderCircuitsTable();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function deleteCircuit(circuitId) {
+        const url = `/elements/${@json($element->id)}/brain/circuits/` + circuitId;
+        try {
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                neuronItems = data.neurons || neuronItems;
+                neuronLinks = data.links || neuronLinks;
+                neuronCircuits = data.circuits;
+                updateNeuronHiddenInput();
+                updateNeuronLinksHiddenInput();
+                renderGrid();
+                renderCircuitsTable();
+            }
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     function neuronKey(i, j) {
@@ -533,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(() => {
                 updateNeuronLinksHiddenInput();
                 renderGrid();
+                renderCircuitsTable();
                 $(neuronModalEl).modal('hide');
             })
             .catch(error => {
@@ -710,6 +878,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     neuronLinks = neuronLinks.filter((l) => !(Number(l.from_neuron_id) === Number(link.from_neuron_id) && Number(l.to_neuron_id) === Number(link.to_neuron_id)));
                     updateNeuronLinksHiddenInput();
                     renderGrid();
+                    renderCircuitsTable();
                 } catch (error) {
                     alert(error.message || 'Errore durante la rimozione del collegamento');
                 }
@@ -728,8 +897,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Circuit borders
             const belongsToCircuits = neuronCircuits.filter(c => c.neuron_ids && c.neuron_ids.includes(Number(neuron.id)));
             belongsToCircuits.forEach((circuit, index) => {
-                const colorIdx = neuronCircuits.indexOf(circuit) % circuitColors.length;
-                const cColor = circuitColors[colorIdx];
+                const cColor = circuit.color ? parseInt(circuit.color.replace('#', '0x'), 16) : circuitColors[neuronCircuits.indexOf(circuit) % circuitColors.length];
                 const offset = 3 + (index * 4);
                 const cBorder = new PIXI.Graphics();
                 cBorder.lineStyle(2, cColor, 0.8);
@@ -737,10 +905,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 layer.addChild(cBorder);
             });
 
-             // Neuron cell border (clickable and draggable)
+            // Neuron cell border (clickable and draggable)
+            const isInactive = belongsToCircuits.length > 0 && belongsToCircuits.every(c => !c.active);
+            const bgColor = isInactive ? 0xd1d5db : 0xFFFFFF;
+
+            const isHighlighted = highlightedCircuitId && belongsToCircuits.some(c => c.id === highlightedCircuitId);
+
             const neuronBorder = new PIXI.Graphics();
-            neuronBorder.lineStyle(2, 0x111827, 1);
-            neuronBorder.beginFill(0xFFFFFF, 1);
+            if (isHighlighted) {
+                neuronBorder.lineStyle(6, 0x3b82f6, 1); // Thicker blue border for better visibility
+            } else {
+                neuronBorder.lineStyle(2, 0x111827, 1);
+            }
+            neuronBorder.beginFill(bgColor, 1);
             neuronBorder.drawRect((j * cellSize) + 1, (i * cellSize) + 1, cellSize - 2, cellSize - 2);
             neuronBorder.endFill();
             neuronBorder.eventMode = 'static';
@@ -1027,6 +1204,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 draggedNeuronLayer = null;
                 dragStarted = false;
                 renderGrid();
+                renderCircuitsTable();
             });
 
         } else {
@@ -1076,6 +1254,8 @@ document.addEventListener('DOMContentLoaded', function () {
         tooltipText.visible = false;
         tooltipText.zIndex = 20000;
         app.stage.addChild(tooltipText);
+        app.stage.sortChildren();
+
         app.stage.sortChildren();
     }
 
@@ -1258,6 +1438,18 @@ document.addEventListener('DOMContentLoaded', function () {
     toggleDetectionFieldsByType();
     updateNeuronLinksHiddenInput();
     renderGrid();
+    renderCircuitsTable();
 });
 </script>
+@endpush
+
+@push('css')
+<style>
+    #circuits-table-body tr {
+        cursor: pointer;
+    }
+    #circuits-table-body tr:hover td {
+        background-color: #f2f2f2 !important;
+    }
+</style>
 @endpush

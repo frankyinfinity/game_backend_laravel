@@ -142,7 +142,10 @@ class ElementHasPositionObserver
             $templateBrain->load('circuits.details');
 
             foreach ($templateBrain->circuits as $templateCircuit) {
-                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED) continue;
+                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED)
+                    continue;
+                if (!$templateCircuit->active)
+                    continue;
 
                 $clonedCircuit = ElementHasPositionNeuronCircuit::query()->create([
                     'element_has_position_id' => $elementHasPosition->id,
@@ -157,10 +160,10 @@ class ElementHasPositionObserver
                             'element_has_position_neuron_circuit_id' => $clonedCircuit->id,
                             'element_has_position_neuron_id' => $clonedNeuronId,
                         ]);
+                    }
                 }
             }
         }
-    }
     }
 
     private function initializeChemicalRules(ElementHasPosition $elementHasPosition): array
@@ -218,7 +221,7 @@ class ElementHasPositionObserver
         try {
             $container = app(DockerContainerService::class)->createElementHasPositionContainer($elementHasPosition, false);
 
-            if (! $elementHasPosition->is_manual) {
+            if (!$elementHasPosition->is_manual) {
                 app(DockerContainerService::class)->startContainer($container);
             }
         } catch (\Throwable $e) {

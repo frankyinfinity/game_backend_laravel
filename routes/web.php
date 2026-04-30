@@ -145,6 +145,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::delete('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'deleteBrainNeuron'])->name('elements.brain.neurons.delete');
     Route::post('/elements/{element}/brain/neuron-links', [App\Http\Controllers\ElementController::class, 'saveNeuronLink'])->name('elements.brain.neuron-links.save');
     Route::delete('/elements/{element}/brain/neuron-links', [App\Http\Controllers\ElementController::class, 'deleteNeuronLink'])->name('elements.brain.neuron-links.delete');
+    Route::post('/elements/{element}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\ElementController::class, 'toggleCircuitActive'])->name('elements.brain.circuits.toggle-active');
+    Route::delete('/elements/{element}/brain/circuits/{circuit}', [App\Http\Controllers\ElementController::class, 'deleteBrainCircuit'])->name('elements.brain.circuits.delete');
 
     //Scores
     Route::resource('scores', App\Http\Controllers\ScoreController::class);
