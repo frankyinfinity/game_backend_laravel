@@ -147,22 +147,29 @@ class BrainFlowRunner
                     $seen[$currentId] = true;
 
                     $hasActiveOutgoing = false;
-                    foreach ($outgoingById[$currentId] ?? [] as $link) {
-                        if (!$this->isLinkActiveFromNeuron($neuronData, $link)) {
-                            continue;
-                        }
+                    $outgoingLinks = $outgoingById[$currentId] ?? [];
+                    $neuronType = $neuronData['type'] ?? null;
 
-                        $hasActiveOutgoing = true;
-                        $toId = (int) $link->to_element_has_position_neuron_id;
-                        if ($toId > 0 && !isset($seen[$toId])) {
-                            $queue[] = [
-                                'id' => $toId,
-                                'from' => [
-                                    'id' => (int) $currentId,
-                                    'type' => $neuronData['type'] ?? null,
-                                    'condition' => $link->condition ?? null,
-                                ],
-                            ];
+                    if ($neuronType === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+                        $hasActiveOutgoing = $this->processChemicalElementOutgoingLinks($neuronData, $outgoingLinks, $currentId, $queue, $seen);
+                    } else {
+                        foreach ($outgoingLinks as $link) {
+                            if (!$this->isLinkActiveFromNeuron($neuronData, $link)) {
+                                continue;
+                            }
+
+                            $hasActiveOutgoing = true;
+                            $toId = (int) $link->to_element_has_position_neuron_id;
+                            if ($toId > 0 && !isset($seen[$toId])) {
+                                $queue[] = [
+                                    'id' => $toId,
+                                    'from' => [
+                                        'id' => (int) $currentId,
+                                        'type' => $neuronData['type'] ?? null,
+                                        'condition' => $link->condition ?? null,
+                                    ],
+                                ];
+                            }
                         }
                     }
 
@@ -305,6 +312,9 @@ class BrainFlowRunner
             case Neuron::TYPE_MOVEMENT:
                 $this->handleMovementNeuron($neuron, $elementHasPosition);
                 break;
+            case Neuron::TYPE_READ_CHIMICAL_ELEMENT:
+                $this->handleReadChemicalElementNeuron($neuron, $elementHasPosition);
+                break;
             default:
                 $this->handleUnknownNeuron($neuron);
                 break;
@@ -385,6 +395,138 @@ class BrainFlowRunner
         $from = ['i' => $centerI, 'j' => $centerJ];
 
         $this->drawPathForPlayer((int) $elementHasPosition->player_id, $from, $target, $elementHasPosition, false);
+    }
+
+    private function handleReadChemicalElementNeuron(array &$neuron, ElementHasPosition $elementHasPosition): void
+    {
+        $ruleId = (int) ($neuron['element_has_rule_chimical_element_id'] ?? 0);
+        if ($ruleId <= 0) {
+            Log::info('ReadChemical: no rule_id');
+            $neuron['chemical_element_value'] = null;
+            return;
+        }
+
+        $container = $this->resolveElementContainer($elementHasPosition);
+        if ($container === null || empty($container->ws_port)) {
+            Log::info('ReadChemical: no container or ws_port');
+            $neuron['chemical_element_value'] = null;
+            return;
+        }
+
+        $host = (string) $this->wsHost;
+        $port = (int) $container->ws_port;
+
+        try {
+            $socket = $this->openMapWebSocket($host, $port);
+            try {
+                $this->readWebSocketFrame($socket);
+
+                $payload = [
+                    'command' => 'get_chimical_elements',
+                ];
+                $this->writeWebSocketFrame($socket, json_encode($payload));
+
+                $replyRaw = $this->readWebSocketFrame($socket);
+                if ($replyRaw === null) {
+                    Log::info('ReadChemical: no reply from websocket');
+                    $neuron['chemical_element_value'] = null;
+                    return;
+                }
+
+                Log::info('ReadChemical: raw websocket reply', ['raw' => $replyRaw]);
+
+                $reply = json_decode($replyRaw, true);
+                if (!is_array($reply)) {
+                    Log::info('ReadChemical: invalid json', ['reply' => $replyRaw]);
+                    $neuron['chemical_element_value'] = null;
+                    return;
+                }
+
+                $chimicalElements = $reply['chimical_elements'] ?? [];
+                if (!is_array($chimicalElements)) {
+                    Log::info('ReadChemical: chimical_elements not array');
+                    $neuron['chemical_element_value'] = null;
+                    return;
+                }
+
+                $ruleId = (int) ($neuron['element_has_rule_chimical_element_id'] ?? 0);
+                if ($ruleId <= 0) {
+                    Log::info('ReadChemical: no rule_id');
+                    $neuron['chemical_element_value'] = null;
+                    return;
+                }
+
+                // Get the RuleChimicalElement to know which underlying element to look for
+                $ruleElement = \App\Models\RuleChimicalElement::query()
+                    ->where('id', $ruleId)
+                    ->first();
+
+                if ($ruleElement === null) {
+                    Log::info('ReadChemical: rule element not found', ['ruleId' => $ruleId]);
+                    $neuron['chemical_element_value'] = null;
+                    return;
+                }
+
+                // Determine which ID to match based on which field is set in the rule
+                $expectedId = null;
+                $expectedType = null;
+
+                if ($ruleElement->chimical_element_id !== null) {
+                    $expectedId = (int) $ruleElement->chimical_element_id;
+                    $expectedType = 'chimical_element';
+                } elseif ($ruleElement->complex_chimical_element_id !== null) {
+                    $expectedId = (int) $ruleElement->complex_chimical_element_id;
+                    $expectedType = 'complex_chimical_element';
+                }
+
+                Log::info('ReadChemical: looking for underlying element', ['expectedId' => $expectedId, 'expectedType' => $expectedType]);
+
+                $foundElement = null;
+                foreach ($chimicalElements as $element) {
+                    if (!is_array($element)) {
+                        continue;
+                    }
+                    Log::info('ReadChemical: checking element', ['element' => $element]);
+
+                    $elementType = $element['type'] ?? '';
+                    $elementId = null;
+
+                    if ($elementType === 'chimical_element') {
+                        $elementId = (int) ($element['chimical_element_id'] ?? 0);
+                    } elseif ($elementType === 'complex_chimical_element') {
+                        $elementId = (int) ($element['complex_chimical_element_id'] ?? 0);
+                    }
+
+                    if ($elementId > 0 && $elementId === $expectedId) {
+                        $foundElement = $element;
+                        break;
+                    }
+                }
+
+                if ($foundElement !== null) {
+                    $neuron['chemical_element_value'] = (int) ($foundElement['value'] ?? 0);
+                    Log::info('ReadChemical: value set', ['value' => $neuron['chemical_element_value']]);
+                } else {
+                    Log::info('ReadChemical: element not found in websocket response');
+                    $neuron['chemical_element_value'] = null;
+                }
+            } finally {
+                fclose($socket);
+            }
+        } catch (\Throwable $e) {
+            Log::info('ReadChemical: exception', ['error' => $e->getMessage()]);
+            $neuron['chemical_element_value'] = null;
+        }
+    }
+
+    private function resolveElementContainer(ElementHasPosition $elementHasPosition): ?Container
+    {
+        return Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->where('parent_id', (int) $elementHasPosition->id)
+            ->whereNotNull('ws_port')
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function handleDetectionNeuron(array &$neuron): void
@@ -544,6 +686,11 @@ class BrainFlowRunner
         }
 
         $type = $neuron['type'] ?? null;
+
+        if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            return $this->hasActiveChemicalElementLinks($neuron, $outgoingLinks);
+        }
+
         $detectionResult = $neuron['detection_result'] ?? null;
         $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
 
@@ -574,13 +721,53 @@ class BrainFlowRunner
         return false;
     }
 
+    private function hasActiveChemicalElementLinks(array $neuron, $outgoingLinks): bool
+    {
+        $value = $neuron['chemical_element_value'] ?? null;
+        if ($value === null) {
+            return false;
+        }
+
+        $hasRangeMatch = false;
+        $hasDefaultLink = false;
+
+        foreach ($outgoingLinks as $link) {
+            $condition = $link->condition ?? null;
+
+            if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
+                $hasDefaultLink = true;
+                continue;
+            }
+
+            $range = $this->parseConditionRange($condition);
+            if ($range === null) {
+                continue;
+            }
+
+            $min = $range['min'];
+            $max = $range['max'];
+
+            if ($value >= $min && $value <= $max) {
+                $hasRangeMatch = true;
+                break;
+            }
+        }
+
+        return $hasRangeMatch || $hasDefaultLink;
+    }
+
     private function isLinkActiveFromNeuron(array $neuron, $link): bool
     {
         $type = $neuron['type'] ?? null;
+        $condition = $link->condition ?? null;
+
+        if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            return $this->isChemicalElementLinkActive($neuron, $link);
+        }
+
         $detectionResult = $neuron['detection_result'] ?? null;
         $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
 
-        $condition = $link->condition ?? null;
         if ($condition === 'found' || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
             $condition = NeuronLink::CONDITION_MAIN;
         } elseif ($condition === 'not_found' || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
@@ -598,6 +785,151 @@ class BrainFlowRunner
         }
 
         return $condition === null || $condition === '' || $condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_TRIGGER;
+    }
+
+    private function isChemicalElementLinkActive(array $neuron, $link): bool
+    {
+        $value = $neuron['chemical_element_value'] ?? null;
+        if ($value === null) {
+            return false;
+        }
+
+        $condition = $link->condition ?? null;
+
+        if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
+            return false;
+        }
+
+        $range = $this->parseConditionRange($condition);
+        if ($range === null) {
+            return false;
+        }
+
+        $min = $range['min'];
+        $max = $range['max'];
+
+        return $value >= $min && $value <= $max;
+    }
+
+    private function parseConditionRange(?string $condition): ?array
+    {
+        if ($condition === null || $condition === '') {
+            Log::info('ParseRange: condition is empty');
+            return null;
+        }
+
+        Log::info('ParseRange: input', ['condition' => $condition]);
+
+        // Remove brackets and whitespace
+        $cleaned = trim($condition, "[] \t\n\r\0\x0B");
+        
+        // Try both comma and forward slash as separator
+        if (str_contains($cleaned, ',')) {
+            $parts = explode(',', $cleaned);
+        } elseif (str_contains($cleaned, '/')) {
+            $parts = explode('/', $cleaned);
+        } else {
+            Log::info('ParseRange: no separator found');
+            return null;
+        }
+
+        if (count($parts) !== 2) {
+            Log::info('ParseRange: invalid parts count', ['parts' => $parts]);
+            return null;
+        }
+
+        $min = trim($parts[0]);
+        $max = trim($parts[1]);
+
+        if (!is_numeric($min) || !is_numeric($max)) {
+            Log::info('ParseRange: not numeric', ['min' => $min, 'max' => $max]);
+            return null;
+        }
+
+        Log::info('ParseRange: success', ['min' => $min, 'max' => $max]);
+
+        return [
+            'min' => (int) $min,
+            'max' => (int) $max,
+        ];
+    }
+
+
+    private function processChemicalElementOutgoingLinks(array $neuronData, $outgoingLinks, int $currentId, array &$queue, array &$seen): bool
+    {
+        $value = $neuronData['chemical_element_value'] ?? null;
+        Log::info('ProcessOutgoing: start', ['value' => $value, 'outgoing_count' => count($outgoingLinks)]);
+
+        if ($value === null) {
+            Log::info('ProcessOutgoing: value is null');
+            return false;
+        }
+
+        $rangeLinks = [];
+        $defaultLink = null;
+
+        foreach ($outgoingLinks as $link) {
+            $condition = $link->condition ?? null;
+            Log::info('ProcessOutgoing: checking link', ['link_id' => $link->id, 'condition' => $condition]);
+
+            if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
+                $defaultLink = $link;
+                Log::info('ProcessOutgoing: found default link');
+                continue;
+            }
+
+            $range = $this->parseConditionRange($condition);
+            if ($range === null) {
+                Log::info('ProcessOutgoing: range is null', ['condition' => $condition]);
+                continue;
+            }
+
+            $min = $range['min'];
+            $max = $range['max'];
+            Log::info('ProcessOutgoing: checking range', ['min' => $min, 'max' => $max, 'value' => $value]);
+
+            if ($value >= $min && $value <= $max) {
+                $rangeLinks[] = $link;
+                Log::info('ProcessOutgoing: range matches!');
+            }
+        }
+
+        $hasActive = false;
+        if (!empty($rangeLinks)) {
+            $hasActive = true;
+            foreach ($rangeLinks as $link) {
+                $toId = (int) $link->to_element_has_position_neuron_id;
+                Log::info('ProcessOutgoing: adding range link to queue', ['toId' => $toId]);
+                if ($toId > 0 && !isset($seen[$toId])) {
+                    $queue[] = [
+                        'id' => $toId,
+                        'from' => [
+                            'id' => $currentId,
+                            'type' => $neuronData['type'] ?? null,
+                            'condition' => $link->condition ?? null,
+                        ],
+                    ];
+                }
+            }
+        } elseif ($defaultLink !== null) {
+            $hasActive = true;
+            $toId = (int) $defaultLink->to_element_has_position_neuron_id;
+            Log::info('ProcessOutgoing: adding default link to queue', ['toId' => $toId]);
+            if ($toId > 0 && !isset($seen[$toId])) {
+                $queue[] = [
+                    'id' => $toId,
+                    'from' => [
+                        'id' => $currentId,
+                        'type' => $neuronData['type'] ?? null,
+                        'condition' => $defaultLink->condition ?? null,
+                    ],
+                ];
+            }
+        } else {
+            Log::info('ProcessOutgoing: no matching links found');
+        }
+
+        return $hasActive;
     }
 
     private function findDetectionTargetAroundElementHasPosition(
@@ -1564,13 +1896,13 @@ class BrainFlowRunner
         }
 
         $updateItemsJson = json_encode($updateItems);
-        
+
         $firstItem = reset($updateItems);
         $type = $firstItem['type'] ?? 'entity';
-        
+
         $bladeFile = $type === 'element' ? 'element/update_info.blade.php' : 'entity/update_info.blade.php';
         $jsPath = resource_path('js/function/' . $bladeFile);
-        
+
         if (is_file($jsPath)) {
             $jsContent = file_get_contents($jsPath);
             if ($jsContent !== false) {
