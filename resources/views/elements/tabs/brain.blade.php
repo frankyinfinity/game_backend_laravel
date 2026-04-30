@@ -290,6 +290,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let tooltipText = null;
     let tooltipBg = null;
     let neuronCircuits = [];
+    let draggedNeuron = null;
+    let draggedNeuronLayer = null;
+    let draggedNeuronOriginalI = null;
+    let draggedNeuronOriginalJ = null;
+    let draggedOffsetX = 0;
+    let draggedOffsetY = 0;
+    let dragStarted = false;
 
     try {
         const parsed = JSON.parse(neuronItemsInput.value || '[]');
@@ -730,18 +737,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 layer.addChild(cBorder);
             });
 
-            // Neuron cell border (clickable)
+             // Neuron cell border (clickable and draggable)
             const neuronBorder = new PIXI.Graphics();
             neuronBorder.lineStyle(2, 0x111827, 1);
             neuronBorder.beginFill(0xFFFFFF, 1);
             neuronBorder.drawRect((j * cellSize) + 1, (i * cellSize) + 1, cellSize - 2, cellSize - 2);
             neuronBorder.endFill();
             neuronBorder.eventMode = 'static';
-            neuronBorder.cursor = 'pointer';
+            neuronBorder.cursor = 'grab';
             neuronBorder.isInteractiveElement = true;
+
             neuronBorder.on('pointerdown', (e) => {
                 e.stopPropagation();
-                openNeuronModal(i, j);
+                if (e.button === 0) {
+                    draggedNeuron = neuronBorder;
+                    draggedNeuronLayer = layer;
+                    draggedNeuronOriginalI = i;
+                    draggedNeuronOriginalJ = j;
+                    const rect = app.view.getBoundingClientRect();
+                    draggedOffsetX = e.global.x - ((j * cellSize) + 1);
+                    draggedOffsetY = e.global.y - ((i * cellSize) + 1);
+                    dragStarted = false;
+                    neuronBorder.cursor = 'grabbing';
+                    neuronBorder.alpha = 0.7;
+                }
             });
             // Tooltip
             neuronBorder.on('pointerover', () => {
@@ -930,13 +949,84 @@ document.addEventListener('DOMContentLoaded', function () {
             app.stage.hitArea = new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight);
 
             app.stage.on('pointerdown', (event) => {
+                if (draggedNeuron) return;
                 const i = Math.floor(event.global.y / fixedCellSize);
                 const j = Math.floor(event.global.x / fixedCellSize);
                 const maxRows = normalize(heightInput.value || 5);
                 const maxCols = normalize(widthInput.value || 5);
                 if (i < 0 || j < 0 || i >= maxRows || j >= maxCols) return;
-
                 openNeuronModal(i, j);
+            });
+
+            // Native browser events for reliable drag
+            app.view.addEventListener('pointermove', (e) => {
+                if (!draggedNeuron) return;
+                const rect = app.view.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const dx = Math.abs(x - draggedOffsetX - ((draggedNeuronOriginalJ * fixedCellSize) + 1));
+                const dy = Math.abs(y - draggedOffsetY - ((draggedNeuronOriginalI * fixedCellSize) + 1));
+                if (dx > 3 || dy > 3) dragStarted = true;
+                if (!dragStarted) return;
+                draggedNeuron.x = x - draggedOffsetX - ((draggedNeuronOriginalJ * fixedCellSize) + 1);
+                draggedNeuron.y = y - draggedOffsetY - ((draggedNeuronOriginalI * fixedCellSize) + 1);
+                if (draggedNeuronLayer) draggedNeuronLayer.sortChildren();
+            });
+
+            app.view.addEventListener('pointerup', async (e) => {
+                if (!draggedNeuron) return;
+                draggedNeuron.cursor = 'grab';
+                draggedNeuron.alpha = 1;
+                if (!dragStarted) {
+                    const tempNeuron = draggedNeuron;
+                    const tempI = draggedNeuronOriginalI;
+                    const tempJ = draggedNeuronOriginalJ;
+                    draggedNeuron = null;
+                    draggedNeuronLayer = null;
+                    openNeuronModal(tempI, tempJ);
+                    return;
+                }
+                const neuron = findNeuronAtCell(draggedNeuronOriginalI, draggedNeuronOriginalJ);
+                if (neuron) {
+                    const newJ = Math.floor((draggedNeuron.x + (draggedNeuronOriginalJ * fixedCellSize) + 1 + (fixedCellSize / 2)) / fixedCellSize);
+                    const newI = Math.floor((draggedNeuron.y + (draggedNeuronOriginalI * fixedCellSize) + 1 + (fixedCellSize / 2)) / fixedCellSize);
+                    const maxRows = normalize(heightInput.value || 5);
+                    const maxCols = normalize(widthInput.value || 5);
+                    const clampedI = Math.max(0, Math.min(newI, maxRows - 1));
+                    const clampedJ = Math.max(0, Math.min(newJ, maxCols - 1));
+                    if (clampedI !== draggedNeuronOriginalI || clampedJ !== draggedNeuronOriginalJ) {
+                        const targetOccupied = findNeuronAtCell(clampedI, clampedJ);
+                        if (!targetOccupied || Number(targetOccupied.id) === Number(neuron.id)) {
+                            try {
+                                const updatedNeuron = await requestSaveNeuron({
+                                    id: neuron.id,
+                                    brain_grid_width: normalize(widthInput.value || 5),
+                                    brain_grid_height: normalize(heightInput.value || 5),
+                                    type: neuron.type,
+                                    grid_i: clampedI,
+                                    grid_j: clampedJ,
+                                    radius: neuron.radius,
+                                    target_type: neuron.target_type,
+                                    target_element_id: neuron.target_element_id,
+                                    gene_life_id: neuron.gene_life_id,
+                                    gene_attack_id: neuron.gene_attack_id,
+                                    element_has_rule_chimical_element_id: neuron.element_has_rule_chimical_element_id,
+                                });
+                                neuronItems = neuronItems.filter(item => Number(item.id) !== Number(neuron.id));
+                                neuronItems.push(updatedNeuron);
+                                updateNeuronHiddenInput();
+                            } catch (error) {
+                                alert(error.message || 'Errore durante lo spostamento del neurone');
+                            }
+                        } else {
+                            alert('La cella di destinazione è già occupata');
+                        }
+                    }
+                }
+                draggedNeuron = null;
+                draggedNeuronLayer = null;
+                dragStarted = false;
+                renderGrid();
             });
 
         } else {
@@ -952,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', function () {
         app.stage.addChild(bg);
 
         const lines = new PIXI.Graphics();
-        lines.lineStyle(1, 0xdddddd, 1); // Lighter gray for better visibility on white
+        lines.lineStyle(1, 0xdddddd, 1);
         for (let c = 0; c <= cols; c++) {
             const x = c * cellSize;
             drawDashedLine(lines, x, 0, x, canvasHeight);
@@ -1163,27 +1253,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Simplified pointer move for hover cursor only (drag&drop removed)
-    window.addEventListener('pointermove', (event) => {
-        if (!app || !app.view) return;
-        const rect = app.view.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        
-        if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-            const i = Math.floor(y / fixedCellSize);
-            const j = Math.floor(x / fixedCellSize);
-            const hoveredNeuron = findNeuronAtCell(i, j);
-            app.view.style.cursor = hoveredNeuron ? 'pointer' : 'default';
-        } else {
-            app.view.style.cursor = 'default';
-        }
-    });
+    // Pointer move handler removed - cursor handled by neuron events
     
-    // Pointerup handler removed (drag&drop not used)
-    // window.addEventListener('pointerup', async (event) => { ... });
-
-
     toggleDetectionFieldsByType();
     updateNeuronLinksHiddenInput();
     renderGrid();
