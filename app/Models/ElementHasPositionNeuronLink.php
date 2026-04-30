@@ -13,6 +13,7 @@ class ElementHasPositionNeuronLink extends Model
         'to_element_has_position_neuron_id' => 'integer',
         'condition' => 'string',
         'color' => 'string',
+        'element_has_position_rule_chimical_element_detail_id' => 'integer',
     ];
 
     public function fromNeuron()

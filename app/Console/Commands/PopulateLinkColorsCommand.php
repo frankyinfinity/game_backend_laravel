@@ -41,6 +41,7 @@ class PopulateLinkColorsCommand extends Command
             if (!$fromN) continue;
 
             $color = null;
+            $ruleDetailId = null;
             if ((string) $fromN->type === \App\Models\Neuron::TYPE_DETECTION) {
                 if ($link->condition === \App\Models\NeuronLink::PORT_DETECTION_FAILURE) {
                     $color = '#F97316'; // Orange
@@ -55,6 +56,7 @@ class PopulateLinkColorsCommand extends Command
                         // Accettiamo sia il vecchio formato che il nuovo per trovare il match, poi salviamo il nuovo
                         if ($detail->min . '_' . $detail->max === $link->condition || $targetCondition === $link->condition) {
                             $color = $detail->color;
+                            $ruleDetailId = $detail->id;
                             $link->condition = $targetCondition; // Aggiorna al nuovo formato
                             break;
                         }
@@ -68,7 +70,8 @@ class PopulateLinkColorsCommand extends Command
 
             $link->update([
                 'color' => $color,
-                'condition' => $link->condition
+                'condition' => $link->condition,
+                'rule_chimical_element_detail_id' => $ruleDetailId
             ]);
         }
     }

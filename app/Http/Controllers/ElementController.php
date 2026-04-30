@@ -697,6 +697,10 @@ class ElementController extends Controller
             ->where('brain_id', $element->brain->id)
             ->first();
 
+        if ($fromNeuron && $fromNeuron->type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            $fromNeuron->load('chemicalRule.details');
+        }
+
         if (!$fromNeuron || !$toNeuron) {
             return response()->json([
                 'success' => false,
@@ -705,6 +709,7 @@ class ElementController extends Controller
         }
 
         $condition = null;
+        $ruleDetailId = null;
         if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
             $candidateCondition = (string) $request->input('condition', '');
             if ($candidateCondition === 'found' || $candidateCondition === 'main' || $candidateCondition === NeuronLink::PORT_DETECTION_SUCCESS) {
@@ -719,6 +724,17 @@ class ElementController extends Controller
             }
         } elseif ($fromNeuron->type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             $condition = (string) $request->input('condition');
+            // Find the matching detail
+            if ($fromNeuron->chemicalRule && $fromNeuron->chemicalRule->details) {
+                foreach ($fromNeuron->chemicalRule->details as $detail) {
+                    $targetCondition = "[{$detail->min}/{$detail->max}]";
+                    if ($detail->min . '_' . $detail->max === $condition || $targetCondition === $condition) {
+                        $ruleDetailId = $detail->id;
+                        $condition = $targetCondition; // Update to new format
+                        break;
+                    }
+                }
+            }
         } else {
             $condition = NeuronLink::PORT_TRIGGER;
         }
@@ -733,13 +749,15 @@ class ElementController extends Controller
             [
                 'condition' => $condition,
                 'color' => $color,
+                'rule_chimical_element_detail_id' => $ruleDetailId,
             ]
         );
 
-        if ($link->condition !== $condition || $link->color !== $color) {
+        if ($link->condition !== $condition || $link->color !== $color || $link->rule_chimical_element_detail_id !== $ruleDetailId) {
             $link->update([
                 'condition' => $condition,
                 'color' => $color,
+                'rule_chimical_element_detail_id' => $ruleDetailId,
             ]);
         }
 
@@ -962,6 +980,7 @@ class ElementController extends Controller
             }
 
             $condition = null;
+            $ruleDetailId = null;
             if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
                 $candidateCondition = (string) ($link['condition'] ?? '');
                 if ($candidateCondition === 'found' || $candidateCondition === 'main' || $candidateCondition === NeuronLink::PORT_DETECTION_SUCCESS) {
@@ -976,6 +995,21 @@ class ElementController extends Controller
                 }
             } elseif ($fromNeuron->type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
                 $condition = (string) ($link['condition'] ?? '');
+                // Load chemicalRule if not loaded
+                if (!$fromNeuron->relationLoaded('chemicalRule')) {
+                    $fromNeuron->load('chemicalRule.details');
+                }
+                // Find the matching detail
+                if ($fromNeuron->chemicalRule && $fromNeuron->chemicalRule->details) {
+                    foreach ($fromNeuron->chemicalRule->details as $detail) {
+                        $targetCondition = "[{$detail->min}/{$detail->max}]";
+                        if ($detail->min . '_' . $detail->max === $condition || $targetCondition === $condition) {
+                            $ruleDetailId = $detail->id;
+                            $condition = $targetCondition; // Update to new format
+                            break;
+                        }
+                    }
+                }
             } else {
                 $condition = NeuronLink::PORT_TRIGGER;
             }
@@ -985,6 +1019,7 @@ class ElementController extends Controller
                 'from_neuron_id' => (int) $fromNeuron->id,
                 'to_neuron_id' => (int) $toNeuron->id,
                 'condition' => $condition,
+                'rule_chimical_element_detail_id' => $ruleDetailId,
             ];
         }
 

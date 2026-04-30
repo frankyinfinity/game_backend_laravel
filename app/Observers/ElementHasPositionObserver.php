@@ -36,9 +36,9 @@ class ElementHasPositionObserver
         if ($element->isInteractive()) {
             $this->initializeInformation($elementHasPosition);
             $this->initializeScore($elementHasPosition);
-            $neuronMap = $this->initializeBrain($elementHasPosition);
+            $detailMap = $this->initializeChemicalRules($elementHasPosition);
+            $neuronMap = $this->initializeBrain($elementHasPosition, $detailMap);
             $this->initializeCircuits($elementHasPosition, $neuronMap);
-            $this->initializeChemicalRules($elementHasPosition);
             $this->initializeContainer($elementHasPosition);
         }
     }
@@ -78,7 +78,7 @@ class ElementHasPositionObserver
     }
 
 
-    private function initializeBrain(ElementHasPosition $elementHasPosition): array
+    private function initializeBrain(ElementHasPosition $elementHasPosition, array $detailMap): array
     {
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
@@ -125,6 +125,7 @@ class ElementHasPositionObserver
                         'to_element_has_position_neuron_id' => $toClonedId,
                         'condition' => $templateLink->condition,
                         'color' => $templateLink->color,
+                        'element_has_position_rule_chimical_element_detail_id' => $detailMap[$templateLink->rule_chimical_element_detail_id] ?? null,
                     ]);
                 }
             }
@@ -141,9 +142,7 @@ class ElementHasPositionObserver
             $templateBrain->load('circuits.details');
 
             foreach ($templateBrain->circuits as $templateCircuit) {
-                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED) {
-                    continue;
-                }
+                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED) continue;
 
                 $clonedCircuit = ElementHasPositionNeuronCircuit::query()->create([
                     'element_has_position_id' => $elementHasPosition->id,
@@ -158,16 +157,17 @@ class ElementHasPositionObserver
                             'element_has_position_neuron_circuit_id' => $clonedCircuit->id,
                             'element_has_position_neuron_id' => $clonedNeuronId,
                         ]);
-                    }
                 }
             }
         }
     }
+    }
 
-    private function initializeChemicalRules(ElementHasPosition $elementHasPosition): void
+    private function initializeChemicalRules(ElementHasPosition $elementHasPosition): array
     {
         $element = $elementHasPosition->element;
         $ruleChimicalElements = $element->ruleChimicalElements()->with('details.effects')->get();
+        $detailMap = [];
 
         foreach ($ruleChimicalElements as $templateRule) {
             $clonedRule = ElementHasPositionRuleChimicalElement::query()->create([
@@ -197,6 +197,8 @@ class ElementHasPositionObserver
                     'color' => $templateDetail->color,
                 ]);
 
+                $detailMap[$templateDetail->id] = $clonedDetail->id;
+
                 foreach ($templateDetail->effects as $templateEffect) {
                     ElementHasPositionRuleChimicalElementDetailEffect::query()->create([
                         'element_has_position_rule_chimical_element_detail_id' => $clonedDetail->id,
@@ -208,6 +210,7 @@ class ElementHasPositionObserver
                 }
             }
         }
+        return $detailMap;
     }
 
     private function initializeContainer(ElementHasPosition $elementHasPosition): void
