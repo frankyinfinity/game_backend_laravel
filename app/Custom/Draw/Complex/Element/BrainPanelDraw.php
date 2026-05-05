@@ -241,7 +241,7 @@ class BrainPanelDraw
         }
 
         $neurons = $this->brain->neurons()
-            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement'])
+            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement', 'targetElement', 'chemicalElement', 'complexChemicalElement'])
             ->orderBy('grid_i')
             ->orderBy('grid_j')
             ->get();
@@ -354,10 +354,16 @@ class BrainPanelDraw
         if ((string) $neuron->type === \App\Models\Neuron::TYPE_DETECTION) {
             $targetLabel = \App\Models\Neuron::TARGET_TYPE_LABELS[$neuron->target_type] ?? '-';
             $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
-            $lines[] = 'Target: ' . $targetLabel;
-            if ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_ELEMENT) {
-                $lines[] = 'Id Element: ' . ($neuron->target_element_id !== null ? (int) $neuron->target_element_id : '-');
+            
+            $targetInfo = $targetLabel;
+            if ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_ELEMENT && $neuron->targetElement) {
+                $targetInfo .= " ({$neuron->targetElement->name})";
+            } elseif ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_CHEMICAL_ELEMENT && $neuron->chemicalElement) {
+                $targetInfo .= " ({$neuron->chemicalElement->name})";
+            } elseif ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT && $neuron->complexChemicalElement) {
+                $targetInfo .= " ({$neuron->complexChemicalElement->name})";
             }
+            $lines[] = 'Target: ' . $targetInfo;
         } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_ATTACK) {
             $lines[] = 'Gene Vita: ' . ($neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : '-');
             $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');

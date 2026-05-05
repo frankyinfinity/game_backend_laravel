@@ -7,11 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 class Neuron extends Model
 {
     public const TYPE_DETECTION = 'detection';
+
     public const TYPE_PATH = 'path';
+
     public const TYPE_ATTACK = 'attack';
+
     public const TYPE_MOVEMENT = 'movement';
+
     public const TYPE_START = 'start';
+
     public const TYPE_END = 'end';
+
     public const TYPE_READ_CHIMICAL_ELEMENT = 'read_chimical_element';
 
     public const TYPES = [
@@ -45,16 +51,25 @@ class Neuron extends Model
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
+
     public const TARGET_TYPE_ENTITY = 'entity';
+
+    public const TARGET_TYPE_CHEMICAL_ELEMENT = 'chemical_element';
+
+    public const TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT = 'complex_chemical_element';
 
     public const TARGET_TYPES = [
         self::TARGET_TYPE_ELEMENT,
         self::TARGET_TYPE_ENTITY,
+        self::TARGET_TYPE_CHEMICAL_ELEMENT,
+        self::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT,
     ];
 
     public const TARGET_TYPE_LABELS = [
         self::TARGET_TYPE_ELEMENT => 'Element',
         self::TARGET_TYPE_ENTITY => 'Entity',
+        self::TARGET_TYPE_CHEMICAL_ELEMENT => 'Elemento Chimico',
+        self::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT => 'Elemento Chimico Complesso',
     ];
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
@@ -68,6 +83,8 @@ class Neuron extends Model
         'gene_life_id' => 'integer',
         'gene_attack_id' => 'integer',
         'element_has_rule_chimical_element_id' => 'integer',
+        'chemical_element_id' => 'integer',
+        'complex_chemical_element_id' => 'integer',
     ];
 
     public function brain()
@@ -90,9 +107,24 @@ class Neuron extends Model
         return $this->hasMany(NeuronLink::class, 'to_neuron_id');
     }
 
+    public function targetElement()
+    {
+        return $this->belongsTo(Element::class, 'target_element_id');
+    }
+
     public function chemicalRule()
     {
         return $this->belongsTo(RuleChimicalElement::class, 'element_has_rule_chimical_element_id');
+    }
+
+    public function chemicalElement()
+    {
+        return $this->belongsTo(ChimicalElement::class, 'chemical_element_id');
+    }
+
+    public function complexChemicalElement()
+    {
+        return $this->belongsTo(ComplexChimicalElement::class, 'complex_chemical_element_id');
     }
 
     public function getOutputConditions(): array
@@ -102,10 +134,12 @@ class Neuron extends Model
         } elseif ((string) $this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $this->chemicalRule;
             if ($rule && $rule->details) {
-                $conditions = $rule->details->map(fn($d) => "[{$d->min}/{$d->max}]")->toArray();
+                $conditions = $rule->details->map(fn ($d) => "[{$d->min}/{$d->max}]")->toArray();
                 $conditions[] = NeuronLink::DEFAULT_CHIMICAL_ELEMENT;
+
                 return $conditions;
             }
+
             return [NeuronLink::DEFAULT_CHIMICAL_ELEMENT];
         } else {
             return [NeuronLink::PORT_TRIGGER];
@@ -114,7 +148,7 @@ class Neuron extends Model
 
     public function getConditionColor(string $condition): string
     {
-        if ((string)$this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
+        if ((string) $this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $this->chemicalRule;
             if ($rule && $rule->details) {
                 foreach ($rule->details as $detail) {
@@ -127,18 +161,11 @@ class Neuron extends Model
                 return '#6b7280';
             }
         }
-        
+
         if ($condition === NeuronLink::PORT_DETECTION_FAILURE) {
             return '#F97316'; // Orange
         }
-        
+
         return '#16A34A'; // Green
     }
 }
-
-
-
-
-
-
-

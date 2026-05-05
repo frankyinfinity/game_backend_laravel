@@ -2,24 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Brain;
-use App\Models\Element;
-use App\Models\Entity;
-use App\Models\ElementType;
 use App\Models\Climate;
-use App\Models\Tile;
+use App\Models\Element;
+use App\Models\ElementHasPosition;
 use App\Models\ElementHasTile;
+use App\Models\ElementType;
+use App\Models\Entity;
 use App\Models\Gene;
 use App\Models\Neuron;
-use App\Models\NeuronLink;
-use App\Models\Score;
-use App\Models\ElementHasGene;
-use App\Models\ElementHasPosition;
-use App\Models\ElementHasPositionInformation;
-use App\Models\RuleChimicalElement;
 use App\Models\NeuronCircuit;
 use App\Models\NeuronCircuitDetail;
+use App\Models\NeuronLink;
+use App\Models\RuleChimicalElement;
+use App\Models\Score;
+use App\Models\Tile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -32,19 +29,19 @@ class ElementController extends Controller
     {
         $uid = $request->query('uid');
 
-        if (!$uid) {
+        if (! $uid) {
             return response()->json([
                 'success' => false,
-                'message' => 'UID non fornito'
+                'message' => 'UID non fornito',
             ], 400);
         }
 
         $elementHasPosition = ElementHasPosition::where('uid', $uid)->first();
 
-        if (!$elementHasPosition) {
+        if (! $elementHasPosition) {
             return response()->json([
                 'success' => false,
-                'message' => 'ElementHasPosition non trovato'
+                'message' => 'ElementHasPosition non trovato',
             ], 404);
         }
 
@@ -67,7 +64,7 @@ class ElementController extends Controller
         return response()->json([
             'success' => true,
             'uid' => $elementHasPosition->uid,
-            'genes' => $genesData
+            'genes' => $genesData,
         ]);
     }
 
@@ -78,19 +75,19 @@ class ElementController extends Controller
     {
         $uid = $request->query('uid');
 
-        if (!$uid) {
+        if (! $uid) {
             return response()->json([
                 'success' => false,
-                'message' => 'UID non fornito'
+                'message' => 'UID non fornito',
             ], 400);
         }
 
         $elementHasPosition = ElementHasPosition::where('uid', $uid)->first();
 
-        if (!$elementHasPosition) {
+        if (! $elementHasPosition) {
             return response()->json([
                 'success' => false,
-                'message' => 'ElementHasPosition non trovato'
+                'message' => 'ElementHasPosition non trovato',
             ], 404);
         }
 
@@ -99,8 +96,9 @@ class ElementController extends Controller
 
         foreach ($elementHasPosition->chimicalElements as $elementChimical) {
             $ruleChimical = $elementChimical->elementHasPositionRuleChimicalElement;
-            if (!$ruleChimical)
+            if (! $ruleChimical) {
                 continue;
+            }
 
             $chimicalData[] = [
                 'id' => $elementChimical->id,
@@ -116,7 +114,7 @@ class ElementController extends Controller
         return response()->json([
             'success' => true,
             'uid' => $elementHasPosition->uid,
-            'chimical_elements' => $chimicalData
+            'chimical_elements' => $chimicalData,
         ]);
     }
 
@@ -127,19 +125,19 @@ class ElementController extends Controller
     {
         $uid = $request->query('uid');
 
-        if (!$uid) {
+        if (! $uid) {
             return response()->json([
                 'success' => false,
-                'message' => 'UID non fornito'
+                'message' => 'UID non fornito',
             ], 400);
         }
 
         $elementHasPosition = ElementHasPosition::where('uid', $uid)->with('element')->first();
 
-        if (!$elementHasPosition) {
+        if (! $elementHasPosition) {
             return response()->json([
                 'success' => false,
-                'message' => 'ElementHasPosition non trovato'
+                'message' => 'ElementHasPosition non trovato',
             ], 404);
         }
 
@@ -161,13 +159,16 @@ class ElementController extends Controller
     public function listDataTable(Request $request)
     {
         $query = Element::with(['elementType', 'climates'])->get();
+
         return datatables($query)
             ->addColumn('graphics', function ($row) {
-                $imagePath = $row->id . '.png';
+                $imagePath = $row->id.'.png';
                 if (\Storage::disk('elements')->exists($imagePath)) {
                     $url = \Storage::disk('elements')->url($imagePath);
-                    return '<img src="' . $url . '?v=' . time() . '" style="width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid #ccc;">';
+
+                    return '<img src="'.$url.'?v='.time().'" style="width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid #ccc;">';
                 }
+
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
             ->addColumn('element_type_name', function ($row) {
@@ -187,6 +188,7 @@ class ElementController extends Controller
     {
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
+
         return view('elements.create', compact('elementTypes', 'climates'));
     }
 
@@ -201,7 +203,7 @@ class ElementController extends Controller
             'neuron_items' => 'nullable|string',
             'neuron_links' => 'nullable|string',
             'climates' => 'array',
-            'climates.*' => 'exists:climates,id'
+            'climates.*' => 'exists:climates,id',
         ]);
 
         $data = $request->only('name', 'element_type_id', 'characteristic');
@@ -261,6 +263,14 @@ class ElementController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $brainChimicalElements = \App\Models\ChimicalElement::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'symbol']);
+
+        $brainComplexChimicalElements = \App\Models\ComplexChimicalElement::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'symbol']);
+
         // Fetch all RuleChimicalElements of type 'element'
         $allRuleChimicalElements = RuleChimicalElement::query()
             ->with(['details', 'chimicalElement', 'complexChimicalElement'])
@@ -276,7 +286,7 @@ class ElementController extends Controller
                 'min' => $gene->min,
                 'max' => $gene->max,
                 'max_from' => $gene->max_from,
-                'max_to' => $gene->max_to
+                'max_to' => $gene->max_to,
             ];
         });
 
@@ -292,6 +302,8 @@ class ElementController extends Controller
             'brainTargetElements',
             'brainTargetEntities',
             'brainGenes',
+            'brainChimicalElements',
+            'brainComplexChimicalElements',
             'allRuleChimicalElements'
         ));
     }
@@ -307,7 +319,7 @@ class ElementController extends Controller
             'neuron_items' => 'nullable|string',
             'neuron_links' => 'nullable|string',
             'climates' => 'array',
-            'climates.*' => 'exists:climates,id'
+            'climates.*' => 'exists:climates,id',
         ]);
 
         $data = $request->only('name', 'element_type_id', 'characteristic');
@@ -326,7 +338,7 @@ class ElementController extends Controller
             $syncGenes = [];
             if ($request->has('consumption_genes')) {
                 foreach ($request->consumption_genes as $g) {
-                    if (!empty($g['gene_id']) && isset($g['effect'])) {
+                    if (! empty($g['gene_id']) && isset($g['effect'])) {
                         $syncGenes[$g['gene_id']] = ['effect' => $g['effect']];
                     }
                 }
@@ -341,14 +353,14 @@ class ElementController extends Controller
             $informations = [];
             if ($request->has('information_genes')) {
                 foreach ($request->information_genes as $g) {
-                    if (!empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['value'])) {
+                    if (! empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['value'])) {
                         $informations[] = [
                             'gene_id' => $g['gene_id'],
                             'min_value' => $g['min_value'],
                             'max_value' => $g['value'], // Set max_value to current value
                             'max_from' => $g['max_from'],
                             'max_to' => $g['max_to'],
-                            'value' => $g['value']
+                            'value' => $g['value'],
                         ];
                     }
                 }
@@ -370,7 +382,7 @@ class ElementController extends Controller
             $scores = [];
             if ($request->has('reward_scores')) {
                 foreach ($request->reward_scores as $s) {
-                    if (!empty($s['score_id']) && isset($s['amount'])) {
+                    if (! empty($s['score_id']) && isset($s['amount'])) {
                         $scores[$s['score_id']] = ['amount' => $s['amount']];
                     }
                 }
@@ -385,7 +397,7 @@ class ElementController extends Controller
             $syncRules = [];
             if ($request->has('rule_chimical_elements')) {
                 foreach ($request->rule_chimical_elements as $r) {
-                    if (!empty($r['rule_chimical_element_id'])) {
+                    if (! empty($r['rule_chimical_element_id'])) {
                         $syncRules[] = $r['rule_chimical_element_id'];
                     }
                 }
@@ -411,7 +423,7 @@ class ElementController extends Controller
                             [
                                 'element_id' => $element->id,
                                 'climate_id' => $climateId,
-                                'tile_id' => $tileId
+                                'tile_id' => $tileId,
                             ],
                             ['percentage' => min(100, $percentage)]
                         );
@@ -427,15 +439,15 @@ class ElementController extends Controller
             ->delete();
 
         // Save Image if provided
-        if ($request->has('image_base64') && !empty($request->image_base64)) {
+        if ($request->has('image_base64') && ! empty($request->image_base64)) {
             $imageData = $request->image_base64;
             $imageData = str_replace('data:image/png;base64,', '', $imageData);
             $imageData = str_replace(' ', '+', $imageData);
-            $imageName = $element->id . '.png';
-            \Storage::disk('uploads')->put('elements/' . $imageName, base64_decode($imageData));
+            $imageName = $element->id.'.png';
+            \Storage::disk('uploads')->put('elements/'.$imageName, base64_decode($imageData));
 
             // Also copy to public disk for web access
-            \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
+            \Storage::disk('public')->put('elements/'.$imageName, base64_decode($imageData));
         }
 
         return redirect()->route('elements.edit', $element)
@@ -448,6 +460,7 @@ class ElementController extends Controller
     public function destroy(Element $element)
     {
         $element->delete();
+
         return redirect()->route('elements.index')
             ->with('success', 'Elemento eliminato con successo.');
     }
@@ -456,10 +469,12 @@ class ElementController extends Controller
     {
         foreach ($request->ids as $id) {
             $element = Element::find($id);
-            if ($element == null)
+            if ($element == null) {
                 continue;
+            }
             $element->delete();
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -472,19 +487,19 @@ class ElementController extends Controller
         $imageData = $request->image;
         $imageData = str_replace('data:image/png;base64,', '', $imageData);
         $imageData = str_replace(' ', '+', $imageData);
-        $imageName = $element->id . '.png';
+        $imageName = $element->id.'.png';
 
-        \Storage::disk('uploads')->put('elements/' . $imageName, base64_decode($imageData));
+        \Storage::disk('uploads')->put('elements/'.$imageName, base64_decode($imageData));
 
         // Also copy to public disk for web access
-        \Storage::disk('public')->put('elements/' . $imageName, base64_decode($imageData));
+        \Storage::disk('public')->put('elements/'.$imageName, base64_decode($imageData));
 
         return response()->json(['success' => true]);
     }
 
     public function saveBrainNeuron(Request $request, Element $element)
     {
-        if (!$element->isInteractive()) {
+        if (! $element->isInteractive()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Elemento non interattivo',
@@ -501,6 +516,8 @@ class ElementController extends Controller
             'radius' => 'nullable|integer|min:1',
             'target_type' => 'nullable|string',
             'target_element_id' => 'nullable|integer|min:1',
+            'chemical_element_id' => 'nullable|integer|exists:chimical_elements,id',
+            'complex_chemical_element_id' => 'nullable|integer|exists:complex_chimical_elements,id',
             'gene_life_id' => 'nullable|integer|exists:genes,id',
             'gene_attack_id' => 'nullable|integer|exists:genes,id',
             'element_has_rule_chimical_element_id' => 'nullable|integer|exists:rule_chimical_elements,id',
@@ -520,7 +537,7 @@ class ElementController extends Controller
         }
 
         $type = (string) $request->input('type');
-        if (!in_array($type, Neuron::TYPES, true)) {
+        if (! in_array($type, Neuron::TYPES, true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tipo neurone non valido',
@@ -530,6 +547,8 @@ class ElementController extends Controller
         $radius = null;
         $targetType = null;
         $targetElementId = null;
+        $chemicalElementId = null;
+        $complexChemicalElementId = null;
         $geneLifeId = null;
         $geneAttackId = null;
         $elementHasRuleChimicalElementId = null;
@@ -544,6 +563,12 @@ class ElementController extends Controller
             if ($targetType === Neuron::TARGET_TYPE_ELEMENT) {
                 $candidateElementId = (int) $request->input('target_element_id', 0);
                 $targetElementId = $candidateElementId > 0 ? $candidateElementId : null;
+            } elseif ($targetType === Neuron::TARGET_TYPE_CHEMICAL_ELEMENT) {
+                $candidateChemicalElementId = (int) $request->input('chemical_element_id', 0);
+                $chemicalElementId = $candidateChemicalElementId > 0 ? $candidateChemicalElementId : null;
+            } elseif ($targetType === Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT) {
+                $candidateComplexChemicalElementId = (int) $request->input('complex_chemical_element_id', 0);
+                $complexChemicalElementId = $candidateComplexChemicalElementId > 0 ? $candidateComplexChemicalElementId : null;
             }
         }
 
@@ -588,6 +613,8 @@ class ElementController extends Controller
                     'radius' => $radius,
                     'target_type' => $targetType,
                     'target_element_id' => $targetElementId,
+                    'chemical_element_id' => $chemicalElementId,
+                    'complex_chemical_element_id' => $complexChemicalElementId,
                     'gene_life_id' => $geneLifeId,
                     'gene_attack_id' => $geneAttackId,
                     'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
@@ -604,6 +631,8 @@ class ElementController extends Controller
                         'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
                         'target_type' => $neuron->target_type,
                         'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+                        'chemical_element_id' => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,
+                        'complex_chemical_element_id' => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
                         'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                         'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
                         'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
@@ -631,6 +660,8 @@ class ElementController extends Controller
                 'radius' => $radius,
                 'target_type' => $targetType,
                 'target_element_id' => $targetElementId,
+                'chemical_element_id' => $chemicalElementId,
+                'complex_chemical_element_id' => $complexChemicalElementId,
                 'gene_life_id' => $geneLifeId,
                 'gene_attack_id' => $geneAttackId,
                 'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
@@ -649,6 +680,8 @@ class ElementController extends Controller
                 'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
                 'target_type' => $neuron->target_type,
                 'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+                'chemical_element_id' => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,
+                'complex_chemical_element_id' => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
                 'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                 'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
                 'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
@@ -665,7 +698,7 @@ class ElementController extends Controller
 
     public function deleteBrainNeuron(Request $request, Element $element)
     {
-        if (!$element->isInteractive() || !$element->brain) {
+        if (! $element->isInteractive() || ! $element->brain) {
             return response()->json(['success' => true]);
         }
 
@@ -684,13 +717,13 @@ class ElementController extends Controller
 
         return response()->json([
             'success' => true,
-            'circuits' => $this->getCircuitsArray($element->brain)
+            'circuits' => $this->getCircuitsArray($element->brain),
         ]);
     }
 
     public function saveNeuronLink(Request $request, Element $element)
     {
-        if (!$element->isInteractive() || !$element->brain) {
+        if (! $element->isInteractive() || ! $element->brain) {
             return response()->json([
                 'success' => false,
                 'message' => 'Brain non disponibile',
@@ -717,7 +750,7 @@ class ElementController extends Controller
             $fromNeuron->load('chemicalRule.details');
         }
 
-        if (!$fromNeuron || !$toNeuron) {
+        if (! $fromNeuron || ! $toNeuron) {
             return response()->json([
                 'success' => false,
                 'message' => 'Neuroni non validi per questo brain',
@@ -744,7 +777,7 @@ class ElementController extends Controller
             if ($fromNeuron->chemicalRule && $fromNeuron->chemicalRule->details) {
                 foreach ($fromNeuron->chemicalRule->details as $detail) {
                     $targetCondition = "[{$detail->min}/{$detail->max}]";
-                    if ($detail->min . '_' . $detail->max === $condition || $targetCondition === $condition) {
+                    if ($detail->min.'_'.$detail->max === $condition || $targetCondition === $condition) {
                         $ruleDetailId = $detail->id;
                         $condition = $targetCondition; // Update to new format
                         break;
@@ -785,18 +818,18 @@ class ElementController extends Controller
                 'to_neuron_id' => (int) $link->to_neuron_id,
                 'condition' => $link->condition,
                 'rule_chimical_element_detail_id' => $link->rule_chimical_element_detail_id ? (int) $link->rule_chimical_element_detail_id : null,
-            ]
+            ],
         ]);
     }
 
     public function saveNeuronConditionOrders(Request $request, Element $element, Neuron $neuron)
     {
         $orders = $request->input('orders', []);
-        
+
         foreach ($orders as $orderData) {
             $condition = $orderData['condition'];
             $sortOrder = (int) $orderData['sort_order'];
-            
+
             \App\Models\NeuronConditionOrder::updateOrCreate(
                 [
                     'neuron_id' => $neuron->id,
@@ -807,25 +840,25 @@ class ElementController extends Controller
                 ]
             );
         }
-        
+
         $neuron->load('conditionOrders');
-        
+
         return response()->json([
             'success' => true,
-            'orders' => $neuron->conditionOrders
+            'orders' => $neuron->conditionOrders,
         ]);
     }
 
     public function toggleCircuitActive(Request $request, Element $element, NeuronCircuit $circuit)
     {
-        if (!$element->brain || $circuit->brain_id !== $element->brain->id) {
+        if (! $element->brain || $circuit->brain_id !== $element->brain->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Circuito non trovato per questo elemento',
             ], 404);
         }
 
-        $circuit->active = !$circuit->active;
+        $circuit->active = ! $circuit->active;
         $circuit->save();
 
         return response()->json([
@@ -837,7 +870,7 @@ class ElementController extends Controller
 
     public function deleteBrainCircuit(Request $request, Element $element, NeuronCircuit $circuit)
     {
-        if (!$element->brain || $circuit->brain_id !== $element->brain->id) {
+        if (! $element->brain || $circuit->brain_id !== $element->brain->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Circuito non trovato per questo elemento',
@@ -848,7 +881,7 @@ class ElementController extends Controller
         $neuronIds = $circuit->details()->pluck('neuron_id')->toArray();
 
         // Delete the neurons (cascade will handle the details and links)
-        if (!empty($neuronIds)) {
+        if (! empty($neuronIds)) {
             $element->brain->neurons()->whereIn('id', $neuronIds)->delete();
         }
 
@@ -865,21 +898,26 @@ class ElementController extends Controller
 
     public function deleteNeuronLink(Request $request, Element $element)
     {
-        if (!$element->isInteractive() || !$element->brain) {
+        if (! $element->isInteractive() || ! $element->brain) {
             return response()->json(['success' => true]);
         }
 
         $request->validate([
             'from_neuron_id' => 'required|integer|min:1',
             'to_neuron_id' => 'required|integer|min:1',
+            'condition' => 'nullable|string',
         ]);
 
         $fromNeuronId = (int) $request->input('from_neuron_id');
         $toNeuronId = (int) $request->input('to_neuron_id');
+        $condition = $request->input('condition');
 
         NeuronLink::query()
             ->where('from_neuron_id', $fromNeuronId)
             ->where('to_neuron_id', $toNeuronId)
+            ->when($condition, function ($q) use ($condition) {
+                $q->where('condition', $condition);
+            })
             ->whereHas('fromNeuron', function ($q) use ($element) {
                 $q->where('brain_id', $element->brain->id);
             })
@@ -892,18 +930,19 @@ class ElementController extends Controller
 
         return response()->json([
             'success' => true,
-            'circuits' => $this->getCircuitsArray($element->brain)
+            'circuits' => $this->getCircuitsArray($element->brain),
         ]);
     }
 
     private function syncElementBrain(Element $element, Request $request): void
     {
-        if (!$element->isInteractive()) {
-            if (!empty($element->brain_id)) {
+        if (! $element->isInteractive()) {
+            if (! empty($element->brain_id)) {
                 $brainId = (int) $element->brain_id;
                 $element->update(['brain_id' => null]);
                 Brain::query()->where('id', $brainId)->delete();
             }
+
             return;
         }
 
@@ -921,6 +960,7 @@ class ElementController extends Controller
                 'grid_width' => $gridWidth,
                 'grid_height' => $gridHeight,
             ]);
+
             return $element->brain;
         }
 
@@ -931,18 +971,19 @@ class ElementController extends Controller
         ]);
 
         $element->update(['brain_id' => $brain->id]);
+
         return $brain;
     }
 
     private function syncBrainGraph(Brain $brain, Request $request, int $maxI, int $maxJ): void
     {
         $json = $request->input('neuron_items');
-        if (!is_string($json) || trim($json) === '') {
+        if (! is_string($json) || trim($json) === '') {
             return;
         }
 
         $decoded = json_decode($json, true);
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             return;
         }
 
@@ -953,28 +994,34 @@ class ElementController extends Controller
 
         foreach ($decoded as $item) {
             $type = (string) ($item['type'] ?? '');
-            if (!in_array($type, Neuron::TYPES, true))
+            if (! in_array($type, Neuron::TYPES, true)) {
                 continue;
+            }
 
             $gridI = (int) ($item['grid_i'] ?? -1);
             $gridJ = (int) ($item['grid_j'] ?? -1);
-            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ)
+            if ($gridI < 0 || $gridJ < 0 || $gridI >= $maxI || $gridJ >= $maxJ) {
                 continue;
+            }
 
             $radius = ($type === Neuron::TYPE_DETECTION || $type === Neuron::TYPE_MOVEMENT)
                 ? max(1, (int) ($item['radius'] ?? 1))
                 : null;
             $targetType = $type === Neuron::TYPE_DETECTION ? (string) ($item['target_type'] ?? '') : null;
             $targetElementId = ($type === Neuron::TYPE_DETECTION && $targetType === Neuron::TARGET_TYPE_ELEMENT) ? (int) ($item['target_element_id'] ?? 0) : null;
+            $chemicalElementId = ($type === Neuron::TYPE_DETECTION && $targetType === Neuron::TARGET_TYPE_CHEMICAL_ELEMENT) ? (int) ($item['chemical_element_id'] ?? 0) : null;
+            $complexChemicalElementId = ($type === Neuron::TYPE_DETECTION && $targetType === Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT) ? (int) ($item['complex_chemical_element_id'] ?? 0) : null;
             $geneLifeId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_life_id'] ?? 0) : null;
             $geneAttackId = $type === Neuron::TYPE_ATTACK ? (int) ($item['gene_attack_id'] ?? 0) : null;
             $elementHasRuleChimicalElementId = $type === Neuron::TYPE_READ_CHIMICAL_ELEMENT ? (int) ($item['element_has_rule_chimical_element_id'] ?? 0) : null;
 
-            if ($type === Neuron::TYPE_ATTACK && ($geneLifeId <= 0 || $geneAttackId <= 0))
+            if ($type === Neuron::TYPE_ATTACK && ($geneLifeId <= 0 || $geneAttackId <= 0)) {
                 continue;
+            }
 
-            if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT && $elementHasRuleChimicalElementId <= 0)
+            if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT && $elementHasRuleChimicalElementId <= 0) {
                 continue;
+            }
 
             $clientId = (int) ($item['id'] ?? 0);
             $neuron = null;
@@ -990,6 +1037,8 @@ class ElementController extends Controller
                     'radius' => $radius,
                     'target_type' => $targetType,
                     'target_element_id' => $targetElementId ?: null,
+                    'chemical_element_id' => $chemicalElementId ?: null,
+                    'complex_chemical_element_id' => $complexChemicalElementId ?: null,
                     'gene_life_id' => $geneLifeId ?: null,
                     'gene_attack_id' => $geneAttackId ?: null,
                     'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId ?: null,
@@ -1003,6 +1052,8 @@ class ElementController extends Controller
                     'radius' => $radius,
                     'target_type' => $targetType,
                     'target_element_id' => $targetElementId ?: null,
+                    'chemical_element_id' => $chemicalElementId ?: null,
+                    'complex_chemical_element_id' => $complexChemicalElementId ?: null,
                     'gene_life_id' => $geneLifeId ?: null,
                     'gene_attack_id' => $geneAttackId ?: null,
                     'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId ?: null,
@@ -1010,10 +1061,10 @@ class ElementController extends Controller
             }
 
             $processedIds[] = $neuron->id;
-            $gridKey = $gridI . '_' . $gridJ;
+            $gridKey = $gridI.'_'.$gridJ;
             $savedNeuronsByGrid[$gridKey] = $neuron;
             $clientIdToGridKey[$clientId] = $gridKey;
-            
+
             // Sync condition orders if provided in JSON
             if (isset($item['condition_orders']) && is_array($item['condition_orders'])) {
                 foreach ($item['condition_orders'] as $orderData) {
@@ -1040,7 +1091,7 @@ class ElementController extends Controller
     private function syncBrainLinks(Brain $brain, Request $request, array $savedNeuronsByGrid, array $clientIdToGridKey): void
     {
         $jsonLinks = $request->input('neuron_links');
-        if (!is_string($jsonLinks) || trim($jsonLinks) === '') {
+        if (! is_string($jsonLinks) || trim($jsonLinks) === '') {
             NeuronLink::query()
                 ->whereHas('fromNeuron', function ($q) use ($brain) {
                     $q->where('brain_id', $brain->id);
@@ -1049,17 +1100,18 @@ class ElementController extends Controller
                     $q->where('brain_id', $brain->id);
                 })
                 ->delete();
+
             return;
         }
 
         $decodedLinks = json_decode($jsonLinks, true);
-        if (!is_array($decodedLinks)) {
+        if (! is_array($decodedLinks)) {
             return;
         }
 
         $validPairs = [];
         foreach ($decodedLinks as $link) {
-            if (!is_array($link)) {
+            if (! is_array($link)) {
                 continue;
             }
 
@@ -1077,7 +1129,7 @@ class ElementController extends Controller
 
             $fromNeuron = $savedNeuronsByGrid[$fromGridKey] ?? null;
             $toNeuron = $savedNeuronsByGrid[$toGridKey] ?? null;
-            if (!$fromNeuron || !$toNeuron) {
+            if (! $fromNeuron || ! $toNeuron) {
                 continue;
             }
 
@@ -1102,7 +1154,7 @@ class ElementController extends Controller
                 if ($rule && $rule->details) {
                     foreach ($rule->details as $detail) {
                         $targetCondition = "[{$detail->min}/{$detail->max}]";
-                        if ($detail->min . '_' . $detail->max === $condition || $targetCondition === $condition) {
+                        if ($detail->min.'_'.$detail->max === $condition || $targetCondition === $condition) {
                             $ruleDetailId = $detail->id;
                             $condition = $targetCondition;
                             break;
@@ -1113,7 +1165,7 @@ class ElementController extends Controller
                 $condition = NeuronLink::PORT_TRIGGER;
             }
 
-            $pairKey = ((int) $fromNeuron->id) . '_' . ((int) $toNeuron->id);
+            $pairKey = ((int) $fromNeuron->id).'_'.((int) $toNeuron->id).'_'.($condition ?? 'null');
             $validPairs[$pairKey] = [
                 'from_neuron_id' => (int) $fromNeuron->id,
                 'to_neuron_id' => (int) $toNeuron->id,
@@ -1198,7 +1250,7 @@ class ElementController extends Controller
             // Delete any orphaned start-neuron circuits
             $brain->circuits()->whereNotNull('start_neuron_id')->delete();
 
-            if (!$circuit && $brain->neurons()->exists()) {
+            if (! $circuit && $brain->neurons()->exists()) {
                 $circuit = $brain->circuits()->create([
                     'uid' => Str::uuid()->toString(),
                     'state' => NeuronCircuit::STATE_CLOSED,
@@ -1214,7 +1266,7 @@ class ElementController extends Controller
                 $toAdd = array_diff($currentIds, $existingIds);
                 $toRemove = array_diff($existingIds, $currentIds);
 
-                if (!empty($toRemove)) {
+                if (! empty($toRemove)) {
                     $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
                 }
                 foreach ($toAdd as $nId) {
@@ -1225,6 +1277,7 @@ class ElementController extends Controller
                     $circuit->update(['state' => NeuronCircuit::STATE_CLOSED]);
                 }
             }
+
             return;
         }
 
@@ -1253,17 +1306,18 @@ class ElementController extends Controller
             $visited = [];
             $queue = [$startNeuron->id];
 
-            while (!empty($queue)) {
+            while (! empty($queue)) {
                 $currId = array_shift($queue);
-                if (isset($visited[$currId]))
+                if (isset($visited[$currId])) {
                     continue;
+                }
 
                 $visited[$currId] = true;
 
                 $currNode = $allNeurons->get($currId);
                 if ($currNode) {
                     foreach ($currNode->outgoingLinks as $link) {
-                        if (!isset($visited[$link->to_neuron_id])) {
+                        if (! isset($visited[$link->to_neuron_id])) {
                             $queue[] = $link->to_neuron_id;
                         }
                     }
@@ -1277,7 +1331,7 @@ class ElementController extends Controller
             $toAdd = array_diff($currentIds, $existingIds);
             $toRemove = array_diff($existingIds, $currentIds);
 
-            if (!empty($toRemove)) {
+            if (! empty($toRemove)) {
                 $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
             }
             foreach ($toAdd as $nId) {

@@ -12,6 +12,8 @@
                 'radius' => $n->radius !== null ? (int) $n->radius : null,
                 'target_type' => $n->target_type,
                 'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
+                'chemical_element_id' => $n->chemical_element_id !== null ? (int) $n->chemical_element_id : null,
+                'complex_chemical_element_id' => $n->complex_chemical_element_id !== null ? (int) $n->complex_chemical_element_id : null,
                 'gene_life_id' => $n->gene_life_id !== null ? (int) $n->gene_life_id : null,
                 'gene_attack_id' => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
                 'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
@@ -36,8 +38,6 @@
                     'color' => $l->color,
                 ];
             });
-        })->unique(function ($l) {
-            return $l['from_neuron_id'] . '_' . $l['to_neuron_id'];
         })->values()->all()
         : [];
     $existingCircuits = $element->brain && $element->brain->circuits
@@ -175,15 +175,14 @@
                             <input type="number" class="form-control" id="neuron_radius" min="1" step="1" value="1">
                         </div>
                         <div class="form-group" id="neuron_target_type_group">
-                            <label>Target da individuare</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="neuron_target_type_element">
-                                <label class="form-check-label" for="neuron_target_type_element">Element</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="neuron_target_type_entity">
-                                <label class="form-check-label" for="neuron_target_type_entity">Entity</label>
-                            </div>
+                            <label for="neuron_target_type">Target da individuare</label>
+                            <select class="form-control" id="neuron_target_type">
+                                <option value="">-- Seleziona Target --</option>
+                                <option value="element">Element</option>
+                                <option value="entity">Entity</option>
+                                <option value="chemical_element">Elemento Chimico</option>
+                                <option value="complex_chemical_element">Elemento Chimico Complesso</option>
+                            </select>
                         </div>
                         <div class="form-group" id="neuron_target_element_group">
                             <label for="neuron_target_element_id">Seleziona Element</label>
@@ -218,6 +217,24 @@
                                 <option value="">-- Seleziona Regola --</option>
                                 @foreach(($allRuleChimicalElements ?? collect()) as $rule)
                                     <option value="{{ $rule->id }}">{{ $rule->title }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" id="neuron_chemical_element_group" style="display:none;">
+                            <label for="neuron_chemical_element_id">Elemento Chimico</label>
+                            <select class="form-control" id="neuron_chemical_element_id">
+                                <option value="">-- Seleziona Elemento Chimico --</option>
+                                @foreach(($brainChimicalElements ?? collect()) as $elem)
+                                    <option value="{{ $elem->id }}">{{ $elem->name }} ({{ $elem->symbol }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" id="neuron_complex_chemical_element_group" style="display:none;">
+                            <label for="neuron_complex_chemical_element_id">Elemento Chimico Complesso</label>
+                            <select class="form-control" id="neuron_complex_chemical_element_id">
+                                <option value="">-- Seleziona Elemento Chimico Complesso --</option>
+                                @foreach(($brainComplexChimicalElements ?? collect()) as $elem)
+                                    <option value="{{ $elem->id }}">{{ $elem->name }} ({{ $elem->symbol }})</option>
                                 @endforeach
                             </select>
                         </div>
@@ -257,8 +274,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const neuronTypeInput = document.getElementById('neuron_type');
     const neuronRadiusInput = document.getElementById('neuron_radius');
     const neuronRadiusGroup = document.getElementById('neuron_radius_group');
-    const neuronTargetTypeElementInput = document.getElementById('neuron_target_type_element');
-    const neuronTargetTypeEntityInput = document.getElementById('neuron_target_type_entity');
+    const neuronTargetTypeInput = document.getElementById('neuron_target_type');
     const neuronTargetTypeGroup = document.getElementById('neuron_target_type_group');
     const neuronTargetElementGroup = document.getElementById('neuron_target_element_group');
     const neuronTargetElementIdInput = document.getElementById('neuron_target_element_id');
@@ -268,12 +284,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const neuronGeneAttackIdInput = document.getElementById('neuron_gene_attack_id');
     const neuronRuleChimicalElementGroup = document.getElementById('neuron_rule_chimical_element_group');
     const neuronRuleChimicalElementIdInput = document.getElementById('neuron_element_has_rule_chimical_element_id');
+    const neuronChemicalElementGroup = document.getElementById('neuron_chemical_element_group');
+    const neuronChemicalElementIdInput = document.getElementById('neuron_chemical_element_id');
+    const neuronComplexChemicalElementGroup = document.getElementById('neuron_complex_chemical_element_group');
+    const neuronComplexChemicalElementIdInput = document.getElementById('neuron_complex_chemical_element_id');
     const selectedCellLabel = document.getElementById('selected_cell_label');
     const saveNeuronBtn = document.getElementById('btn_save_neuron');
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
     const circuitsTableBody = document.getElementById('circuits-table-body');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeElementInput || !neuronTargetTypeEntityInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !circuitsTableBody) {
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronTargetTypeInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !neuronChemicalElementGroup || !neuronChemicalElementIdInput || !neuronComplexChemicalElementGroup || !neuronComplexChemicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !circuitsTableBody) {
         console.warn('One or more required elements for the brain tab are missing.');
         return;
     }
@@ -293,6 +313,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeReadChimicalElement = @json(\App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
+    const targetTypeChemicalElement = @json(\App\Models\Neuron::TARGET_TYPE_CHEMICAL_ELEMENT);
+    const targetTypeComplexChemicalElement = @json(\App\Models\Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT);
     const typeSymbols = @json(\App\Models\Neuron::TYPE_SYMBOLS);
     const typeLabels = @json(\App\Models\Neuron::TYPE_LABELS);
     const targetTypeLabels = @json(\App\Models\Neuron::TARGET_TYPE_LABELS);
@@ -304,6 +326,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
+    const brainChimicalElements = @json($brainChimicalElements ?? []);
+    const brainComplexChimicalElements = @json($brainComplexChimicalElements ?? []);
+    const brainTargetElements = @json($brainTargetElements ?? []);
     const deleteNeuronLinkUrl = @json(route('elements.brain.neuron-links.delete', $element));
     const allRuleChimicalElements = @json($allRuleChimicalElements);
 
@@ -848,7 +873,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             // Delete old link
                             await requestDeleteNeuronLink({
                                 from_neuron_id: Number(neuronId),
-                                to_neuron_id: Number(existingLink.to_neuron_id)
+                                to_neuron_id: Number(existingLink.to_neuron_id),
+                                condition: condition
                             });
                             neuronLinks = neuronLinks.filter(l => l !== existingLink);
 
@@ -976,11 +1002,16 @@ document.addEventListener('DOMContentLoaded', function () {
         neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
         neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
         neuronRuleChimicalElementGroup.style.display = isReadChimicalElement ? '' : 'none';
+        neuronChemicalElementGroup.style.display = 'none';
+        neuronComplexChemicalElementGroup.style.display = 'none';
         if (!isDetection) {
             neuronTargetElementGroup.style.display = 'none';
             return;
         }
-        neuronTargetElementGroup.style.display = neuronTargetTypeElementInput.checked ? '' : 'none';
+        const targetType = neuronTargetTypeInput.value;
+        neuronTargetElementGroup.style.display = targetType === targetTypeElement ? '' : 'none';
+        neuronChemicalElementGroup.style.display = targetType === targetTypeChemicalElement ? '' : 'none';
+        neuronComplexChemicalElementGroup.style.display = targetType === targetTypeComplexChemicalElement ? '' : 'none';
     }
 
     function openNeuronModal(i, j) {
@@ -992,17 +1023,20 @@ document.addEventListener('DOMContentLoaded', function () {
             currentNeuronId = existing.id;
             const inferredTargetType = existing.target_type
                 || (existing.target_element_id != null ? targetTypeElement : null)
+                || (existing.chemical_element_id != null ? targetTypeChemicalElement : null)
+                || (existing.complex_chemical_element_id != null ? targetTypeComplexChemicalElement : null)
                 || targetTypeElement;
 
             neuronTypeInput.value = existing.type;
             neuronRadiusInput.value = existing.radius != null ? Number(existing.radius) : 1;
-            neuronTargetTypeElementInput.checked = inferredTargetType === targetTypeElement;
-            neuronTargetTypeEntityInput.checked = inferredTargetType === targetTypeEntity;
-            neuronTargetElementIdInput.value = existing.target_element_id != null ? String(existing.target_element_id) : '';
             neuronGeneLifeIdInput.value = existing.gene_life_id != null ? String(existing.gene_life_id) : '';
             neuronGeneAttackIdInput.value = existing.gene_attack_id != null ? String(existing.gene_attack_id) : '';
             neuronRuleChimicalElementIdInput.value = existing.element_has_rule_chimical_element_id != null ? String(existing.element_has_rule_chimical_element_id) : '';
+            neuronChemicalElementIdInput.value = existing.chemical_element_id != null ? String(existing.chemical_element_id) : '';
+            neuronComplexChemicalElementIdInput.value = existing.complex_chemical_element_id != null ? String(existing.complex_chemical_element_id) : '';
             deleteNeuronBtn.style.display = '';
+
+            toggleDetectionFieldsByType(); // Update visibility based on loaded values
 
             // Populate links tab
             populateLinksTab(existing.id);
@@ -1010,11 +1044,12 @@ document.addEventListener('DOMContentLoaded', function () {
             currentNeuronId = null;
             neuronTypeInput.value = typeDetection;
             neuronRadiusInput.value = 1;
-            neuronTargetTypeElementInput.checked = true;
-            neuronTargetTypeEntityInput.checked = false;
+            neuronTargetTypeInput.value = targetTypeElement;
             neuronTargetElementIdInput.value = '';
+            neuronChemicalElementIdInput.value = '';
+            neuronComplexChemicalElementIdInput.value = '';
             neuronGeneLifeIdInput.value = '';
-            neuronGeneAttackIdInput.value = '';
+            neuronRuleChimicalElementIdInput.value = '';
             neuronRuleChimicalElementIdInput.value = '';
             deleteNeuronBtn.style.display = 'none';
 
@@ -1024,6 +1059,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
         toggleDetectionFieldsByType();
         $(neuronModalEl).modal('show');
+
+        // Set the target type and specific inputs after the modal is fully shown
+        $(neuronModalEl).one('shown.bs.modal', function() {
+            if (currentNeuronId) {
+                const existing = findNeuronById(currentNeuronId);
+                if (existing) {
+                    const inferredTargetType = existing.target_type
+                        || (existing.target_element_id != null ? targetTypeElement : null)
+                        || (existing.chemical_element_id != null ? targetTypeChemicalElement : null)
+                        || (existing.complex_chemical_element_id != null ? targetTypeComplexChemicalElement : null)
+                        || targetTypeElement;
+                    
+                    neuronTargetTypeInput.value = inferredTargetType;
+                    toggleDetectionFieldsByType(); 
+
+                    if (inferredTargetType === targetTypeElement) {
+                        neuronTargetElementIdInput.value = existing.target_element_id != null ? String(existing.target_element_id) : '';
+                    } else if (inferredTargetType === targetTypeChemicalElement) {
+                        neuronChemicalElementIdInput.value = existing.chemical_element_id != null ? String(existing.chemical_element_id) : '';
+                    } else if (inferredTargetType === targetTypeComplexChemicalElement) {
+                        neuronComplexChemicalElementIdInput.value = existing.complex_chemical_element_id != null ? String(existing.complex_chemical_element_id) : '';
+                    }
+                }
+            }
+        });
     }
 
     function drawNeuronLinks(layer, cellSize) {
@@ -1157,10 +1217,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (neuron.type === typeDetection) {
                     const targetLabel = targetTypeLabels[neuron.target_type] || '-';
                     lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
-                    lines.push(`Target: ${targetLabel}`);
+                    let targetInfo = targetLabel;
                     if (neuron.target_type === targetTypeElement) {
-                        lines.push(`Id Element: ${neuron.target_element_id != null ? neuron.target_element_id : '-'}`);
+                        const targetElem = brainTargetElements.find(e => Number(e.id) === Number(neuron.target_element_id));
+                        targetInfo += ` (${targetElem ? targetElem.name : '-'})`;
+                    } else if (neuron.target_type === targetTypeChemicalElement) {
+                        const chem = brainChimicalElements.find(c => Number(c.id) === Number(neuron.chemical_element_id));
+                        targetInfo += ` (${chem ? chem.name : '-'})`;
+                    } else if (neuron.target_type === targetTypeComplexChemicalElement) {
+                        const comp = brainComplexChimicalElements.find(c => Number(c.id) === Number(neuron.complex_chemical_element_id));
+                        targetInfo += ` (${comp ? comp.name : '-'})`;
                     }
+                    lines.push(`Target: ${targetInfo}`);
                 } else if (neuron.type === typeAttack) {
                     lines.push(`Gene Vita: ${neuron.gene_life_id != null ? neuron.gene_life_id : '-'}`);
                     lines.push(`Gene Attacco: ${neuron.gene_attack_id != null ? neuron.gene_attack_id : '-'}`);
@@ -1374,6 +1442,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                     radius: neuron.radius,
                                     target_type: neuron.target_type,
                                     target_element_id: neuron.target_element_id,
+                                    chemical_element_id: neuron.chemical_element_id,
+                                    complex_chemical_element_id: neuron.complex_chemical_element_id,
                                     gene_life_id: neuron.gene_life_id,
                                     gene_attack_id: neuron.gene_attack_id,
                                     element_has_rule_chimical_element_id: neuron.element_has_rule_chimical_element_id,
@@ -1513,14 +1583,7 @@ document.addEventListener('DOMContentLoaded', function () {
     widthInput.addEventListener('input', renderGrid);
     heightInput.addEventListener('input', renderGrid);
     neuronTypeInput.addEventListener('change', toggleDetectionFieldsByType);
-    neuronTargetTypeElementInput.addEventListener('change', function () {
-        if (neuronTargetTypeElementInput.checked) neuronTargetTypeEntityInput.checked = false;
-        toggleDetectionFieldsByType();
-    });
-    neuronTargetTypeEntityInput.addEventListener('change', function () {
-        if (neuronTargetTypeEntityInput.checked) neuronTargetTypeElementInput.checked = false;
-        toggleDetectionFieldsByType();
-    });
+    neuronTargetTypeInput.addEventListener('change', toggleDetectionFieldsByType);
 
     saveNeuronBtn.addEventListener('click', async function () {
         if (!selectedCell) return;
@@ -1531,16 +1594,23 @@ document.addEventListener('DOMContentLoaded', function () {
         let radius = null;
         let targetType = null;
         let targetElementId = null;
+        let chemicalElementId = null;
+        let complexChemicalElementId = null;
         let geneLifeId = null;
         let geneAttackId = null;
         let elementHasRuleChimicalElementId = null;
         if (type === typeDetection) {
             radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
-            if (neuronTargetTypeEntityInput.checked) targetType = targetTypeEntity;
-            else if (neuronTargetTypeElementInput.checked) targetType = targetTypeElement;
+            targetType = neuronTargetTypeInput.value;
             if (targetType === targetTypeElement) {
                 const parsed = parseInt(neuronTargetElementIdInput.value, 10);
                 targetElementId = Number.isNaN(parsed) ? null : parsed;
+            } else if (targetType === targetTypeChemicalElement) {
+                const parsed = parseInt(neuronChemicalElementIdInput.value, 10);
+                chemicalElementId = Number.isNaN(parsed) ? null : parsed;
+            } else if (targetType === targetTypeComplexChemicalElement) {
+                const parsed = parseInt(neuronComplexChemicalElementIdInput.value, 10);
+                complexChemicalElementId = Number.isNaN(parsed) ? null : parsed;
             }
         } else if (type === typeMovement) {
             radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
@@ -1574,6 +1644,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 radius: radius,
                 target_type: targetType,
                 target_element_id: targetElementId,
+                chemical_element_id: chemicalElementId,
+                complex_chemical_element_id: complexChemicalElementId,
                 gene_life_id: geneLifeId,
                 gene_attack_id: geneAttackId,
                 element_has_rule_chimical_element_id: elementHasRuleChimicalElementId,
