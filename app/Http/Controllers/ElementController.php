@@ -263,7 +263,7 @@ class ElementController extends Controller
 
         // Fetch all RuleChimicalElements of type 'element'
         $allRuleChimicalElements = RuleChimicalElement::query()
-            ->with('details')
+            ->with(['details', 'chimicalElement', 'complexChimicalElement'])
             ->where('type', RuleChimicalElement::TYPE_ELEMENT)
             ->orderBy('name')
             ->get();

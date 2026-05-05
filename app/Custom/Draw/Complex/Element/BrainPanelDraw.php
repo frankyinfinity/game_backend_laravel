@@ -195,7 +195,7 @@ class BrainPanelDraw
         }
 
         $neurons = $this->brain->neurons()
-            ->with(['outgoingLinks', 'incomingLinks', 'chemicalRule.details'])
+            ->with(['outgoingLinks', 'incomingLinks', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement'])
             ->orderBy('grid_i')
             ->orderBy('grid_j')
             ->get();
@@ -325,7 +325,8 @@ class BrainPanelDraw
         } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_MOVEMENT) {
             $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
         } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
-            // Regola info here if needed
+            $rule = $neuron->chemicalRule;
+            $lines[] = 'Elemento: ' . ($rule ? ($rule->title ?: $rule->name) : '-');
         }
 
         return implode("\n", $lines);

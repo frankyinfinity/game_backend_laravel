@@ -611,104 +611,94 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function saveLinks(neuronId) {
+    async function saveLinks(neuronId) {
         const selects = document.querySelectorAll('.link-target');
-        const operations = [];
-
+        const saveBtn = document.getElementById('btn_save_links');
+        
         // Find source neuron to determine default color for new links
-        const sourceNeuron = neuronItems.find(n => n.id === neuronId);
+        const sourceNeuron = neuronItems.find(n => Number(n.id) === Number(neuronId));
+        if (!sourceNeuron) return;
 
-        selects.forEach(select => {
-            const condition = select.dataset.condition;
-            const targetId = select.value ? Number(select.value) : null;
-            const existingLink = neuronLinks.find(l => l.from_neuron_id == neuronId && l.condition === condition);
+        if (saveBtn) saveBtn.disabled = true;
 
-            if (targetId) {
-                if (existingLink) {
-                    if (existingLink.to_neuron_id !== targetId) {
-                        // Update existing link
-                        operations.push(
-                            requestSaveNeuronLink({
-                                from_neuron_id: neuronId,
+        try {
+            for (const select of selects) {
+                const condition = select.dataset.condition;
+                const targetId = select.value ? Number(select.value) : null;
+                const existingLink = neuronLinks.find(l => Number(l.from_neuron_id) === Number(neuronId) && l.condition === condition);
+
+                if (targetId) {
+                    if (existingLink) {
+                        if (Number(existingLink.to_neuron_id) !== targetId) {
+                            // Delete old link
+                            await requestDeleteNeuronLink({
+                                from_neuron_id: Number(neuronId),
+                                to_neuron_id: Number(existingLink.to_neuron_id)
+                            });
+                            neuronLinks = neuronLinks.filter(l => l !== existingLink);
+
+                            // Save new link
+                            const linkColor = existingLink.color;
+                            const savedLink = await requestSaveNeuronLink({
+                                from_neuron_id: Number(neuronId),
                                 to_neuron_id: targetId,
                                 condition: condition,
-                                color: existingLink.color
-                            }).then(response => {
-                                if (response && response.link) {
-                                    Object.assign(existingLink, response.link);
-                                } else {
-                                    existingLink.to_neuron_id = targetId;
-                                }
-                            })
-                        );
-                    }
-                } else {
-                    // Create new link
-                    let linkColor = null;
-                    if (sourceNeuron && sourceNeuron.type === typeReadChimicalElement) {
-                        const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(sourceNeuron.element_has_rule_chimical_element_id));
-                        if (rule && rule.details) {
-                            const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
-                            if (detail && detail.color) linkColor = detail.color;
+                                color: linkColor
+                            });
+                            if (savedLink) {
+                                neuronLinks.push(savedLink);
+                            }
                         }
-                        if (condition === DEFAULT_CHIMICAL_ELEMENT) linkColor = '#6b7280';
-                    } else if (condition === portDetectionFailure) {
-                        linkColor = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
                     } else {
-                        linkColor = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
-                    }
+                        // Create new link
+                        let linkColor = null;
+                        if (sourceNeuron.type === typeReadChimicalElement) {
+                            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(sourceNeuron.element_has_rule_chimical_element_id));
+                            if (rule && rule.details) {
+                                const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
+                                if (detail && detail.color) linkColor = detail.color;
+                            }
+                            if (condition === DEFAULT_CHIMICAL_ELEMENT) linkColor = '#6b7280';
+                        } else if (condition === portDetectionFailure) {
+                            linkColor = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
+                        } else {
+                            linkColor = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
+                        }
 
-                    operations.push(
-                        requestSaveNeuronLink({
-                            from_neuron_id: neuronId,
+                        const savedLink = await requestSaveNeuronLink({
+                            from_neuron_id: Number(neuronId),
                             to_neuron_id: targetId,
                             condition: condition,
                             color: linkColor
-                        }).then(response => {
-                            if (response && response.link) {
-                                neuronLinks.push(response.link);
-                            } else {
-                                neuronLinks.push({
-                                    from_neuron_id: neuronId,
-                                    to_neuron_id: targetId,
-                                    condition: condition,
-                                    color: linkColor,
-                                });
-                            }
-                        })
-                    );
-                }
-            } else {
-                if (existingLink) {
-                    operations.push(
-                        requestDeleteNeuronLink({
-                            from_neuron_id: neuronId,
-                            to_neuron_id: existingLink.to_neuron_id
-                        }).then(() => {
-                            neuronLinks = neuronLinks.filter(l => l !== existingLink);
-                        })
-                    );
+                        });
+                        if (savedLink) {
+                            neuronLinks.push(savedLink);
+                        }
+                    }
+                } else {
+                    if (existingLink) {
+                        // Delete removed link
+                        await requestDeleteNeuronLink({
+                            from_neuron_id: Number(neuronId),
+                            to_neuron_id: Number(existingLink.to_neuron_id)
+                        });
+                        neuronLinks = neuronLinks.filter(l => l !== existingLink);
+                    }
                 }
             }
-        });
 
-        const saveBtn = document.getElementById('btn_save_links');
-        if (saveBtn) saveBtn.disabled = true;
+            updateNeuronLinksHiddenInput();
+            renderGrid();
+            renderCircuitsTable();
+            $(neuronModalEl).modal('hide');
 
-        Promise.all(operations)
-            .then(() => {
-                updateNeuronLinksHiddenInput();
-                renderGrid();
-                renderCircuitsTable();
-                $(neuronModalEl).modal('hide');
-            })
-            .catch(error => {
-                alert(error.message || 'Errore durante il salvataggio dei collegamenti');
-            })
-            .finally(() => {
-                if (saveBtn) saveBtn.disabled = false;
-            });
+        } catch (error) {
+            alert(error.message || 'Errore durante il salvataggio dei collegamenti');
+        } finally {
+            if (saveBtn) saveBtn.disabled = false;
+        }
     }
+
 
     function getRightAnchorPoint(neuron, cellSize, condition) {
         if (!neuron) return { x: 0, y: 0 };
@@ -959,7 +949,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else if (neuron.type === typeReadChimicalElement) {
                     const ruleId = neuron.element_has_rule_chimical_element_id;
                     const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-                    lines.push(`Regola: ${rule ? rule.title : '-'}`);
+                    lines.push(`Elemento: ${rule ? rule.title : '-'}`);
                 }
                 tooltipText.text = lines.join('\n');
                 tooltipText.visible = true;
