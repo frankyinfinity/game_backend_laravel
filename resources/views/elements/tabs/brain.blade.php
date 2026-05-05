@@ -298,8 +298,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
     const deleteNeuronLinkUrl = @json(route('elements.brain.neuron-links.delete', $element));
-    const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
     const allRuleChimicalElements = @json($allRuleChimicalElements);
+
+    function getConditionColor(type, ruleId, condition) {
+        if (type === typeReadChimicalElement) {
+            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+            if (rule && rule.details) {
+                const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
+                if (detail && detail.color) return detail.color;
+            }
+            if (condition === DEFAULT_CHIMICAL_ELEMENT) return '#6b7280';
+        }
+        const colorInt = portColors[condition] || portColors[portTrigger];
+        // Ensure colorInt is handled as hex string
+        return '#' + (colorInt ? colorInt.toString(16).padStart(6, '0') : '000000');
+    }
+    const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
 
     let app = null;
     let selectedCell = null;
@@ -554,11 +568,28 @@ document.addEventListener('DOMContentLoaded', function () {
             const link = neuronLinks.find(l => l.from_neuron_id === neuronId && l.condition === condition);
 
             const div = document.createElement('div');
-            div.className = 'form-group';
+            div.className = 'form-group mb-3';
+
+            const labelContainer = document.createElement('div');
+            labelContainer.className = 'd-flex align-items-center mb-1';
+            
+            const color = getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, condition);
+            const dot = document.createElement('span');
+            dot.style.display = 'inline-block';
+            dot.style.width = '10px';
+            dot.style.height = '10px';
+            dot.style.borderRadius = '50%';
+            dot.style.backgroundColor = color;
+            dot.style.marginRight = '8px';
+            labelContainer.appendChild(dot);
 
             const label = document.createElement('label');
-            label.textContent = condition;
-            div.appendChild(label);
+            label.className = 'mb-0';
+            label.style.fontWeight = 'bold';
+            label.textContent = condition === portTrigger ? 'Trigger' : (condition === portDetectionSuccess ? 'Success' : (condition === portDetectionFailure ? 'Failure' : condition));
+            labelContainer.appendChild(label);
+            
+            div.appendChild(labelContainer);
 
             const select = document.createElement('select');
             select.className = 'form-control link-target';
