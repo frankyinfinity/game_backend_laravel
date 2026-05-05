@@ -12,8 +12,6 @@ class ElementHasPositionNeuronLink extends Model
         'from_element_has_position_neuron_id' => 'integer',
         'to_element_has_position_neuron_id' => 'integer',
         'condition' => 'string',
-        'color' => 'string',
-        'sort_order' => 'integer',
         'element_has_position_rule_chimical_element_detail_id' => 'integer',
     ];
 

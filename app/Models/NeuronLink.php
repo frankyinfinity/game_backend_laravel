@@ -41,8 +41,6 @@ class NeuronLink extends Model
         'from_neuron_id',
         'to_neuron_id',
         'condition',
-        'color',
-        'sort_order',
         'rule_chimical_element_detail_id',
     ];
 

@@ -942,6 +942,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const baseX = topLeftX + cellSize;
 
         let orders = neuron.condition_orders || [];
+        if (orders.length === 0) {
+            const conditions = getOutputConditions(neuron);
+            orders = conditions.map((c, i) => ({ condition: c, sort_order: i }));
+        }
 
         const sortedOrders = [...orders].sort((a, b) => a.sort_order - b.sort_order);
         const index = sortedOrders.findIndex(o => o.condition === condition);
@@ -1093,28 +1097,6 @@ document.addEventListener('DOMContentLoaded', function () {
         for (const neuron of neuronItems) {
             const topLeftX = (Number(neuron.grid_j) * cellSize);
             const topLeftY = (Number(neuron.grid_i) * cellSize);
-
-            // Draw output anchors as colored dots
-            let orders = neuron.condition_orders || [];
-            
-            const sortedOrders = [...orders].sort((a, b) => a.sort_order - b.sort_order);
-
-            for (const orderObj of sortedOrders) {
-                const cond = orderObj.condition;
-                const anchor = getRightAnchorPoint(neuron, cellSize, cond);
-                
-                // Get color from orderObj
-                const color = (orderObj && orderObj.color) ? orderObj.color : getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, cond);
-                
-                const dot = new PIXI.Graphics();
-                dot.beginFill(parseInt(color.replace('#', '0x'), 16));
-                dot.lineStyle(1, 0xffffff, 1);
-                dot.drawCircle(0, 0, 4);
-                dot.endFill();
-                dot.x = anchor.x;
-                dot.y = anchor.y;
-                layer.addChild(dot);
-            }
 
             const i = Number(neuron.grid_i);
             const j = Number(neuron.grid_j);
@@ -1268,59 +1250,39 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (hasRightAnchor) {
-                const baseX = (j * cellSize) + cellSize;
-                const baseY = i * cellSize;
+                let orders = neuron.condition_orders || [];
+                if (orders.length === 0) {
+                    const conditions = getOutputConditions(neuron);
+                    orders = conditions.map((c, idx) => ({
+                        condition: c,
+                        sort_order: idx,
+                        color: getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, c)
+                    }));
+                }
 
-                if (neuron.type === typeDetection) {
-                    const topY = baseY + (cellSize * 0.3);
-                    const bottomY = baseY + (cellSize * 0.7);
-                    const anchors = [
-                        { y: topY, color: portColors[portDetectionSuccess] },
-                        { y: bottomY, color: portColors[portDetectionFailure] },
-                    ];
-                    anchors.forEach(ac => {
-                        const a = new PIXI.Graphics();
-                        a.beginFill(ac.color);
-                        a.lineStyle(2, 0xffffff, 1);
-                        a.drawCircle(baseX, ac.y, 8);
-                        a.endFill();
-                        a.eventMode = 'none';
-                        layer.addChild(a);
-                    });
-                } else if (neuron.type === typeReadChimicalElement) {
-                    const ruleId = neuron.element_has_rule_chimical_element_id;
-                    const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-                    const dynamicRadius = 10;
-                    if (rule && rule.details && rule.details.length > 0) {
-                        const details = rule.details;
-                        const count = details.length;
-                        const step = cellSize / (count + 1);
-                        details.forEach((detail, idx) => {
-                            const anchorY = baseY + (step * (idx + 1));
-                            const color = parseInt(detail.color.replace('#', '0x'), 16);
-                            const a = new PIXI.Graphics();
-                            a.beginFill(color);
-                            a.lineStyle(1, 0xffffff, 1);
-                            a.drawCircle(baseX + 2, anchorY, dynamicRadius);
-                            a.endFill();
-                            a.eventMode = 'none';
-                            layer.addChild(a);
-                        });
+                const sortedOrders = [...orders].sort((a, b) => a.sort_order - b.sort_order);
+
+                for (const orderObj of sortedOrders) {
+                    const cond = orderObj.condition;
+                    const anchor = getRightAnchorPoint(neuron, cellSize, cond);
+                    
+                    const colorStr = (orderObj && orderObj.color) ? orderObj.color : getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, cond);
+                    let colorInt;
+                    if (typeof colorStr === 'string' && colorStr.startsWith('#')) {
+                        colorInt = parseInt(colorStr.replace('#', '0x'), 16);
+                    } else if (typeof colorStr === 'number') {
+                        colorInt = colorStr;
+                    } else {
+                        colorInt = 0x000000;
                     }
-                    // Default gray anchor
-                    const defaultAnchorY = baseY + cellSize;
-                    const defaultAnchor = new PIXI.Graphics();
-                    defaultAnchor.beginFill(0x6b7280);
-                    defaultAnchor.lineStyle(1, 0xffffff, 1);
-                    defaultAnchor.drawCircle(baseX + 2, defaultAnchorY, dynamicRadius);
-                    defaultAnchor.endFill();
-                    defaultAnchor.eventMode = 'none';
-                    layer.addChild(defaultAnchor);
-                } else {
+
+                    const dynamicRadius = neuron.type === typeReadChimicalElement ? 10 : 8;
+                    const xOffset = neuron.type === typeReadChimicalElement ? 2 : 0;
+                    
                     const a = new PIXI.Graphics();
-                    a.beginFill(portColors[portTrigger]);
-                    a.lineStyle(2, 0xffffff, 1);
-                    a.drawCircle(baseX, baseY + (cellSize / 2), 8);
+                    a.beginFill(colorInt);
+                    a.lineStyle(neuron.type === typeReadChimicalElement ? 1 : 2, 0xffffff, 1);
+                    a.drawCircle(anchor.x + xOffset, anchor.y, dynamicRadius);
                     a.endFill();
                     a.eventMode = 'none';
                     layer.addChild(a);

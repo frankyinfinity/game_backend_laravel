@@ -152,7 +152,7 @@ class BrainPanelDraw
 
     private function addConnections(array $circuitNeuronIds = []): void
     {
-        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
+        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'conditionOrders', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
 
         if (!empty($circuitNeuronIds)) {
             $neurons = $neurons->filter(fn($n) => in_array((int) $n->id, $circuitNeuronIds));
@@ -178,10 +178,16 @@ class BrainPanelDraw
                     continue;
                 }
 
+                // Get color from conditionOrders first, then fall back to link color
+                $condOrder = $neuron->conditionOrders->firstWhere('condition', (string)$link->condition);
+                $linkColor = $condOrder && $condOrder->color
+                    ? (int) hexdec(ltrim($condOrder->color, '#'))
+                    : $this->getLinkColorForNeuron($neuron, $link);
+
                 $line = new MultiLine($this->uid . '_link_' . $neuron->id . '_' . $link->id . '_' . $linkIndex);
                 $line->setPoint($start['x'], $start['y']);
                 $line->setPoint($end['x'], $end['y']);
-                $line->setColor($this->getLinkColorForNeuron($neuron, $link));
+                $line->setColor($linkColor);
                 $line->setThickness(2);
                 $line->setRenderable($this->renderable);
                 $line->addAttributes('z_index', 20008);
@@ -198,18 +204,16 @@ class BrainPanelDraw
         $baseX = $origin['x'] + $cellSize;
         $topLeftY = $origin['y'];
 
-        $conditions = $this->getOutputConditions($neuron);
-        $orders = $neuron->conditionOrders->pluck('sort_order', 'condition')->toArray();
+        // Use conditionOrders sorted by sort_order as the single source of truth
+        $sortedOrders = $neuron->conditionOrders->sortBy('sort_order')->values();
         
-        $sortedConditions = $conditions;
-        usort($sortedConditions, function($a, $b) use ($orders) {
-            $orderA = $orders[$a] ?? 999;
-            $orderB = $orders[$b] ?? 999;
-            return $orderA <=> $orderB;
-        });
-        
-        $index = array_search($condition, $sortedConditions);
-        $count = count($sortedConditions);
+        if ($sortedOrders->isEmpty()) {
+            // Fallback if no condition orders exist yet
+            return ['x' => $baseX, 'y' => (int) ($topLeftY + ($cellSize / 2))];
+        }
+
+        $index = $sortedOrders->search(fn($o) => (string)$o->condition === $condition);
+        $count = $sortedOrders->count();
         
         if ($count > 0 && $index !== false) {
             $step = $cellSize / ($count + 1);
@@ -230,23 +234,6 @@ class BrainPanelDraw
         ];
     }
 
-    private function getOutputConditions(ElementHasPositionNeuron $neuron): array
-    {
-        if ((string) $neuron->type === \App\Models\Neuron::TYPE_DETECTION) {
-            return [\App\Models\NeuronLink::PORT_DETECTION_SUCCESS, \App\Models\NeuronLink::PORT_DETECTION_FAILURE];
-        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
-            $rule = $neuron->chemicalRule;
-            if ($rule && $rule->details) {
-                $conditions = $rule->details->map(fn($d) => "[{$d->min}/{$d->max}]")->toArray();
-                $conditions[] = \App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT;
-                return $conditions;
-            }
-            return [\App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT];
-        } else {
-            return [\App\Models\NeuronLink::PORT_TRIGGER];
-        }
-    }
-
     private function addNodes(array $circuitNeuronIds = []): void
     {
         if (!$this->brain) {
@@ -254,7 +241,7 @@ class BrainPanelDraw
         }
 
         $neurons = $this->brain->neurons()
-            ->with(['outgoingLinks', 'incomingLinks', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement'])
+            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement'])
             ->orderBy('grid_i')
             ->orderBy('grid_j')
             ->get();
@@ -277,40 +264,14 @@ class BrainPanelDraw
             $node->setThickness(2);
             $node->setBorderRadius(0);
             $node->setRenderable($this->renderable);
-            $node->addAttributes('z_index', 20009);
+            $node->addAttributes('z_index', 20010);
             $node->addAttributes('neuron_type', $neuron->type);
             $node->addAttributes('grid_i', (int) $neuron->grid_i);
             $node->addAttributes('grid_j', (int) $neuron->grid_j);
             $node->addAttributes('tooltip_text', $this->buildNeuronTooltip($neuron));
             $this->drawItems[] = $node;
 
-            // Draw output anchors as small colored dots based on sort_order
-            $conditions = $this->getOutputConditions($neuron);
-            $links = $neuron->outgoingLinks->keyBy('condition');
-            
-            $conditionsWithOrder = [];
-            foreach ($conditions as $idx => $c) {
-                $link = $links->get($c);
-                $conditionsWithOrder[] = [
-                    'name' => $c,
-                    'order' => $link ? ($link->sort_order ?? ($idx + 1000)) : ($idx + 1000)
-                ];
-            }
-            
-            usort($conditionsWithOrder, fn($a, $b) => $a['order'] <=> $b['order']);
-            
-            foreach ($conditionsWithOrder as $idx => $c) {
-                $anchor = $this->getRightAnchorPoint($neuron, $this->cellSize, $c['name']);
-                $color = $this->getLinkColorByCondition($neuron, $c['name']);
-                
-                $dot = new Circle($this->uid . '_anchor_' . $neuron->id . '_' . md5($c['name']));
-                $dot->setOrigin($anchor['x'], $anchor['y']);
-                $dot->setRadius(3);
-                $dot->setColor($color);
-                $dot->setRenderable($this->renderable);
-                $dot->addAttributes('z_index', 20011);
-                $this->drawItems[] = $dot;
-            }
+
 
             $icon = new Text($this->uid . '_node_icon_' . $index);
             $icon->setOrigin($position['x'] + (int) floor($this->cellSize / 2), $position['y'] + (int) floor($this->cellSize / 2) - 1);
@@ -319,13 +280,8 @@ class BrainPanelDraw
             $icon->setFontSize(12);
             $icon->setColor(Colors::BLACK);
             $icon->setRenderable($this->renderable);
-            $icon->addAttributes('z_index', 20010);
+            $icon->addAttributes('z_index', 20011);
             $this->drawItems[] = $icon;
-
-             // Per il neurone Lettura Elemento Chimico: disegna le N ancore colorate sul bordo destro
-             if ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
-                 // Anchors removed as requested
-             }
         }
     }
 
@@ -372,10 +328,6 @@ class BrainPanelDraw
 
     private function getLinkColorForNeuron(ElementHasPositionNeuron $neuron, ElementHasPositionNeuronLink $link): int
     {
-        if ($link->color) {
-            return (int) hexdec(ltrim($link->color, '#'));
-        }
-
         $condition = (string) $link->condition;
         if ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $neuron->chemicalRule;
@@ -417,28 +369,5 @@ class BrainPanelDraw
         }
 
         return implode("\n", $lines);
-    }
-
-    private function getLinkColorByCondition(ElementHasPositionNeuron $neuron, string $condition): string
-    {
-        if ((string)$neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
-            $rule = $neuron->chemicalRule;
-            if ($rule && $rule->details) {
-                foreach ($rule->details as $detail) {
-                    if ("[{$detail->min}/{$detail->max}]" === $condition) {
-                        return $detail->color ?? '#6b7280';
-                    }
-                }
-            }
-            if ($condition === \App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
-                return '#6b7280';
-            }
-        }
-        
-        if ($condition === \App\Models\NeuronLink::PORT_DETECTION_FAILURE) {
-            return '#F97316';
-        }
-        
-        return '#16A34A'; // Default green
     }
 }

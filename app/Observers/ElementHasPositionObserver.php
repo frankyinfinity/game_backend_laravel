@@ -134,7 +134,6 @@ class ElementHasPositionObserver
                         'from_element_has_position_neuron_id' => $fromClonedId,
                         'to_element_has_position_neuron_id' => $toClonedId,
                         'condition' => $templateLink->condition,
-                        'color' => $templateLink->color,
                         'element_has_position_rule_chimical_element_detail_id' => $detailMap[$templateLink->rule_chimical_element_detail_id] ?? null,
                     ]);
                 }
@@ -247,6 +246,7 @@ class ElementHasPositionObserver
      */
     public function deleted(ElementHasPosition $elementHasPosition): void
     {
+        $this->cleanupRelatedData($elementHasPosition);
         $this->cleanupContainer($elementHasPosition);
     }
 
@@ -255,7 +255,68 @@ class ElementHasPositionObserver
      */
     public function forceDeleted(ElementHasPosition $elementHasPosition): void
     {
+        $this->cleanupRelatedData($elementHasPosition);
         $this->cleanupContainer($elementHasPosition);
+    }
+
+    private function cleanupRelatedData(ElementHasPosition $elementHasPosition): void
+    {
+        $posId = $elementHasPosition->id;
+
+        // Delete brain schedules
+        foreach (\App\Models\BrainSchedule::where('element_has_position_id', $posId)->get() as $schedule) {
+            $schedule->delete();
+        }
+
+        // Delete circuit details and circuits
+        foreach (ElementHasPositionNeuronCircuit::where('element_has_position_id', $posId)->get() as $circuit) {
+            foreach (ElementHasPositionNeuronCircuitDetail::where('element_has_position_neuron_circuit_id', $circuit->id)->get() as $detail) {
+                $detail->delete();
+            }
+            $circuit->delete();
+        }
+
+        // Delete neuron links, condition orders, and neurons (via brain)
+        $brain = ElementHasPositionBrain::where('element_has_position_id', $posId)->first();
+        if ($brain) {
+            foreach (ElementHasPositionNeuron::where('element_has_position_brain_id', $brain->id)->get() as $neuron) {
+                foreach (ElementHasPositionNeuronLink::where('from_element_has_position_neuron_id', $neuron->id)->get() as $link) {
+                    $link->delete();
+                }
+                foreach (ElementHasPositionNeuronLink::where('to_element_has_position_neuron_id', $neuron->id)->get() as $link) {
+                    $link->delete();
+                }
+                foreach (\App\Models\ElementHasPositionNeuronConditionOrder::where('element_has_position_neuron_id', $neuron->id)->get() as $order) {
+                    $order->delete();
+                }
+                $neuron->delete();
+            }
+            $brain->delete();
+        }
+
+        // Delete chemical rules, details, effects, and chimical elements
+        foreach (ElementHasPositionRuleChimicalElement::where('element_has_position_id', $posId)->get() as $rule) {
+            foreach (ElementHasPositionRuleChimicalElementDetail::where('element_has_position_rule_chimical_element_id', $rule->id)->get() as $detail) {
+                foreach (ElementHasPositionRuleChimicalElementDetailEffect::where('element_has_position_rule_chimical_element_detail_id', $detail->id)->get() as $effect) {
+                    $effect->delete();
+                }
+                $detail->delete();
+            }
+            $rule->delete();
+        }
+
+        foreach (ElementHasPositionChimicalElement::where('element_has_position_id', $posId)->get() as $chimical) {
+            $chimical->delete();
+        }
+
+        // Delete informations and scores
+        foreach (\App\Models\ElementHasPositionInformation::where('element_has_position_id', $posId)->get() as $info) {
+            $info->delete();
+        }
+
+        foreach (ElementHasPositionScore::where('element_has_position_id', $posId)->get() as $score) {
+            $score->delete();
+        }
     }
 
     private function cleanupContainer(ElementHasPosition $elementHasPosition): void
