@@ -46,34 +46,44 @@ class ElementHasPositionObserver
     private function initializeInformation(ElementHasPosition $elementHasPosition): void
     {
         $element = $elementHasPosition->element;
-        $elementHasInformations = ElementInformation::query()
+        $now = now();
+        
+        $data = ElementInformation::query()
             ->where('element_id', $element->id)
-            ->get();
-
-        foreach ($elementHasInformations as $elementHasInformation) {
-            ElementHasPositionInformation::query()->create([
+            ->get()
+            ->map(fn($info) => [
                 'element_has_position_id' => $elementHasPosition->id,
-                'gene_id' => $elementHasInformation->gene_id,
-                'min' => $elementHasInformation->min_value,
-                'max' => $elementHasInformation->value,
-                'value' => $elementHasInformation->value
-            ]);
+                'gene_id' => $info->gene_id,
+                'min' => $info->min_value,
+                'max' => $info->value,
+                'value' => $info->value,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->toArray();
+
+        if (!empty($data)) {
+            ElementHasPositionInformation::insert($data);
         }
     }
 
     private function initializeScore(ElementHasPosition $elementHasPosition): void
     {
         $element = $elementHasPosition->element;
-        $elementHasScores = ElementHasScore::query()
+        $now = now();
+        
+        $data = ElementHasScore::query()
             ->where('element_id', $element->id)
-            ->get();
-
-        foreach ($elementHasScores as $elementHasScore) {
-            ElementHasPositionScore::query()->create([
+            ->get()
+            ->map(fn($score) => [
                 'element_has_position_id' => $elementHasPosition->id,
-                'score_id' => $elementHasScore->score_id,
-                'amount' => $elementHasScore->amount,
-            ]);
+                'score_id' => $score->score_id,
+                'amount' => $score->amount,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->toArray();
+
+        if (!empty($data)) {
+            ElementHasPositionScore::insert($data);
         }
     }
 
@@ -83,9 +93,10 @@ class ElementHasPositionObserver
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
         $templateToClonedNeuronId = [];
+        $now = now();
 
         if ($templateBrain !== null) {
-            $templateBrain->load('neurons.outgoingLinks');
+            $templateBrain->load('neurons.conditionOrders', 'neurons.outgoingLinks');
 
             $clonedBrain = ElementHasPositionBrain::query()->create([
                 'element_has_position_id' => $elementHasPosition->id,
@@ -94,7 +105,7 @@ class ElementHasPositionObserver
                 'grid_height' => (int) ($templateBrain->grid_height ?? 5),
             ]);
 
-            $templateToClonedNeuronId = [];
+            $conditionOrderData = [];
             foreach ($templateBrain->neurons as $templateNeuron) {
                 $clonedNeuron = ElementHasPositionNeuron::query()->create([
                     'element_has_position_brain_id' => $clonedBrain->id,
@@ -113,32 +124,43 @@ class ElementHasPositionObserver
 
                 $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;
 
-                // Copy condition orders
                 foreach ($templateNeuron->conditionOrders as $templateOrder) {
-                    \App\Models\ElementHasPositionNeuronConditionOrder::create([
+                    $conditionOrderData[] = [
                         'element_has_position_neuron_id' => $clonedNeuron->id,
                         'condition' => $templateOrder->condition,
                         'sort_order' => $templateOrder->sort_order,
                         'color' => $templateOrder->color,
-                    ]);
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
                 }
             }
 
+            if (!empty($conditionOrderData)) {
+                \App\Models\ElementHasPositionNeuronConditionOrder::insert($conditionOrderData);
+            }
+
+            $linkData = [];
             foreach ($templateBrain->neurons as $templateNeuron) {
                 foreach ($templateNeuron->outgoingLinks as $templateLink) {
                     $fromClonedId = $templateToClonedNeuronId[(int) $templateLink->from_neuron_id] ?? null;
                     $toClonedId = $templateToClonedNeuronId[(int) $templateLink->to_neuron_id] ?? null;
-                    if ($fromClonedId === null || $toClonedId === null) {
-                        continue;
+                    
+                    if ($fromClonedId !== null && $toClonedId !== null) {
+                        $linkData[] = [
+                            'from_element_has_position_neuron_id' => $fromClonedId,
+                            'to_element_has_position_neuron_id' => $toClonedId,
+                            'condition' => $templateLink->condition,
+                            'element_has_position_rule_chimical_element_detail_id' => $detailMap[$templateLink->rule_chimical_element_detail_id] ?? null,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
                     }
-
-                    ElementHasPositionNeuronLink::query()->firstOrCreate([
-                        'from_element_has_position_neuron_id' => $fromClonedId,
-                        'to_element_has_position_neuron_id' => $toClonedId,
-                        'condition' => $templateLink->condition,
-                        'element_has_position_rule_chimical_element_detail_id' => $detailMap[$templateLink->rule_chimical_element_detail_id] ?? null,
-                    ]);
                 }
+            }
+            
+            if (!empty($linkData)) {
+                ElementHasPositionNeuronLink::insert($linkData);
             }
         }
         return $templateToClonedNeuronId;
@@ -148,15 +170,15 @@ class ElementHasPositionObserver
     {
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
+        $now = now();
 
         if ($templateBrain !== null) {
             $templateBrain->load('circuits.details');
 
             foreach ($templateBrain->circuits as $templateCircuit) {
-                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED)
+                if ($templateCircuit->state !== NeuronCircuit::STATE_CLOSED || !$templateCircuit->active) {
                     continue;
-                if (!$templateCircuit->active)
-                    continue;
+                }
 
                 $clonedCircuit = ElementHasPositionNeuronCircuit::query()->create([
                     'element_has_position_id' => $elementHasPosition->id,
@@ -164,14 +186,21 @@ class ElementHasPositionObserver
                     'start_element_has_position_neuron_id' => $neuronMap[(int) $templateCircuit->start_neuron_id] ?? null,
                 ]);
 
+                $detailData = [];
                 foreach ($templateCircuit->details as $templateDetail) {
                     $clonedNeuronId = $neuronMap[(int) $templateDetail->neuron_id] ?? null;
                     if ($clonedNeuronId) {
-                        ElementHasPositionNeuronCircuitDetail::query()->create([
+                        $detailData[] = [
                             'element_has_position_neuron_circuit_id' => $clonedCircuit->id,
                             'element_has_position_neuron_id' => $clonedNeuronId,
-                        ]);
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
                     }
+                }
+                
+                if (!empty($detailData)) {
+                    ElementHasPositionNeuronCircuitDetail::insert($detailData);
                 }
             }
         }
@@ -182,6 +211,7 @@ class ElementHasPositionObserver
         $element = $elementHasPosition->element;
         $ruleChimicalElements = $element->ruleChimicalElements()->with('details.effects')->get();
         $detailMap = [];
+        $now = now();
 
         foreach ($ruleChimicalElements as $templateRule) {
             $clonedRule = ElementHasPositionRuleChimicalElement::query()->create([
@@ -195,12 +225,16 @@ class ElementHasPositionObserver
                 'quantity_tick_degradation' => $templateRule->quantity_tick_degradation ?? 0,
                 'percentage_degradation' => $templateRule->percentage_degradation ?? 0,
                 'degradable' => $templateRule->degradable ?? false,
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
 
             ElementHasPositionChimicalElement::query()->create([
                 'element_has_position_id' => $elementHasPosition->id,
                 'element_has_position_rule_chimical_element_id' => $clonedRule->id,
                 'value' => $templateRule->default_value ?? 0,
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
 
             foreach ($templateRule->details as $templateDetail) {
@@ -209,18 +243,27 @@ class ElementHasPositionObserver
                     'min' => $templateDetail->min,
                     'max' => $templateDetail->max,
                     'color' => $templateDetail->color,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]);
 
                 $detailMap[$templateDetail->id] = $clonedDetail->id;
 
+                $effectData = [];
                 foreach ($templateDetail->effects as $templateEffect) {
-                    ElementHasPositionRuleChimicalElementDetailEffect::query()->create([
+                    $effectData[] = [
                         'element_has_position_rule_chimical_element_detail_id' => $clonedDetail->id,
                         'type' => $templateEffect->type,
                         'gene_id' => $templateEffect->gene_id,
                         'value' => $templateEffect->value,
                         'duration' => $templateEffect->duration ?? 0,
-                    ]);
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                
+                if (!empty($effectData)) {
+                    ElementHasPositionRuleChimicalElementDetailEffect::insert($effectData);
                 }
             }
         }
@@ -266,59 +309,50 @@ class ElementHasPositionObserver
         $posId = $elementHasPosition->id;
 
         // Delete brain schedules
-        foreach (\App\Models\BrainSchedule::where('element_has_position_id', $posId)->get() as $schedule) {
-            $schedule->delete();
-        }
+        \App\Models\BrainSchedule::where('element_has_position_id', $posId)->delete();
 
         // Delete circuit details and circuits
-        foreach (ElementHasPositionNeuronCircuit::where('element_has_position_id', $posId)->get() as $circuit) {
-            foreach (ElementHasPositionNeuronCircuitDetail::where('element_has_position_neuron_circuit_id', $circuit->id)->get() as $detail) {
-                $detail->delete();
-            }
-            $circuit->delete();
-        }
+        ElementHasPositionNeuronCircuitDetail::whereHas('circuit', function ($query) use ($posId) {
+            $query->where('element_has_position_id', $posId);
+        })->delete();
+
+        ElementHasPositionNeuronCircuit::where('element_has_position_id', $posId)->delete();
 
         // Delete neuron links, condition orders, and neurons (via brain)
         $brain = ElementHasPositionBrain::where('element_has_position_id', $posId)->first();
         if ($brain) {
-            foreach (ElementHasPositionNeuron::where('element_has_position_brain_id', $brain->id)->get() as $neuron) {
-                foreach (ElementHasPositionNeuronLink::where('from_element_has_position_neuron_id', $neuron->id)->get() as $link) {
-                    $link->delete();
-                }
-                foreach (ElementHasPositionNeuronLink::where('to_element_has_position_neuron_id', $neuron->id)->get() as $link) {
-                    $link->delete();
-                }
-                foreach (\App\Models\ElementHasPositionNeuronConditionOrder::where('element_has_position_neuron_id', $neuron->id)->get() as $order) {
-                    $order->delete();
-                }
-                $neuron->delete();
-            }
+            ElementHasPositionNeuronLink::whereHas('fromNeuron', function ($q) use ($brain) {
+                $q->where('element_has_position_brain_id', $brain->id);
+            })->orWhereHas('toNeuron', function ($q) use ($brain) {
+                $q->where('element_has_position_brain_id', $brain->id);
+            })->delete();
+
+            \App\Models\ElementHasPositionNeuronConditionOrder::whereHas('neuron', function ($q) use ($brain) {
+                $q->where('element_has_position_brain_id', $brain->id);
+            })->delete();
+
+            ElementHasPositionNeuron::where('element_has_position_brain_id', $brain->id)->delete();
             $brain->delete();
         }
 
         // Delete chemical rules, details, effects, and chimical elements
-        foreach (ElementHasPositionRuleChimicalElement::where('element_has_position_id', $posId)->get() as $rule) {
-            foreach (ElementHasPositionRuleChimicalElementDetail::where('element_has_position_rule_chimical_element_id', $rule->id)->get() as $detail) {
-                foreach (ElementHasPositionRuleChimicalElementDetailEffect::where('element_has_position_rule_chimical_element_detail_id', $detail->id)->get() as $effect) {
-                    $effect->delete();
-                }
-                $detail->delete();
-            }
-            $rule->delete();
-        }
+        ElementHasPositionRuleChimicalElementDetailEffect::whereHas('detail', function ($q) use ($posId) {
+            $q->whereHas('rule', function ($q2) use ($posId) {
+                $q2->where('element_has_position_id', $posId);
+            });
+        })->delete();
 
-        foreach (ElementHasPositionChimicalElement::where('element_has_position_id', $posId)->get() as $chimical) {
-            $chimical->delete();
-        }
+        ElementHasPositionRuleChimicalElementDetail::whereHas('rule', function ($q) use ($posId) {
+            $q->where('element_has_position_id', $posId);
+        })->delete();
+
+        ElementHasPositionRuleChimicalElement::where('element_has_position_id', $posId)->delete();
+
+        ElementHasPositionChimicalElement::where('element_has_position_id', $posId)->delete();
 
         // Delete informations and scores
-        foreach (\App\Models\ElementHasPositionInformation::where('element_has_position_id', $posId)->get() as $info) {
-            $info->delete();
-        }
-
-        foreach (ElementHasPositionScore::where('element_has_position_id', $posId)->get() as $score) {
-            $score->delete();
-        }
+        \App\Models\ElementHasPositionInformation::where('element_has_position_id', $posId)->delete();
+        ElementHasPositionScore::where('element_has_position_id', $posId)->delete();
     }
 
     private function cleanupContainer(ElementHasPosition $elementHasPosition): void
