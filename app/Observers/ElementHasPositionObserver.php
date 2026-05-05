@@ -110,6 +110,16 @@ class ElementHasPositionObserver
                 ]);
 
                 $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;
+
+                // Copy condition orders
+                foreach ($templateNeuron->conditionOrders as $templateOrder) {
+                    \App\Models\ElementHasPositionNeuronConditionOrder::create([
+                        'element_has_position_neuron_id' => $clonedNeuron->id,
+                        'condition' => $templateOrder->condition,
+                        'sort_order' => $templateOrder->sort_order,
+                        'color' => $templateOrder->color,
+                    ]);
+                }
             }
 
             foreach ($templateBrain->neurons as $templateNeuron) {

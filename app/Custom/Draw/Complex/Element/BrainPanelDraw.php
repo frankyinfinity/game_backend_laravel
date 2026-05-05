@@ -7,6 +7,7 @@ use App\Custom\Draw\Primitive\Line;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Primitive\Circle;
 use App\Models\ElementHasPositionBrain;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\ElementHasPositionNeuronLink;
@@ -159,7 +160,8 @@ class BrainPanelDraw
 
         foreach ($neurons as $neuron) {
             /** @var ElementHasPositionNeuron $neuron */
-            foreach ($neuron->outgoingLinks as $linkIndex => $link) {
+            $sortedLinks = $neuron->outgoingLinks->sortBy('sort_order');
+            foreach ($sortedLinks as $linkIndex => $link) {
                 /** @var ElementHasPositionNeuronLink $link */
                 $toNeuron = $link->toNeuron;
                 if (!$toNeuron) {
@@ -170,8 +172,8 @@ class BrainPanelDraw
                     continue;
                 }
 
-                $start = $this->cellCenter((int) $neuron->grid_j, (int) $neuron->grid_i);
-                $end = $this->cellCenter((int) $toNeuron->grid_j, (int) $toNeuron->grid_i);
+                $start = $this->getRightAnchorPoint($neuron, $this->cellSize, (string)$link->condition);
+                $end = $this->getLeftAnchorPoint($toNeuron, $this->cellSize);
                 if ($start === null || $end === null) {
                     continue;
                 }
@@ -185,6 +187,63 @@ class BrainPanelDraw
                 $line->addAttributes('z_index', 20008);
                 $this->drawItems[] = $line;
             }
+        }
+    }
+
+    private function getRightAnchorPoint(ElementHasPositionNeuron $neuron, int $cellSize, string $condition): array
+    {
+        $origin = $this->cellOrigin((int) $neuron->grid_j, (int) $neuron->grid_i);
+        if (!$origin) return ['x' => 0, 'y' => 0];
+        
+        $baseX = $origin['x'] + $cellSize;
+        $topLeftY = $origin['y'];
+
+        $conditions = $this->getOutputConditions($neuron);
+        $orders = $neuron->conditionOrders->pluck('sort_order', 'condition')->toArray();
+        
+        $sortedConditions = $conditions;
+        usort($sortedConditions, function($a, $b) use ($orders) {
+            $orderA = $orders[$a] ?? 999;
+            $orderB = $orders[$b] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
+        $index = array_search($condition, $sortedConditions);
+        $count = count($sortedConditions);
+        
+        if ($count > 0 && $index !== false) {
+            $step = $cellSize / ($count + 1);
+            return ['x' => $baseX, 'y' => (int) ($topLeftY + ($step * ($index + 1)))];
+        }
+
+        return ['x' => $baseX, 'y' => (int) ($topLeftY + ($cellSize / 2))];
+    }
+
+    private function getLeftAnchorPoint(ElementHasPositionNeuron $neuron, int $cellSize): array
+    {
+        $origin = $this->cellOrigin((int) $neuron->grid_j, (int) $neuron->grid_i);
+        if (!$origin) return ['x' => 0, 'y' => 0];
+        
+        return [
+            'x' => $origin['x'],
+            'y' => (int) ($origin['y'] + ($cellSize / 2))
+        ];
+    }
+
+    private function getOutputConditions(ElementHasPositionNeuron $neuron): array
+    {
+        if ((string) $neuron->type === \App\Models\Neuron::TYPE_DETECTION) {
+            return [\App\Models\NeuronLink::PORT_DETECTION_SUCCESS, \App\Models\NeuronLink::PORT_DETECTION_FAILURE];
+        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            $rule = $neuron->chemicalRule;
+            if ($rule && $rule->details) {
+                $conditions = $rule->details->map(fn($d) => "[{$d->min}/{$d->max}]")->toArray();
+                $conditions[] = \App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT;
+                return $conditions;
+            }
+            return [\App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT];
+        } else {
+            return [\App\Models\NeuronLink::PORT_TRIGGER];
         }
     }
 
@@ -224,6 +283,34 @@ class BrainPanelDraw
             $node->addAttributes('grid_j', (int) $neuron->grid_j);
             $node->addAttributes('tooltip_text', $this->buildNeuronTooltip($neuron));
             $this->drawItems[] = $node;
+
+            // Draw output anchors as small colored dots based on sort_order
+            $conditions = $this->getOutputConditions($neuron);
+            $links = $neuron->outgoingLinks->keyBy('condition');
+            
+            $conditionsWithOrder = [];
+            foreach ($conditions as $idx => $c) {
+                $link = $links->get($c);
+                $conditionsWithOrder[] = [
+                    'name' => $c,
+                    'order' => $link ? ($link->sort_order ?? ($idx + 1000)) : ($idx + 1000)
+                ];
+            }
+            
+            usort($conditionsWithOrder, fn($a, $b) => $a['order'] <=> $b['order']);
+            
+            foreach ($conditionsWithOrder as $idx => $c) {
+                $anchor = $this->getRightAnchorPoint($neuron, $this->cellSize, $c['name']);
+                $color = $this->getLinkColorByCondition($neuron, $c['name']);
+                
+                $dot = new Circle($this->uid . '_anchor_' . $neuron->id . '_' . md5($c['name']));
+                $dot->setOrigin($anchor['x'], $anchor['y']);
+                $dot->setRadius(3);
+                $dot->setColor($color);
+                $dot->setRenderable($this->renderable);
+                $dot->addAttributes('z_index', 20011);
+                $this->drawItems[] = $dot;
+            }
 
             $icon = new Text($this->uid . '_node_icon_' . $index);
             $icon->setOrigin($position['x'] + (int) floor($this->cellSize / 2), $position['y'] + (int) floor($this->cellSize / 2) - 1);
@@ -330,5 +417,28 @@ class BrainPanelDraw
         }
 
         return implode("\n", $lines);
+    }
+
+    private function getLinkColorByCondition(ElementHasPositionNeuron $neuron, string $condition): string
+    {
+        if ((string)$neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+            $rule = $neuron->chemicalRule;
+            if ($rule && $rule->details) {
+                foreach ($rule->details as $detail) {
+                    if ("[{$detail->min}/{$detail->max}]" === $condition) {
+                        return $detail->color ?? '#6b7280';
+                    }
+                }
+            }
+            if ($condition === \App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
+                return '#6b7280';
+            }
+        }
+        
+        if ($condition === \App\Models\NeuronLink::PORT_DETECTION_FAILURE) {
+            return '#F97316';
+        }
+        
+        return '#16A34A'; // Default green
     }
 }

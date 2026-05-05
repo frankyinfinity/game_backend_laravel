@@ -607,6 +607,13 @@ class ElementController extends Controller
                         'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                         'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
                         'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
+                        'condition_orders' => $neuron->conditionOrders->map(function ($co) {
+                            return [
+                                'condition' => $co->condition,
+                                'sort_order' => (int) $co->sort_order,
+                                'color' => $co->color,
+                            ];
+                        })->values()->all(),
                     ],
                     'circuits' => $this->getCircuitsArray($brain),
                 ]);
@@ -645,6 +652,12 @@ class ElementController extends Controller
                 'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                 'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
                 'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
+                'condition_orders' => $neuron->conditionOrders->map(function ($co) {
+                    return [
+                        'condition' => $co->condition,
+                        'sort_order' => (int) $co->sort_order,
+                    ];
+                })->values()->all(),
             ],
             'circuits' => $this->getCircuitsArray($brain),
         ]);
@@ -748,18 +761,16 @@ class ElementController extends Controller
             [
                 'from_neuron_id' => $fromNeuron->id,
                 'to_neuron_id' => $toNeuron->id,
+                'condition' => $condition,
             ],
             [
-                'condition' => $condition,
-                'color' => $color,
                 'rule_chimical_element_detail_id' => $ruleDetailId,
             ]
         );
 
-        if ($link->condition !== $condition || $link->color !== $color || $link->rule_chimical_element_detail_id !== $ruleDetailId) {
+        if ($link->condition !== $condition || $link->rule_chimical_element_detail_id !== $ruleDetailId) {
             $link->update([
                 'condition' => $condition,
-                'color' => $color,
                 'rule_chimical_element_detail_id' => $ruleDetailId,
             ]);
         }
@@ -773,9 +784,35 @@ class ElementController extends Controller
                 'from_neuron_id' => (int) $link->from_neuron_id,
                 'to_neuron_id' => (int) $link->to_neuron_id,
                 'condition' => $link->condition,
-                'color' => $link->color,
-            ],
-            'circuits' => $this->getCircuitsArray($element->brain),
+                'rule_chimical_element_detail_id' => $link->rule_chimical_element_detail_id ? (int) $link->rule_chimical_element_detail_id : null,
+            ]
+        ]);
+    }
+
+    public function saveNeuronConditionOrders(Request $request, Element $element, Neuron $neuron)
+    {
+        $orders = $request->input('orders', []);
+        
+        foreach ($orders as $orderData) {
+            $condition = $orderData['condition'];
+            $sortOrder = (int) $orderData['sort_order'];
+            
+            \App\Models\NeuronConditionOrder::updateOrCreate(
+                [
+                    'neuron_id' => $neuron->id,
+                    'condition' => $condition,
+                ],
+                [
+                    'sort_order' => $sortOrder,
+                ]
+            );
+        }
+        
+        $neuron->load('conditionOrders');
+        
+        return response()->json([
+            'success' => true,
+            'orders' => $neuron->conditionOrders
         ]);
     }
 
@@ -912,6 +949,7 @@ class ElementController extends Controller
         $existingNeurons = $brain->neurons()->get()->keyBy('id');
         $processedIds = [];
         $savedNeuronsByGrid = [];
+        $clientIdToGridKey = [];
 
         foreach ($decoded as $item) {
             $type = (string) ($item['type'] ?? '');
@@ -974,8 +1012,22 @@ class ElementController extends Controller
             $processedIds[] = $neuron->id;
             $gridKey = $gridI . '_' . $gridJ;
             $savedNeuronsByGrid[$gridKey] = $neuron;
-            if ($clientId > 0) {
-                $clientIdToGridKey[$clientId] = $gridKey;
+            $clientIdToGridKey[$clientId] = $gridKey;
+            
+            // Sync condition orders if provided in JSON
+            if (isset($item['condition_orders']) && is_array($item['condition_orders'])) {
+                foreach ($item['condition_orders'] as $orderData) {
+                    \App\Models\NeuronConditionOrder::updateOrCreate(
+                        [
+                            'neuron_id' => $neuron->id,
+                            'condition' => $orderData['condition'],
+                        ],
+                        [
+                            'sort_order' => (int) $orderData['sort_order'],
+                            'color' => $orderData['color'] ?? null,
+                        ]
+                    );
+                }
             }
         }
 

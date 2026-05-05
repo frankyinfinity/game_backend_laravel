@@ -27,6 +27,8 @@ use App\Models\ElementHasPositionChimicalElement;
 use App\Observers\ElementHasPositionChimicalElementObserver;
 use App\Models\ElementModifier;
 use App\Observers\ElementModifierObserver;
+use App\Models\Neuron;
+use App\Observers\NeuronObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -55,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
         PlayerModifier::observe(PlayerModifierObserver::class);
         ElementHasPositionChimicalElement::observe(ElementHasPositionChimicalElementObserver::class);
         ElementModifier::observe(ElementModifierObserver::class);
+        Neuron::observe(NeuronObserver::class);
 
     }
 }

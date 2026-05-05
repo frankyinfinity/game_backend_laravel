@@ -15,6 +15,13 @@
                 'gene_life_id' => $n->gene_life_id !== null ? (int) $n->gene_life_id : null,
                 'gene_attack_id' => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
                 'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
+                'condition_orders' => $n->conditionOrders->map(function ($co) {
+                    return [
+                        'condition' => $co->condition,
+                        'sort_order' => (int) $co->sort_order,
+                        'color' => $co->color,
+                    ];
+                })->values()->all(),
             ];
         })->values()->all()
         : [];
@@ -561,39 +568,79 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('neuron-links-container');
         container.innerHTML = '';
 
-        const outputConditions = getOutputConditions(neuron);
+        // Use neuron.condition_orders as the primary source
+        let conditionsData = neuron.condition_orders || [];
+        
+        if (conditionsData.length === 0) {
+            // Fallback for new neurons if observer hasn't run yet or for some reason it's empty
+            const neuronConditions = getOutputConditions(neuron);
+            conditionsData = neuronConditions.map((c, i) => ({
+                condition: c,
+                sort_order: i,
+                color: getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, c)
+            }));
+            neuron.condition_orders = conditionsData;
+        }
 
-        for (let i = 0; i < outputConditions.length; i++) {
-            const condition = outputConditions[i];
-            const link = neuronLinks.find(l => l.from_neuron_id === neuronId && l.condition === condition);
+        // Sort by sort_order
+        const sortedData = [...conditionsData].sort((a, b) => a.sort_order - b.sort_order);
+
+        for (let i = 0; i < sortedData.length; i++) {
+            const condObj = sortedData[i];
+            const condition = condObj.condition;
+            const color = condObj.color || '#16A34A';
+            const link = neuronLinks.find(l => Number(l.from_neuron_id) === Number(neuronId) && l.condition === condition);
 
             const div = document.createElement('div');
-            div.className = 'form-group mb-3';
+            div.className = 'form-group mb-3 border-bottom pb-2';
 
             const labelContainer = document.createElement('div');
             labelContainer.className = 'd-flex align-items-center mb-1';
             
-            const color = getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, condition);
             const dot = document.createElement('span');
             dot.style.display = 'inline-block';
-            dot.style.width = '10px';
-            dot.style.height = '10px';
+            dot.style.width = '12px';
+            dot.style.height = '12px';
             dot.style.borderRadius = '50%';
             dot.style.backgroundColor = color;
-            dot.style.marginRight = '8px';
+            dot.style.marginRight = '10px';
             labelContainer.appendChild(dot);
 
             const label = document.createElement('label');
-            label.className = 'mb-0';
+            label.className = 'mb-0 mr-auto';
             label.style.fontWeight = 'bold';
             label.textContent = condition === portTrigger ? 'Trigger' : (condition === portDetectionSuccess ? 'Success' : (condition === portDetectionFailure ? 'Failure' : condition));
             labelContainer.appendChild(label);
+
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'btn-group ml-2';
+
+            const btnUp = document.createElement('button');
+            btnUp.className = 'btn btn-xs btn-outline-secondary btn-move-up';
+            btnUp.innerHTML = '<i class="fas fa-arrow-up"></i>';
+            btnUp.title = 'Sposta Su';
+            btnUp.onclick = (e) => { e.preventDefault(); moveCondition(neuronId, i, -1); };
+            if (i === 0) btnUp.disabled = true;
+
+            const btnDown = document.createElement('button');
+            btnDown.className = 'btn btn-xs btn-outline-secondary btn-move-down';
+            btnDown.innerHTML = '<i class="fas fa-arrow-down"></i>';
+            btnDown.title = 'Sposta Giù';
+            btnDown.onclick = (e) => { e.preventDefault(); moveCondition(neuronId, i, 1); };
+            if (i === conditionsData.length - 1) btnDown.disabled = true;
+
+            btnGroup.appendChild(btnUp);
+            btnGroup.appendChild(btnDown);
+            labelContainer.appendChild(btnGroup);
             
             div.appendChild(labelContainer);
 
             const select = document.createElement('select');
             select.className = 'form-control link-target';
             select.setAttribute('data-condition', condition);
+            select.onchange = () => {
+                // Sorting enabled for all ports now
+            };
 
             const defaultOption = document.createElement('option');
             defaultOption.value = '';
@@ -610,6 +657,135 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (link && link.to_neuron_id == n.id) {
                     option.selected = true;
                 }
+                select.appendChild(option);
+            }
+
+            div.appendChild(select);
+            container.appendChild(div);
+        }
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.id = 'btn_save_links';
+        saveBtn.className = 'btn btn-primary mt-3';
+        saveBtn.textContent = 'Salva Collegamenti';
+        saveBtn.onclick = function() { saveLinks(neuronId); };
+        container.appendChild(saveBtn);
+    }
+
+    function moveCondition(neuronId, index, direction) {
+        const neuron = findNeuronById(neuronId);
+        if (!neuron) return;
+
+        const container = document.getElementById('neuron-links-container');
+        const selects = Array.from(container.querySelectorAll('.link-target'));
+        const currentData = selects.map((s, i) => {
+            const cond = s.dataset.condition;
+            const target = s.value;
+            const oldOrder = neuron.condition_orders ? neuron.condition_orders.find(o => o.condition === cond) : null;
+            return {
+                name: cond,
+                targetId: target,
+                sort_order: i,
+                color: oldOrder ? oldOrder.color : null
+            };
+        });
+
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= currentData.length) return;
+
+        const temp = currentData[index];
+        currentData[index] = currentData[targetIndex];
+        currentData[targetIndex] = temp;
+
+        // Re-assign sort_order
+        currentData.forEach((d, i) => {
+            d.sort_order = i;
+        });
+
+        // Update global neuron.condition_orders
+        neuron.condition_orders = currentData.map(d => ({
+            condition: d.name,
+            sort_order: d.sort_order,
+            color: d.color
+        }));
+
+        populateLinksTabWithData(neuronId, currentData);
+        renderGrid();
+    }
+
+    function populateLinksTabWithData(neuronId, currentData) {
+        const neuron = findNeuronById(neuronId);
+        const container = document.getElementById('neuron-links-container');
+        container.innerHTML = '';
+
+        for (let i = 0; i < currentData.length; i++) {
+            const condObj = currentData[i];
+            const condition = condObj.name;
+            const link = neuronLinks.find(l => Number(l.from_neuron_id) === Number(neuronId) && l.condition === condition);
+
+            const div = document.createElement('div');
+            div.className = 'form-group mb-3 border-bottom pb-2';
+
+            const labelContainer = document.createElement('div');
+            labelContainer.className = 'd-flex align-items-center mb-1';
+            
+            const color = condObj.color || getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, condition);
+            const dot = document.createElement('span');
+            dot.style.display = 'inline-block';
+            dot.style.width = '12px';
+            dot.style.height = '12px';
+            dot.style.borderRadius = '50%';
+            dot.style.backgroundColor = color;
+            dot.style.marginRight = '10px';
+            labelContainer.appendChild(dot);
+
+            const label = document.createElement('label');
+            label.className = 'mb-0 mr-auto';
+            label.style.fontWeight = 'bold';
+            label.textContent = condition === portTrigger ? 'Trigger' : (condition === portDetectionSuccess ? 'Success' : (condition === portDetectionFailure ? 'Failure' : condition));
+            labelContainer.appendChild(label);
+
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'btn-group ml-2';
+
+            const btnUp = document.createElement('button');
+            btnUp.className = 'btn btn-xs btn-outline-secondary btn-move-up';
+            btnUp.innerHTML = '<i class="fas fa-arrow-up"></i>';
+            btnUp.onclick = (e) => { e.preventDefault(); moveCondition(neuronId, i, -1); };
+            if (i === 0) btnUp.disabled = true;
+
+            const btnDown = document.createElement('button');
+            btnDown.className = 'btn btn-xs btn-outline-secondary btn-move-down';
+            btnDown.innerHTML = '<i class="fas fa-arrow-down"></i>';
+            btnDown.onclick = (e) => { e.preventDefault(); moveCondition(neuronId, i, 1); };
+            if (i === currentData.length - 1) btnDown.disabled = true;
+
+            btnGroup.appendChild(btnUp);
+            btnGroup.appendChild(btnDown);
+            labelContainer.appendChild(btnGroup);
+            
+            div.appendChild(labelContainer);
+
+            const select = document.createElement('select');
+            select.className = 'form-control link-target';
+            select.setAttribute('data-condition', condition);
+            select.onchange = () => {
+                // Sorting enabled for all ports
+            };
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '-- Nessun collegamento --';
+            select.appendChild(defaultOption);
+
+            for (let j = 0; j < neuronItems.length; j++) {
+                const n = neuronItems[j];
+                if (n.id === neuronId) continue;
+                const option = document.createElement('option');
+                option.value = n.id;
+                option.textContent = `#${n.id} (${n.grid_i},${n.grid_j}) - ${typeLabels[n.type] || n.type}`;
+                if (condObj.targetId == n.id) option.selected = true;
                 select.appendChild(option);
             }
 
@@ -643,20 +819,28 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function saveLinks(neuronId) {
-        const selects = document.querySelectorAll('.link-target');
+        const container = document.getElementById('neuron-links-container');
+        const selects = Array.from(container.querySelectorAll('.link-target'));
         const saveBtn = document.getElementById('btn_save_links');
         
-        // Find source neuron to determine default color for new links
         const sourceNeuron = neuronItems.find(n => Number(n.id) === Number(neuronId));
         if (!sourceNeuron) return;
 
         if (saveBtn) saveBtn.disabled = true;
 
         try {
-            for (const select of selects) {
+            const conditionOrders = [];
+
+            for (let i = 0; i < selects.length; i++) {
+                const select = selects[i];
                 const condition = select.dataset.condition;
                 const targetId = select.value ? Number(select.value) : null;
                 const existingLink = neuronLinks.find(l => Number(l.from_neuron_id) === Number(neuronId) && l.condition === condition);
+                
+                conditionOrders.push({
+                    condition: condition,
+                    sort_order: i
+                });
 
                 if (targetId) {
                     if (existingLink) {
@@ -668,17 +852,14 @@ document.addEventListener('DOMContentLoaded', function () {
                             });
                             neuronLinks = neuronLinks.filter(l => l !== existingLink);
 
-                            // Save new link
-                            const linkColor = existingLink.color;
+                            // Create new link
                             const savedLink = await requestSaveNeuronLink({
                                 from_neuron_id: Number(neuronId),
                                 to_neuron_id: targetId,
                                 condition: condition,
-                                color: linkColor
+                                color: existingLink.color
                             });
-                            if (savedLink) {
-                                neuronLinks.push(savedLink);
-                            }
+                            if (savedLink) neuronLinks.push(savedLink);
                         }
                     } else {
                         // Create new link
@@ -702,13 +883,10 @@ document.addEventListener('DOMContentLoaded', function () {
                             condition: condition,
                             color: linkColor
                         });
-                        if (savedLink) {
-                            neuronLinks.push(savedLink);
-                        }
+                        if (savedLink) neuronLinks.push(savedLink);
                     }
                 } else {
                     if (existingLink) {
-                        // Delete removed link
                         await requestDeleteNeuronLink({
                             from_neuron_id: Number(neuronId),
                             to_neuron_id: Number(existingLink.to_neuron_id)
@@ -717,6 +895,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             }
+
+            // Save the full order
+            await requestSaveNeuronConditionOrders(neuronId, conditionOrders);
 
             updateNeuronLinksHiddenInput();
             renderGrid();
@@ -730,6 +911,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    async function requestSaveNeuronConditionOrders(neuronId, orders) {
+        const response = await fetch(`/elements/${@json($element->id)}/brain/neurons/${neuronId}/condition-orders`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ orders: orders })
+        });
+        if (!response.ok) throw new Error('Errore salvataggio ordine porte');
+        const data = await response.json();
+        // Update local neuron state
+        const neuron = findNeuronById(neuronId);
+        if (neuron && data.orders) {
+            neuron.condition_orders = data.orders.map(o => ({
+                condition: o.condition,
+                sort_order: o.sort_order,
+                color: o.color
+            }));
+        }
+        return data;
+    }
+
 
     function getRightAnchorPoint(neuron, cellSize, condition) {
         if (!neuron) return { x: 0, y: 0 };
@@ -737,28 +941,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const topLeftY = (Number(neuron.grid_i) * cellSize);
         const baseX = topLeftX + cellSize;
 
-        if (neuron.type === typeDetection) {
-            const topY = topLeftY + (cellSize * 0.3);
-            const bottomY = topLeftY + (cellSize * 0.7);
-            const useBottom = condition === portDetectionFailure;
-            return { x: baseX, y: useBottom ? bottomY : topY };
-        }
+        let orders = neuron.condition_orders || [];
 
-        if (neuron.type === typeReadChimicalElement) {
-            if (condition === DEFAULT_CHIMICAL_ELEMENT) {
-                return { x: baseX, y: topLeftY + cellSize };
-            }
-            const ruleId = neuron.element_has_rule_chimical_element_id;
-            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-            if (rule && rule.details && rule.details.length > 0) {
-                const details = rule.details;
-                const count = details.length;
-                const index = details.findIndex(d => `[${d.min}/${d.max}]` === condition);
-                if (index !== -1) {
-                    const step = cellSize / (count + 1);
-                    return { x: baseX + 2, y: topLeftY + (step * (index + 1)) };
-                }
-            }
+        const sortedOrders = [...orders].sort((a, b) => a.sort_order - b.sort_order);
+        const index = sortedOrders.findIndex(o => o.condition === condition);
+        const count = sortedOrders.length;
+        
+        if (count > 0 && index !== -1) {
+            const step = cellSize / (count + 1);
+            return { x: baseX, y: topLeftY + (step * (index + 1)) };
         }
 
         return { x: baseX, y: topLeftY + (cellSize / 2) };
@@ -841,25 +1032,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const fromPoint = getRightAnchorPoint(fromN, cellSize, linkCondition);
             const toPoint = getLeftAnchorPoint(toN, cellSize);
 
-            let lineColor = portColors[portTrigger];
-            if (link.color) {
-                lineColor = link.color.startsWith('#') ? parseInt(link.color.replace('#', '0x'), 16) : Number(link.color);
-            } else if (linkCondition === portDetectionFailure) {
-                lineColor = portColors[portDetectionFailure];
-            } else if (fromN.type === typeReadChimicalElement) {
-                const ruleId = fromN.element_has_rule_chimical_element_id;
-                const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-                if (rule && rule.details) {
-                    const detail = rule.details.find(d => `[${d.min}/${d.max}]` === linkCondition);
-                    if (detail && detail.color) {
-                        lineColor = parseInt(detail.color.replace('#', '0x'), 16);
-                    }
-                }
-                // If condition is 'default_chimical_element', use gray
-                if (linkCondition === 'default_chimical_element') {
-                    lineColor = 0x6b7280; // Gray
-                }
+            // Get color from fromN.condition_orders
+            const orderObj = fromN.condition_orders ? fromN.condition_orders.find(o => o.condition === linkCondition) : null;
+            const linkColorStr = (orderObj && orderObj.color) ? orderObj.color : getConditionColor(fromN.type, fromN.element_has_rule_chimical_element_id, linkCondition);
+            let lineColor = linkColorStr.startsWith('#') ? parseInt(linkColorStr.replace('#', '0x'), 16) : Number(linkColorStr);
+            
+            // If condition is 'default_chimical_element', use gray
+            if (linkCondition === 'default_chimical_element') {
+                lineColor = 0x6b7280; // Gray
             }
+
             const line = new PIXI.Graphics();
             line.lineStyle(3, lineColor, 1);
             line.moveTo(fromPoint.x, fromPoint.y);
@@ -909,6 +1091,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function drawNeuronSymbols(layer, cellSize) {
         for (const neuron of neuronItems) {
+            const topLeftX = (Number(neuron.grid_j) * cellSize);
+            const topLeftY = (Number(neuron.grid_i) * cellSize);
+
+            // Draw output anchors as colored dots
+            let orders = neuron.condition_orders || [];
+            
+            const sortedOrders = [...orders].sort((a, b) => a.sort_order - b.sort_order);
+
+            for (const orderObj of sortedOrders) {
+                const cond = orderObj.condition;
+                const anchor = getRightAnchorPoint(neuron, cellSize, cond);
+                
+                // Get color from orderObj
+                const color = (orderObj && orderObj.color) ? orderObj.color : getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, cond);
+                
+                const dot = new PIXI.Graphics();
+                dot.beginFill(parseInt(color.replace('#', '0x'), 16));
+                dot.lineStyle(1, 0xffffff, 1);
+                dot.drawCircle(0, 0, 4);
+                dot.endFill();
+                dot.x = anchor.x;
+                dot.y = anchor.y;
+                layer.addChild(dot);
+            }
+
             const i = Number(neuron.grid_i);
             const j = Number(neuron.grid_j);
 

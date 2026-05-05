@@ -80,6 +80,11 @@ class Neuron extends Model
         return $this->hasMany(NeuronLink::class, 'from_neuron_id');
     }
 
+    public function conditionOrders()
+    {
+        return $this->hasMany(NeuronConditionOrder::class, 'neuron_id');
+    }
+
     public function incomingLinks()
     {
         return $this->hasMany(NeuronLink::class, 'to_neuron_id');
@@ -88,6 +93,46 @@ class Neuron extends Model
     public function chemicalRule()
     {
         return $this->belongsTo(RuleChimicalElement::class, 'element_has_rule_chimical_element_id');
+    }
+
+    public function getOutputConditions(): array
+    {
+        if ((string) $this->type === self::TYPE_DETECTION) {
+            return [NeuronLink::PORT_DETECTION_SUCCESS, NeuronLink::PORT_DETECTION_FAILURE];
+        } elseif ((string) $this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
+            $rule = $this->chemicalRule;
+            if ($rule && $rule->details) {
+                $conditions = $rule->details->map(fn($d) => "[{$d->min}/{$d->max}]")->toArray();
+                $conditions[] = NeuronLink::DEFAULT_CHIMICAL_ELEMENT;
+                return $conditions;
+            }
+            return [NeuronLink::DEFAULT_CHIMICAL_ELEMENT];
+        } else {
+            return [NeuronLink::PORT_TRIGGER];
+        }
+    }
+
+    public function getConditionColor(string $condition): string
+    {
+        if ((string)$this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
+            $rule = $this->chemicalRule;
+            if ($rule && $rule->details) {
+                foreach ($rule->details as $detail) {
+                    if ("[{$detail->min}/{$detail->max}]" === $condition) {
+                        return $detail->color ?? '#6b7280';
+                    }
+                }
+            }
+            if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
+                return '#6b7280';
+            }
+        }
+        
+        if ($condition === NeuronLink::PORT_DETECTION_FAILURE) {
+            return '#F97316'; // Orange
+        }
+        
+        return '#16A34A'; // Green
     }
 }
 
