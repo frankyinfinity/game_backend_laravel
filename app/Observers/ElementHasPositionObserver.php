@@ -287,9 +287,9 @@ class ElementHasPositionObserver
     }
 
     /**
-     * Handle the ElementHasPosition "deleted" event.
+     * Handle the ElementHasPosition "deleting" event.
      */
-    public function deleted(ElementHasPosition $elementHasPosition): void
+    public function deleting(ElementHasPosition $elementHasPosition): void
     {
         $this->cleanupRelatedData($elementHasPosition);
         $this->cleanupContainer($elementHasPosition);
@@ -308,49 +308,41 @@ class ElementHasPositionObserver
     {
         $posId = $elementHasPosition->id;
 
-        // Delete brain schedules
-        \App\Models\BrainSchedule::where('element_has_position_id', $posId)->delete();
+        // 1. Collect all relevant IDs first
+        $brainIds = ElementHasPositionBrain::where('element_has_position_id', $posId)->pluck('id');
+        $neuronIds = ElementHasPositionNeuron::whereIn('element_has_position_brain_id', $brainIds)->pluck('id');
+        $circuitIds = ElementHasPositionNeuronCircuit::where('element_has_position_id', $posId)->pluck('id');
+        $ruleIds = ElementHasPositionRuleChimicalElement::where('element_has_position_id', $posId)->pluck('id');
+        $detailIds = ElementHasPositionRuleChimicalElementDetail::whereIn('element_has_position_rule_chimical_element_id', $ruleIds)->pluck('id');
 
-        // Delete circuit details and circuits
-        ElementHasPositionNeuronCircuitDetail::whereHas('circuit', function ($query) use ($posId) {
-            $query->where('element_has_position_id', $posId);
-        })->delete();
+        // 2. Delete starting from the most dependent records (leaves)
 
-        ElementHasPositionNeuronCircuit::where('element_has_position_id', $posId)->delete();
-
-        // Delete neuron links, condition orders, and neurons (via brain)
-        $brain = ElementHasPositionBrain::where('element_has_position_id', $posId)->first();
-        if ($brain) {
-            ElementHasPositionNeuronLink::whereHas('fromNeuron', function ($q) use ($brain) {
-                $q->where('element_has_position_brain_id', $brain->id);
-            })->orWhereHas('toNeuron', function ($q) use ($brain) {
-                $q->where('element_has_position_brain_id', $brain->id);
-            })->delete();
-
-            \App\Models\ElementHasPositionNeuronConditionOrder::whereHas('neuron', function ($q) use ($brain) {
-                $q->where('element_has_position_brain_id', $brain->id);
-            })->delete();
-
-            ElementHasPositionNeuron::where('element_has_position_brain_id', $brain->id)->delete();
-            $brain->delete();
-        }
-
-        // Delete chemical rules, details, effects, and chimical elements
-        ElementHasPositionRuleChimicalElementDetailEffect::whereHas('detail', function ($q) use ($posId) {
-            $q->whereHas('rule', function ($q2) use ($posId) {
-                $q2->where('element_has_position_id', $posId);
-            });
-        })->delete();
-
-        ElementHasPositionRuleChimicalElementDetail::whereHas('rule', function ($q) use ($posId) {
-            $q->where('element_has_position_id', $posId);
-        })->delete();
-
-        ElementHasPositionRuleChimicalElement::where('element_has_position_id', $posId)->delete();
-
+        // Chemical Rules dependencies
+        ElementHasPositionRuleChimicalElementDetailEffect::whereIn('element_has_position_rule_chimical_element_detail_id', $detailIds)->delete();
+        ElementHasPositionRuleChimicalElementDetail::whereIn('id', $detailIds)->delete();
+        ElementHasPositionRuleChimicalElement::whereIn('id', $ruleIds)->delete();
         ElementHasPositionChimicalElement::where('element_has_position_id', $posId)->delete();
 
-        // Delete informations and scores
+        // Neuron dependencies
+        if ($neuronIds->isNotEmpty()) {
+            ElementHasPositionNeuronLink::where(function ($q) use ($neuronIds) {
+                $q->whereIn('from_element_has_position_neuron_id', $neuronIds)
+                    ->orWhereIn('to_element_has_position_neuron_id', $neuronIds);
+            })->delete();
+
+            \App\Models\ElementHasPositionNeuronConditionOrder::whereIn('element_has_position_neuron_id', $neuronIds)->delete();
+        }
+
+        // Circuit dependencies
+        ElementHasPositionNeuronCircuitDetail::whereIn('element_has_position_neuron_circuit_id', $circuitIds)->delete();
+        ElementHasPositionNeuronCircuit::whereIn('id', $circuitIds)->delete();
+
+        // Primary Brain components
+        ElementHasPositionNeuron::whereIn('id', $neuronIds)->delete();
+        ElementHasPositionBrain::whereIn('id', $brainIds)->delete();
+
+        // Other related data
+        \App\Models\BrainSchedule::where('element_has_position_id', $posId)->delete();
         \App\Models\ElementHasPositionInformation::where('element_has_position_id', $posId)->delete();
         ElementHasPositionScore::where('element_has_position_id', $posId)->delete();
     }
