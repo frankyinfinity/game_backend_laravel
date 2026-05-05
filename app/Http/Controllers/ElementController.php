@@ -1151,7 +1151,7 @@ class ElementController extends Controller
                     'uid' => Str::uuid()->toString(),
                     'state' => NeuronCircuit::STATE_CLOSED,
                     'start_neuron_id' => null,
-                    'color' => NeuronCircuit::PALETTE[0],
+                    'color' => NeuronCircuit::generateRandomColor(),
                 ]);
             }
 
@@ -1194,7 +1194,7 @@ class ElementController extends Controller
                 [
                     'uid' => Str::uuid()->toString(),
                     'state' => NeuronCircuit::STATE_CREATED,
-                    'color' => NeuronCircuit::PALETTE[$index % count(NeuronCircuit::PALETTE)],
+                    'color' => NeuronCircuit::generateRandomColor(),
                 ]
             );
 

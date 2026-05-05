@@ -337,7 +337,6 @@ document.addEventListener('DOMContentLoaded', function () {
         neuronCircuits = [];
     }
 
-    const circuitColors = [0x3b82f6, 0x8b5cf6, 0xec4899, 0x10b981, 0xf59e0b, 0xef4444, 0x06b6d4, 0x84cc16];
 
     function normalize(value) {
         const parsed = parseInt(value, 10);
@@ -355,7 +354,7 @@ document.addEventListener('DOMContentLoaded', function () {
         circuitsTableBody.innerHTML = '';
 
         neuronCircuits.forEach((circuit, index) => {
-            const cColorHex = circuit.color || '#' + (circuitColors[index % circuitColors.length].toString(16).padStart(6, '0'));
+            const cColorHex = circuit.color || '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
             
             const tr = document.createElement('tr');
             tr.dataset.circuitId = circuit.id;
