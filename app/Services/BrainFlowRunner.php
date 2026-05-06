@@ -99,7 +99,7 @@ class BrainFlowRunner
 
                 $outgoingById[$neuron->id] = $neuron->outgoingLinks
                     ->filter(fn($link) => $neuronIds->contains($link->to_element_has_position_neuron_id))
-                    ->sortBy('id')->values();
+                    ->sortBy(fn($link) => $link->conditionOrder ? $link->conditionOrder->sort_order : 0)->values();
 
                 $incomingCount[$neuron->id] = (int) $incomingById[$neuron->id]->count();
             }
@@ -489,8 +489,6 @@ class BrainFlowRunner
                     if (!is_array($element)) {
                         continue;
                     }
-                    Log::info('ReadChemical: checking element', ['element' => $element]);
-
                     $elementType = $element['type'] ?? '';
                     $elementId = null;
 
@@ -500,9 +498,58 @@ class BrainFlowRunner
                         $elementId = (int) ($element['complex_chimical_element_id'] ?? 0);
                     }
 
-                    if ($elementId > 0 && $elementId === $expectedId) {
+                    if ($elementId > 0 && $elementId === $expectedId && $elementType === $expectedType) {
                         $foundElement = $element;
                         break;
+                    }
+                }
+
+                // If not found in container, try reading from tile
+                if ($foundElement === null) {
+                    Log::info('ReadChemical: not found in container, checking tile');
+                    $mapContainer = $this->resolveMapContainerForElementPosition($elementHasPosition);
+                    if ($mapContainer !== null && !empty($mapContainer->ws_port)) {
+                        $mapSocket = $this->openMapWebSocket($host, (int) $mapContainer->ws_port);
+                        if ($mapSocket) {
+                            try {
+                                $this->readWebSocketFrame($mapSocket);
+                                $tileReply = $this->queryTileInfo($mapSocket, (int) $elementHasPosition->tile_i, (int) $elementHasPosition->tile_j, Neuron::TARGET_TYPE_CHEMICAL_ELEMENT);
+
+                                $detailData = (isset($tileReply['detail']) && isset($tileReply['detail']['birth_region_detail_data']))
+                                    ? $tileReply['detail']['birth_region_detail_data']
+                                    : [];
+
+                                foreach ($detailData as $item) {
+                                    $qty = (int) ($item['quantity'] ?? 0);
+                                    if ($qty <= 0) {
+                                        continue;
+                                    }
+
+                                    $ceJson = $item['json_chimical_element'] ?? null;
+                                    $cceJson = $item['json_complex_chimical_element'] ?? null;
+
+                                    if ($expectedType === 'chimical_element' && $ceJson) {
+                                        $ce = is_string($ceJson) ? json_decode($ceJson, true) : $ceJson;
+                                        if (isset($ce['id']) && (int) $ce['id'] === $expectedId) {
+                                            $foundElement = ['value' => $qty];
+                                            Log::info('ReadChemical: found on tile', ['value' => $qty]);
+                                            break;
+                                        }
+                                    } elseif ($expectedType === 'complex_chimical_element' && $cceJson) {
+                                        $cce = is_string($cceJson) ? json_decode($cceJson, true) : $cceJson;
+                                        if (isset($cce['id']) && (int) $cce['id'] === $expectedId) {
+                                            $foundElement = ['value' => $qty];
+                                            Log::info('ReadChemical: found on tile (complex)', ['value' => $qty]);
+                                            break;
+                                        }
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                Log::error('ReadChemical: error reading from tile', ['error' => $e->getMessage()]);
+                            } finally {
+                                fclose($mapSocket);
+                            }
+                        }
                     }
                 }
 
@@ -550,12 +597,20 @@ class BrainFlowRunner
         $targetElementId = isset($neuron['target_element_id']) && $neuron['target_element_id'] !== null
             ? (int) $neuron['target_element_id']
             : null;
+        $chemicalElementId = isset($neuron['chemical_element_id']) && $neuron['chemical_element_id'] !== null
+            ? (int) $neuron['chemical_element_id']
+            : null;
+        $complexChemicalElementId = isset($neuron['complex_chemical_element_id']) && $neuron['complex_chemical_element_id'] !== null
+            ? (int) $neuron['complex_chemical_element_id']
+            : null;
 
-        $neuron['detection_result'] = $this->findDetectionTargetAroundElementHasPosition(
+        $neuron['detection_result'] = $this->findTargetAroundPosition(
             $elementHasPosition,
             $range,
             $targetType,
-            $targetElementId
+            $targetElementId,
+            $chemicalElementId,
+            $complexChemicalElementId
         );
     }
 
@@ -845,7 +900,7 @@ class BrainFlowRunner
 
         // Remove brackets and whitespace
         $cleaned = trim($condition, "[] \t\n\r\0\x0B");
-        
+
         // Try both comma and forward slash as separator
         if (str_contains($cleaned, ',')) {
             $parts = explode(',', $cleaned);
@@ -894,7 +949,7 @@ class BrainFlowRunner
         foreach ($outgoingLinks as $link) {
             $port = $link->conditionOrder;
             $condition = $port ? $port->condition : ($link->condition ?? null);
-            
+
             Log::info('ProcessOutgoing: checking link', ['link_id' => $link->id, 'condition' => $condition]);
 
             if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
@@ -931,10 +986,11 @@ class BrainFlowRunner
         $hasActive = false;
         if (!empty($rangeLinks)) {
             $hasActive = true;
+            Log::info('ProcessOutgoing: range links prioritized', ['count' => count($rangeLinks)]);
             foreach ($rangeLinks as $link) {
                 $toId = (int) $link->to_element_has_position_neuron_id;
-                Log::info('ProcessOutgoing: adding range link to queue', ['toId' => $toId]);
                 if ($toId > 0 && !isset($seen[$toId])) {
+                    Log::info('ProcessOutgoing: queuing range link', ['toId' => $toId]);
                     $queue[] = [
                         'id' => $toId,
                         'from' => [
@@ -943,34 +999,37 @@ class BrainFlowRunner
                             'condition' => $link->conditionOrder ? $link->conditionOrder->condition : ($link->condition ?? null),
                         ],
                     ];
+                    // Note: We don't mark as seen here because it will be marked when processed in the loop
                 }
             }
         } elseif ($defaultLink !== null) {
             $hasActive = true;
             $toId = (int) $defaultLink->to_element_has_position_neuron_id;
-            Log::info('ProcessOutgoing: adding default link to queue', ['toId' => $toId]);
+            Log::info('ProcessOutgoing: no range match, using default link', ['toId' => $toId]);
             if ($toId > 0 && !isset($seen[$toId])) {
                 $queue[] = [
                     'id' => $toId,
                     'from' => [
                         'id' => $currentId,
                         'type' => $neuronData['type'] ?? null,
-                        'condition' => $defaultLink->conditionOrder ? $defaultLink->conditionOrder->condition : ($defaultLink->condition ?? null),
+                        'condition' => NeuronLink::DEFAULT_CHIMICAL_ELEMENT,
                     ],
                 ];
             }
         } else {
-            Log::info('ProcessOutgoing: no matching links found');
+            Log::info('ProcessOutgoing: no active range links and no default link found');
         }
 
         return $hasActive;
     }
 
-    private function findDetectionTargetAroundElementHasPosition(
+    private function findTargetAroundPosition(
         ElementHasPosition $elementHasPosition,
         int $range,
         string $targetType,
-        ?int $targetElementId
+        ?int $targetElementId,
+        ?int $chemicalElementId = null,
+        ?int $complexChemicalElementId = null
     ): ?string {
         $mapContainer = $this->resolveMapContainerForElementPosition($elementHasPosition);
         if ($mapContainer === null || empty($mapContainer->ws_port)) {
@@ -995,8 +1054,25 @@ class BrainFlowRunner
                 $this->readWebSocketFrame($socket);
 
                 foreach ($coordinates as [$tileI, $tileJ]) {
-                    $reply = $this->queryTileInfo($socket, $tileI, $tileJ);
-                    if (!$this->isTileMatchingTarget($reply, $targetType, $targetElementId, $elementHasPosition)) {
+                    $tileReply = $this->queryTileInfo($socket, $tileI, $tileJ, Neuron::TARGET_TYPE_ENTITY); // Uses 'get_tile_info'
+
+                    $reply = $tileReply;
+                    if ($targetType === Neuron::TARGET_TYPE_CHEMICAL_ELEMENT || $targetType === Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT) {
+                        $chemReply = $this->queryTileInfo($socket, $tileI, $tileJ, $targetType); // Uses 'get_birth_region_details'
+                        Log::info('Detection ws reply for tile (' . $tileI . ',' . $tileJ . ') type=' . $targetType . ': ' . json_encode($chemReply));
+                        $reply['detail'] = $chemReply['detail'] ?? null;
+                    }
+
+                    if (
+                        !$this->isTileMatchingTarget(
+                            $reply,
+                            $targetType,
+                            $targetElementId,
+                            $elementHasPosition,
+                            $chemicalElementId,
+                            $complexChemicalElementId
+                        )
+                    ) {
                         continue;
                     }
 
@@ -1031,6 +1107,8 @@ class BrainFlowRunner
         });
 
         $best = $matches[0];
+        Log::info('best match');
+        Log::info('(' . $best['i'] . ',' . $best['j'] . ')');
         return '(' . $best['i'] . ',' . $best['j'] . ')';
     }
 
@@ -1079,8 +1157,14 @@ class BrainFlowRunner
         array $reply,
         string $targetType,
         ?int $targetElementId,
-        ElementHasPosition $selfElementHasPosition
+        ElementHasPosition $selfElementHasPosition,
+        ?int $chemicalElementId = null,
+        ?int $complexChemicalElementId = null
     ): bool {
+
+        Log::info('reply json_encode:');
+        Log::info(json_encode($reply));
+
         $isSuccess = (bool) ($reply['success'] ?? false);
         if (!$isSuccess) {
             return false;
@@ -1090,9 +1174,13 @@ class BrainFlowRunner
         if (!is_array($tile)) {
             return false;
         }
+
         if (($tile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
             return false;
         }
+
+        Log::info('targetType:');
+        Log::info($targetType);
 
         if ($targetType === Neuron::TARGET_TYPE_ENTITY) {
             return !empty($tile['entity']);
@@ -1118,6 +1206,60 @@ class BrainFlowRunner
             return true;
         }
 
+        $detailData = (isset($reply['detail']) && isset($reply['detail']['birth_region_detail_data']))
+            ? $reply['detail']['birth_region_detail_data']
+            : [];
+
+        if ($targetType === Neuron::TARGET_TYPE_CHEMICAL_ELEMENT) {
+            Log::info('chimicalElementId:');
+            Log::info($chemicalElementId);
+            if ($chemicalElementId === null || $chemicalElementId <= 0) {
+                return false;
+            }
+            Log::info('Detection ChemicalElement - target_id: ' . $chemicalElementId . ', detail_data: ' . json_encode($detailData));
+            foreach ($detailData as $item) {
+                $qty = (int) ($item['quantity'] ?? 0);
+                if ($qty <= 0)
+                    continue;
+
+                $ceJson = $item['json_chimical_element'] ?? null;
+                if ($ceJson) {
+                    $ce = is_string($ceJson) ? json_decode($ceJson, true) : $ceJson;
+                    Log::info('Detection ChemicalElement - checking ce_id: ' . ($ce['id'] ?? 'null') . ' vs expected: ' . $chemicalElementId);
+                    if (isset($ce['id']) && (int) $ce['id'] === $chemicalElementId) {
+                        Log::info('Detection ChemicalElement - MATCH found for id: ' . $chemicalElementId);
+                        return true;
+                    }
+                }
+            }
+            Log::info('Detection ChemicalElement - no match found for id: ' . $chemicalElementId);
+            return false;
+        }
+
+        if ($targetType === Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT) {
+            if ($complexChemicalElementId === null || $complexChemicalElementId <= 0) {
+                return false;
+            }
+            Log::info('Detection ComplexChemicalElement - target_id: ' . $complexChemicalElementId . ', detail_data: ' . json_encode($detailData));
+            foreach ($detailData as $item) {
+                $qty = (int) ($item['quantity'] ?? 0);
+                if ($qty <= 0)
+                    continue;
+
+                $cceJson = $item['json_complex_chimical_element'] ?? null;
+                if ($cceJson) {
+                    $cce = is_string($cceJson) ? json_decode($cceJson, true) : $cceJson;
+                    Log::info('Detection ComplexChemicalElement - checking cce_id: ' . ($cce['id'] ?? 'null') . ' vs expected: ' . $complexChemicalElementId);
+                    if (isset($cce['id']) && (int) $cce['id'] === $complexChemicalElementId) {
+                        Log::info('Detection ComplexChemicalElement - MATCH found for id: ' . $complexChemicalElementId);
+                        return true;
+                    }
+                }
+            }
+            Log::info('Detection ComplexChemicalElement - no match found for id: ' . $complexChemicalElementId);
+            return false;
+        }
+
         return false;
     }
 
@@ -1140,10 +1282,15 @@ class BrainFlowRunner
         return $socket;
     }
 
-    private function queryTileInfo($socket, int $tileI, int $tileJ): array
+    private function queryTileInfo($socket, int $tileI, int $tileJ, string $targetType): array
     {
+        $command = 'get_tile_info';
+        if ($targetType === Neuron::TARGET_TYPE_CHEMICAL_ELEMENT || $targetType === Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT) {
+            $command = 'get_birth_region_details';
+        }
+
         $payload = [
-            'command' => 'get_tile_info',
+            'command' => $command,
             'params' => [
                 'tile_i' => $tileI,
                 'tile_j' => $tileJ,
