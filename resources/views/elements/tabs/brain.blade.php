@@ -19,9 +19,11 @@
                 'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
                 'condition_orders' => $n->conditionOrders->map(function ($co) {
                     return [
+                        'id' => $co->id,
                         'condition' => $co->condition,
                         'sort_order' => (int) $co->sort_order,
                         'color' => $co->color,
+                        'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
                     ];
                 })->values()->all(),
             ];
@@ -34,6 +36,7 @@
                     'id' => (int) $l->id,
                     'from_neuron_id' => (int) $l->from_neuron_id,
                     'to_neuron_id' => (int) $l->to_neuron_id,
+                    'neuron_condition_order_id' => (int) $l->neuron_condition_order_id,
                     'condition' => $l->condition,
                     'color' => $l->color,
                 ];
@@ -598,11 +601,12 @@ document.addEventListener('DOMContentLoaded', function () {
         
         if (conditionsData.length === 0) {
             // Fallback for new neurons if observer hasn't run yet or for some reason it's empty
-            const neuronConditions = getOutputConditions(neuron);
+            const neuronConditions = getOutputConditionsDetailed(neuron);
             conditionsData = neuronConditions.map((c, i) => ({
-                condition: c,
+                condition: c.condition,
                 sort_order: i,
-                color: getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, c)
+                color: getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, c.condition),
+                rule_chimical_element_detail_id: c.rule_detail_id
             }));
             neuron.condition_orders = conditionsData;
         }
@@ -663,6 +667,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const select = document.createElement('select');
             select.className = 'form-control link-target';
             select.setAttribute('data-condition', condition);
+            select.setAttribute('data-rule-detail-id', condObj.rule_chimical_element_detail_id || '');
             select.onchange = () => {
                 // Sorting enabled for all ports now
             };
@@ -707,12 +712,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const currentData = selects.map((s, i) => {
             const cond = s.dataset.condition;
             const target = s.value;
+            const detailId = s.dataset.ruleDetailId;
             const oldOrder = neuron.condition_orders ? neuron.condition_orders.find(o => o.condition === cond) : null;
             return {
                 name: cond,
                 targetId: target,
                 sort_order: i,
-                color: oldOrder ? oldOrder.color : null
+                color: oldOrder ? oldOrder.color : null,
+                rule_chimical_element_detail_id: detailId
             };
         });
 
@@ -732,7 +739,8 @@ document.addEventListener('DOMContentLoaded', function () {
         neuron.condition_orders = currentData.map(d => ({
             condition: d.name,
             sort_order: d.sort_order,
-            color: d.color
+            color: d.color,
+            rule_chimical_element_detail_id: d.rule_chimical_element_detail_id
         }));
 
         populateLinksTabWithData(neuronId, currentData);
@@ -795,6 +803,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const select = document.createElement('select');
             select.className = 'form-control link-target';
             select.setAttribute('data-condition', condition);
+            select.setAttribute('data-rule-detail-id', condObj.rule_chimical_element_detail_id || '');
             select.onchange = () => {
                 // Sorting enabled for all ports
             };
@@ -827,19 +836,22 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(saveBtn);
     }
 
-    function getOutputConditions(neuron) {
+    function getOutputConditionsDetailed(neuron) {
         if (neuron.type === typeDetection) {
-            return [portDetectionSuccess, portDetectionFailure];
+            return [
+                { condition: portDetectionSuccess, rule_detail_id: null },
+                { condition: portDetectionFailure, rule_detail_id: null }
+            ];
         } else if (neuron.type === typeReadChimicalElement) {
             const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(neuron.element_has_rule_chimical_element_id));
             if (rule && rule.details) {
-                const conditions = rule.details.map(d => `[${d.min}/${d.max}]`);
-                conditions.push(DEFAULT_CHIMICAL_ELEMENT);
+                const conditions = rule.details.map(d => ({ condition: `[${d.min}/${d.max}]`, rule_detail_id: d.id }));
+                conditions.push({ condition: DEFAULT_CHIMICAL_ELEMENT, rule_detail_id: null });
                 return conditions;
             }
-            return [DEFAULT_CHIMICAL_ELEMENT];
+            return [{ condition: DEFAULT_CHIMICAL_ELEMENT, rule_detail_id: null }];
         } else {
-            return [portTrigger];
+            return [{ condition: portTrigger, rule_detail_id: null }];
         }
     }
 
@@ -859,12 +871,14 @@ document.addEventListener('DOMContentLoaded', function () {
             for (let i = 0; i < selects.length; i++) {
                 const select = selects[i];
                 const condition = select.dataset.condition;
+                const ruleDetailId = select.dataset.ruleDetailId ? Number(select.dataset.ruleDetailId) : null;
                 const targetId = select.value ? Number(select.value) : null;
                 const existingLink = neuronLinks.find(l => Number(l.from_neuron_id) === Number(neuronId) && l.condition === condition);
                 
                 conditionOrders.push({
                     condition: condition,
-                    sort_order: i
+                    sort_order: i,
+                    rule_chimical_element_detail_id: ruleDetailId
                 });
 
                 if (targetId) {
@@ -952,9 +966,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const neuron = findNeuronById(neuronId);
         if (neuron && data.orders) {
             neuron.condition_orders = data.orders.map(o => ({
+                id: o.id,
                 condition: o.condition,
                 sort_order: o.sort_order,
-                color: o.color
+                color: o.color,
+                rule_chimical_element_detail_id: o.rule_chimical_element_detail_id
             }));
         }
         return data;
@@ -969,8 +985,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let orders = neuron.condition_orders || [];
         if (orders.length === 0) {
-            const conditions = getOutputConditions(neuron);
-            orders = conditions.map((c, i) => ({ condition: c, sort_order: i }));
+            const conditions = getOutputConditionsDetailed(neuron);
+            orders = conditions.map((c, i) => ({ condition: c.condition, sort_order: i }));
         }
 
         const sortedOrders = [...orders].sort((a, b) => a.sort_order - b.sort_order);
@@ -1140,8 +1156,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     await requestDeleteNeuronLink({
                         from_neuron_id: Number(link.from_neuron_id),
                         to_neuron_id: Number(link.to_neuron_id),
+                        condition: linkCondition
                     });
-                    neuronLinks = neuronLinks.filter((l) => !(Number(l.from_neuron_id) === Number(link.from_neuron_id) && Number(l.to_neuron_id) === Number(link.to_neuron_id)));
+                    neuronLinks = neuronLinks.filter((l) => !(Number(l.from_neuron_id) === Number(link.from_neuron_id) && Number(l.to_neuron_id) === Number(link.to_neuron_id) && l.condition === linkCondition));
                     updateNeuronLinksHiddenInput();
                     renderGrid();
                     renderCircuitsTable();
@@ -1166,7 +1183,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Circuit borders
             const belongsToCircuits = neuronCircuits.filter(c => c.neuron_ids && c.neuron_ids.includes(Number(neuron.id)));
             belongsToCircuits.forEach((circuit, index) => {
-                const cColor = circuit.color ? parseInt(circuit.color.replace('#', '0x'), 16) : circuitColors[neuronCircuits.indexOf(circuit) % circuitColors.length];
+                const cColor = circuit.color ? parseInt(circuit.color.replace('#', '0x'), 16) : 0xcccccc;
                 const offset = 3 + (index * 4);
                 const cBorder = new PIXI.Graphics();
                 cBorder.lineStyle(2, cColor, 0.8);
@@ -1320,11 +1337,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (hasRightAnchor) {
                 let orders = neuron.condition_orders || [];
                 if (orders.length === 0) {
-                    const conditions = getOutputConditions(neuron);
+                    const conditions = getOutputConditionsDetailed(neuron);
                     orders = conditions.map((c, idx) => ({
-                        condition: c,
+                        condition: c.condition,
                         sort_order: idx,
-                        color: getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, c)
+                        color: getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, c.condition),
+                        rule_chimical_element_detail_id: c.rule_detail_id
                     }));
                 }
 
@@ -1514,8 +1532,6 @@ document.addEventListener('DOMContentLoaded', function () {
         tooltipText.zIndex = 20000;
         app.stage.addChild(tooltipText);
         app.stage.sortChildren();
-
-        app.stage.sortChildren();
     }
 
     async function requestSaveNeuron(payload) {
@@ -1694,8 +1710,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Pointer move handler removed - cursor handled by neuron events
-    
     toggleDetectionFieldsByType();
     updateNeuronLinksHiddenInput();
     renderGrid();

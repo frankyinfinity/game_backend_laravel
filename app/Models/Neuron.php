@@ -130,19 +130,25 @@ class Neuron extends Model
     public function getOutputConditions(): array
     {
         if ((string) $this->type === self::TYPE_DETECTION) {
-            return [NeuronLink::PORT_DETECTION_SUCCESS, NeuronLink::PORT_DETECTION_FAILURE];
+            return [
+                ['condition' => NeuronLink::PORT_DETECTION_SUCCESS, 'rule_detail_id' => null],
+                ['condition' => NeuronLink::PORT_DETECTION_FAILURE, 'rule_detail_id' => null],
+            ];
         } elseif ((string) $this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $this->chemicalRule;
             if ($rule && $rule->details) {
-                $conditions = $rule->details->map(fn ($d) => "[{$d->min}/{$d->max}]")->toArray();
-                $conditions[] = NeuronLink::DEFAULT_CHIMICAL_ELEMENT;
+                $conditions = $rule->details->map(fn ($d) => [
+                    'condition' => "[{$d->min}/{$d->max}]",
+                    'rule_detail_id' => $d->id
+                ])->toArray();
+                $conditions[] = ['condition' => NeuronLink::DEFAULT_CHIMICAL_ELEMENT, 'rule_detail_id' => null];
 
                 return $conditions;
             }
 
-            return [NeuronLink::DEFAULT_CHIMICAL_ELEMENT];
+            return [['condition' => NeuronLink::DEFAULT_CHIMICAL_ELEMENT, 'rule_detail_id' => null]];
         } else {
-            return [NeuronLink::PORT_TRIGGER];
+            return [['condition' => NeuronLink::PORT_TRIGGER, 'rule_detail_id' => null]];
         }
     }
 

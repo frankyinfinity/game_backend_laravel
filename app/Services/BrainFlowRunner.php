@@ -76,7 +76,10 @@ class BrainFlowRunner
             $neuronIds = $circuit->details->pluck('element_has_position_neuron_id');
             $neurons = ElementHasPositionNeuron::query()
                 ->whereIn('id', $neuronIds)
-                ->with(['outgoingLinks', 'incomingLinks'])
+                ->with([
+                    'outgoingLinks.conditionOrder.ruleChimicalElementDetail',
+                    'incomingLinks.conditionOrder'
+                ])
                 ->get()
                 ->values();
 
@@ -166,7 +169,7 @@ class BrainFlowRunner
                                     'from' => [
                                         'id' => (int) $currentId,
                                         'type' => $neuronData['type'] ?? null,
-                                        'condition' => $link->condition ?? null,
+                                        'condition' => $link->conditionOrder ? $link->conditionOrder->condition : ($link->condition ?? null),
                                     ],
                                 ];
                             }
@@ -266,7 +269,7 @@ class BrainFlowRunner
                     $neuronFrom = [
                         'id' => (int) $fromNeuron->id,
                         'type' => $fromNeuron->type,
-                        'condition' => $link->condition ?? null,
+                        'condition' => $link->conditionOrder ? $link->conditionOrder->condition : ($link->condition ?? null),
                     ];
                     break;
                 }
@@ -274,7 +277,7 @@ class BrainFlowRunner
                 $neuronFrom = [
                     'id' => (int) $link->from_element_has_position_neuron_id,
                     'type' => null,
-                    'condition' => $link->condition ?? null,
+                    'condition' => $link->conditionOrder ? $link->conditionOrder->condition : ($link->condition ?? null),
                 ];
                 break;
             }
@@ -695,7 +698,9 @@ class BrainFlowRunner
         $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
 
         foreach ($outgoingLinks as $link) {
-            $condition = $link->condition ?? null;
+            $port = $link->conditionOrder;
+            $condition = $port ? $port->condition : ($link->condition ?? null);
+
             if ($condition === 'found' || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
                 $condition = NeuronLink::CONDITION_MAIN;
             } elseif ($condition === 'not_found' || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
@@ -703,10 +708,10 @@ class BrainFlowRunner
             }
 
             if ($type === Neuron::TYPE_DETECTION) {
-                if (($condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_DETECTION_SUCCESS) && $hasDetection) {
+                if ($condition === NeuronLink::CONDITION_MAIN && $hasDetection) {
                     return true;
                 }
-                if (($condition === NeuronLink::CONDITION_ELSE || $condition === NeuronLink::PORT_DETECTION_FAILURE) && !$hasDetection) {
+                if ($condition === NeuronLink::CONDITION_ELSE && !$hasDetection) {
                     return true;
                 }
                 if ($condition === null || $condition === '' || $condition === NeuronLink::PORT_TRIGGER) {
@@ -732,24 +737,33 @@ class BrainFlowRunner
         $hasDefaultLink = false;
 
         foreach ($outgoingLinks as $link) {
-            $condition = $link->condition ?? null;
+            $port = $link->conditionOrder;
+            $condition = $port ? $port->condition : ($link->condition ?? null);
 
             if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
                 $hasDefaultLink = true;
                 continue;
             }
 
-            $range = $this->parseConditionRange($condition);
-            if ($range === null) {
-                continue;
+            $min = null;
+            $max = null;
+
+            if ($port && $port->ruleChimicalElementDetail) {
+                $min = $port->ruleChimicalElementDetail->min;
+                $max = $port->ruleChimicalElementDetail->max;
+            } else {
+                $range = $this->parseConditionRange($condition);
+                if ($range !== null) {
+                    $min = $range['min'];
+                    $max = $range['max'];
+                }
             }
 
-            $min = $range['min'];
-            $max = $range['max'];
-
-            if ($value >= $min && $value <= $max) {
-                $hasRangeMatch = true;
-                break;
+            if ($min !== null && $max !== null) {
+                if ($value >= $min && $value <= $max) {
+                    $hasRangeMatch = true;
+                    break;
+                }
             }
         }
 
@@ -759,7 +773,8 @@ class BrainFlowRunner
     private function isLinkActiveFromNeuron(array $neuron, $link): bool
     {
         $type = $neuron['type'] ?? null;
-        $condition = $link->condition ?? null;
+        $port = $link->conditionOrder;
+        $condition = $port ? $port->condition : ($link->condition ?? null);
 
         if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             return $this->isChemicalElementLinkActive($neuron, $link);
@@ -775,10 +790,10 @@ class BrainFlowRunner
         }
 
         if ($type === Neuron::TYPE_DETECTION) {
-            if ($condition === NeuronLink::CONDITION_MAIN || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
+            if ($condition === NeuronLink::CONDITION_MAIN) {
                 return $hasDetection;
             }
-            if ($condition === NeuronLink::CONDITION_ELSE || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
+            if ($condition === NeuronLink::CONDITION_ELSE) {
                 return !$hasDetection;
             }
             return true;
@@ -794,21 +809,29 @@ class BrainFlowRunner
             return false;
         }
 
-        $condition = $link->condition ?? null;
+        $port = $link->conditionOrder;
+        if (!$port) {
+            return false;
+        }
+
+        $condition = $port->condition;
 
         if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
             return false;
         }
 
+        $ruleDetail = $port->ruleChimicalElementDetail;
+        if ($ruleDetail) {
+            return $value >= $ruleDetail->min && $value <= $ruleDetail->max;
+        }
+
+        // Fallback to string parsing if no structured rule detail is present
         $range = $this->parseConditionRange($condition);
         if ($range === null) {
             return false;
         }
 
-        $min = $range['min'];
-        $max = $range['max'];
-
-        return $value >= $min && $value <= $max;
+        return $value >= $range['min'] && $value <= $range['max'];
     }
 
     private function parseConditionRange(?string $condition): ?array
@@ -869,7 +892,9 @@ class BrainFlowRunner
         $defaultLink = null;
 
         foreach ($outgoingLinks as $link) {
-            $condition = $link->condition ?? null;
+            $port = $link->conditionOrder;
+            $condition = $port ? $port->condition : ($link->condition ?? null);
+            
             Log::info('ProcessOutgoing: checking link', ['link_id' => $link->id, 'condition' => $condition]);
 
             if ($condition === NeuronLink::DEFAULT_CHIMICAL_ELEMENT) {
@@ -878,19 +903,28 @@ class BrainFlowRunner
                 continue;
             }
 
-            $range = $this->parseConditionRange($condition);
-            if ($range === null) {
-                Log::info('ProcessOutgoing: range is null', ['condition' => $condition]);
-                continue;
+            $min = null;
+            $max = null;
+
+            if ($port && $port->ruleChimicalElementDetail) {
+                $min = $port->ruleChimicalElementDetail->min;
+                $max = $port->ruleChimicalElementDetail->max;
+            } else {
+                $range = $this->parseConditionRange($condition);
+                if ($range !== null) {
+                    $min = $range['min'];
+                    $max = $range['max'];
+                }
             }
 
-            $min = $range['min'];
-            $max = $range['max'];
-            Log::info('ProcessOutgoing: checking range', ['min' => $min, 'max' => $max, 'value' => $value]);
-
-            if ($value >= $min && $value <= $max) {
-                $rangeLinks[] = $link;
-                Log::info('ProcessOutgoing: range matches!');
+            if ($min !== null && $max !== null) {
+                Log::info('ProcessOutgoing: checking range', ['min' => $min, 'max' => $max, 'value' => $value]);
+                if ($value >= $min && $value <= $max) {
+                    $rangeLinks[] = $link;
+                    Log::info('ProcessOutgoing: range matches!');
+                }
+            } else {
+                Log::info('ProcessOutgoing: range could not be determined', ['condition' => $condition]);
             }
         }
 
@@ -906,7 +940,7 @@ class BrainFlowRunner
                         'from' => [
                             'id' => $currentId,
                             'type' => $neuronData['type'] ?? null,
-                            'condition' => $link->condition ?? null,
+                            'condition' => $link->conditionOrder ? $link->conditionOrder->condition : ($link->condition ?? null),
                         ],
                     ];
                 }
@@ -921,7 +955,7 @@ class BrainFlowRunner
                     'from' => [
                         'id' => $currentId,
                         'type' => $neuronData['type'] ?? null,
-                        'condition' => $defaultLink->condition ?? null,
+                        'condition' => $defaultLink->conditionOrder ? $defaultLink->conditionOrder->condition : ($defaultLink->condition ?? null),
                     ],
                 ];
             }

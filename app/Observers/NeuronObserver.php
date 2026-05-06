@@ -13,12 +13,16 @@ class NeuronObserver
     public function created(Neuron $neuron): void
     {
         $conditions = $neuron->getOutputConditions();
-        foreach ($conditions as $index => $condition) {
+        foreach ($conditions as $index => $condData) {
+            $conditionName = $condData['condition'];
+            $ruleDetailId = $condData['rule_detail_id'];
+
             NeuronConditionOrder::create([
                 'neuron_id' => $neuron->id,
-                'condition' => $condition,
+                'condition' => $conditionName,
                 'sort_order' => $index,
-                'color' => $neuron->getConditionColor($condition),
+                'color' => $neuron->getConditionColor($conditionName),
+                'rule_chimical_element_detail_id' => $ruleDetailId,
             ]);
         }
     }

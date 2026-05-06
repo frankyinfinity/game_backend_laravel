@@ -152,7 +152,7 @@ class BrainPanelDraw
 
     private function addConnections(array $circuitNeuronIds = []): void
     {
-        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'conditionOrders', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
+        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'outgoingLinks.conditionOrder', 'conditionOrders', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
 
         if (!empty($circuitNeuronIds)) {
             $neurons = $neurons->filter(fn($n) => in_array((int) $n->id, $circuitNeuronIds));
@@ -160,7 +160,7 @@ class BrainPanelDraw
 
         foreach ($neurons as $neuron) {
             /** @var ElementHasPositionNeuron $neuron */
-            $sortedLinks = $neuron->outgoingLinks->sortBy('sort_order');
+            $sortedLinks = $neuron->outgoingLinks->sortBy(fn($link) => $link->conditionOrder ? $link->conditionOrder->sort_order : 0);
             foreach ($sortedLinks as $linkIndex => $link) {
                 /** @var ElementHasPositionNeuronLink $link */
                 $toNeuron = $link->toNeuron;

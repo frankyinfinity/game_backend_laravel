@@ -40,8 +40,7 @@ class NeuronLink extends Model
     protected $fillable = [
         'from_neuron_id',
         'to_neuron_id',
-        'condition',
-        'rule_chimical_element_detail_id',
+        'neuron_condition_order_id',
     ];
 
     public function fromNeuron()
@@ -52,5 +51,20 @@ class NeuronLink extends Model
     public function toNeuron()
     {
         return $this->belongsTo(Neuron::class, 'to_neuron_id');
+    }
+
+    public function conditionOrder()
+    {
+        return $this->belongsTo(NeuronConditionOrder::class, 'neuron_condition_order_id');
+    }
+
+    public function getConditionAttribute()
+    {
+        return $this->conditionOrder ? $this->conditionOrder->condition : null;
+    }
+
+    public function getRuleChimicalElementDetailIdAttribute()
+    {
+        return $this->conditionOrder ? $this->conditionOrder->rule_chimical_element_detail_id : null;
     }
 }

@@ -149,8 +149,6 @@ class ElementController extends Controller
         ]);
     }
 
-    // ... index, listDataTable, create, store methods remain unchanged ...
-
     public function index()
     {
         return view('elements.index');
@@ -638,9 +636,11 @@ class ElementController extends Controller
                         'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
                         'condition_orders' => $neuron->conditionOrders->map(function ($co) {
                             return [
+                                'id' => $co->id,
                                 'condition' => $co->condition,
                                 'sort_order' => (int) $co->sort_order,
                                 'color' => $co->color,
+                                'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
                             ];
                         })->values()->all(),
                     ],
@@ -687,8 +687,11 @@ class ElementController extends Controller
                 'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
                 'condition_orders' => $neuron->conditionOrders->map(function ($co) {
                     return [
+                        'id' => $co->id,
                         'condition' => $co->condition,
                         'sort_order' => (int) $co->sort_order,
+                        'color' => $co->color,
+                        'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
                     ];
                 })->values()->all(),
             ],
@@ -790,23 +793,25 @@ class ElementController extends Controller
 
         $color = $request->input('color');
 
-        $link = NeuronLink::query()->firstOrCreate(
+        // Find or create the condition order for this link
+        $conditionOrder = \App\Models\NeuronConditionOrder::query()->updateOrCreate(
             [
-                'from_neuron_id' => $fromNeuron->id,
-                'to_neuron_id' => $toNeuron->id,
+                'neuron_id' => $fromNeuron->id,
                 'condition' => $condition,
             ],
             [
                 'rule_chimical_element_detail_id' => $ruleDetailId,
+                'color' => $color,
             ]
         );
 
-        if ($link->condition !== $condition || $link->rule_chimical_element_detail_id !== $ruleDetailId) {
-            $link->update([
-                'condition' => $condition,
-                'rule_chimical_element_detail_id' => $ruleDetailId,
-            ]);
-        }
+        $link = NeuronLink::query()->firstOrCreate(
+            [
+                'from_neuron_id' => $fromNeuron->id,
+                'to_neuron_id' => $toNeuron->id,
+                'neuron_condition_order_id' => $conditionOrder->id,
+            ]
+        );
 
         $this->updateBrainCircuit($element->brain);
 
@@ -816,8 +821,9 @@ class ElementController extends Controller
                 'id' => (int) $link->id,
                 'from_neuron_id' => (int) $link->from_neuron_id,
                 'to_neuron_id' => (int) $link->to_neuron_id,
-                'condition' => $link->condition,
-                'rule_chimical_element_detail_id' => $link->rule_chimical_element_detail_id ? (int) $link->rule_chimical_element_detail_id : null,
+                'neuron_condition_order_id' => (int) $link->neuron_condition_order_id,
+                'condition' => $condition,
+                'rule_chimical_element_detail_id' => $ruleDetailId,
             ],
         ]);
     }
@@ -829,6 +835,7 @@ class ElementController extends Controller
         foreach ($orders as $orderData) {
             $condition = $orderData['condition'];
             $sortOrder = (int) $orderData['sort_order'];
+            $ruleDetailId = $orderData['rule_chimical_element_detail_id'] ?? null;
 
             \App\Models\NeuronConditionOrder::updateOrCreate(
                 [
@@ -837,6 +844,7 @@ class ElementController extends Controller
                 ],
                 [
                     'sort_order' => $sortOrder,
+                    'rule_chimical_element_detail_id' => $ruleDetailId,
                 ]
             );
         }
@@ -916,7 +924,9 @@ class ElementController extends Controller
             ->where('from_neuron_id', $fromNeuronId)
             ->where('to_neuron_id', $toNeuronId)
             ->when($condition, function ($q) use ($condition) {
-                $q->where('condition', $condition);
+                $q->whereHas('conditionOrder', function ($sq) use ($condition) {
+                    $sq->where('condition', $condition);
+                });
             })
             ->whereHas('fromNeuron', function ($q) use ($element) {
                 $q->where('brain_id', $element->brain->id);
@@ -1076,6 +1086,7 @@ class ElementController extends Controller
                         [
                             'sort_order' => (int) $orderData['sort_order'],
                             'color' => $orderData['color'] ?? null,
+                            'rule_chimical_element_detail_id' => $orderData['rule_chimical_element_detail_id'] ?? null,
                         ]
                     );
                 }
@@ -1109,7 +1120,7 @@ class ElementController extends Controller
             return;
         }
 
-        $validPairs = [];
+        $validLinks = [];
         foreach ($decodedLinks as $link) {
             if (! is_array($link)) {
                 continue;
@@ -1165,12 +1176,21 @@ class ElementController extends Controller
                 $condition = NeuronLink::PORT_TRIGGER;
             }
 
-            $pairKey = ((int) $fromNeuron->id).'_'.((int) $toNeuron->id).'_'.($condition ?? 'null');
-            $validPairs[$pairKey] = [
+            // Find or create condition order
+            $conditionOrder = \App\Models\NeuronConditionOrder::query()->updateOrCreate(
+                [
+                    'neuron_id' => $fromNeuron->id,
+                    'condition' => $condition,
+                ],
+                [
+                    'rule_chimical_element_detail_id' => $ruleDetailId,
+                ]
+            );
+
+            $validLinks[] = [
                 'from_neuron_id' => (int) $fromNeuron->id,
                 'to_neuron_id' => (int) $toNeuron->id,
-                'condition' => $condition,
-                'rule_chimical_element_detail_id' => $ruleDetailId,
+                'neuron_condition_order_id' => $conditionOrder->id,
             ];
         }
 
@@ -1183,8 +1203,8 @@ class ElementController extends Controller
             })
             ->delete();
 
-        foreach ($validPairs as $pair) {
-            NeuronLink::query()->create($pair);
+        foreach ($validLinks as $linkData) {
+            NeuronLink::query()->create($linkData);
         }
 
         $this->updateBrainCircuit($brain);
@@ -1232,6 +1252,7 @@ class ElementController extends Controller
                 'id' => $l->id,
                 'from_neuron_id' => (int) $l->from_neuron_id,
                 'to_neuron_id' => (int) $l->to_neuron_id,
+                'neuron_condition_order_id' => (int) $l->neuron_condition_order_id,
                 'condition' => $l->condition,
                 'color' => $l->color,
             ];

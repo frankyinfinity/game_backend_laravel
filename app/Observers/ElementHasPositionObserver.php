@@ -93,6 +93,7 @@ class ElementHasPositionObserver
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
         $templateToClonedNeuronId = [];
+        $templateToClonedOrderId = [];
         $now = now();
 
         if ($templateBrain !== null) {
@@ -105,7 +106,6 @@ class ElementHasPositionObserver
                 'grid_height' => (int) ($templateBrain->grid_height ?? 5),
             ]);
 
-            $conditionOrderData = [];
             foreach ($templateBrain->neurons as $templateNeuron) {
                 $clonedNeuron = ElementHasPositionNeuron::query()->create([
                     'element_has_position_brain_id' => $clonedBrain->id,
@@ -125,19 +125,15 @@ class ElementHasPositionObserver
                 $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;
 
                 foreach ($templateNeuron->conditionOrders as $templateOrder) {
-                    $conditionOrderData[] = [
+                    $clonedOrder = \App\Models\ElementHasPositionNeuronConditionOrder::query()->create([
                         'element_has_position_neuron_id' => $clonedNeuron->id,
                         'condition' => $templateOrder->condition,
                         'sort_order' => $templateOrder->sort_order,
                         'color' => $templateOrder->color,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
+                        'element_has_position_rule_chimical_element_detail_id' => $detailMap[$templateOrder->rule_chimical_element_detail_id] ?? null,
+                    ]);
+                    $templateToClonedOrderId[(int) $templateOrder->id] = (int) $clonedOrder->id;
                 }
-            }
-
-            if (!empty($conditionOrderData)) {
-                \App\Models\ElementHasPositionNeuronConditionOrder::insert($conditionOrderData);
             }
 
             $linkData = [];
@@ -145,13 +141,13 @@ class ElementHasPositionObserver
                 foreach ($templateNeuron->outgoingLinks as $templateLink) {
                     $fromClonedId = $templateToClonedNeuronId[(int) $templateLink->from_neuron_id] ?? null;
                     $toClonedId = $templateToClonedNeuronId[(int) $templateLink->to_neuron_id] ?? null;
+                    $clonedOrderId = $templateToClonedOrderId[(int) $templateLink->neuron_condition_order_id] ?? null;
                     
                     if ($fromClonedId !== null && $toClonedId !== null) {
                         $linkData[] = [
                             'from_element_has_position_neuron_id' => $fromClonedId,
                             'to_element_has_position_neuron_id' => $toClonedId,
-                            'condition' => $templateLink->condition,
-                            'element_has_position_rule_chimical_element_detail_id' => $detailMap[$templateLink->rule_chimical_element_detail_id] ?? null,
+                            'element_has_position_neuron_condition_order_id' => $clonedOrderId,
                             'created_at' => $now,
                             'updated_at' => $now,
                         ];
