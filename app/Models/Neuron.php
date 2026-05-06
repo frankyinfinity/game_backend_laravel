@@ -85,6 +85,7 @@ class Neuron extends Model
         'element_has_rule_chimical_element_id' => 'integer',
         'chemical_element_id' => 'integer',
         'complex_chemical_element_id' => 'integer',
+        'stop_before_target' => 'boolean',
     ];
 
     public function brain()

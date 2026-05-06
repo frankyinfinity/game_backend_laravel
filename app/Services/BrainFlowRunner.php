@@ -642,7 +642,7 @@ class BrainFlowRunner
             'j' => (int) $elementHasPosition->tile_j,
         ];
 
-        $this->drawPathForPlayer((int) $elementHasPosition->player_id, $from, $to, $elementHasPosition);
+        $this->drawPathForPlayer((int) $elementHasPosition->player_id, $from, $to, $elementHasPosition, $neuron['stop_before_target'] ?? true);
     }
 
     private function handleAttackNeuron(array $neuron, ElementHasPosition $elementHasPosition): void

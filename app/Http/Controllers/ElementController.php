@@ -512,6 +512,7 @@ class ElementController extends Controller
             'grid_i' => 'required|integer|min:0',
             'grid_j' => 'required|integer|min:0',
             'radius' => 'nullable|integer|min:1',
+            'stop_before_target' => 'nullable|boolean',
             'target_type' => 'nullable|string',
             'target_element_id' => 'nullable|integer|min:1',
             'chemical_element_id' => 'nullable|integer|exists:chimical_elements,id',
@@ -543,6 +544,7 @@ class ElementController extends Controller
         }
 
         $radius = null;
+        $stopBeforeTarget = (bool) $request->input('stop_before_target', false);
         $targetType = null;
         $targetElementId = null;
         $chemicalElementId = null;
@@ -609,6 +611,7 @@ class ElementController extends Controller
                     'grid_j' => $gridJ,
                     'type' => $type,
                     'radius' => $radius,
+                    'stop_before_target' => $stopBeforeTarget,
                     'target_type' => $targetType,
                     'target_element_id' => $targetElementId,
                     'chemical_element_id' => $chemicalElementId,
@@ -627,6 +630,7 @@ class ElementController extends Controller
                         'grid_i' => (int) $neuron->grid_i,
                         'grid_j' => (int) $neuron->grid_j,
                         'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
+                        'stop_before_target' => (bool) $neuron->stop_before_target,
                         'target_type' => $neuron->target_type,
                         'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
                         'chemical_element_id' => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,
@@ -658,6 +662,7 @@ class ElementController extends Controller
             [
                 'type' => $type,
                 'radius' => $radius,
+                'stop_before_target' => $stopBeforeTarget,
                 'target_type' => $targetType,
                 'target_element_id' => $targetElementId,
                 'chemical_element_id' => $chemicalElementId,
@@ -678,6 +683,7 @@ class ElementController extends Controller
                 'grid_i' => (int) $neuron->grid_i,
                 'grid_j' => (int) $neuron->grid_j,
                 'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
+                'stop_before_target' => (bool) $neuron->stop_before_target,
                 'target_type' => $neuron->target_type,
                 'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
                 'chemical_element_id' => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,

@@ -369,6 +369,8 @@ class BrainPanelDraw
             $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');
         } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_MOVEMENT) {
             $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
+        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_PATH) {
+            $lines[] = 'Stop movimento prima del target: ' . ($neuron->stop_before_target ? 'SI' : 'NO');
         } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $neuron->chemicalRule;
             $lines[] = 'Elemento: ' . ($rule ? ($rule->title ?: $rule->name) : '-');

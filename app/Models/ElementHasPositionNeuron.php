@@ -20,6 +20,7 @@ class ElementHasPositionNeuron extends Model
         'chemical_element_id' => 'integer',
         'complex_chemical_element_id' => 'integer',
         'active' => 'boolean',
+        'stop_before_target' => 'boolean',
     ];
 
     public function brain()
