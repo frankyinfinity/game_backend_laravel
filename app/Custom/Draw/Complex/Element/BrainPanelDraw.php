@@ -242,7 +242,7 @@ class BrainPanelDraw
         }
 
         $neurons = $this->brain->neurons()
-            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement', 'targetElement', 'chemicalElement', 'complexChemicalElement'])
+            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'information.gene'])
             ->orderBy('grid_i')
             ->orderBy('grid_j')
             ->get();

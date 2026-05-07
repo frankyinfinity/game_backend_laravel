@@ -96,18 +96,18 @@ class ElementDraw
         }
         // ------------------------------
 
-         if ($elementHasPosition) {
-             $elementHasPosition->loadMissing([
-                 'brain.neurons.outgoingLinks.toNeuron',
-                 'brain.neurons.incomingLinks',
-                 'brain.neurons.conditionOrders',
-                 'brain.neurons.targetElement',
-                 'brain.neurons.chemicalElement',
-                 'brain.neurons.complexChemicalElement',
-                 'brain.neurons.chemicalRule',
-                 'brain.neurons.informationGene',
-             ]);
-         }
+          if ($elementHasPosition) {
+              $elementHasPosition->loadMissing([
+                  'brain.neurons.outgoingLinks.toNeuron',
+                  'brain.neurons.incomingLinks',
+                  'brain.neurons.conditionOrders',
+                  'brain.neurons.targetElement',
+                  'brain.neurons.chemicalElement',
+                  'brain.neurons.complexChemicalElement',
+                  'brain.neurons.chemicalRule',
+                  'brain.neurons.information.gene',
+              ]);
+          }
         
         $x = ($this->tileJ * Helper::TILE_SIZE) + Helper::MAP_START_X;
         $y = ($this->tileI * Helper::TILE_SIZE) + Helper::MAP_START_Y;

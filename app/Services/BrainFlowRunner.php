@@ -321,6 +321,9 @@ class BrainFlowRunner
             case Neuron::TYPE_READ_GENE:
                 $this->handleReadGeneNeuron($neuron, $elementHasPosition);
                 break;
+            case Neuron::TYPE_MAX_VALUE_GENE:
+                $this->handleMaxValueGeneNeuron($neuron, $elementHasPosition);
+                break;
             default:
                 $this->handleUnknownNeuron($neuron);
                 break;
@@ -405,7 +408,7 @@ class BrainFlowRunner
 
     private function handleReadChemicalElementNeuron(array &$neuron, ElementHasPosition $elementHasPosition): void
     {
-        $ruleId = (int) ($neuron['element_has_rule_chimical_element_id'] ?? 0);
+        $ruleId = (int) ($neuron['element_has_position_rule_chimical_element_id'] ?? 0);
         if ($ruleId <= 0) {
             Log::info('ReadChemical: no rule_id');
             $neuron['chemical_element_value'] = null;
@@ -455,15 +458,15 @@ class BrainFlowRunner
                     return;
                 }
 
-                $ruleId = (int) ($neuron['element_has_rule_chimical_element_id'] ?? 0);
+                $ruleId = (int) ($neuron['element_has_position_rule_chimical_element_id'] ?? 0);
                 if ($ruleId <= 0) {
                     Log::info('ReadChemical: no rule_id');
                     $neuron['chemical_element_value'] = null;
                     return;
                 }
 
-                // Get the RuleChimicalElement to know which underlying element to look for
-                $ruleElement = \App\Models\RuleChimicalElement::query()
+                // Get the ElementHasPositionRuleChimicalElement to know which underlying element to look for
+                $ruleElement = \App\Models\ElementHasPositionRuleChimicalElement::query()
                     ->where('id', $ruleId)
                     ->first();
 
@@ -574,9 +577,39 @@ class BrainFlowRunner
 
     private function handleReadGeneNeuron(array &$neuron, ElementHasPosition $elementHasPosition): void
     {
-        $geneId = (int) ($neuron['element_has_position_information_id'] ?? 0);
+        $elementHasPositionInformationId = (int) ($neuron['element_has_position_information_id'] ?? 0);
+        if ($elementHasPositionInformationId <= 0) {
+            Log::info('ReadGene: no element_has_position_information_id set', ['info_id' => $elementHasPositionInformationId]);
+            $neuron['gene_value'] = null;
+            return;
+        }
+
+        // Recupera ElementHasPositionInformation per ottenere il gene_id effettivo
+        $elementHasPositionInformation = \App\Models\ElementHasPositionInformation::find($elementHasPositionInformationId);
+        if (!$elementHasPositionInformation) {
+            Log::info('ReadGene: ElementHasPositionInformation not found', ['info_id' => $elementHasPositionInformationId]);
+            $neuron['gene_value'] = null;
+            return;
+        }
+
+        $geneId = (int) ($elementHasPositionInformation->gene_id ?? 0);
         if ($geneId <= 0) {
-            Log::info('ReadGene: no gene_id set', ['gene_id' => $geneId]);
+            Log::info('ReadGene: no gene_id in ElementHasPositionInformation', ['info_id' => $elementHasPositionInformationId]);
+            $neuron['gene_value'] = null;
+            return;
+        }
+
+        // Recupera ElementHasPositionInformation per ottenere il gene_id effettivo
+        $elementHasPositionInformation = \App\Models\ElementHasPositionInformation::find($elementHasPositionInformationId);
+        if (!$elementHasPositionInformation) {
+            Log::info('ReadGene: ElementHasPositionInformation not found', ['info_id' => $elementHasPositionInformationId]);
+            $neuron['gene_value'] = null;
+            return;
+        }
+
+        $geneId = (int) ($elementHasPositionInformation->gene_id ?? 0);
+        if ($geneId <= 0) {
+            Log::info('ReadGene: no gene_id in ElementHasPositionInformation', ['info_id' => $elementHasPositionInformationId]);
             $neuron['gene_value'] = null;
             return;
         }
@@ -651,6 +684,57 @@ class BrainFlowRunner
             Log::info('ReadGene: exception', ['error' => $e->getMessage(), 'gene_id' => $geneId]);
             $neuron['gene_value'] = null;
         }
+    }
+
+    private function handleMaxValueGeneNeuron(array &$neuron, ElementHasPosition $elementHasPosition): void
+    {
+        $geneInfoId = (int) ($neuron['element_has_position_information_id'] ?? 0);
+        if ($geneInfoId <= 0) {
+            Log::info('MaxValueGene: no gene_info_id set', ['gene_info_id' => $geneInfoId]);
+            $neuron['gene_max_value_result'] = false;
+            return;
+        }
+
+        // Prendi il valore dal neurone sorgente (ReadGene) tramite neuron_from
+        $incomingValue = null;
+        if (isset($neuron['neuron_from']) && is_array($neuron['neuron_from'])) {
+            $fromId = (int) ($neuron['neuron_from']['id'] ?? 0);
+            if ($fromId > 0 && isset($this->processedNeuronsById[$fromId])) {
+                $fromNeuron = $this->processedNeuronsById[$fromId];
+                $incomingValue = $fromNeuron['gene_value'] ?? null;
+            }
+        }
+
+        if ($incomingValue === null) {
+            Log::info('MaxValueGene: no incoming gene_value', [
+                'from' => $neuron['neuron_from'] ?? null,
+                'processed_ids' => array_keys($this->processedNeuronsById)
+            ]);
+            $neuron['gene_max_value_result'] = false;
+            return;
+        }
+
+        // Recupera ElementHasPositionInformation con il gene per ottenere max + modifier
+        $info = \App\Models\ElementHasPositionInformation::with('gene')->find($geneInfoId);
+        if (!$info || !$info->gene) {
+            Log::info('MaxValueGene: gene info not found', ['gene_info_id' => $geneInfoId]);
+            $neuron['gene_max_value_result'] = false;
+            return;
+        }
+
+        $baseMax = (int) ($info->max ?? 0);
+        $modifier = (int) ($info->modifier ?? 0);
+        $effectiveMax = $baseMax + $modifier;
+        $value = (int) $incomingValue;
+
+        $neuron['gene_max_value_result'] = ($value >= $effectiveMax);
+        Log::info('MaxValueGene: result', [
+            'value' => $value,
+            'base_max' => $baseMax,
+            'modifier' => $modifier,
+            'effective_max' => $effectiveMax,
+            'result' => $neuron['gene_max_value_result']
+        ]);
     }
 
     private function resolveElementContainer(ElementHasPosition $elementHasPosition): ?Container
@@ -833,18 +917,16 @@ class BrainFlowRunner
             return $this->hasActiveChemicalElementLinks($neuron, $outgoingLinks);
         }
 
+        if ($type === Neuron::TYPE_MAX_VALUE_GENE) {
+            return $this->hasActiveMaxValueGeneLinks($neuron, $outgoingLinks);
+        }
+
         $detectionResult = $neuron['detection_result'] ?? null;
         $hasDetection = is_string($detectionResult) && trim($detectionResult) !== '';
 
         foreach ($outgoingLinks as $link) {
             $port = $link->conditionOrder;
             $condition = $port ? $port->condition : ($link->condition ?? null);
-
-            if ($condition === 'found' || $condition === NeuronLink::PORT_DETECTION_SUCCESS) {
-                $condition = NeuronLink::CONDITION_MAIN;
-            } elseif ($condition === 'not_found' || $condition === NeuronLink::PORT_DETECTION_FAILURE) {
-                $condition = NeuronLink::CONDITION_ELSE;
-            }
 
             if ($type === Neuron::TYPE_DETECTION) {
                 if ($condition === NeuronLink::CONDITION_MAIN && $hasDetection) {
@@ -909,6 +991,32 @@ class BrainFlowRunner
         return $hasRangeMatch || $hasDefaultLink;
     }
 
+    private function hasActiveMaxValueGeneLinks(array $neuron, array $outgoingLinks): bool
+    {
+        $result = $neuron['gene_max_value_result'] ?? null;
+        if ($result === null) {
+            return false;
+        }
+        foreach ($outgoingLinks as $link) {
+            $port = $link->conditionOrder;
+            $condition = $port ? $port->condition : ($link->condition ?? null);
+            if ($result && $condition === Neuron::MAX_VALUE_GENE_YES) {
+                return true;
+            }
+            if (!$result && $condition === Neuron::MAX_VALUE_GENE_NO) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isMaxValueGeneLinkActive(array $neuron, $condition): bool
+    {
+        $result = $neuron['gene_max_value_result'] ?? false;
+        $desiredCondition = $result ? Neuron::MAX_VALUE_GENE_YES : Neuron::MAX_VALUE_GENE_NO;
+        return $condition === $desiredCondition;
+    }
+
     private function isLinkActiveFromNeuron(array $neuron, $link): bool
     {
         $type = $neuron['type'] ?? null;
@@ -917,6 +1025,10 @@ class BrainFlowRunner
 
         if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             return $this->isChemicalElementLinkActive($neuron, $link);
+        }
+
+        if ($type === Neuron::TYPE_MAX_VALUE_GENE) {
+            return $this->isMaxValueGeneLinkActive($neuron, $condition);
         }
 
         $detectionResult = $neuron['detection_result'] ?? null;

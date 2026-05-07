@@ -36,8 +36,8 @@ class ElementHasPositionObserver
         if ($element->isInteractive()) {
             $this->initializeInformation($elementHasPosition);
             $this->initializeScore($elementHasPosition);
-            $detailMap = $this->initializeChemicalRules($elementHasPosition);
-            $neuronMap = $this->initializeBrain($elementHasPosition, $detailMap);
+            $maps = $this->initializeChemicalRules($elementHasPosition);
+            $neuronMap = $this->initializeBrain($elementHasPosition, $maps['ruleMap'], $maps['detailMap']);
             $this->initializeCircuits($elementHasPosition, $neuronMap);
             $this->initializeContainer($elementHasPosition);
         }
@@ -88,13 +88,24 @@ class ElementHasPositionObserver
     }
 
 
-    private function initializeBrain(ElementHasPosition $elementHasPosition, array $detailMap): array
+    private function initializeBrain(ElementHasPosition $elementHasPosition, array $ruleMap, array $detailMap): array
     {
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
         $templateToClonedNeuronId = [];
         $templateToClonedOrderId = [];
         $now = now();
+
+        // Pre-carica la mappa gene_id -> element_has_position_information_id per questo elemento
+        $geneInfoMap = [];
+        $elementInformations = \App\Models\ElementHasPositionInformation::where('element_has_position_id', $elementHasPosition->id)
+            ->with('gene')
+            ->get();
+        foreach ($elementInformations as $info) {
+            if ($info->gene) {
+                $geneInfoMap[(int)$info->gene->id] = (int)$info->id;
+            }
+        }
 
         if ($templateBrain !== null) {
             $templateBrain->load('neurons.conditionOrders', 'neurons.outgoingLinks');
@@ -107,6 +118,18 @@ class ElementHasPositionObserver
             ]);
 
             foreach ($templateBrain->neurons as $templateNeuron) {
+                // Mappa il gene dal template (genes.id) al corrispondente ElementHasPositionInformation.id
+                $geneInfoId = null;
+                if ($templateNeuron->element_infomation_id !== null) {
+                    $geneInfoId = $geneInfoMap[(int)$templateNeuron->element_infomation_id] ?? null;
+                }
+
+                // Mappa rule_chimical_element_id dal template a element_has_position_rule_chimical_element_id
+                $ruleId = null;
+                if ($templateNeuron->element_has_rule_chimical_element_id !== null) {
+                    $ruleId = $ruleMap[(int)$templateNeuron->element_has_rule_chimical_element_id] ?? null;
+                }
+
                 $clonedNeuron = ElementHasPositionNeuron::query()->create([
                     'element_has_position_brain_id' => $clonedBrain->id,
                     'type' => $templateNeuron->type,
@@ -117,10 +140,10 @@ class ElementHasPositionObserver
                     'target_element_id' => $templateNeuron->target_element_id,
                     'gene_life_id' => $templateNeuron->gene_life_id,
                     'gene_attack_id' => $templateNeuron->gene_attack_id,
-                    'element_has_rule_chimical_element_id' => $templateNeuron->element_has_rule_chimical_element_id,
+                    'element_has_position_rule_chimical_element_id' => $ruleId,
                     'chemical_element_id' => $templateNeuron->chemical_element_id,
                     'complex_chemical_element_id' => $templateNeuron->complex_chemical_element_id,
-                    'element_has_position_information_id' => $templateNeuron->element_infomation_id,
+                    'element_has_position_information_id' => $geneInfoId,
                     'stop_before_target' => $templateNeuron->stop_before_target,
                 ]);
 
@@ -144,7 +167,7 @@ class ElementHasPositionObserver
                     $fromClonedId = $templateToClonedNeuronId[(int) $templateLink->from_neuron_id] ?? null;
                     $toClonedId = $templateToClonedNeuronId[(int) $templateLink->to_neuron_id] ?? null;
                     $clonedOrderId = $templateToClonedOrderId[(int) $templateLink->neuron_condition_order_id] ?? null;
-                    
+
                     if ($fromClonedId !== null && $toClonedId !== null) {
                         $linkData[] = [
                             'from_element_has_position_neuron_id' => $fromClonedId,
@@ -156,9 +179,9 @@ class ElementHasPositionObserver
                     }
                 }
             }
-            
+
             if (!empty($linkData)) {
-                ElementHasPositionNeuronLink::insert($linkData);
+                \App\Models\ElementHasPositionNeuronLink::insert($linkData);
             }
         }
         return $templateToClonedNeuronId;
@@ -208,6 +231,7 @@ class ElementHasPositionObserver
     {
         $element = $elementHasPosition->element;
         $ruleChimicalElements = $element->ruleChimicalElements()->with('details.effects')->get();
+        $ruleMap = [];
         $detailMap = [];
         $now = now();
 
@@ -226,6 +250,9 @@ class ElementHasPositionObserver
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+
+            // Mappa rule_id template -> cloned rule id
+            $ruleMap[(int)$templateRule->id] = (int)$clonedRule->id;
 
             ElementHasPositionChimicalElement::query()->create([
                 'element_has_position_id' => $elementHasPosition->id,
@@ -265,7 +292,10 @@ class ElementHasPositionObserver
                 }
             }
         }
-        return $detailMap;
+        return [
+            'ruleMap' => $ruleMap,
+            'detailMap' => $detailMap,
+        ];
     }
 
     private function initializeContainer(ElementHasPosition $elementHasPosition): void

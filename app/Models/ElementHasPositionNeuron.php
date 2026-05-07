@@ -16,7 +16,7 @@ class ElementHasPositionNeuron extends Model
         'target_element_id' => 'integer',
         'gene_life_id' => 'integer',
         'gene_attack_id' => 'integer',
-        'element_has_rule_chimical_element_id' => 'integer',
+        'element_has_position_rule_chimical_element_id' => 'integer',
         'chemical_element_id' => 'integer',
         'complex_chemical_element_id' => 'integer',
         'element_has_position_information_id' => 'integer',
@@ -61,12 +61,18 @@ class ElementHasPositionNeuron extends Model
 
     public function chemicalRule()
     {
-        return $this->belongsTo(RuleChimicalElement::class, 'element_has_rule_chimical_element_id');
+        return $this->belongsTo(\App\Models\ElementHasPositionRuleChimicalElement::class, 'element_has_position_rule_chimical_element_id');
     }
 
-    public function informationGene()
+    public function information()
     {
-        return $this->belongsTo(Gene::class, 'element_has_position_information_id');
+        return $this->belongsTo(ElementHasPositionInformation::class, 'element_has_position_information_id');
+    }
+
+    public function getInformationGeneAttribute()
+    {
+        // Accessor per compatibilità: usa information->gene
+        return $this->information->gene ?? null;
     }
 
     public function getOutputConditions(): array
