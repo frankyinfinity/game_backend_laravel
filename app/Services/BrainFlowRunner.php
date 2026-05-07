@@ -318,6 +318,9 @@ class BrainFlowRunner
             case Neuron::TYPE_READ_CHIMICAL_ELEMENT:
                 $this->handleReadChemicalElementNeuron($neuron, $elementHasPosition);
                 break;
+            case Neuron::TYPE_READ_GENE:
+                $this->handleReadGeneNeuron($neuron, $elementHasPosition);
+                break;
             default:
                 $this->handleUnknownNeuron($neuron);
                 break;
@@ -566,6 +569,87 @@ class BrainFlowRunner
         } catch (\Throwable $e) {
             Log::info('ReadChemical: exception', ['error' => $e->getMessage()]);
             $neuron['chemical_element_value'] = null;
+        }
+    }
+
+    private function handleReadGeneNeuron(array &$neuron, ElementHasPosition $elementHasPosition): void
+    {
+        $geneId = (int) ($neuron['element_has_position_information_id'] ?? 0);
+        if ($geneId <= 0) {
+            Log::info('ReadGene: no gene_id set', ['gene_id' => $geneId]);
+            $neuron['gene_value'] = null;
+            return;
+        }
+
+        $container = $this->resolveElementContainer($elementHasPosition);
+        if ($container === null || empty($container->ws_port)) {
+            Log::info('ReadGene: no container or ws_port');
+            $neuron['gene_value'] = null;
+            return;
+        }
+
+        $host = (string) $this->wsHost;
+        $port = (int) $container->ws_port;
+
+        try {
+            $socket = $this->openMapWebSocket($host, $port);
+            try {
+                $this->readWebSocketFrame($socket);
+
+                $payload = [
+                    'command' => 'get_genes',
+                ];
+                $this->writeWebSocketFrame($socket, json_encode($payload));
+
+                $replyRaw = $this->readWebSocketFrame($socket);
+                if ($replyRaw === null) {
+                    Log::info('ReadGene: no reply from websocket');
+                    $neuron['gene_value'] = null;
+                    return;
+                }
+
+                Log::info('ReadGene: raw websocket reply', ['raw' => $replyRaw]);
+
+                $reply = json_decode($replyRaw, true);
+                if (!is_array($reply)) {
+                    Log::info('ReadGene: invalid json', ['reply' => $replyRaw]);
+                    $neuron['gene_value'] = null;
+                    return;
+                }
+
+                $genes = $reply['genes'] ?? [];
+                if (!is_array($genes)) {
+                    Log::info('ReadGene: genes not array');
+                    $neuron['gene_value'] = null;
+                    return;
+                }
+
+                $foundGene = null;
+                foreach ($genes as $gene) {
+                    if (!is_array($gene)) {
+                        continue;
+                    }
+                    $id = (int) ($gene['id'] ?? 0);
+                    if ($id === $geneId) {
+                        $foundGene = $gene;
+                        break;
+                    }
+                }
+
+                if ($foundGene !== null) {
+                    $value = $foundGene['value'] ?? null;
+                    $neuron['gene_value'] = $value !== null ? (int) $value : null;
+                    Log::info('ReadGene: value set', ['gene_id' => $geneId, 'value' => $neuron['gene_value']]);
+                } else {
+                    Log::info('ReadGene: gene not found in websocket response', ['gene_id' => $geneId, 'available_genes' => array_column($genes, 'id')]);
+                    $neuron['gene_value'] = null;
+                }
+            } finally {
+                fclose($socket);
+            }
+        } catch (\Throwable $e) {
+            Log::info('ReadGene: exception', ['error' => $e->getMessage(), 'gene_id' => $geneId]);
+            $neuron['gene_value'] = null;
         }
     }
 
