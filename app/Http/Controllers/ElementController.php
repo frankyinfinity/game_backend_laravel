@@ -17,6 +17,7 @@ use App\Models\NeuronLink;
 use App\Models\RuleChimicalElement;
 use App\Models\Score;
 use App\Models\Tile;
+use App\Helpers\NeuronTooltipHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -227,7 +228,17 @@ class ElementController extends Controller
      */
     public function edit(Element $element)
     {
-        $element->load('brain.neurons.outgoingLinks', 'brain.neurons.incomingLinks', 'brain.circuits.details');
+        $element->load([
+            'brain.neurons.outgoingLinks',
+            'brain.neurons.incomingLinks',
+            'brain.neurons.conditionOrders',
+            'brain.neurons.targetElement',
+            'brain.neurons.chemicalElement',
+            'brain.neurons.complexChemicalElement',
+            'brain.neurons.chemicalRule',
+            'brain.neurons.informationGene',
+            'brain.circuits.details'
+        ]);
 
         $elementTypes = ElementType::orderBy('name')->get();
         $climates = Climate::orderBy('name')->get();
@@ -276,6 +287,9 @@ class ElementController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Genes selected in information tab
+        $informationGenes = $element->informations->pluck('gene')->unique();
+
         // Prepare gene data for JavaScript
         $geneData = $allGenes->map(function ($gene) {
             return [
@@ -302,7 +316,8 @@ class ElementController extends Controller
             'brainGenes',
             'brainChimicalElements',
             'brainComplexChimicalElements',
-            'allRuleChimicalElements'
+            'allRuleChimicalElements',
+            'informationGenes'
         ));
     }
 
@@ -519,6 +534,7 @@ class ElementController extends Controller
             'complex_chemical_element_id' => 'nullable|integer|exists:complex_chimical_elements,id',
             'gene_life_id' => 'nullable|integer|exists:genes,id',
             'gene_attack_id' => 'nullable|integer|exists:genes,id',
+            'element_infomation_id' => 'nullable|integer|exists:genes,id',
             'element_has_rule_chimical_element_id' => 'nullable|integer|exists:rule_chimical_elements,id',
         ]);
 
@@ -551,6 +567,7 @@ class ElementController extends Controller
         $complexChemicalElementId = null;
         $geneLifeId = null;
         $geneAttackId = null;
+        $elementInfomationId = null;
         $elementHasRuleChimicalElementId = null;
 
         if ($type === Neuron::TYPE_DETECTION) {
@@ -590,6 +607,18 @@ class ElementController extends Controller
             }
         }
 
+        if ($type === Neuron::TYPE_READ_GENE) {
+            $candidateElementInfomationId = (int) $request->input('element_infomation_id', 0);
+            $elementInfomationId = $candidateElementInfomationId > 0 ? $candidateElementInfomationId : null;
+
+            if ($elementInfomationId === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Per il neurone Lettura Gene devi selezionare un Gene',
+                ], 422);
+            }
+        }
+
         if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             $candidateRuleId = (int) $request->input('element_has_rule_chimical_element_id', 0);
             $elementHasRuleChimicalElementId = $candidateRuleId > 0 ? $candidateRuleId : null;
@@ -604,7 +633,10 @@ class ElementController extends Controller
 
         $neuronId = $request->input('id');
         if ($neuronId) {
-            $neuron = Neuron::query()->where('brain_id', $brain->id)->find($neuronId);
+            $neuron = Neuron::query()
+                ->where('brain_id', $brain->id)
+                ->with(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene'])
+                ->find($neuronId);
             if ($neuron) {
                 $neuron->update([
                     'grid_i' => $gridI,
@@ -618,9 +650,10 @@ class ElementController extends Controller
                     'complex_chemical_element_id' => $complexChemicalElementId,
                     'gene_life_id' => $geneLifeId,
                     'gene_attack_id' => $geneAttackId,
+                    'element_infomation_id' => $elementInfomationId,
                     'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
                 ]);
-                $this->updateBrainCircuit($brain);
+                $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
 
                 return response()->json([
                     'success' => true,
@@ -637,8 +670,10 @@ class ElementController extends Controller
                         'complex_chemical_element_id' => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
                         'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                         'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
-                        'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
-                        'condition_orders' => $neuron->conditionOrders->map(function ($co) {
+                'element_infomation_id' => $neuron->element_infomation_id !== null ? (int) $neuron->element_infomation_id : null,
+                'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
+                'tooltip' => NeuronTooltipHelper::generateTextFromNeuron($neuron),
+                'condition_orders' => $neuron->conditionOrders->map(function ($co) {
                             return [
                                 'id' => $co->id,
                                 'condition' => $co->condition,
@@ -669,9 +704,13 @@ class ElementController extends Controller
                 'complex_chemical_element_id' => $complexChemicalElementId,
                 'gene_life_id' => $geneLifeId,
                 'gene_attack_id' => $geneAttackId,
+                'element_infomation_id' => $elementInfomationId,
                 'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
             ]
         );
+
+        // Load relationships for tooltip
+        $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
 
         $this->updateBrainCircuit($brain);
 
@@ -690,7 +729,97 @@ class ElementController extends Controller
                 'complex_chemical_element_id' => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
                 'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
                 'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
+                'element_infomation_id' => $neuron->element_infomation_id !== null ? (int) $neuron->element_infomation_id : null,
                 'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
+                'tooltip' => NeuronTooltipHelper::generateTextFromNeuron($neuron),
+                'condition_orders' => $neuron->conditionOrders->map(function ($co) {
+                    return [
+                        'id' => $co->id,
+                        'condition' => $co->condition,
+                        'sort_order' => (int) $co->sort_order,
+                        'color' => $co->color,
+                        'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
+                    ];
+                })->values()->all(),
+            ],
+            'circuits' => $this->getCircuitsArray($brain),
+        ]);
+    }
+
+    public function moveBrainNeuron(Request $request, Element $element, Neuron $neuron)
+    {
+        if (! $element->isInteractive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Elemento non interattivo',
+            ], 422);
+        }
+
+        $request->validate([
+            'grid_i' => 'required|integer|min:0',
+            'grid_j' => 'required|integer|min:0',
+        ]);
+
+        $brain = $element->brain;
+        if (!$brain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cervello non trovato',
+            ], 404);
+        }
+
+        $gridI = (int) $request->input('grid_i');
+        $gridJ = (int) $request->input('grid_j');
+        if ($gridI < 0 || $gridJ < 0 || $gridI >= $brain->grid_height || $gridJ >= $brain->grid_width) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Coordinate neurone fuori griglia',
+            ], 422);
+        }
+
+        // Check if target cell is occupied by another neuron
+        $existingNeuron = Neuron::query()
+            ->where('brain_id', $brain->id)
+            ->where('grid_i', $gridI)
+            ->where('grid_j', $gridJ)
+            ->where('id', '!=', $neuron->id)
+            ->first();
+
+        if ($existingNeuron) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La cella di destinazione è già occupata',
+            ], 422);
+        }
+
+        $neuron->update([
+            'grid_i' => $gridI,
+            'grid_j' => $gridJ,
+        ]);
+
+        // Refresh relationships for tooltip
+        $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
+
+        $this->updateBrainCircuit($brain);
+
+        return response()->json([
+            'success' => true,
+            'neuron' => [
+                'id' => (int) $neuron->id,
+                'type' => $neuron->type,
+                'grid_i' => (int) $neuron->grid_i,
+                'grid_j' => (int) $neuron->grid_j,
+                'radius' => $neuron->radius !== null ? (int) $neuron->radius : null,
+                'stop_before_target' => (bool) $neuron->stop_before_target,
+                'target_type' => $neuron->target_type,
+                'target_element_id' => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+                'chemical_element_id' => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,
+                'complex_chemical_element_id' => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
+                'gene_life_id' => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
+                'gene_attack_id' => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
+                'element_infomation_id' => $neuron->element_infomation_id !== null ? (int) $neuron->element_infomation_id : null,
+                'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
+                'tooltip' => NeuronTooltipHelper::generateTextFromNeuron($neuron),
                 'condition_orders' => $neuron->conditionOrders->map(function ($co) {
                     return [
                         'id' => $co->id,

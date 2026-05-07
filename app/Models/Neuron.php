@@ -20,6 +20,8 @@ class Neuron extends Model
 
     public const TYPE_READ_CHIMICAL_ELEMENT = 'read_chimical_element';
 
+    public const TYPE_READ_GENE = 'read_gene';
+
     public const TYPES = [
         self::TYPE_DETECTION,
         self::TYPE_PATH,
@@ -28,6 +30,7 @@ class Neuron extends Model
         self::TYPE_START,
         self::TYPE_END,
         self::TYPE_READ_CHIMICAL_ELEMENT,
+        self::TYPE_READ_GENE,
     ];
 
     public const TYPE_LABELS = [
@@ -38,6 +41,7 @@ class Neuron extends Model
         self::TYPE_START => 'Inizio',
         self::TYPE_END => 'Fine',
         self::TYPE_READ_CHIMICAL_ELEMENT => 'Lettura Elemento Chimico',
+        self::TYPE_READ_GENE => 'Lettura Gene',
     ];
 
     public const TYPE_SYMBOLS = [
@@ -48,6 +52,7 @@ class Neuron extends Model
         self::TYPE_START => '►',
         self::TYPE_END => '■',
         self::TYPE_READ_CHIMICAL_ELEMENT => '🧪',
+        self::TYPE_READ_GENE => '🧬',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
@@ -85,6 +90,7 @@ class Neuron extends Model
         'element_has_rule_chimical_element_id' => 'integer',
         'chemical_element_id' => 'integer',
         'complex_chemical_element_id' => 'integer',
+        'element_infomation_id' => 'integer',
         'stop_before_target' => 'boolean',
     ];
 
@@ -126,6 +132,11 @@ class Neuron extends Model
     public function complexChemicalElement()
     {
         return $this->belongsTo(ComplexChimicalElement::class, 'complex_chemical_element_id');
+    }
+
+    public function informationGene()
+    {
+        return $this->belongsTo(Gene::class, 'element_infomation_id');
     }
 
     public function getOutputConditions(): array

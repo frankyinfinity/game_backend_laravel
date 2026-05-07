@@ -400,9 +400,71 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                         </div>
 
-                        <!-- Pagina 7: START e END -->
+                         <!-- Pagina 7: LETTURA GENE -->
+                         <div class="carousel-item">
+                             <div class="text-center mb-4">
+                                 <h4><i class="fas fa-dna fa-2x text-info mb-3"></i></h4>
+                                 <h5>LETTURA GENE (Gene Reading)</h5>
+                                 <p class="text-muted">Il lettore di informazioni genetiche</p>
+                             </div>
+
+                             <div class="row mb-3">
+                                 <div class="col-12">
+                                     <div class="card border-info">
+                                         <div class="card-header bg-info text-white">
+                                             <h6 class="mb-0"><i class="fas fa-dna"></i> Funzione Principale</h6>
+                                         </div>
+                                         <div class="card-body">
+                                             <p>Il neurone lettura gene permette di accedere alle informazioni genetiche configurate nell'elemento. È in grado di leggere i valori genetici definiti nella sezione "Informazioni" e utilizzarli per prendere decisioni comportamentali.</p>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             <div class="row">
+                                 <div class="col-md-6">
+                                     <div class="card h-100">
+                                         <div class="card-header">
+                                             <h6 class="mb-0"><i class="fas fa-list"></i> Configurazione</h6>
+                                         </div>
+                                         <div class="card-body">
+                                             <ul>
+                                                 <li><strong>Selezione Gene:</strong> Scegli un gene dalla sezione Informazioni</li>
+                                                 <li><strong>Accesso diretto:</strong> Legge i valori genetici attuali dell'elemento</li>
+                                                 <li><strong>Trigger semplice:</strong> Genera un segnale di attivazione quando eseguito</li>
+                                             </ul>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 <div class="col-md-6">
+                                     <div class="card h-100">
+                                         <div class="card-header">
+                                             <h6 class="mb-0"><i class="fas fa-bolt"></i> Uscita</h6>
+                                         </div>
+                                         <div class="card-body">
+                                             <ul>
+                                                 <li><strong>Trigger:</strong> Segnale verde che indica la lettura completata</li>
+                                                 <li><strong>Attivazione:</strong> Può essere collegato ad altri neuroni per comportamenti condizionati</li>
+                                                 <li><strong>Sequenziale:</strong> Perfetto per catene di decisioni basate sui geni</li>
+                                             </ul>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             <div class="row mt-3">
+                                 <div class="col-12">
+                                     <div class="alert alert-info">
+                                         <h6><i class="fas fa-info-circle"></i> Utilizzo Pratico</h6>
+                                         <p>Ideale per comportamenti che dipendono dalle caratteristiche genetiche dell'elemento, come adattamenti ambientali o specializzazioni comportamentali basate sui valori genetici configurati.</p>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+
+                         <!-- Pagina 8: START e END -->
                         <div class="carousel-item">
                             <div class="text-center mb-4">
                                 <h4><i class="fas fa-play-circle fa-2x text-success mb-3"></i></h4>
@@ -445,9 +507,9 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                          </div>
 
-                        <!-- Pagina 8: COLLEGAMENTI -->
+                          <!-- Pagina 9: COLLEGAMENTI -->
                         <div class="carousel-item">
                             <div class="text-center mb-4">
                                 <h4><i class="fas fa-project-diagram fa-2x text-info mb-3"></i></h4>
@@ -518,7 +580,7 @@
                         </button>
 
                         <div class="text-center">
-                            <small class="text-muted" id="currentSlideNumber">1 / 8</small>
+                            <small class="text-muted" id="currentSlideNumber">1 / 9</small>
                         </div>
 
                         <button class="btn btn-outline-secondary" type="button" id="guideNextBtn">
@@ -530,35 +592,38 @@
         </div>
     </div>
 </div>
-@php
-    $existingNeuronItems = $element->brain && $element->brain->neurons
-        ? $element->brain->neurons->map(function ($n) {
-            return [
-                'id' => (int) $n->id,
-                'type' => $n->type,
-                'grid_i' => (int) $n->grid_i,
-                'grid_j' => (int) $n->grid_j,
-                'radius' => $n->radius !== null ? (int) $n->radius : null,
-                'stop_before_target' => (bool) $n->stop_before_target,
-                'target_type' => $n->target_type,
-                'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
-                'chemical_element_id' => $n->chemical_element_id !== null ? (int) $n->chemical_element_id : null,
-                'complex_chemical_element_id' => $n->complex_chemical_element_id !== null ? (int) $n->complex_chemical_element_id : null,
-                'gene_life_id' => $n->gene_life_id !== null ? (int) $n->gene_life_id : null,
-                'gene_attack_id' => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
-                'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
-                'condition_orders' => $n->conditionOrders->map(function ($co) {
-                    return [
-                        'id' => $co->id,
-                        'condition' => $co->condition,
-                        'sort_order' => (int) $co->sort_order,
-                        'color' => $co->color,
-                        'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
-                    ];
-                })->values()->all(),
-            ];
-        })->values()->all()
-        : [];
+ @php
+     use App\Helpers\NeuronTooltipHelper;
+     $existingNeuronItems = $element->brain && $element->brain->neurons
+         ? $element->brain->neurons->map(function ($n) {
+             return [
+                 'id' => (int) $n->id,
+                 'type' => $n->type,
+                 'grid_i' => (int) $n->grid_i,
+                 'grid_j' => (int) $n->grid_j,
+                 'radius' => $n->radius !== null ? (int) $n->radius : null,
+                 'stop_before_target' => (bool) $n->stop_before_target,
+                 'target_type' => $n->target_type,
+                 'target_element_id' => $n->target_element_id !== null ? (int) $n->target_element_id : null,
+                 'chemical_element_id' => $n->chemical_element_id !== null ? (int) $n->chemical_element_id : null,
+                 'complex_chemical_element_id' => $n->complex_chemical_element_id !== null ? (int) $n->complex_chemical_element_id : null,
+                 'gene_life_id' => $n->gene_life_id !== null ? (int) $n->gene_life_id : null,
+                 'gene_attack_id' => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
+                 'element_infomation_id' => $n->element_infomation_id !== null ? (int) $n->element_infomation_id : null,
+                 'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
+                 'tooltip' => NeuronTooltipHelper::generateTextFromNeuron($n),
+                 'condition_orders' => $n->conditionOrders->map(function ($co) {
+                     return [
+                         'id' => $co->id,
+                         'condition' => $co->condition,
+                         'sort_order' => (int) $co->sort_order,
+                         'color' => $co->color,
+                         'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
+                     ];
+                 })->values()->all(),
+             ];
+         })->values()->all()
+         : [];
     $existingNeuronLinks = $element->brain && $element->brain->neurons
         ? $element->brain->neurons->flatMap(function ($n) {
             return $n->outgoingLinks->map(function ($l) {
@@ -752,6 +817,15 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div class="form-group" id="neuron_element_infomation_group" style="display:none;">
+                            <label for="neuron_element_infomation_id">Gene</label>
+                            <select class="form-control" id="neuron_element_infomation_id" title="Seleziona un gene">
+                                <option value="">-- Seleziona Gene --</option>
+                                @foreach(($informationGenes ?? collect()) as $infoGene)
+                                    <option value="{{ $infoGene->id }}" title="{{ $infoGene->name }} (#{{ $infoGene->id }})">{{ $infoGene->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="form-group" id="neuron_rule_chimical_element_group" style="display:none;">
                             <label for="neuron_element_has_rule_chimical_element_id">Regola Elemento Chimico</label>
                             <select class="form-control" id="neuron_element_has_rule_chimical_element_id">
@@ -825,6 +899,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const neuronGeneLifeIdInput = document.getElementById('neuron_gene_life_id');
     const neuronGeneAttackGroup = document.getElementById('neuron_gene_attack_group');
     const neuronGeneAttackIdInput = document.getElementById('neuron_gene_attack_id');
+    const neuronElementInfomationGroup = document.getElementById('neuron_element_infomation_group');
+    const neuronElementInfomationIdInput = document.getElementById('neuron_element_infomation_id');
     const neuronRuleChimicalElementGroup = document.getElementById('neuron_rule_chimical_element_group');
     const neuronRuleChimicalElementIdInput = document.getElementById('neuron_element_has_rule_chimical_element_id');
     const neuronChemicalElementGroup = document.getElementById('neuron_chemical_element_group');
@@ -836,7 +912,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteNeuronBtn = document.getElementById('btn_delete_neuron');
     const neuronModalEl = document.getElementById('brainNeuronModal');
     const circuitsTableBody = document.getElementById('circuits-table-body');
-    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronStopBeforeTargetGroup || !neuronStopBeforeTargetInput || !neuronTargetTypeInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !neuronChemicalElementGroup || !neuronChemicalElementIdInput || !neuronComplexChemicalElementGroup || !neuronComplexChemicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !circuitsTableBody) {
+    if (!widthInput || !heightInput || !container || !neuronItemsInput || !neuronLinksInput || !neuronTypeInput || !neuronRadiusInput || !neuronRadiusGroup || !neuronStopBeforeTargetGroup || !neuronStopBeforeTargetInput || !neuronTargetTypeInput || !neuronTargetTypeGroup || !neuronTargetElementGroup || !neuronTargetElementIdInput || !neuronGeneLifeGroup || !neuronGeneLifeIdInput || !neuronGeneAttackGroup || !neuronGeneAttackIdInput || !neuronElementInfomationGroup || !neuronElementInfomationIdInput || !neuronRuleChimicalElementGroup || !neuronRuleChimicalElementIdInput || !neuronChemicalElementGroup || !neuronChemicalElementIdInput || !neuronComplexChemicalElementGroup || !neuronComplexChemicalElementIdInput || !selectedCellLabel || !saveNeuronBtn || !deleteNeuronBtn || !neuronModalEl || !circuitsTableBody) {
         console.warn('One or more required elements for the brain tab are missing.');
         return;
     }
@@ -853,7 +929,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeMovement = @json(\App\Models\Neuron::TYPE_MOVEMENT);
     const typeStart = @json(\App\Models\Neuron::TYPE_START);
     const typeEnd = @json(\App\Models\Neuron::TYPE_END);
-    const typeReadChimicalElement = @json(\App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT);
+     const typeReadChimicalElement = @json(\App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT);
+     const typeReadGene = @json(\App\Models\Neuron::TYPE_READ_GENE);
     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const targetTypeChemicalElement = @json(\App\Models\Neuron::TARGET_TYPE_CHEMICAL_ELEMENT);
@@ -867,11 +944,13 @@ document.addEventListener('DOMContentLoaded', function () {
      const DEFAULT_CHIMICAL_ELEMENT = @json(\App\Models\NeuronLink::DEFAULT_CHIMICAL_ELEMENT);
      const portColors = @json(\App\Models\NeuronLink::PORT_COLORS);
     const saveNeuronUrl = @json(route('elements.brain.neurons.save', $element));
+    const moveNeuronUrl = @json(route('elements.brain.neurons.move', [$element, ':neuron']));
     const deleteNeuronUrl = @json(route('elements.brain.neurons.delete', $element));
     const saveNeuronLinkUrl = @json(route('elements.brain.neuron-links.save', $element));
     const brainChimicalElements = @json($brainChimicalElements ?? []);
     const brainComplexChimicalElements = @json($brainComplexChimicalElements ?? []);
     const brainTargetElements = @json($brainTargetElements ?? []);
+    const informationGenes = @json($informationGenes ?? []);
     const deleteNeuronLinkUrl = @json(route('elements.brain.neuron-links.delete', $element));
     const allRuleChimicalElements = @json($allRuleChimicalElements);
 
@@ -1553,12 +1632,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const isMovement = neuronTypeInput.value === typeMovement;
         const isAttack = neuronTypeInput.value === typeAttack;
         const isReadChimicalElement = neuronTypeInput.value === typeReadChimicalElement;
+        const isReadGene = neuronTypeInput.value === typeReadGene;
         const isPath = neuronTypeInput.value === typePath;
         neuronRadiusGroup.style.display = (isDetection || isMovement) ? '' : 'none';
         neuronStopBeforeTargetGroup.style.display = isPath ? '' : 'none';
         neuronTargetTypeGroup.style.display = isDetection ? '' : 'none';
         neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
         neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
+        neuronElementInfomationGroup.style.display = isReadGene ? '' : 'none';
         neuronRuleChimicalElementGroup.style.display = isReadChimicalElement ? '' : 'none';
         neuronChemicalElementGroup.style.display = 'none';
         neuronComplexChemicalElementGroup.style.display = 'none';
@@ -1570,6 +1651,12 @@ document.addEventListener('DOMContentLoaded', function () {
         neuronTargetElementGroup.style.display = targetType === targetTypeElement ? '' : 'none';
         neuronChemicalElementGroup.style.display = targetType === targetTypeChemicalElement ? '' : 'none';
         neuronComplexChemicalElementGroup.style.display = targetType === targetTypeComplexChemicalElement ? '' : 'none';
+    }
+
+    function updateGeneInformationTooltip() {
+        const selectedOption = neuronElementInfomationIdInput.options[neuronElementInfomationIdInput.selectedIndex];
+        const geneName = selectedOption ? selectedOption.text : '';
+        neuronElementInfomationIdInput.title = geneName ? `Gene selezionato: ${geneName}` : 'Seleziona un gene';
     }
 
     function openNeuronModal(i, j) {
@@ -1590,12 +1677,15 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronStopBeforeTargetInput.checked = existing.stop_before_target || false;
             neuronGeneLifeIdInput.value = existing.gene_life_id != null ? String(existing.gene_life_id) : '';
             neuronGeneAttackIdInput.value = existing.gene_attack_id != null ? String(existing.gene_attack_id) : '';
+            neuronElementInfomationIdInput.value = existing.element_infomation_id != null ? String(existing.element_infomation_id) : '';
+            updateGeneInformationTooltip();
             neuronRuleChimicalElementIdInput.value = existing.element_has_rule_chimical_element_id != null ? String(existing.element_has_rule_chimical_element_id) : '';
             neuronChemicalElementIdInput.value = existing.chemical_element_id != null ? String(existing.chemical_element_id) : '';
             neuronComplexChemicalElementIdInput.value = existing.complex_chemical_element_id != null ? String(existing.complex_chemical_element_id) : '';
             deleteNeuronBtn.style.display = '';
 
             toggleDetectionFieldsByType(); // Update visibility based on loaded values
+            updateGeneInformationTooltip();
 
             // Populate links tab
             populateLinksTab(existing.id);
@@ -1609,7 +1699,8 @@ document.addEventListener('DOMContentLoaded', function () {
             neuronChemicalElementIdInput.value = '';
             neuronComplexChemicalElementIdInput.value = '';
             neuronGeneLifeIdInput.value = '';
-            neuronRuleChimicalElementIdInput.value = '';
+            neuronGeneAttackIdInput.value = '';
+            neuronElementInfomationIdInput.value = '';
             neuronRuleChimicalElementIdInput.value = '';
             deleteNeuronBtn.style.display = 'none';
 
@@ -1618,6 +1709,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         toggleDetectionFieldsByType();
+        updateGeneInformationTooltip();
         $(neuronModalEl).modal('show');
 
         // Set the target type and specific inputs after the modal is fully shown
@@ -1772,37 +1864,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Tooltip
             neuronBorder.on('pointerover', () => {
                 if (!tooltipText || !tooltipBg) return;
-                const label = typeLabels[neuron.type] || neuron.type || 'Neurone';
-                const lines = [label];
-                lines.push(`Cella: (${Number(neuron.grid_i)}, ${Number(neuron.grid_j)})`);
-                if (neuron.type === typeDetection) {
-                    const targetLabel = targetTypeLabels[neuron.target_type] || '-';
-                    lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
-                    let targetInfo = targetLabel;
-                    if (neuron.target_type === targetTypeElement) {
-                        const targetElem = brainTargetElements.find(e => Number(e.id) === Number(neuron.target_element_id));
-                        targetInfo += ` (${targetElem ? targetElem.name : '-'})`;
-                    } else if (neuron.target_type === targetTypeChemicalElement) {
-                        const chem = brainChimicalElements.find(c => Number(c.id) === Number(neuron.chemical_element_id));
-                        targetInfo += ` (${chem ? chem.name : '-'})`;
-                    } else if (neuron.target_type === targetTypeComplexChemicalElement) {
-                        const comp = brainComplexChimicalElements.find(c => Number(c.id) === Number(neuron.complex_chemical_element_id));
-                        targetInfo += ` (${comp ? comp.name : '-'})`;
-                    }
-                    lines.push(`Target: ${targetInfo}`);
-                } else if (neuron.type === typeAttack) {
-                    lines.push(`Gene Vita: ${neuron.gene_life_id != null ? neuron.gene_life_id : '-'}`);
-                    lines.push(`Gene Attacco: ${neuron.gene_attack_id != null ? neuron.gene_attack_id : '-'}`);
-                } else if (neuron.type === typeMovement) {
-                    lines.push(`Raggio: ${neuron.radius != null ? neuron.radius : '-'}`);
-                } else if (neuron.type === typePath) {
-                    lines.push(`Stop movimento prima del target: ${neuron.stop_before_target ? 'SI' : 'NO'}`);
-                } else if (neuron.type === typeReadChimicalElement) {
-                    const ruleId = neuron.element_has_rule_chimical_element_id;
-                    const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-                    lines.push(`Elemento: ${rule ? rule.title : '-'}`);
-                }
-                tooltipText.text = lines.join('\n');
+                tooltipText.text = neuron.tooltip || 'Neurone';
                 tooltipText.visible = true;
                 tooltipBg.visible = true;
                 const paddingX = 6, paddingY = 4;
@@ -1867,18 +1929,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Anchors (static visualization)
-            const hasLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement;
-            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement;
-
-            if (hasLeftAnchor) {
+            // Draw left input anchor (single point) for neurons that receive connections
+            const needsLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene;
+            if (needsLeftAnchor) {
+                const leftAnchorPoint = getLeftAnchorPoint(neuron, cellSize);
                 const leftAnchor = new PIXI.Graphics();
-                leftAnchor.beginFill(0x16a34a);
+                leftAnchor.beginFill(0x16a34a); // Green color for all left anchors
                 leftAnchor.lineStyle(2, 0xffffff, 1);
-                leftAnchor.drawCircle((j * cellSize), (i * cellSize) + (cellSize / 2), 8);
+                leftAnchor.drawCircle(leftAnchorPoint.x, leftAnchorPoint.y, 8);
                 leftAnchor.endFill();
                 leftAnchor.eventMode = 'none';
                 layer.addChild(leftAnchor);
             }
+
+            // Draw right output anchors from condition_orders
+            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene;
+
+
+
 
             if (hasRightAnchor) {
                 let orders = neuron.condition_orders || [];
@@ -1897,7 +1965,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 for (const orderObj of sortedOrders) {
                     const cond = orderObj.condition;
                     const anchor = getRightAnchorPoint(neuron, cellSize, cond);
-                    
+
                     const colorStr = (orderObj && orderObj.color) ? orderObj.color : getConditionColor(neuron.type, neuron.element_has_rule_chimical_element_id, cond);
                     let colorInt;
                     if (typeof colorStr === 'string' && colorStr.startsWith('#')) {
@@ -1910,7 +1978,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     const dynamicRadius = neuron.type === typeReadChimicalElement ? 10 : 8;
                     const xOffset = neuron.type === typeReadChimicalElement ? 2 : 0;
-                    
+
                     const a = new PIXI.Graphics();
                     a.beginFill(colorInt);
                     a.lineStyle(neuron.type === typeReadChimicalElement ? 1 : 2, 0xffffff, 1);
@@ -1996,22 +2064,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         const targetOccupied = findNeuronAtCell(clampedI, clampedJ);
                         if (!targetOccupied || Number(targetOccupied.id) === Number(neuron.id)) {
                             try {
-                                const updatedNeuron = await requestSaveNeuron({
-                                    id: neuron.id,
-                                    brain_grid_width: normalize(widthInput.value || 5),
-                                    brain_grid_height: normalize(heightInput.value || 5),
-                                    type: neuron.type,
-                                    grid_i: clampedI,
-                                    grid_j: clampedJ,
-                                    radius: neuron.radius,
-                                    target_type: neuron.target_type,
-                                    target_element_id: neuron.target_element_id,
-                                    chemical_element_id: neuron.chemical_element_id,
-                                    complex_chemical_element_id: neuron.complex_chemical_element_id,
-                                    gene_life_id: neuron.gene_life_id,
-                                    gene_attack_id: neuron.gene_attack_id,
-                                    element_has_rule_chimical_element_id: neuron.element_has_rule_chimical_element_id,
-                                });
+                                const updatedNeuron = await requestMoveNeuron(neuron.id, clampedI, clampedJ);
                                 neuronItems = neuronItems.filter(item => Number(item.id) !== Number(neuron.id));
                                 neuronItems.push(updatedNeuron);
                                 updateNeuronHiddenInput();
@@ -2111,6 +2164,26 @@ document.addEventListener('DOMContentLoaded', function () {
         if (data.circuits) neuronCircuits = data.circuits;
     }
 
+    async function requestMoveNeuron(neuronId, gridI, gridJ) {
+        const url = moveNeuronUrl.replace(':neuron', neuronId);
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({
+                grid_i: gridI,
+                grid_j: gridJ,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Errore durante lo spostamento neurone');
+        if (data.circuits) neuronCircuits = data.circuits;
+        return data.neuron;
+    }
+
     async function requestSaveNeuronLink(payload) {
         const response = await fetch(saveNeuronLinkUrl, {
             method: 'POST',
@@ -2146,6 +2219,7 @@ document.addEventListener('DOMContentLoaded', function () {
     heightInput.addEventListener('input', renderGrid);
     neuronTypeInput.addEventListener('change', toggleDetectionFieldsByType);
     neuronTargetTypeInput.addEventListener('change', toggleDetectionFieldsByType);
+    neuronElementInfomationIdInput.addEventListener('change', updateGeneInformationTooltip);
 
     saveNeuronBtn.addEventListener('click', async function () {
         if (!selectedCell) return;
@@ -2160,6 +2234,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let complexChemicalElementId = null;
         let geneLifeId = null;
         let geneAttackId = null;
+        let elementInfomationId = null;
         let elementHasRuleChimicalElementId = null;
         if (type === typeDetection) {
             radius = Math.max(1, normalize(neuronRadiusInput.value || 1));
@@ -2183,6 +2258,13 @@ document.addEventListener('DOMContentLoaded', function () {
             geneAttackId = Number.isNaN(parsedAttack) ? null : parsedAttack;
             if (geneLifeId == null || geneAttackId == null) {
                 alert('Per il neurone Attacco devi selezionare Gene Vita e Gene Attacco');
+                return;
+            }
+        } else if (type === typeReadGene) {
+            const parsedInfo = parseInt(neuronElementInfomationIdInput.value, 10);
+            elementInfomationId = Number.isNaN(parsedInfo) ? null : parsedInfo;
+            if (elementInfomationId == null) {
+                alert('Per il neurone Lettura Gene devi selezionare un Gene');
                 return;
             }
         } else if (type === typeReadChimicalElement) {
@@ -2211,6 +2293,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 complex_chemical_element_id: complexChemicalElementId,
                 gene_life_id: geneLifeId,
                 gene_attack_id: geneAttackId,
+                element_infomation_id: elementInfomationId,
                 element_has_rule_chimical_element_id: elementHasRuleChimicalElementId,
             });
             neuronItems = neuronItems.filter((item) => !(Number(item.grid_i) === i && Number(item.grid_j) === j));
@@ -2261,6 +2344,16 @@ document.addEventListener('DOMContentLoaded', function () {
     updateNeuronLinksHiddenInput();
     renderGrid();
     renderCircuitsTable();
+
+    // Update guide carousel counter
+    const guideCarousel = document.getElementById('brainGuideCarousel');
+    if (guideCarousel) {
+        guideCarousel.addEventListener('slid.bs.carousel', function (event) {
+            const totalSlides = 10;
+            const currentIndex = Array.from(guideCarousel.querySelectorAll('.carousel-item')).findIndex(item => item.classList.contains('active'));
+            document.getElementById('currentSlideNumber').textContent = `${currentIndex + 1} / ${totalSlides}`;
+        });
+    }
 });
 </script>
 @endpush

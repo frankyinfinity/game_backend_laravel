@@ -11,6 +11,7 @@ use App\Custom\Draw\Primitive\Circle;
 use App\Models\ElementHasPositionBrain;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\ElementHasPositionNeuronLink;
+use App\Helpers\NeuronTooltipHelper;
 
 class BrainPanelDraw
 {
@@ -343,39 +344,8 @@ class BrainPanelDraw
         return $this->getLinkColor($condition);
     }
 
-    private function buildNeuronTooltip(ElementHasPositionNeuron $neuron): string
-    {
-        $label = \App\Models\Neuron::TYPE_LABELS[(string) $neuron->type] ?? ucfirst((string) $neuron->type);
-
-        $lines = [];
-        $lines[] = $label;
-        $lines[] = 'Cella: (' . (int) $neuron->grid_i . ', ' . (int) $neuron->grid_j . ')';
-
-        if ((string) $neuron->type === \App\Models\Neuron::TYPE_DETECTION) {
-            $targetLabel = \App\Models\Neuron::TARGET_TYPE_LABELS[$neuron->target_type] ?? '-';
-            $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
-            
-            $targetInfo = $targetLabel;
-            if ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_ELEMENT && $neuron->targetElement) {
-                $targetInfo .= " ({$neuron->targetElement->name})";
-            } elseif ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_CHEMICAL_ELEMENT && $neuron->chemicalElement) {
-                $targetInfo .= " ({$neuron->chemicalElement->name})";
-            } elseif ($neuron->target_type === \App\Models\Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT && $neuron->complexChemicalElement) {
-                $targetInfo .= " ({$neuron->complexChemicalElement->name})";
-            }
-            $lines[] = 'Target: ' . $targetInfo;
-        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_ATTACK) {
-            $lines[] = 'Gene Vita: ' . ($neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : '-');
-            $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');
-        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_MOVEMENT) {
-            $lines[] = 'Raggio: ' . ($neuron->radius !== null ? (int) $neuron->radius : '-');
-        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_PATH) {
-            $lines[] = 'Stop movimento prima del target: ' . ($neuron->stop_before_target ? 'SI' : 'NO');
-        } elseif ((string) $neuron->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
-            $rule = $neuron->chemicalRule;
-            $lines[] = 'Elemento: ' . ($rule ? ($rule->title ?: $rule->name) : '-');
-        }
-
-        return implode("\n", $lines);
-    }
+     private function buildNeuronTooltip(ElementHasPositionNeuron $neuron): string
+     {
+         return NeuronTooltipHelper::generateTextFromElementHasPositionNeuron($neuron);
+     }
 }
