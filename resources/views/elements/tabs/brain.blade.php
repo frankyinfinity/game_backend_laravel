@@ -931,7 +931,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeEnd = @json(\App\Models\Neuron::TYPE_END);
      const typeReadChimicalElement = @json(\App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT);
      const typeReadGene = @json(\App\Models\Neuron::TYPE_READ_GENE);
-    const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
+     const typeMaxValueGene = @json(\App\Models\Neuron::TYPE_MAX_VALUE_GENE);
+     const MAX_VALUE_GENE_YES = @json(\App\Models\Neuron::MAX_VALUE_GENE_YES);
+     const MAX_VALUE_GENE_NO = @json(\App\Models\Neuron::MAX_VALUE_GENE_NO);
+     const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
     const targetTypeEntity = @json(\App\Models\Neuron::TARGET_TYPE_ENTITY);
     const targetTypeChemicalElement = @json(\App\Models\Neuron::TARGET_TYPE_CHEMICAL_ELEMENT);
     const targetTypeComplexChemicalElement = @json(\App\Models\Neuron::TARGET_TYPE_COMPLEX_CHEMICAL_ELEMENT);
@@ -954,19 +957,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteNeuronLinkUrl = @json(route('elements.brain.neuron-links.delete', $element));
     const allRuleChimicalElements = @json($allRuleChimicalElements);
 
-    function getConditionColor(type, ruleId, condition) {
-        if (type === typeReadChimicalElement) {
-            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
-            if (rule && rule.details) {
-                const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
-                if (detail && detail.color) return detail.color;
-            }
-            if (condition === DEFAULT_CHIMICAL_ELEMENT) return '#6b7280';
-        }
-        const colorInt = portColors[condition] || portColors[portTrigger];
-        // Ensure colorInt is handled as hex string
-        return '#' + (colorInt ? colorInt.toString(16).padStart(6, '0') : '000000');
-    }
+     function getConditionColor(type, ruleId, condition) {
+         if (type === typeReadChimicalElement) {
+             const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(ruleId));
+             if (rule && rule.details) {
+                 const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
+                 if (detail && detail.color) return detail.color;
+             }
+             if (condition === DEFAULT_CHIMICAL_ELEMENT) return '#6b7280';
+         }
+         if (type === typeMaxValueGene) {
+             if (condition === MAX_VALUE_GENE_YES) return '#16A34A';
+             if (condition === MAX_VALUE_GENE_NO) return '#DC2626';
+             return '#16A34A';
+         }
+         const colorInt = portColors[condition] || portColors[portTrigger];
+         // Ensure colorInt is handled as hex string
+         return '#' + (colorInt ? colorInt.toString(16).padStart(6, '0') : '000000');
+     }
     const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
 
     let app = null;
@@ -1455,24 +1463,29 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(saveBtn);
     }
 
-    function getOutputConditionsDetailed(neuron) {
-        if (neuron.type === typeDetection) {
-            return [
-                { condition: portDetectionSuccess, rule_detail_id: null },
-                { condition: portDetectionFailure, rule_detail_id: null }
-            ];
-        } else if (neuron.type === typeReadChimicalElement) {
-            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(neuron.element_has_rule_chimical_element_id));
-            if (rule && rule.details) {
-                const conditions = rule.details.map(d => ({ condition: `[${d.min}/${d.max}]`, rule_detail_id: d.id }));
-                conditions.push({ condition: DEFAULT_CHIMICAL_ELEMENT, rule_detail_id: null });
-                return conditions;
-            }
-            return [{ condition: DEFAULT_CHIMICAL_ELEMENT, rule_detail_id: null }];
-        } else {
-            return [{ condition: portTrigger, rule_detail_id: null }];
-        }
-    }
+     function getOutputConditionsDetailed(neuron) {
+         if (neuron.type === typeDetection) {
+             return [
+                 { condition: portDetectionSuccess, rule_detail_id: null },
+                 { condition: portDetectionFailure, rule_detail_id: null }
+             ];
+         } else if (neuron.type === typeReadChimicalElement) {
+             const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(neuron.element_has_rule_chimical_element_id));
+             if (rule && rule.details) {
+                 const conditions = rule.details.map(d => ({ condition: `[${d.min}/${d.max}]`, rule_detail_id: d.id }));
+                 conditions.push({ condition: DEFAULT_CHIMICAL_ELEMENT, rule_detail_id: null });
+                 return conditions;
+             }
+             return [{ condition: DEFAULT_CHIMICAL_ELEMENT, rule_detail_id: null }];
+         } else if (neuron.type === typeMaxValueGene) {
+             return [
+                 { condition: MAX_VALUE_GENE_YES, rule_detail_id: null },
+                 { condition: MAX_VALUE_GENE_NO, rule_detail_id: null }
+             ];
+         } else {
+             return [{ condition: portTrigger, rule_detail_id: null }];
+         }
+     }
 
     async function saveLinks(neuronId) {
         const container = document.getElementById('neuron-links-container');
@@ -1521,20 +1534,24 @@ document.addEventListener('DOMContentLoaded', function () {
                             if (savedLink) neuronLinks.push(savedLink);
                         }
                     } else {
-                        // Create new link
-                        let linkColor = null;
-                        if (sourceNeuron.type === typeReadChimicalElement) {
-                            const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(sourceNeuron.element_has_rule_chimical_element_id));
-                            if (rule && rule.details) {
-                                const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
-                                if (detail && detail.color) linkColor = detail.color;
-                            }
-                            if (condition === DEFAULT_CHIMICAL_ELEMENT) linkColor = '#6b7280';
-                        } else if (condition === portDetectionFailure) {
-                            linkColor = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
-                        } else {
-                            linkColor = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
-                        }
+                         // Create new link
+                         let linkColor = null;
+                         if (sourceNeuron.type === typeReadChimicalElement) {
+                             const rule = allRuleChimicalElements.find(r => Number(r.id) === Number(sourceNeuron.element_has_rule_chimical_element_id));
+                             if (rule && rule.details) {
+                                 const detail = rule.details.find(d => `[${d.min}/${d.max}]` === condition);
+                                 if (detail && detail.color) linkColor = detail.color;
+                             }
+                             if (condition === DEFAULT_CHIMICAL_ELEMENT) linkColor = '#6b7280';
+                         } else if (sourceNeuron.type === typeMaxValueGene) {
+                             if (condition === MAX_VALUE_GENE_YES) linkColor = '#16A34A';
+                             else if (condition === MAX_VALUE_GENE_NO) linkColor = '#DC2626';
+                             else linkColor = '#16A34A';
+                         } else if (condition === portDetectionFailure) {
+                             linkColor = '#' + portColors[portDetectionFailure].toString(16).padStart(6, '0');
+                         } else {
+                             linkColor = '#' + portColors[portTrigger].toString(16).padStart(6, '0');
+                         }
 
                         const savedLink = await requestSaveNeuronLink({
                             from_neuron_id: Number(neuronId),
@@ -1627,31 +1644,32 @@ document.addEventListener('DOMContentLoaded', function () {
         return { x: topLeftX, y: topLeftY + (cellSize / 2) };
     }
 
-    function toggleDetectionFieldsByType() {
-        const isDetection = neuronTypeInput.value === typeDetection;
-        const isMovement = neuronTypeInput.value === typeMovement;
-        const isAttack = neuronTypeInput.value === typeAttack;
-        const isReadChimicalElement = neuronTypeInput.value === typeReadChimicalElement;
-        const isReadGene = neuronTypeInput.value === typeReadGene;
-        const isPath = neuronTypeInput.value === typePath;
-        neuronRadiusGroup.style.display = (isDetection || isMovement) ? '' : 'none';
-        neuronStopBeforeTargetGroup.style.display = isPath ? '' : 'none';
-        neuronTargetTypeGroup.style.display = isDetection ? '' : 'none';
-        neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
-        neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
-        neuronElementInfomationGroup.style.display = isReadGene ? '' : 'none';
-        neuronRuleChimicalElementGroup.style.display = isReadChimicalElement ? '' : 'none';
-        neuronChemicalElementGroup.style.display = 'none';
-        neuronComplexChemicalElementGroup.style.display = 'none';
-        if (!isDetection) {
-            neuronTargetElementGroup.style.display = 'none';
-            return;
-        }
-        const targetType = neuronTargetTypeInput.value;
-        neuronTargetElementGroup.style.display = targetType === targetTypeElement ? '' : 'none';
-        neuronChemicalElementGroup.style.display = targetType === targetTypeChemicalElement ? '' : 'none';
-        neuronComplexChemicalElementGroup.style.display = targetType === targetTypeComplexChemicalElement ? '' : 'none';
-    }
+     function toggleDetectionFieldsByType() {
+         const isDetection = neuronTypeInput.value === typeDetection;
+         const isMovement = neuronTypeInput.value === typeMovement;
+         const isAttack = neuronTypeInput.value === typeAttack;
+         const isReadChimicalElement = neuronTypeInput.value === typeReadChimicalElement;
+         const isReadGene = neuronTypeInput.value === typeReadGene;
+         const isMaxValueGene = neuronTypeInput.value === typeMaxValueGene;
+         const isPath = neuronTypeInput.value === typePath;
+         neuronRadiusGroup.style.display = (isDetection || isMovement) ? '' : 'none';
+         neuronStopBeforeTargetGroup.style.display = isPath ? '' : 'none';
+         neuronTargetTypeGroup.style.display = isDetection ? '' : 'none';
+         neuronGeneLifeGroup.style.display = isAttack ? '' : 'none';
+         neuronGeneAttackGroup.style.display = isAttack ? '' : 'none';
+         neuronElementInfomationGroup.style.display = (isReadGene || isMaxValueGene) ? '' : 'none';
+         neuronRuleChimicalElementGroup.style.display = isReadChimicalElement ? '' : 'none';
+         neuronChemicalElementGroup.style.display = 'none';
+         neuronComplexChemicalElementGroup.style.display = 'none';
+         if (!isDetection) {
+             neuronTargetElementGroup.style.display = 'none';
+             return;
+         }
+         const targetType = neuronTargetTypeInput.value;
+         neuronTargetElementGroup.style.display = targetType === targetTypeElement ? '' : 'none';
+         neuronChemicalElementGroup.style.display = targetType === targetTypeChemicalElement ? '' : 'none';
+         neuronComplexChemicalElementGroup.style.display = targetType === targetTypeComplexChemicalElement ? '' : 'none';
+     }
 
     function updateGeneInformationTooltip() {
         const selectedOption = neuronElementInfomationIdInput.options[neuronElementInfomationIdInput.selectedIndex];
@@ -1930,7 +1948,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Anchors (static visualization)
             // Draw left input anchor (single point) for neurons that receive connections
-            const needsLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene;
+            const needsLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene || neuron.type === typeMaxValueGene;
             if (needsLeftAnchor) {
                 const leftAnchorPoint = getLeftAnchorPoint(neuron, cellSize);
                 const leftAnchor = new PIXI.Graphics();
@@ -1943,7 +1961,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Draw right output anchors from condition_orders
-            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene;
+            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene || neuron.type === typeMaxValueGene;
 
 
 
@@ -2260,14 +2278,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Per il neurone Attacco devi selezionare Gene Vita e Gene Attacco');
                 return;
             }
-        } else if (type === typeReadGene) {
-            const parsedInfo = parseInt(neuronElementInfomationIdInput.value, 10);
-            elementInfomationId = Number.isNaN(parsedInfo) ? null : parsedInfo;
-            if (elementInfomationId == null) {
-                alert('Per il neurone Lettura Gene devi selezionare un Gene');
-                return;
-            }
-        } else if (type === typeReadChimicalElement) {
+         } else if (type === typeReadGene) {
+             const parsedInfo = parseInt(neuronElementInfomationIdInput.value, 10);
+             elementInfomationId = Number.isNaN(parsedInfo) ? null : parsedInfo;
+             if (elementInfomationId == null) {
+                 alert('Per il neurone Lettura Gene devi selezionare un Gene');
+                 return;
+             }
+         } else if (type === typeMaxValueGene) {
+             const parsedInfo = parseInt(neuronElementInfomationIdInput.value, 10);
+             elementInfomationId = Number.isNaN(parsedInfo) ? null : parsedInfo;
+             if (elementInfomationId == null) {
+                 alert('Per il neurone Valore Massimo Gene devi selezionare un Gene');
+                 return;
+             }
+         } else if (type === typeReadChimicalElement) {
             const parsedRule = parseInt(neuronRuleChimicalElementIdInput.value, 10);
             elementHasRuleChimicalElementId = Number.isNaN(parsedRule) ? null : parsedRule;
             if (elementHasRuleChimicalElementId == null) {

@@ -619,6 +619,18 @@ class ElementController extends Controller
             }
         }
 
+        if ($type === Neuron::TYPE_MAX_VALUE_GENE) {
+            $candidateElementInfomationId = (int) $request->input('element_infomation_id', 0);
+            $elementInfomationId = $candidateElementInfomationId > 0 ? $candidateElementInfomationId : null;
+
+            if ($elementInfomationId === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Per il neurone Valore Massimo Gene devi selezionare un Gene',
+                ], 422);
+            }
+        }
+
         if ($type === Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             $candidateRuleId = (int) $request->input('element_has_rule_chimical_element_id', 0);
             $elementHasRuleChimicalElementId = $candidateRuleId > 0 ? $candidateRuleId : null;
@@ -922,9 +934,17 @@ class ElementController extends Controller
                     }
                 }
             }
+        } elseif ($fromNeuron->type === Neuron::TYPE_MAX_VALUE_GENE) {
+            $candidateCondition = (string) $request->input('condition', '');
+            if ($candidateCondition === Neuron::MAX_VALUE_GENE_YES || $candidateCondition === Neuron::MAX_VALUE_GENE_NO) {
+                $condition = $candidateCondition;
+            } else {
+                $condition = Neuron::MAX_VALUE_GENE_YES;
+            }
+            $ruleDetailId = null;
         } else {
-            $condition = NeuronLink::PORT_TRIGGER;
-        }
+             $condition = NeuronLink::PORT_TRIGGER;
+         }
 
         $color = $request->input('color');
 
@@ -1491,6 +1511,10 @@ class ElementController extends Controller
                 $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
             }
             foreach ($toAdd as $nId) {
+                // Controlla che il neurone esista effettivamente (difesa da casi di inconsistenza)
+                if (!$allNeurons->has($nId)) {
+                    continue;
+                }
                 NeuronCircuitDetail::create(['neuron_circuit_id' => $circuit->id, 'neuron_id' => $nId]);
             }
 

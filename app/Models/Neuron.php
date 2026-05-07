@@ -22,6 +22,11 @@ class Neuron extends Model
 
     public const TYPE_READ_GENE = 'read_gene';
 
+    public const TYPE_MAX_VALUE_GENE = 'max_value_gene';
+
+    public const MAX_VALUE_GENE_YES = 'yes';
+    public const MAX_VALUE_GENE_NO = 'no';
+
     public const TYPES = [
         self::TYPE_DETECTION,
         self::TYPE_PATH,
@@ -31,6 +36,7 @@ class Neuron extends Model
         self::TYPE_END,
         self::TYPE_READ_CHIMICAL_ELEMENT,
         self::TYPE_READ_GENE,
+        self::TYPE_MAX_VALUE_GENE,
     ];
 
     public const TYPE_LABELS = [
@@ -42,6 +48,7 @@ class Neuron extends Model
         self::TYPE_END => 'Fine',
         self::TYPE_READ_CHIMICAL_ELEMENT => 'Lettura Elemento Chimico',
         self::TYPE_READ_GENE => 'Lettura Gene',
+        self::TYPE_MAX_VALUE_GENE => 'Valore Massimo Gene',
     ];
 
     public const TYPE_SYMBOLS = [
@@ -53,6 +60,7 @@ class Neuron extends Model
         self::TYPE_END => '■',
         self::TYPE_READ_CHIMICAL_ELEMENT => '🧪',
         self::TYPE_READ_GENE => '🧬',
+        self::TYPE_MAX_VALUE_GENE => '📊',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
@@ -159,6 +167,11 @@ class Neuron extends Model
             }
 
             return [['condition' => NeuronLink::DEFAULT_CHIMICAL_ELEMENT, 'rule_detail_id' => null]];
+        }         elseif ((string) $this->type === self::TYPE_MAX_VALUE_GENE) {
+            return [
+                ['condition' => self::MAX_VALUE_GENE_YES, 'rule_detail_id' => null],
+                ['condition' => self::MAX_VALUE_GENE_NO, 'rule_detail_id' => null],
+            ];
         } else {
             return [['condition' => NeuronLink::PORT_TRIGGER, 'rule_detail_id' => null]];
         }
@@ -166,6 +179,16 @@ class Neuron extends Model
 
     public function getConditionColor(string $condition): string
     {
+        if ((string) $this->type === self::TYPE_MAX_VALUE_GENE) {
+            if ($condition === self::MAX_VALUE_GENE_YES) {
+                return '#16A34A'; // Green
+            }
+            if ($condition === self::MAX_VALUE_GENE_NO) {
+                return '#DC2626'; // Red
+            }
+            return '#16A34A';
+        }
+
         if ((string) $this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $this->chemicalRule;
             if ($rule && $rule->details) {

@@ -59,6 +59,11 @@ class NeuronTooltipHelper
                 $gene = $neuron->informationGene;
                 $lines[] = 'Gene: ' . ($gene ? $gene->name : '-');
                 break;
+
+            case Neuron::TYPE_MAX_VALUE_GENE:
+                $gene = $neuron->informationGene;
+                $lines[] = 'Gene: ' . ($gene ? $gene->name : '-');
+                break;
         }
 
         return [
