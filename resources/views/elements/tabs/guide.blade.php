@@ -4,10 +4,10 @@
 
 <!-- Brain Guide Modal -->
 <div class="modal fade" id="brainGuideModal" tabindex="-1" role="dialog" aria-labelledby="brainGuideModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="brainGuideModalLabel">Guida al Sistema Neuronale</h5>
+                <h5 class="modal-title" id="brainGuideModalLabel">Guida Neuroni</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Chiudi">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -350,6 +350,171 @@
                             </div>
                         </div>
 
+                        <!-- Pagina 7: CONSUMO -->
+                        <div class="carousel-item">
+                            <div class="text-center mb-4">
+                                <h4><i class="fas fa-utensils fa-2x text-success mb-3"></i></h4>
+                                <h5>CONSUMO (Consume)</h5>
+                                <p class="text-muted">Il neurone della nutrizione e crescita</p>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-success">
+                                        <div class="card-header bg-success text-white">
+                                            <h6 class="mb-0"><i class="fas fa-cookie-bite"></i> Funzione Principale</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Il neurone consumo permette all'elemento di assimilare un bersaglio posizionato sulla sua stessa cella. Questo processo elimina il bersaglio e innesca aggiornamenti genetici basati sulle caratteristiche dell'elemento consumato.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-dna"></i> Effetti sui Geni</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul>
+                                                <li><strong>Aggiornamento Genetico:</strong> Modifica i valori dei geni dell'elemento consumatore.</li>
+                                                <li><strong>Parametri Dinamici:</strong> Gli effetti dipendono dalla composizione del bersaglio.</li>
+                                                <li><strong>Atomicità:</strong> L'aggiornamento avviene istantaneamente dopo il consumo.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-exclamation-circle"></i> Requisiti di Esecuzione</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul>
+                                                <li><strong>Posizionamento:</strong> Il consumatore deve trovarsi esattamente sulla cella del bersaglio.</li>
+                                                <li><strong>Eliminazione:</strong> Il bersaglio viene rimosso definitivamente dalla mappa.</li>
+                                                <li><strong>Sequenza:</strong> Solitamente attivato dopo un neurone Percorso (senza stop).</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="alert alert-success">
+                                        <h6><i class="fas fa-sync"></i> Sincronizzazione</h6>
+                                        <p>Questo neurone sincronizza automaticamente i cambiamenti genetici tra il server e l'interfaccia di gioco, assicurando che le statistiche dell'elemento siano sempre aggiornate.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pagina 8: LETTURA GENE -->
+                        <div class="carousel-item">
+                            <div class="text-center mb-4">
+                                <h4><i class="fas fa-dna fa-2x text-info mb-3"></i></h4>
+                                <h5>LETTURA GENE (Read Gene)</h5>
+                                <p class="text-muted">Il monitor dello stato interno</p>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-info">
+                                        <div class="card-header bg-info text-white">
+                                            <h6 class="mb-0"><i class="fas fa-search"></i> Funzione Principale</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Il neurone di lettura gene permette di monitorare il valore attuale di uno specifico gene all'interno dell'elemento. È essenziale per creare comportamenti che dipendono dalle condizioni fisiche o dalle capacità dell'elemento.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-filter"></i> Applicazioni Lociche</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul>
+                                                <li><strong>Controllo Salute:</strong> Verifica se il gene vita è sceso sotto una soglia per attivare la fuga.</li>
+                                                <li><strong>Potenza Attacco:</strong> Modula il comportamento in base alla forza attuale.</li>
+                                                <li><strong>Adattabilità:</strong> Cambia strategia in base all'evoluzione genetica.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-layer-group"></i> Uscite Condizionali</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul>
+                                                <li><strong>Range di Valori:</strong> Genera segnali diversi in base all'intensità del gene.</li>
+                                                <li><strong>Trigger Precisi:</strong> Può attivare rami diversi del cervello in base ai dati letti.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pagina 9: LIMITE GENE -->
+                        <div class="carousel-item">
+                            <div class="text-center mb-4">
+                                <h4><i class="fas fa-vial fa-2x text-danger mb-3"></i></h4>
+                                <h5>LIMITE GENE (Max Value Gene)</h5>
+                                <p class="text-muted">Il sensore di saturazione genetica</p>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-danger">
+                                        <div class="card-header bg-danger text-white">
+                                            <h6 class="mb-0"><i class="fas fa-arrow-up"></i> Funzione Principale</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Questo neurone specializzato rileva se un determinato gene ha raggiunto il suo valore massimo consentito dal genoma. È fondamentale per ottimizzare i processi di consumo ed evitare sprechi di risorse.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-check-double"></i> Controllo Saturazione</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul>
+                                                <li><strong>SI (Saturato):</strong> Attiva l'uscita se il gene è al massimo.</li>
+                                                <li><strong>NO (Non Saturato):</strong> Attiva l'uscita se c'è ancora spazio per crescere.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-stopwatch"></i> Utilizzo Strategico</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul>
+                                                <li><strong>Efficienza:</strong> Interrompe la ricerca di cibo se i geni sono già al massimo.</li>
+                                                <li><strong>Gestione Risorse:</strong> Indirizza l'elemento verso altri obiettivi quando un parametro è completo.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Pagina 7: START e END -->
                         <div class="carousel-item">
                             <div class="text-center mb-4">
@@ -466,7 +631,7 @@
                         </button>
 
                         <div class="text-center">
-                            <small class="text-muted" id="currentSlideNumber">1 / 8</small>
+                            <small class="text-muted" id="currentSlideNumber">1 / 11</small>
                         </div>
 
                         <button class="btn btn-outline-secondary" type="button" id="guideNextBtn">
@@ -483,7 +648,7 @@
 <script>
     $(function () {
         let currentSlide = 0;
-        const totalSlides = 8;
+        const totalSlides = 11;
         const carousel = document.getElementById('brainGuideCarousel');
         const prevBtn = document.getElementById('guidePrevBtn');
         const nextBtn = document.getElementById('guideNextBtn');

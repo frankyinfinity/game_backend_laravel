@@ -65,7 +65,7 @@ class Neuron extends Model
         self::TYPE_READ_CHIMICAL_ELEMENT => '🧪',
         self::TYPE_READ_GENE => '🧬',
         self::TYPE_MAX_VALUE_GENE => '📊',
-        self::TYPE_CONSUME => '⚡',
+        self::TYPE_CONSUME => '🍴',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
