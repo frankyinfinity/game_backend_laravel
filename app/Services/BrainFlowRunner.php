@@ -783,23 +783,6 @@ class BrainFlowRunner
             return;
         }
 
-        // Trova la regola corrispondente nel consumer (quale tipo di elemento puÃ² consumare)
-        $rule = null;
-        if ($targetElement->chimical_element_id !== null) {
-            $rule = $elementHasPosition->rules()
-                ->where('chimical_element_id', $targetElement->chimical_element_id)
-                ->first();
-        } elseif ($targetElement->complex_chimical_element_id !== null) {
-            $rule = $elementHasPosition->rules()
-                ->where('complex_chimical_element_id', $targetElement->complex_chimical_element_id)
-                ->first();
-        }
-
-        if (!$rule) {
-            Log::info('Consume: no matching consumption rule for target element type');
-            return;
-        }
-
         // Accoda comandi di cancellazione UI per il target
         $targetUidsToClear = [
             $targetUid,
@@ -855,9 +838,7 @@ class BrainFlowRunner
 
         $neuron['consume_result'] = [
             'target_uid' => $targetUid,
-            'target_element_id' => $targetElementId,
-            'rule_id' => $rule->id,
-            'max' => $rule->max
+            'target_element_id' => $targetElementId
         ];
 
         Log::info('Consume: success', $neuron['consume_result']);
