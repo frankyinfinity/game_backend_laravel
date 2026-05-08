@@ -2623,6 +2623,22 @@ class GameController extends Controller
         return '';
     }
 
+    private function buildApplyElementGeneEffectsCode(string $elementHasPositionUid, string $targetElementUid, int $targetElementId): string
+    {
+        $jsPath = resource_path('js/function/element/apply_gene_effects.blade.php');
+        if (is_file($jsPath)) {
+            $jsContent = file_get_contents($jsPath);
+            if ($jsContent !== false) {
+                $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
+                $jsContent = str_replace('__TARGET_ELEMENT_UID__', $targetElementUid, $jsContent);
+                $jsContent = str_replace('__TARGET_ELEMENT_ID__', (string) $targetElementId, $jsContent);
+                return Helper::setCommonJsCode($jsContent, Str::random(20));
+            }
+        }
+
+        return '';
+    }
+
     private function buildRefreshRemoteWebSocketsCode(int $playerId): string
     {
         $safePlayerId = max(0, $playerId);
@@ -3055,6 +3071,44 @@ class GameController extends Controller
                     if ($newValue !== $oldValue) {
                         $entityInfo->update(['value' => $newValue]);
                     }
+                }
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function applyElementGeneEffects(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $elementHasPositionUid = $request->element_has_position_uid;
+        $targetElementId = $request->target_element_id;
+
+        $elementHasPosition = ElementHasPosition::query()->where('uid', $elementHasPositionUid)->first();
+        if (!$elementHasPosition) {
+            return response()->json(['success' => false, 'message' => 'ElementHasPosition not found']);
+        }
+
+        $elementEffects = ElementHasGene::query()->where('element_id', $targetElementId)->get();
+        foreach ($elementEffects as $effect) {
+            $gene = Gene::find($effect->gene_id);
+            if (!$gene)
+                continue;
+
+            $info = ElementHasPositionInformation::query()
+                ->where('element_has_position_id', $elementHasPosition->id)
+                ->where('gene_id', $gene->id)
+                ->first();
+
+            if ($info) {
+                $oldValue = $info->value;
+                $newValue = $oldValue + $effect->effect;
+
+                $min = $info->min;
+                $max = $info->max + ($info->modifier ?? 0);
+                $newValue = max($min, min($max, $newValue));
+
+                if ($newValue !== $oldValue) {
+                    $info->update(['value' => $newValue]);
                 }
             }
         }

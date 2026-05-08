@@ -61,11 +61,6 @@ class ElementHasPosition extends Model
         return $this->hasMany(ElementHasPositionNeuronCircuit::class);
     }
 
-    public function elementHasPositionScores()
-    {
-        return $this->hasMany(ElementHasPositionScore::class);
-    }
-
     public function scores()
     {
         return $this->belongsToMany(Score::class, 'element_has_position_scores')->withPivot('value');

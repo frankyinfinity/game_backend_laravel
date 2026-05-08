@@ -100,7 +100,7 @@ class ElementHasPositionNeuron extends Model
 
     public function getConditionColor(string $condition): string
     {
-        if ((string)$this->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
+        if ((string) $this->type === \App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $this->chemicalRule;
             if ($rule && $rule->details) {
                 foreach ($rule->details as $detail) {
@@ -113,11 +113,11 @@ class ElementHasPositionNeuron extends Model
                 return '#6b7280';
             }
         }
-        
+
         if ($condition === \App\Models\NeuronLink::PORT_DETECTION_FAILURE) {
             return '#F97316'; // Orange
         }
-        
+
         return '#16A34A'; // Green
     }
 }

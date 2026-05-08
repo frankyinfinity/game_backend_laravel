@@ -868,37 +868,19 @@ class BrainFlowRunner
             $this->queuedDrawBySession[$sessionId][] = (new ObjectClear($uid, $sessionId))->get();
         }
 
-        // Apply gene effects directly from consumed element to consumer's entity
-        $entity = Entity::where('uid', $consumerUid)->first();
-        if ($entity) {
-            $elementEffects = ElementHasGene::where('element_id', $targetElementId)->get();
-            foreach ($elementEffects as $effect) {
-                $gene = Gene::find($effect->gene_id);
-                if (!$gene) {
-                    continue;
-                }
-                $genome = Genome::where('entity_id', $entity->id)->where('gene_id', $gene->id)->first();
-                if ($genome) {
-                    $entityInfo = EntityInformation::where('genome_id', $genome->id)->first();
-                    if ($entityInfo) {
-                        $oldValue = $entityInfo->value;
-                        $newValue = $oldValue + $effect->effect;
-                        $min = $genome->min;
-                        $max = $genome->max + ($genome->modifier ?? 0);
-                        $newValue = max($min, min($max, $newValue));
-                        if ($newValue != $oldValue) {
-                            $entityInfo->update(['value' => $newValue]);
-                        }
-                    }
-                }
-            }
-            Log::info('Consume: gene effects applied', ['entity_uid' => $consumerUid, 'element_id' => $targetElementId, 'effects_count' => $elementEffects->count()]);
-        } else {
-            Log::info('Consume: no entity found for consumer uid', ['consumer_uid' => $consumerUid]);
+        // Apply element effects via JS function pattern
+        $gameController = app(\App\Http\Controllers\Api\GameController::class);
+        $rewardCode = $gameController->buildApplyElementGeneEffectsCode(
+            $elementHasPosition->uid,
+            $targetUid,
+            (int) $targetElementId
+        );
+
+        if ($rewardCode !== '') {
+            $this->queuedDrawBySession[$sessionId][] = (new ObjectCode($rewardCode, 500))->get();
+            Log::info('Consume: element reward code queued', ['element_uid' => $elementHasPosition->uid, 'target_element_id' => $targetElementId]);
         }
 
-        // Reset player consume flag directly
-        PlayerValue::setFlag($player->id, PlayerValue::KEY_CONSUME, false);
         // Invia notifica WS al container del consumer
         $consumerContainer = Container::where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
             ->where('parent_id', $elementHasPosition->id)

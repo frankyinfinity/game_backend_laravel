@@ -162,7 +162,7 @@ class Neuron extends Model
         } elseif ((string) $this->type === self::TYPE_READ_CHIMICAL_ELEMENT) {
             $rule = $this->chemicalRule;
             if ($rule && $rule->details) {
-                $conditions = $rule->details->map(fn ($d) => [
+                $conditions = $rule->details->map(fn($d) => [
                     'condition' => "[{$d->min}/{$d->max}]",
                     'rule_detail_id' => $d->id
                 ])->toArray();
