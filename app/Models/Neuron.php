@@ -24,6 +24,8 @@ class Neuron extends Model
 
     public const TYPE_MAX_VALUE_GENE = 'max_value_gene';
 
+    public const TYPE_CONSUME = 'consume';
+
     public const MAX_VALUE_GENE_YES = 'yes';
     public const MAX_VALUE_GENE_NO = 'no';
 
@@ -37,6 +39,7 @@ class Neuron extends Model
         self::TYPE_READ_CHIMICAL_ELEMENT,
         self::TYPE_READ_GENE,
         self::TYPE_MAX_VALUE_GENE,
+        self::TYPE_CONSUME,
     ];
 
     public const TYPE_LABELS = [
@@ -49,6 +52,7 @@ class Neuron extends Model
         self::TYPE_READ_CHIMICAL_ELEMENT => 'Lettura Elemento Chimico',
         self::TYPE_READ_GENE => 'Lettura Gene',
         self::TYPE_MAX_VALUE_GENE => 'Valore Massimo Gene',
+        self::TYPE_CONSUME => 'Consumo',
     ];
 
     public const TYPE_SYMBOLS = [
@@ -61,6 +65,7 @@ class Neuron extends Model
         self::TYPE_READ_CHIMICAL_ELEMENT => '🧪',
         self::TYPE_READ_GENE => '🧬',
         self::TYPE_MAX_VALUE_GENE => '📊',
+        self::TYPE_CONSUME => '⚡',
     ];
 
     public const TARGET_TYPE_ELEMENT = 'element';
@@ -167,11 +172,13 @@ class Neuron extends Model
             }
 
             return [['condition' => NeuronLink::DEFAULT_CHIMICAL_ELEMENT, 'rule_detail_id' => null]];
-        }         elseif ((string) $this->type === self::TYPE_MAX_VALUE_GENE) {
+        } elseif ((string) $this->type === self::TYPE_MAX_VALUE_GENE) {
             return [
                 ['condition' => self::MAX_VALUE_GENE_YES, 'rule_detail_id' => null],
                 ['condition' => self::MAX_VALUE_GENE_NO, 'rule_detail_id' => null],
             ];
+        } elseif ((string) $this->type === self::TYPE_CONSUME) {
+            return [['condition' => NeuronLink::PORT_TRIGGER, 'rule_detail_id' => null]];
         } else {
             return [['condition' => NeuronLink::PORT_TRIGGER, 'rule_detail_id' => null]];
         }

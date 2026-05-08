@@ -324,6 +324,9 @@ class BrainFlowRunner
             case Neuron::TYPE_MAX_VALUE_GENE:
                 $this->handleMaxValueGeneNeuron($neuron, $elementHasPosition);
                 break;
+            case Neuron::TYPE_CONSUME:
+                // Consume neurons have no special processing - just activate
+                break;
             default:
                 $this->handleUnknownNeuron($neuron);
                 break;

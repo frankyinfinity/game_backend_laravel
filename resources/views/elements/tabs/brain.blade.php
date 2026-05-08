@@ -932,6 +932,7 @@ document.addEventListener('DOMContentLoaded', function () {
      const typeReadChimicalElement = @json(\App\Models\Neuron::TYPE_READ_CHIMICAL_ELEMENT);
      const typeReadGene = @json(\App\Models\Neuron::TYPE_READ_GENE);
      const typeMaxValueGene = @json(\App\Models\Neuron::TYPE_MAX_VALUE_GENE);
+     const typeConsume = @json(\App\Models\Neuron::TYPE_CONSUME);
      const MAX_VALUE_GENE_YES = @json(\App\Models\Neuron::MAX_VALUE_GENE_YES);
      const MAX_VALUE_GENE_NO = @json(\App\Models\Neuron::MAX_VALUE_GENE_NO);
      const targetTypeElement = @json(\App\Models\Neuron::TARGET_TYPE_ELEMENT);
@@ -1948,7 +1949,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Anchors (static visualization)
             // Draw left input anchor (single point) for neurons that receive connections
-            const needsLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene || neuron.type === typeMaxValueGene;
+              const needsLeftAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeEnd || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene || neuron.type === typeMaxValueGene || neuron.type === typeConsume;
             if (needsLeftAnchor) {
                 const leftAnchorPoint = getLeftAnchorPoint(neuron, cellSize);
                 const leftAnchor = new PIXI.Graphics();
@@ -1961,7 +1962,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Draw right output anchors from condition_orders
-            const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene || neuron.type === typeMaxValueGene;
+             const hasRightAnchor = neuron.type === typeDetection || neuron.type === typePath || neuron.type === typeStart || neuron.type === typeAttack || neuron.type === typeMovement || neuron.type === typeReadChimicalElement || neuron.type === typeReadGene || neuron.type === typeMaxValueGene || neuron.type === typeConsume;
 
 
 
