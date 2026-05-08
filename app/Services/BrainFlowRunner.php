@@ -800,57 +800,6 @@ class BrainFlowRunner
             return;
         }
 
-        // Aggiorna il valore chimico nel consumer (ElementHasPositionChimicalElement)
-        $stored = $elementHasPosition->chimicalElements()
-            ->where('element_has_position_rule_chimical_element_id', $rule->id)
-            ->first();
-
-        if ($stored) {
-            if ($stored->value >= $rule->max) {
-                Log::info('Consume: consumer storage full for this element type');
-                // Nota: anche se pieno, il consumo procede comunque (l'elemento target viene eliminato)
-            } else {
-                $stored->value += 1;
-                $stored->save();
-            }
-        } else {
-            $stored = ElementHasPositionChimicalElement::create([
-                'element_has_position_id' => $elementHasPosition->id,
-                'element_has_position_rule_chimical_element_id' => $rule->id,
-                'value' => 1
-            ]);
-        }
-
-        // AGGIORNAMENTO REWARD SCORES: somma gli score dell'elemento target al consumer
-        $targetRewardScores = $targetElement->scores()->get();
-        foreach ($targetRewardScores as $score) {
-            $amount = (int) ($score->pivot->amount ?? 0);
-            if ($amount <= 0) {
-                continue;
-            }
-
-            // Trova o crea il record ElementHasPositionScore per il consumer
-            $consumerScore = $elementHasPosition->elementHasPositionScores()
-                ->where('score_id', $score->id)
-                ->first();
-
-            if ($consumerScore) {
-                $consumerScore->value += $amount;
-                $consumerScore->save();
-            } else {
-                $elementHasPosition->elementHasPositionScores()->create([
-                    'score_id' => $score->id,
-                    'value' => $amount
-                ]);
-            }
-
-            Log::info('Consume: reward score added', [
-                'score_id' => $score->id,
-                'score_name' => $score->name,
-                'amount' => $amount
-            ]);
-        }
-
         // Accoda comandi di cancellazione UI per il target
         $targetUidsToClear = [
             $targetUid,
@@ -908,9 +857,7 @@ class BrainFlowRunner
             'target_uid' => $targetUid,
             'target_element_id' => $targetElementId,
             'rule_id' => $rule->id,
-            'stored_value' => $stored->value,
-            'max' => $rule->max,
-            'reward_scores_added' => $targetRewardScores->count()
+            'max' => $rule->max
         ];
 
         Log::info('Consume: success', $neuron['consume_result']);
