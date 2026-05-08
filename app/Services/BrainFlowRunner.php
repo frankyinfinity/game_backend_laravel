@@ -17,6 +17,11 @@ use App\Models\NeuronLink;
 use App\Models\Tile;
 use App\Models\Player;
 use App\Models\Genome;
+use App\Models\ElementHasPositionRuleChimicalElement;
+use App\Models\ElementHasPositionChimicalElement;
+use App\Models\BirthRegionDetailData;
+use App\Models\ElementHasGene;
+use App\Models\PlayerValue;
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
@@ -325,7 +330,7 @@ class BrainFlowRunner
                 $this->handleMaxValueGeneNeuron($neuron, $elementHasPosition);
                 break;
             case Neuron::TYPE_CONSUME:
-                // Consume neurons have no special processing - just activate
+                $this->handleConsumeNeuron($neuron, $elementHasPosition);
                 break;
             default:
                 $this->handleUnknownNeuron($neuron);
@@ -740,15 +745,195 @@ class BrainFlowRunner
         ]);
     }
 
-    private function resolveElementContainer(ElementHasPosition $elementHasPosition): ?Container
+
+
+    private function handleConsumeNeuron(array &$neuron, ElementHasPosition $elementHasPosition): void
     {
-        return Container::query()
-            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
-            ->where('parent_id', (int) $elementHasPosition->id)
-            ->whereNotNull('ws_port')
-            ->orderByDesc('id')
+        $neuron['consume_result'] = null;
+
+        $player = $elementHasPosition->player()->first();
+        if (!$player) {
+            Log::info('Consume: player not found');
+            return;
+        }
+
+        // Trova un ElementHasPosition sulla stessa tile (escluso se stesso)
+        $target = ElementHasPosition::where('player_id', $elementHasPosition->player_id)
+            ->where('tile_i', $elementHasPosition->tile_i)
+            ->where('tile_j', $elementHasPosition->tile_j)
+            ->where('id', '!=', $elementHasPosition->id)
             ->first();
+
+        if (!$target) {
+            Log::info('Consume: no target element on same tile');
+            return;
+        }
+
+        $sessionId = $player->actual_session_id;
+        $consumerUid = $elementHasPosition->uid;
+        $targetUid = $target->uid;
+        $targetElementId = $target->element_id;
+
+        Log::info("Consume: {$consumerUid} consuming {$targetUid} on tile ({$elementHasPosition->tile_i}, {$elementHasPosition->tile_j})");
+
+        // Determina il tipo di elemento bersaglio per aggiornare il valore corrispondente nel consumer
+        $targetElement = $target->element;
+        if (!$targetElement) {
+            Log::info('Consume: target element not found');
+            return;
+        }
+
+        // Trova la regola corrispondente nel consumer (quale tipo di elemento puÃ² consumare)
+        $rule = null;
+        if ($targetElement->chimical_element_id !== null) {
+            $rule = $elementHasPosition->rules()
+                ->where('chimical_element_id', $targetElement->chimical_element_id)
+                ->first();
+        } elseif ($targetElement->complex_chimical_element_id !== null) {
+            $rule = $elementHasPosition->rules()
+                ->where('complex_chimical_element_id', $targetElement->complex_chimical_element_id)
+                ->first();
+        }
+
+        if (!$rule) {
+            Log::info('Consume: no matching consumption rule for target element type');
+            return;
+        }
+
+        // Aggiorna il valore chimico nel consumer (ElementHasPositionChimicalElement)
+        $stored = $elementHasPosition->chimicalElements()
+            ->where('element_has_position_rule_chimical_element_id', $rule->id)
+            ->first();
+
+        if ($stored) {
+            if ($stored->value >= $rule->max) {
+                Log::info('Consume: consumer storage full for this element type');
+                // Nota: anche se pieno, il consumo procede comunque (l'elemento target viene eliminato)
+            } else {
+                $stored->value += 1;
+                $stored->save();
+            }
+        } else {
+            $stored = ElementHasPositionChimicalElement::create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'element_has_position_rule_chimical_element_id' => $rule->id,
+                'value' => 1
+            ]);
+        }
+
+        // AGGIORNAMENTO REWARD SCORES: somma gli score dell'elemento target al consumer
+        $targetRewardScores = $targetElement->scores()->get();
+        foreach ($targetRewardScores as $score) {
+            $amount = (int) ($score->pivot->amount ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            // Trova o crea il record ElementHasPositionScore per il consumer
+            $consumerScore = $elementHasPosition->elementHasPositionScores()
+                ->where('score_id', $score->id)
+                ->first();
+
+            if ($consumerScore) {
+                $consumerScore->value += $amount;
+                $consumerScore->save();
+            } else {
+                $elementHasPosition->elementHasPositionScores()->create([
+                    'score_id' => $score->id,
+                    'value' => $amount
+                ]);
+            }
+
+            Log::info('Consume: reward score added', [
+                'score_id' => $score->id,
+                'score_name' => $score->name,
+                'amount' => $amount
+            ]);
+        }
+
+        // Accoda comandi di cancellazione UI per il target
+        $targetUidsToClear = [
+            $targetUid,
+            $targetUid . '_panel',
+            $targetUid . '_text_name',
+            $targetUid . '_btn_attack',
+            $targetUid . '_btn_attack_rect',
+            $targetUid . '_btn_attack_text',
+            $targetUid . '_btn_consume',
+            $targetUid . '_btn_consume_rect',
+            $targetUid . '_btn_consume_text',
+        ];
+
+        foreach ($targetUidsToClear as $uid) {
+            $this->queuedDrawBySession[$sessionId][] = (new ObjectClear($uid, $sessionId))->get();
+        }
+
+        // Apply gene effects directly from consumed element to consumer's entity
+        $entity = Entity::where('uid', $consumerUid)->first();
+        if ($entity) {
+            $elementEffects = ElementHasGene::where('element_id', $targetElementId)->get();
+            foreach ($elementEffects as $effect) {
+                $gene = Gene::find($effect->gene_id);
+                if (!$gene) {
+                    continue;
+                }
+                $genome = Genome::where('entity_id', $entity->id)->where('gene_id', $gene->id)->first();
+                if ($genome) {
+                    $entityInfo = EntityInformation::where('genome_id', $genome->id)->first();
+                    if ($entityInfo) {
+                        $oldValue = $entityInfo->value;
+                        $newValue = $oldValue + $effect->effect;
+                        $min = $genome->min;
+                        $max = $genome->max + ($genome->modifier ?? 0);
+                        $newValue = max($min, min($max, $newValue));
+                        if ($newValue != $oldValue) {
+                            $entityInfo->update(['value' => $newValue]);
+                        }
+                    }
+                }
+            }
+            Log::info('Consume: gene effects applied', ['entity_uid' => $consumerUid, 'element_id' => $targetElementId, 'effects_count' => $elementEffects->count()]);
+        } else {
+            Log::info('Consume: no entity found for consumer uid', ['consumer_uid' => $consumerUid]);
+        }
+
+        // Reset player consume flag directly
+        PlayerValue::setFlag($player->id, PlayerValue::KEY_CONSUME, false);
+        // Invia notifica WS al container del consumer
+        $consumerContainer = Container::where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->where('parent_id', $elementHasPosition->id)
+            ->whereNotNull('ws_port')
+            ->first();
+
+        if ($consumerContainer) {
+            try {
+                $payload = [
+                    'event' => 'consume',
+                    'element_uid' => $consumerUid,
+                    'target_uid' => $targetUid,
+                ];
+                app(DockerContainerService::class)->sendMessageToContainer($consumerContainer, $payload);
+            } catch (\Throwable $e) {
+                Log::error("Consume WS error: " . $e->getMessage());
+            }
+        }
+
+
+        // Elimina il target dal DB
+        $target->delete();
+
+        $neuron['consume_result'] = [
+            'target_uid' => $targetUid,
+            'target_element_id' => $targetElementId,
+            'rule_id' => $rule->id,
+            'stored_value' => $stored->value,
+            'max' => $rule->max,
+            'reward_scores_added' => $targetRewardScores->count()
+        ];
+
+        Log::info('Consume: success', $neuron['consume_result']);
     }
+
 
     private function handleDetectionNeuron(array &$neuron): void
     {
