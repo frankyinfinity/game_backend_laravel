@@ -769,7 +769,7 @@ class BrainFlowRunner
             return;
         }
 
-        $sessionId = $player->actual_session_id;
+        $sessionId = $player->actual_session_id ?: 'init_session_id';
         $consumerUid = $elementHasPosition->uid;
         $targetUid = $target->uid;
         $targetElementId = $target->element_id;
@@ -796,9 +796,11 @@ class BrainFlowRunner
             $targetUid . '_btn_consume_text',
         ];
 
+        $clearCommands = [];
         foreach ($targetUidsToClear as $uid) {
-            $this->queuedDrawBySession[$sessionId][] = (new ObjectClear($uid, $sessionId))->get();
+            $clearCommands[] = (new ObjectClear($uid, $sessionId))->get();
         }
+        $this->queueDrawCommands($player, $sessionId, $clearCommands);
 
         // Apply element effects via JS function pattern
         $gameController = app(\App\Http\Controllers\Api\GameController::class);
@@ -809,29 +811,9 @@ class BrainFlowRunner
         );
 
         if ($rewardCode !== '') {
-            $this->queuedDrawBySession[$sessionId][] = (new ObjectCode($rewardCode, 500))->get();
+            $this->queueDrawCommands($player, $sessionId, [(new ObjectCode($rewardCode, 500))->get()]);
             Log::info('Consume: element reward code queued', ['element_uid' => $elementHasPosition->uid, 'target_element_id' => $targetElementId]);
         }
-
-        // Invia notifica WS al container del consumer
-        $consumerContainer = Container::where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
-            ->where('parent_id', $elementHasPosition->id)
-            ->whereNotNull('ws_port')
-            ->first();
-
-        if ($consumerContainer) {
-            try {
-                $payload = [
-                    'event' => 'consume',
-                    'element_uid' => $consumerUid,
-                    'target_uid' => $targetUid,
-                ];
-                app(DockerContainerService::class)->sendMessageToContainer($consumerContainer, $payload);
-            } catch (\Throwable $e) {
-                Log::error("Consume WS error: " . $e->getMessage());
-            }
-        }
-
 
         // Elimina il target dal DB
         $target->delete();
@@ -1428,6 +1410,16 @@ class BrainFlowRunner
         return Container::query()
             ->where('parent_type', Container::PARENT_TYPE_MAP)
             ->where('parent_id', (int) $player->birth_region_id)
+            ->whereNotNull('ws_port')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    private function resolveElementContainer(ElementHasPosition $elementHasPosition): ?Container
+    {
+        return Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->where('parent_id', (int) $elementHasPosition->id)
             ->whereNotNull('ws_port')
             ->orderByDesc('id')
             ->first();

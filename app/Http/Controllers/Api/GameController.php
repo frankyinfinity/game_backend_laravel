@@ -2451,9 +2451,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 
@@ -2607,7 +2607,7 @@ class GameController extends Controller
         return '';
     }
 
-    private function buildApplyGeneEffectsCode(string $entityUid, string $elementUid, int $elementId): string
+    public function buildApplyGeneEffectsCode(string $entityUid, string $elementUid, int $elementId): string
     {
         $jsPath = resource_path('js/function/entity/apply_gene_effects.blade.php');
         if (is_file($jsPath)) {
@@ -2623,7 +2623,7 @@ class GameController extends Controller
         return '';
     }
 
-    private function buildApplyElementGeneEffectsCode(string $elementHasPositionUid, string $targetElementUid, int $targetElementId): string
+    public function buildApplyElementGeneEffectsCode(string $elementHasPositionUid, string $targetElementUid, int $targetElementId): string
     {
         $jsPath = resource_path('js/function/element/apply_gene_effects.blade.php');
         if (is_file($jsPath)) {
