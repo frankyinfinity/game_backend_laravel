@@ -718,19 +718,13 @@ class GameController extends Controller
         }
 
         if ($playerIds->isNotEmpty()) {
-            $elementPositionsQuery = ElementHasPosition::query()
+
+            $elementPositions = ElementHasPosition::query()
                 ->whereIn('player_id', $playerIds)
                 ->whereNotNull('tile_i')
-                ->whereNotNull('tile_j');
+                ->whereNotNull('tile_j')
+                ->get();
 
-            if ($playerIds->count() === 1) {
-                $singlePlayer = Player::query()->find($playerIds->first());
-                if ($singlePlayer !== null && !empty($singlePlayer->actual_session_id)) {
-                    $elementPositionsQuery->where('session_id', $singlePlayer->actual_session_id);
-                }
-            }
-
-            $elementPositions = $elementPositionsQuery->get();
             $elementIds = $elementPositions->pluck('element_id')->unique()->filter()->values();
             $elementsById = Element::query()
                 ->whereIn('id', $elementIds)
@@ -2451,9 +2445,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        return response()->json($result['body'], $result['status']);
-        //return response()->json(['success' => true]);
+        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        //return response()->json($result['body'], $result['status']);
+        return response()->json(['success' => true]);
 
     }
 
