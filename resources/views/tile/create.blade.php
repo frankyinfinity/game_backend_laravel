@@ -35,10 +35,11 @@
                 </div>
                 <div class="col-6">
                     <div class="form-group">
-                        <label for="type">Tipo*</label>
-                        <select id="type" name="type" class="form-control" required>
-                          <option value="{{ App\Models\Tile::TYPE_SOLID }}">Solido</option>
-                          <option value="{{ App\Models\Tile::TYPE_LIQUID }}">Liquido</option>
+                        <label for="family_tile_id">Famiglia Tile*</label>
+                        <select id="family_tile_id" name="family_tile_id" class="form-control" required>
+                            @foreach(\App\Models\FamilyTile::all() as $family)
+                                <option value="{{ $family->id }}">{{ $family->name }} ({{ \App\Models\FamilyTile::getTypeLabels()[$family->type] }})</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>

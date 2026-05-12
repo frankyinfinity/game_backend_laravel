@@ -18,13 +18,14 @@
                 <label for="name">Nome</label>
                 <input type="text" class="form-control" id="name" name="name" required>
             </div>
-            <div class="form-group">
-                <label for="type">Tipo</label>
-                <select class="form-control" id="type" name="type" required>
-                    <option value="solid">Solido</option>
-                    <option value="liquid">Liquido</option>
-                </select>
-            </div>
+                    <div class="form-group">
+                        <label for="type">Tipo</label>
+                        <select class="form-control" id="type" name="type" required>
+                            @foreach(\App\Models\FamilyTile::getTypeLabels() as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
             <button type="submit" class="btn btn-primary">Salva</button>
             <a href="{{ route('family-tiles.index') }}" class="btn btn-secondary">Annulla</a>
         </form>

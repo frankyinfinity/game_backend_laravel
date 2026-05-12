@@ -85,7 +85,7 @@ class Helper
                     $tile = $searchTile['tile'];
                 }
 
-                $value = $tile['type'] == Tile::TYPE_SOLID ? 'X' : '0';
+                $value = $tile['type'] == \App\Models\FamilyTile::TYPE_SOLID ? 'X' : '0';
                 $mapSolidTiles[sizeof($mapSolidTiles)-1][] = $value;
 
             }

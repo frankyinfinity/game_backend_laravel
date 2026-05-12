@@ -6,11 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class Tile extends Model
 {
-    protected $guarded = ['id', 'created_at', 'updated_at'];
+    protected $fillable = [
+        'name',
+        'family_tile_id',
+        'color',
+        'type',
+    ];
 
-    const TYPE_SOLID = 0;
-    const TYPE_LIQUID = 1;
-    
+    protected static function booted()
+    {
+        static::observe(\App\Observers\TileObserver::class);
+    }
+
+    public function familyTile()
+    {
+        return $this->belongsTo(FamilyTile::class);
+    }
+
     public function defaultClimates(){
         return $this->hasMany(Climate::class,'default_tile_id','id');
     }

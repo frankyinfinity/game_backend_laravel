@@ -21,9 +21,10 @@
             </div>
             <div class="form-group">
                 <label for="type">Tipo</label>
-                <select class="form-control" id="type" name="type" required>
-                    <option value="solid" {{ $familyTile->type == 'solid' ? 'selected' : '' }}>Solido</option>
-                    <option value="liquid" {{ $familyTile->type == 'liquid' ? 'selected' : '' }}>Liquido</option>
+                        <select class="form-control" id="type" name="type" required>
+                    @foreach(\App\Models\FamilyTile::getTypeLabels() as $value => $label)
+                        <option value="{{ $value }}" {{ $familyTile->type == $value ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
                 </select>
             </div>
             <button type="submit" class="btn btn-primary">Salva</button>

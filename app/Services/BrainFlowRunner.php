@@ -1390,7 +1390,7 @@ class BrainFlowRunner
             $tile = $tiles->where('i', $tileI)->where('j', $tileJ)->first();
             return is_array($tile)
                 && isset($tile['tile']['type'])
-                && $tile['tile']['type'] === Tile::TYPE_LIQUID;
+                && $tile['tile']['type'] === 1;
         }
 
         return false;
@@ -1457,7 +1457,7 @@ class BrainFlowRunner
             return false;
         }
 
-        if (($tile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+        if (($tile['tile']['type'] ?? null) !== 1) {
             return false;
         }
 

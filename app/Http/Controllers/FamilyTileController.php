@@ -31,7 +31,7 @@ class FamilyTileController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:solid,liquid',
+            'type' => 'required|integer|in:0,1',
         ]);
 
         FamilyTile::create($request->only(['name', 'type']));
@@ -62,7 +62,7 @@ class FamilyTileController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:solid,liquid',
+            'type' => 'required|integer|in:0,1',
         ]);
 
         $familyTile->update($request->only(['name', 'type']));
@@ -86,7 +86,7 @@ class FamilyTileController extends Controller
 
         return datatables($query)
             ->addColumn('type_label', function ($row) {
-                return $row->type == 'solid' ? 'Solido' : 'Liquido';
+                return FamilyTile::getTypeLabels()[$row->type] ?? $row->type;
             })
             ->rawColumns([])
             ->toJson();

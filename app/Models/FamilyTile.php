@@ -11,6 +11,19 @@ class FamilyTile extends Model
         'type',
     ];
 
-    const TYPE_SOLID = 'solid';
-    const TYPE_LIQUID = 'liquid';
+    protected static function booted()
+    {
+        static::observe(\App\Observers\FamilyTileObserver::class);
+    }
+
+    const TYPE_SOLID = 0;
+    const TYPE_LIQUID = 1;
+
+    public static function getTypeLabels(): array
+    {
+        return [
+            self::TYPE_SOLID => 'Solido',
+            self::TYPE_LIQUID => 'Liquido',
+        ];
+    }
 }

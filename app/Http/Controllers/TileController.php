@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Tile;
+use App\Models\FamilyTile;
 
 class TileController extends Controller
 {
@@ -27,8 +28,16 @@ class TileController extends Controller
 
     public function listDataTable(Request $request)
     {
-        $query = Tile::query()->get();
-        return datatables($query)->toJson();
+        $query = Tile::with('familyTile')->get();
+        return datatables($query)
+            ->addColumn('family_tile_name', function ($row) {
+                if ($row->familyTile) {
+                    $typeLabel = FamilyTile::getTypeLabels()[$row->familyTile->type] ?? $row->familyTile->type;
+                    return $row->familyTile->name . ' (' . $typeLabel . ')';
+                }
+                return '-';
+            })
+            ->toJson();
     }
 
     /**
@@ -44,14 +53,23 @@ class TileController extends Controller
      */
     public function store(Request $request)
     {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'family_tile_id' => 'required|exists:family_tiles,id',
+            'color' => 'required|string|max:7',
+        ]);
+
+        $family = \App\Models\FamilyTile::find($request->family_tile_id);
+        $type = $family ? $family->type : 0;
 
         Tile::query()->create([
             "name" => $request->name,
+            "family_tile_id" => $request->family_tile_id,
             "color" => $request->color,
-            "type" => $request->type,
+            "type" => $type,
         ]);
 
-        return redirect(route('tiles.index'));
+        return redirect(route('tiles.index'))->with('success', 'Tile creato con successo.');
 
     }
 
@@ -70,7 +88,8 @@ class TileController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        $tile = Tile::findOrFail($id);
+        return view('tile.edit', compact('tile'));
     }
 
     /**
@@ -78,13 +97,18 @@ class TileController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'family_tile_id' => 'required|exists:family_tiles,id',
+            'color' => 'required|string|max:7',
+        ]);
+
         $tile = Tile::query()->findOrFail($id);
 
         $fields = [
             "name" => $request->name,
+            "family_tile_id" => $request->family_tile_id,
             "color" => $request->color,
-            "type" => $request->type,
         ];
 
         $tile->update($fields);

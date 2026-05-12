@@ -1195,7 +1195,7 @@ class GameController extends Controller
         }
 
         $tile = $tilesByCoord[$targetTileI . ':' . $targetTileJ] ?? null;
-        if (!is_array($tile) || ($tile['type'] ?? null) !== Tile::TYPE_LIQUID) {
+        if (!is_array($tile) || ($tile['type'] ?? null) !== \App\Models\FamilyTile::TYPE_LIQUID) {
             return response()->json(['success' => true]);
         }
 
@@ -1473,7 +1473,7 @@ class GameController extends Controller
         $birthRegion = $player->birthRegion;
         $tiles = Helper::getBirthRegionTiles($birthRegion);
         $targetTile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
-        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== 1) {
             return response()->json(['success' => false, 'message' => 'Target tile not valid']);
         }
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
@@ -1690,7 +1690,7 @@ class GameController extends Controller
         $birthRegion = $player->birthRegion;
         $tiles = Helper::getBirthRegionTiles($birthRegion);
         $targetTile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
-        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== Tile::TYPE_LIQUID) {
+        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== 1) {
             return response()->json(['success' => false, 'message' => 'Target tile not valid']);
         }
         $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
@@ -2447,9 +2447,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        return response()->json($result['body'], $result['status']);
-        //return response()->json(['success' => true]);
+        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        //return response()->json($result['body'], $result['status']);
+        return response()->json(['success' => true]);
 
     }
 
