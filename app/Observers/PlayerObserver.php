@@ -21,6 +21,13 @@ use App\Models\RuleChimicalElement;
 use App\Models\PlayerRuleChimicalElement;
 use App\Models\PlayerRuleChimicalElementDetail;
 use App\Models\PlayerRuleChimicalElementDetailEffect;
+use App\Models\BirthRegion;
+use App\Models\BirthRegionLimit;
+use App\Models\BirthRegionLimitDetail;
+use App\Models\FamilyTile;
+use App\Models\FamilyTileLimit;
+use App\Models\ChimicalElement;
+use App\Models\ComplexChimicalElement;
 use App\Services\DockerContainerService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -45,6 +52,9 @@ class PlayerObserver
 
         // Clone RuleChimicalElements for the player
         $this->cloneRuleChimicalElements($player);
+
+        // Populate BirthRegionLimit and BirthRegionLimitDetail
+        $this->populateBirthRegionLimits($player);
 
         // Check if there's registration data stored on the player
         if (isset($player->registrationData)) {
@@ -245,6 +255,82 @@ class PlayerObserver
     public function restored(Player $player): void
     {
         //
+    }
+
+    /**
+     * Populate BirthRegionLimit and BirthRegionLimitDetail for the player's birth regions.
+     */
+    protected function populateBirthRegionLimits(Player $player): void
+    {
+        Log::info('populateBirthRegionLimits called', ['player_id' => $player->id]);
+
+        if (!isset($player->registrationData['birth_planet_id'])) {
+            Log::info('No birth_planet_id in registrationData', ['registrationData' => $player->registrationData]);
+            return;
+        }
+
+        $birthPlanetId = $player->registrationData['birth_planet_id'];
+        $birthRegions = BirthRegion::where('birth_planet_id', $birthPlanetId)->get();
+        Log::info('Found birth regions', ['count' => $birthRegions->count(), 'birth_regions' => $birthRegions->pluck('id')]);
+
+        foreach ($birthRegions as $birthRegion) {
+            Log::info('Processing birth region', ['birth_region_id' => $birthRegion->id]);
+
+            $familyTiles = FamilyTile::query()->get();
+            Log::info('Found family tiles', ['count' => $familyTiles->count()]);
+
+            foreach ($familyTiles as $familyTile) {
+                Log::info('Creating BirthRegionLimit for family tile', ['family_tile_id' => $familyTile->id]);
+
+                $birthRegionLimit = BirthRegionLimit::firstOrCreate([
+                    'birth_region_id' => $birthRegion->id,
+                    'family_tile_id' => $familyTile->id,
+                ], [
+                    'json_family_tile' => $familyTile->toArray(),
+                ]);
+
+                Log::info('BirthRegionLimit created or found', ['id' => $birthRegionLimit->id]);
+
+                // Only create details if not exists
+                if ($birthRegionLimit->birthRegionLimitDetails->isEmpty()) {
+                    // Chemical elements
+                    $chemicalElements = ChimicalElement::all();
+                    foreach ($chemicalElements as $element) {
+                        $limitValue = FamilyTileLimit::where('family_tile_id', $familyTile->id)
+                            ->where('chimical_element_id', $element->id)
+                            ->value('limit_value');
+                        if ($limitValue === null) {
+                            $rule = RuleChimicalElement::where('chimical_element_id', $element->id)->first();
+                            $limitValue = $rule ? $rule->default_value : 0;
+                        }
+
+                        BirthRegionLimitDetail::create([
+                            'birth_region_limit_id' => $birthRegionLimit->id,
+                            'json_chimical_element' => $element->toArray(),
+                            'limit_value' => $limitValue,
+                        ]);
+                    }
+
+                    // Complex chemical elements
+                    $complexElements = ComplexChimicalElement::all();
+                    foreach ($complexElements as $element) {
+                        $limitValue = FamilyTileLimit::where('family_tile_id', $familyTile->id)
+                            ->where('complex_chimical_element_id', $element->id)
+                            ->value('limit_value');
+                        if ($limitValue === null) {
+                            $rule = RuleChimicalElement::where('complex_chimical_element_id', $element->id)->first();
+                            $limitValue = $rule ? $rule->default_value : 0;
+                        }
+
+                        BirthRegionLimitDetail::create([
+                            'birth_region_limit_id' => $birthRegionLimit->id,
+                            'json_complex_chimical_element' => $element->toArray(),
+                            'limit_value' => $limitValue,
+                        ]);
+                    }
+                }
+            }
+        }
     }
 
     /**
