@@ -18,10 +18,6 @@
                     <a class="nav-link active" id="tab-general-link" data-toggle="pill" href="#tab-general" role="tab"
                         aria-controls="tab-general" aria-selected="true">Dati Generali</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="tab-diffusion-link" data-toggle="pill" href="#tab-diffusion" role="tab"
-                        aria-controls="tab-diffusion" aria-selected="false">Diffusione</a>
-                </li>
                 @if($element->isConsumable())
                     <li class="nav-item">
                         <a class="nav-link" id="tab-consumption-link" data-toggle="pill" href="#tab-consumption" role="tab"
@@ -62,11 +58,6 @@
                 <div class="tab-pane fade show active" id="tab-general" role="tabpanel"
                     aria-labelledby="tab-general-link">
                     @include('elements.tabs.general')
-                </div>
-
-                <!-- TAB DIFFUSIONE -->
-                <div class="tab-pane fade" id="tab-diffusion" role="tabpanel" aria-labelledby="tab-diffusion-link">
-                    @include('elements.tabs.diffusion')
                 </div>
 
                 <!-- TAB CONSUMPTION -->

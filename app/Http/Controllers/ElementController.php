@@ -1541,4 +1541,59 @@ class ElementController extends Controller
             }
         }
     }
+
+    /**
+     * Index for Elements Diffusion
+     */
+    public function diffusionIndex()
+    {
+        return view('elements.diffusion.index');
+    }
+
+    /**
+     * Show diffusion data for an element
+     */
+    public function diffusionShow(Element $element)
+    {
+        $element->load('climates');
+
+        // Fetch all tiles for diffusion tab
+        $allTiles = Tile::orderBy('name')->get();
+
+        // Fetch existing diffusion data
+        $existingDiffusion = ElementHasTile::where('element_id', $element->id)->get();
+        $diffusionMap = [];
+        foreach ($existingDiffusion as $diff) {
+            $diffusionMap[$diff->climate_id][$diff->tile_id] = $diff->percentage;
+        }
+
+        return view('elements.diffusion.show', compact('element', 'allTiles', 'diffusionMap'));
+    }
+
+    /**
+     * Update diffusion data for an element
+     */
+    public function diffusionUpdate(Request $request, Element $element)
+    {
+        $data = $request->input('diffusion', []);
+
+        // Delete existing
+        ElementHasTile::where('element_id', $element->id)->delete();
+
+        // Insert new
+        foreach ($data as $climateId => $tiles) {
+            foreach ($tiles as $tileId => $percentage) {
+                if ($percentage > 0) {
+                    ElementHasTile::create([
+                        'element_id' => $element->id,
+                        'climate_id' => $climateId,
+                        'tile_id' => $tileId,
+                        'percentage' => $percentage,
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('elements.diffusion.show', $element)->with('success', 'Diffusione aggiornata con successo.');
+    }
 }

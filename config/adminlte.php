@@ -365,6 +365,11 @@ return [
                     'text' => 'Elementi',
                     'url'  => '/elements',
                     'icon' => 'fas fa-atom',
+                ],
+                [
+                    'text' => 'Diffusione Elementi',
+                    'url'  => '/elements/diffusion',
+                    'icon' => 'fas fa-map',
                 ]
             ]
         ],

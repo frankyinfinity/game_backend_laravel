@@ -136,6 +136,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::put('/rule-chimical-elements/effects/{effect}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'updateEffect'])->name('rule-chimical-elements.detail.effects.update');
     Route::delete('/rule-chimical-elements/effects/{effect}', [App\Http\Controllers\RuleChimicalElementDetailController::class, 'destroyEffect'])->name('rule-chimical-elements.detail.effects.destroy');
 
+    //Elements Diffusion
+    Route::get('/elements/diffusion', [App\Http\Controllers\ElementController::class, 'diffusionIndex'])->name('elements.diffusion.index');
+    Route::get('/elements/{element}/diffusion', [App\Http\Controllers\ElementController::class, 'diffusionShow'])->name('elements.diffusion.show');
+    Route::put('/elements/{element}/diffusion', [App\Http\Controllers\ElementController::class, 'diffusionUpdate'])->name('elements.diffusion.update');
+
     //Elements
     Route::resource('elements', App\Http\Controllers\ElementController::class);
     Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');
