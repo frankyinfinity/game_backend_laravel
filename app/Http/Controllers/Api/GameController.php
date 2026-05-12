@@ -699,12 +699,10 @@ class GameController extends Controller
 
         if ($playerIds->isNotEmpty()) {
             $entities = Entity::query()
+                ->where('birth_region_id', $birthRegionId)
                 ->whereNotNull('tile_i')
                 ->whereNotNull('tile_j')
                 ->where('state', Entity::STATE_LIFE)
-                ->whereHas('specie', function ($query) use ($playerIds) {
-                    $query->whereIn('player_id', $playerIds);
-                })
                 ->get();
 
             foreach ($entities as $entity) {
@@ -722,7 +720,7 @@ class GameController extends Controller
         if ($playerIds->isNotEmpty()) {
 
             $elementPositions = ElementHasPosition::query()
-                ->whereIn('player_id', $playerIds)
+                ->where('birth_region_id', $birthRegionId)
                 ->whereNotNull('tile_i')
                 ->whereNotNull('tile_j')
                 ->where('state', ElementHasPosition::STATE_LIFE)
@@ -2449,9 +2447,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 
@@ -3227,6 +3225,7 @@ class GameController extends Controller
         $elementHasPosition = \App\Models\ElementHasPosition::create([
             'player_id' => $playerId,
             'session_id' => 'session_' . time(),
+            'birth_region_id' => $player->birth_region_id,
             'element_id' => $elementId,
             'uid' => (string) \Illuminate\Support\Str::uuid(),
             'tile_i' => $tileI,

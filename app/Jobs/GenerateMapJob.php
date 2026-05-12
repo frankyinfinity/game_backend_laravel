@@ -74,10 +74,8 @@ class GenerateMapJob implements ShouldQueue
         }
 
         $entities = Entity::query()
+            ->where('birth_region_id', $birthRegion->id)
             ->where('state', Entity::STATE_LIFE)
-            ->whereHas('specie', function ($q) use ($player_id) {
-                $q->where('player_id', $player_id);
-            })
             ->get();
 
         $entityIds = $entities->pluck('id');
@@ -214,9 +212,9 @@ class GenerateMapJob implements ShouldQueue
             $pixelY += $tileSize;
         }
 
-        // Draw all existing ElementHasPosition records for this player/session that are LIFE.
+        // Draw all existing ElementHasPosition records for this birth_region that are LIFE.
         $existingElementPositions = ElementHasPosition::query()
-            ->where('player_id', $player_id)
+            ->where('birth_region_id', $birthRegion->id)
             ->where('state', ElementHasPosition::STATE_LIFE)
             ->with('element')
             ->get();

@@ -7,7 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 class Entity extends Model
 {
 
-    protected $guarded = ['id', 'created_at', 'updated_at'];
+    protected $fillable = [
+        'specie_id',
+        'birth_region_id',
+        'uid',
+        'tile_i',
+        'tile_j',
+        'state',
+    ];
 
     const STATE_LIFE = 0;
     const STATE_DEATH = 1;

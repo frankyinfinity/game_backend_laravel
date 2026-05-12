@@ -9,6 +9,7 @@ class ElementHasPosition extends Model
     protected $fillable = [
         'player_id',
         'session_id',
+        'birth_region_id',
         'element_id',
         'uid',
         'tile_i',

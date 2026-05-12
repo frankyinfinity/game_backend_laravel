@@ -162,6 +162,7 @@ class InitializePlayerJob implements ShouldQueue
         $uid = uniqid('', true);
         $entity = Entity::query()->create([
             'specie_id' => $specie->id,
+            'birth_region_id' => $searchBirthRegion->id,
             'uid' => $uid,
             'tile_i' => $data['tile_i'],
             'tile_j' => $data['tile_j']
