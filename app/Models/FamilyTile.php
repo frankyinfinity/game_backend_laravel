@@ -26,4 +26,9 @@ class FamilyTile extends Model
             self::TYPE_LIQUID => 'Liquido',
         ];
     }
+
+    public function limits()
+    {
+        return $this->hasMany(FamilyTileLimit::class);
+    }
 }

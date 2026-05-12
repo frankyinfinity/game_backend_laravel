@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\FamilyTile;
+use App\Models\FamilyTileLimit;
+use App\Models\ChimicalElement;
+use App\Models\ComplexChimicalElement;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
 
@@ -52,7 +55,13 @@ class FamilyTileController extends Controller
      */
     public function edit(FamilyTile $familyTile)
     {
-        return view('family_tiles.edit', compact('familyTile'));
+        $familyTile->load('limits.chimicalElement', 'limits.complexChimicalElement');
+
+        // Get all chimical elements and complex chimical elements
+        $chimicalElements = ChimicalElement::orderBy('name')->get();
+        $complexChimicalElements = ComplexChimicalElement::orderBy('name')->get();
+
+        return view('family_tiles.edit', compact('familyTile', 'chimicalElements', 'complexChimicalElements'));
     }
 
     /**
@@ -98,5 +107,62 @@ class FamilyTileController extends Controller
         FamilyTile::whereIn('id', $ids)->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    public function updateLimits(Request $request, FamilyTile $familyTile)
+    {
+        $allLimitValue = $request->input('all_limit_value');
+
+        if ($allLimitValue !== null) {
+            // Update all limits to the same value
+            $chimicalElements = ChimicalElement::all();
+            $complexChimicalElements = ComplexChimicalElement::all();
+
+            // Delete existing limits
+            FamilyTileLimit::where('family_tile_id', $familyTile->id)->delete();
+
+            // Insert new limits for all chimical elements
+            foreach ($chimicalElements as $element) {
+                FamilyTileLimit::create([
+                    'family_tile_id' => $familyTile->id,
+                    'chimical_element_id' => $element->id,
+                    'limit_value' => $allLimitValue,
+                ]);
+            }
+
+            // Insert new limits for all complex chimical elements
+            foreach ($complexChimicalElements as $element) {
+                FamilyTileLimit::create([
+                    'family_tile_id' => $familyTile->id,
+                    'complex_chimical_element_id' => $element->id,
+                    'limit_value' => $allLimitValue,
+                ]);
+            }
+        } else {
+            // Update individual limits
+            $limits = $request->input('limits', []);
+
+            // Delete existing limits
+            FamilyTileLimit::where('family_tile_id', $familyTile->id)->delete();
+
+            // Insert new limits
+            foreach ($limits as $limitData) {
+                if (isset($limitData['chimical_element_id']) && $limitData['limit_value'] > 0) {
+                    FamilyTileLimit::create([
+                        'family_tile_id' => $familyTile->id,
+                        'chimical_element_id' => $limitData['chimical_element_id'],
+                        'limit_value' => $limitData['limit_value'],
+                    ]);
+                } elseif (isset($limitData['complex_chimical_element_id']) && $limitData['limit_value'] > 0) {
+                    FamilyTileLimit::create([
+                        'family_tile_id' => $familyTile->id,
+                        'complex_chimical_element_id' => $limitData['complex_chimical_element_id'],
+                        'limit_value' => $limitData['limit_value'],
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('family-tiles.edit', $familyTile)->with('success', 'Limiti aggiornati con successo.');
     }
 }
