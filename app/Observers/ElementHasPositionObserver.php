@@ -22,6 +22,7 @@ use App\Models\Container;
 use Docker\Docker;
 use Illuminate\Support\Str;
 use App\Services\DockerContainerService;
+use App\Models\ElementHasPositionReward;
 use Illuminate\Support\Facades\Log;
 
 class ElementHasPositionObserver
@@ -41,13 +42,17 @@ class ElementHasPositionObserver
             $this->initializeCircuits($elementHasPosition, $neuronMap);
             $this->initializeContainer($elementHasPosition);
         }
+
+        if ($element->isConsumable()) {
+            $this->initializeRewards($elementHasPosition);
+        }
     }
 
     private function initializeInformation(ElementHasPosition $elementHasPosition): void
     {
         $element = $elementHasPosition->element;
         $now = now();
-        
+
         $data = ElementInformation::query()
             ->where('element_id', $element->id)
             ->get()
@@ -70,7 +75,7 @@ class ElementHasPositionObserver
     {
         $element = $elementHasPosition->element;
         $now = now();
-        
+
         $data = ElementHasScore::query()
             ->where('element_id', $element->id)
             ->get()
@@ -103,7 +108,7 @@ class ElementHasPositionObserver
             ->get();
         foreach ($elementInformations as $info) {
             if ($info->gene) {
-                $geneInfoMap[(int)$info->gene->id] = (int)$info->id;
+                $geneInfoMap[(int) $info->gene->id] = (int) $info->id;
             }
         }
 
@@ -121,13 +126,13 @@ class ElementHasPositionObserver
                 // Mappa il gene dal template (genes.id) al corrispondente ElementHasPositionInformation.id
                 $geneInfoId = null;
                 if ($templateNeuron->element_infomation_id !== null) {
-                    $geneInfoId = $geneInfoMap[(int)$templateNeuron->element_infomation_id] ?? null;
+                    $geneInfoId = $geneInfoMap[(int) $templateNeuron->element_infomation_id] ?? null;
                 }
 
                 // Mappa rule_chimical_element_id dal template a element_has_position_rule_chimical_element_id
                 $ruleId = null;
                 if ($templateNeuron->element_has_rule_chimical_element_id !== null) {
-                    $ruleId = $ruleMap[(int)$templateNeuron->element_has_rule_chimical_element_id] ?? null;
+                    $ruleId = $ruleMap[(int) $templateNeuron->element_has_rule_chimical_element_id] ?? null;
                 }
 
                 $clonedNeuron = ElementHasPositionNeuron::query()->create([
@@ -219,7 +224,7 @@ class ElementHasPositionObserver
                         ];
                     }
                 }
-                
+
                 if (!empty($detailData)) {
                     ElementHasPositionNeuronCircuitDetail::insert($detailData);
                 }
@@ -252,7 +257,7 @@ class ElementHasPositionObserver
             ]);
 
             // Mappa rule_id template -> cloned rule id
-            $ruleMap[(int)$templateRule->id] = (int)$clonedRule->id;
+            $ruleMap[(int) $templateRule->id] = (int) $clonedRule->id;
 
             ElementHasPositionChimicalElement::query()->create([
                 'element_has_position_id' => $elementHasPosition->id,
@@ -286,7 +291,7 @@ class ElementHasPositionObserver
                         'updated_at' => $now,
                     ];
                 }
-                
+
                 if (!empty($effectData)) {
                     ElementHasPositionRuleChimicalElementDetailEffect::insert($effectData);
                 }
@@ -296,6 +301,27 @@ class ElementHasPositionObserver
             'ruleMap' => $ruleMap,
             'detailMap' => $detailMap,
         ];
+    }
+
+    private function initializeRewards(ElementHasPosition $elementHasPosition): void
+    {
+        $element = $elementHasPosition->element;
+        $now = now();
+
+        $data = ElementHasGene::query()
+            ->where('element_id', $element->id)
+            ->get()
+            ->map(fn($gene) => [
+                'element_has_position_id' => $elementHasPosition->id,
+                'gene_id' => $gene->gene_id,
+                'effect' => $gene->effect,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->toArray();
+
+        if (!empty($data)) {
+            ElementHasPositionReward::insert($data);
+        }
     }
 
     private function initializeContainer(ElementHasPosition $elementHasPosition): void
@@ -315,64 +341,13 @@ class ElementHasPositionObserver
     }
 
     /**
-     * Handle the ElementHasPosition "deleting" event.
+     * Handle the ElementHasPosition "updated" event.
      */
-    public function deleting(ElementHasPosition $elementHasPosition): void
+    public function updated(ElementHasPosition $elementHasPosition): void
     {
-        $this->cleanupRelatedData($elementHasPosition);
-        $this->cleanupContainer($elementHasPosition);
-    }
-
-    /**
-     * Handle the ElementHasPosition "force deleted" event.
-     */
-    public function forceDeleted(ElementHasPosition $elementHasPosition): void
-    {
-        $this->cleanupRelatedData($elementHasPosition);
-        $this->cleanupContainer($elementHasPosition);
-    }
-
-    private function cleanupRelatedData(ElementHasPosition $elementHasPosition): void
-    {
-        $posId = $elementHasPosition->id;
-
-        // 1. Collect all relevant IDs first
-        $brainIds = ElementHasPositionBrain::where('element_has_position_id', $posId)->pluck('id');
-        $neuronIds = ElementHasPositionNeuron::whereIn('element_has_position_brain_id', $brainIds)->pluck('id');
-        $circuitIds = ElementHasPositionNeuronCircuit::where('element_has_position_id', $posId)->pluck('id');
-        $ruleIds = ElementHasPositionRuleChimicalElement::where('element_has_position_id', $posId)->pluck('id');
-        $detailIds = ElementHasPositionRuleChimicalElementDetail::whereIn('element_has_position_rule_chimical_element_id', $ruleIds)->pluck('id');
-
-        // 2. Delete starting from the most dependent records (leaves)
-
-        // Chemical Rules dependencies
-        ElementHasPositionRuleChimicalElementDetailEffect::whereIn('element_has_position_rule_chimical_element_detail_id', $detailIds)->delete();
-        ElementHasPositionRuleChimicalElementDetail::whereIn('id', $detailIds)->delete();
-        ElementHasPositionRuleChimicalElement::whereIn('id', $ruleIds)->delete();
-        ElementHasPositionChimicalElement::where('element_has_position_id', $posId)->delete();
-
-        // Neuron dependencies
-        if ($neuronIds->isNotEmpty()) {
-            ElementHasPositionNeuronLink::where(function ($q) use ($neuronIds) {
-                $q->whereIn('from_element_has_position_neuron_id', $neuronIds)
-                    ->orWhereIn('to_element_has_position_neuron_id', $neuronIds);
-            })->delete();
-
-            \App\Models\ElementHasPositionNeuronConditionOrder::whereIn('element_has_position_neuron_id', $neuronIds)->delete();
+        if ($elementHasPosition->wasChanged('state') && $elementHasPosition->state === ElementHasPosition::STATE_DEATH) {
+            $this->cleanupContainer($elementHasPosition);
         }
-
-        // Circuit dependencies
-        ElementHasPositionNeuronCircuitDetail::whereIn('element_has_position_neuron_circuit_id', $circuitIds)->delete();
-        ElementHasPositionNeuronCircuit::whereIn('id', $circuitIds)->delete();
-
-        // Primary Brain components
-        ElementHasPositionNeuron::whereIn('id', $neuronIds)->delete();
-        ElementHasPositionBrain::whereIn('id', $brainIds)->delete();
-
-        // Other related data
-        \App\Models\BrainSchedule::where('element_has_position_id', $posId)->delete();
-        \App\Models\ElementHasPositionInformation::where('element_has_position_id', $posId)->delete();
-        ElementHasPositionScore::where('element_has_position_id', $posId)->delete();
     }
 
     private function cleanupContainer(ElementHasPosition $elementHasPosition): void
@@ -384,7 +359,7 @@ class ElementHasPositionObserver
             ->first();
 
         if ($container === null) {
-            Log::info('No container found for deleted element_has_position', [
+            Log::info('No container found for element_has_position', [
                 'element_has_position_id' => $elementHasPosition->id,
                 'element_has_position_uid' => $elementHasPosition->uid,
             ]);
@@ -394,7 +369,7 @@ class ElementHasPositionObserver
         try {
             app(DockerContainerService::class)->stopContainer($container);
         } catch (\Throwable $e) {
-            Log::warning('Unable to stop element container during delete', [
+            Log::warning('Unable to stop element container', [
                 'element_has_position_id' => $elementHasPosition->id,
                 'container_id' => $container->container_id,
                 'error' => $e->getMessage(),
@@ -404,7 +379,7 @@ class ElementHasPositionObserver
         try {
             app(DockerContainerService::class)->deleteContainer($container, true);
         } catch (\Throwable $e) {
-            Log::warning('Unable to delete element container during delete', [
+            Log::warning('Unable to delete element container', [
                 'element_has_position_id' => $elementHasPosition->id,
                 'container_id' => $container->container_id,
                 'error' => $e->getMessage(),

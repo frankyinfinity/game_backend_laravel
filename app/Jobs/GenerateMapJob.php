@@ -214,9 +214,10 @@ class GenerateMapJob implements ShouldQueue
             $pixelY += $tileSize;
         }
 
-        // Draw all existing ElementHasPosition records for this player/session.
+        // Draw all existing ElementHasPosition records for this player/session that are LIFE.
         $existingElementPositions = ElementHasPosition::query()
             ->where('player_id', $player_id)
+            ->where('state', ElementHasPosition::STATE_LIFE)
             ->with('element')
             ->get();
 

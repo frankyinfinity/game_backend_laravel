@@ -14,7 +14,11 @@ class ElementHasPosition extends Model
         'tile_i',
         'tile_j',
         'is_manual',
+        'state',
     ];
+
+    const STATE_LIFE = 0;
+    const STATE_DEATH = 1;
 
     public function player()
     {
@@ -64,5 +68,10 @@ class ElementHasPosition extends Model
     public function scores()
     {
         return $this->belongsToMany(Score::class, 'element_has_position_scores')->withPivot('value');
+    }
+
+    public function rewards()
+    {
+        return $this->hasMany(ElementHasPositionReward::class);
     }
 }

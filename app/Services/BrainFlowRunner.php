@@ -19,13 +19,10 @@ use App\Models\Player;
 use App\Models\Genome;
 use App\Models\ElementHasPositionRuleChimicalElement;
 use App\Models\ElementHasPositionChimicalElement;
-use App\Models\BirthRegionDetailData;
-use App\Models\ElementHasGene;
 use App\Models\PlayerValue;
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
-use App\Custom\Draw\Complex\ProgressBarDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectCode;
@@ -771,10 +768,10 @@ class BrainFlowRunner
 
         $sessionId = $player->actual_session_id ?: 'init_session_id';
         $consumerUid = $elementHasPosition->uid;
-        $targetUid = $target->uid;
+        $targetElementHasPositionUid = $target->uid;
         $targetElementId = $target->element_id;
 
-        Log::info("Consume: {$consumerUid} consuming {$targetUid} on tile ({$elementHasPosition->tile_i}, {$elementHasPosition->tile_j})");
+        Log::info("Consume: {$consumerUid} consuming {$targetElementHasPositionUid} on tile ({$elementHasPosition->tile_i}, {$elementHasPosition->tile_j})");
 
         // Determina il tipo di elemento bersaglio per aggiornare il valore corrispondente nel consumer
         $targetElement = $target->element;
@@ -785,15 +782,15 @@ class BrainFlowRunner
 
         // Accoda comandi di cancellazione UI per il target
         $targetUidsToClear = [
-            $targetUid,
-            $targetUid . '_panel',
-            $targetUid . '_text_name',
-            $targetUid . '_btn_attack',
-            $targetUid . '_btn_attack_rect',
-            $targetUid . '_btn_attack_text',
-            $targetUid . '_btn_consume',
-            $targetUid . '_btn_consume_rect',
-            $targetUid . '_btn_consume_text',
+            $targetElementHasPositionUid,
+            $targetElementHasPositionUid . '_panel',
+            $targetElementHasPositionUid . '_text_name',
+            $targetElementHasPositionUid . '_btn_attack',
+            $targetElementHasPositionUid . '_btn_attack_rect',
+            $targetElementHasPositionUid . '_btn_attack_text',
+            $targetElementHasPositionUid . '_btn_consume',
+            $targetElementHasPositionUid . '_btn_consume_rect',
+            $targetElementHasPositionUid . '_btn_consume_text',
         ];
 
         $clearCommands = [];
@@ -806,8 +803,7 @@ class BrainFlowRunner
         $gameController = app(\App\Http\Controllers\Api\GameController::class);
         $rewardCode = $gameController->buildApplyElementGeneEffectsCode(
             $elementHasPosition->uid,
-            $targetUid,
-            (int) $targetElementId
+            $targetElementHasPositionUid
         );
 
         if ($rewardCode !== '') {
@@ -815,11 +811,11 @@ class BrainFlowRunner
             Log::info('Consume: element reward code queued', ['element_uid' => $elementHasPosition->uid, 'target_element_id' => $targetElementId]);
         }
 
-        // Elimina il target dal DB
-        $target->delete();
+        // Set target state to death
+        $target->update(['state' => ElementHasPosition::STATE_DEATH]);
 
         $neuron['consume_result'] = [
-            'target_uid' => $targetUid,
+            'target_uid' => $targetElementHasPositionUid,
             'target_element_id' => $targetElementId
         ];
 

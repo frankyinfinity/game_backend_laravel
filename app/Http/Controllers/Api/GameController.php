@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\Rectangle;
@@ -539,10 +540,11 @@ class GameController extends Controller
                 ->pluck('id')
                 ->toArray();
 
-            // Stop element containers immediately before delete, because the async stop job may run later.
+            // Stop element containers and set elements to death
             if (!empty($elementHasPositionIds)) {
                 try {
                     app(DockerContainerService::class)->stopElementHasPositionContainers($elementHasPositionIds);
+                    ElementHasPosition::whereIn('id', $elementHasPositionIds)->update(['state' => ElementHasPosition::STATE_DEATH]);
                 } catch (\Throwable $e) {
                     \Log::error("Errore nello stop dei container element su close per player {$player_id}: " . $e->getMessage());
                 }
@@ -723,6 +725,7 @@ class GameController extends Controller
                 ->whereIn('player_id', $playerIds)
                 ->whereNotNull('tile_i')
                 ->whereNotNull('tile_j')
+                ->where('state', ElementHasPosition::STATE_LIFE)
                 ->get();
 
             $elementIds = $elementPositions->pluck('element_id')->unique()->filter()->values();
@@ -1447,15 +1450,15 @@ class GameController extends Controller
     public function consume(Request $request): \Illuminate\Http\JsonResponse
     {
         $entityUid = $request->entity_uid;
-        $elementUid = $request->element_uid;
+        $elementHasPositionUid = $request->element_has_position_uid ?: $request->element_uid;
 
-        Log::info("Starting consume process for Entity: {$entityUid} on Element: {$elementUid}");
+        Log::info("Starting consume process for Entity: {$entityUid} on Element: {$elementHasPositionUid}");
 
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
         if (!$entity)
             return response()->json(['success' => false, 'message' => 'Entity not found']);
 
-        $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
+        $elementPosition = ElementHasPosition::query()->where('uid', $elementHasPositionUid)->first();
         if (!$elementPosition)
             return response()->json(['success' => false, 'message' => 'Element not found']);
 
@@ -1578,26 +1581,26 @@ class GameController extends Controller
         // Clear Element from UI by using all draw UIDs attached to the root object.
         $idsToClear = array_merge($idsToClear, $this->resolveDrawUidsForObject(
             $player->actual_session_id,
-            $elementUid,
+            $elementHasPositionUid,
             [
-                $elementUid,
-                $elementUid . '_panel',
-                $elementUid . '_text_name',
-                $elementUid . '_btn_attack',
-                $elementUid . '_btn_attack_rect',
-                $elementUid . '_btn_attack_text',
-                $elementUid . '_btn_consume',
-                $elementUid . '_btn_consume_rect',
-                $elementUid . '_btn_consume_text',
+                $elementHasPositionUid,
+                $elementHasPositionUid . '_panel',
+                $elementHasPositionUid . '_text_name',
+                $elementHasPositionUid . '_btn_attack',
+                $elementHasPositionUid . '_btn_attack_rect',
+                $elementHasPositionUid . '_btn_attack_text',
+                $elementHasPositionUid . '_btn_consume',
+                $elementHasPositionUid . '_btn_consume_rect',
+                $elementHasPositionUid . '_btn_consume_text',
             ]
         ));
 
-        // Actual removal from DB
+        // Set state to death
         $elementId = $elementPosition->element_id;
-        $elementPosition->delete();
+        $elementPosition->update(['state' => ElementHasPosition::STATE_DEATH]);
 
         // --- APPLY GENE EFFECTS (via JS) ---
-        $drawCommands[] = (new ObjectCode($this->buildApplyGeneEffectsCode($entityUid, $elementUid, $elementId), 100))->get();
+        $drawCommands[] = (new ObjectCode($this->buildApplyGeneEffectsCode($entityUid, $elementHasPositionUid, $elementId), 100))->get();
         // -------------------------------------
 
         foreach ($updateCommands as $update)
@@ -1619,7 +1622,7 @@ class GameController extends Controller
             'items' => json_encode($drawCommands),
         ]);
 
-        Log::info("Consume process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Cleared IDs: " . implode(', ', $idsToClear));
+        Log::info("Consume process COMPLETED for Entity: {$entityUid} on Element: {$elementHasPositionUid}. Cleared IDs: " . implode(', ', $idsToClear));
 
         try {
             $entityContainer = Container::query()
@@ -1631,7 +1634,7 @@ class GameController extends Controller
                 $payload = [
                     'event' => 'consume',
                     'entity_uid' => $entityUid,
-                    'element_uid' => $elementUid,
+                    'element_uid' => $elementHasPositionUid,
                 ];
                 app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
             }
@@ -1912,8 +1915,8 @@ class GameController extends Controller
                     ->with(['score'])
                     ->get();
 
-                // Delete from DB after getting scores
-                $elementPosition->delete();
+                // Set state to death after getting scores
+                $elementPosition->update(['state' => ElementHasPosition::STATE_DEATH]);
 
                 foreach ($elementHasPositionScores as $elementHasPositionScore) {
                     $score = $elementHasPositionScore->score;
@@ -2601,36 +2604,25 @@ class GameController extends Controller
         return '';
     }
 
-    public function buildApplyGeneEffectsCode(string $entityUid, string $elementUid, int $elementId): string
+    public function buildApplyGeneEffectsCode(string $entityUid, string $elementHasPositionUid, int $elementId): string
     {
-        $jsPath = resource_path('js/function/entity/apply_gene_effects.blade.php');
-        if (is_file($jsPath)) {
-            $jsContent = file_get_contents($jsPath);
-            if ($jsContent !== false) {
-                $jsContent = str_replace('__ENTITY_UID__', $entityUid, $jsContent);
-                $jsContent = str_replace('__ELEMENT_UID__', $elementUid, $jsContent);
-                $jsContent = str_replace('__ELEMENT_ID__', (string) $elementId, $jsContent);
-                return Helper::setCommonJsCode($jsContent, Str::random(20));
-            }
-        }
+        $jsContent = File::get(resource_path('js/function/entity/apply_gene_effects.blade.php'));
+        $jsContent = str_replace('__ENTITY_UID__', $entityUid, $jsContent);
+        $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
+        $jsContent = str_replace('__ELEMENT_ID__', (string) $elementId, $jsContent);
+        $jsContent = Helper::setCommonJsCode($jsContent, 'applyGeneEffects_' . Str::random(20));
 
-        return '';
+        return $jsContent;
     }
 
-    public function buildApplyElementGeneEffectsCode(string $elementHasPositionUid, string $targetElementUid, int $targetElementId): string
+    public function buildApplyElementGeneEffectsCode(string $elementHasPositionUid, string $targetElementHasPositionUid): string
     {
-        $jsPath = resource_path('js/function/element/apply_gene_effects.blade.php');
-        if (is_file($jsPath)) {
-            $jsContent = file_get_contents($jsPath);
-            if ($jsContent !== false) {
-                $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
-                $jsContent = str_replace('__TARGET_ELEMENT_UID__', $targetElementUid, $jsContent);
-                $jsContent = str_replace('__TARGET_ELEMENT_ID__', (string) $targetElementId, $jsContent);
-                return Helper::setCommonJsCode($jsContent, Str::random(20));
-            }
-        }
+        $jsContent = File::get(resource_path('js/function/element/apply_gene_effects.blade.php'));
+        $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
+        $jsContent = str_replace('__TARGET_ELEMENT_HAS_POSITION_UID__', $targetElementHasPositionUid, $jsContent);
+        $jsContent = Helper::setCommonJsCode($jsContent, 'applyElementGeneEffects_' . Str::random(20));
 
-        return '';
+        return $jsContent;
     }
 
     private function buildRefreshRemoteWebSocketsCode(int $playerId): string
@@ -2928,7 +2920,6 @@ class GameController extends Controller
     public function updateGenes(Request $request): \Illuminate\Http\JsonResponse
     {
         $entityUid = $request->entity_uid;
-        $elementId = $request->element_id;
         $chimicalElementId = $request->chimical_element_id;
         $actionType = $request->action_type;
 
@@ -2937,30 +2928,36 @@ class GameController extends Controller
             return response()->json(['success' => false, 'message' => 'Entity not found']);
         }
 
-        if ($elementId) {
-            $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
-            foreach ($elementEffects as $effect) {
-                $gene = Gene::find($effect->gene_id);
-                if (!$gene)
-                    continue;
+        $elementHasPositionUid = $request->element_has_position_uid;
+        $elementHasPosition = ElementHasPosition::where('uid', $elementHasPositionUid)->first();
+        $elementEffects = $elementHasPosition ? $elementHasPosition->rewards->map(function ($r) {
+            return (object) [
+                'gene_id' => $r->gene_id,
+                'effect' => $r->effect
+            ];
+        }) : [];
 
-                $genome = Genome::query()
-                    ->where('entity_id', $entity->id)
-                    ->where('gene_id', $gene->id)
-                    ->first();
+        foreach ($elementEffects as $effect) {
+            $gene = Gene::find($effect->gene_id);
+            if (!$gene)
+                continue;
 
-                if ($genome) {
-                    $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
-                    if ($entityInfo) {
-                        $oldValue = $entityInfo->value;
-                        $newValue = $oldValue + $effect->effect;
-                        $min = $genome->min;
-                        $max = $genome->max + ($genome->modifier ?? 0);
-                        $newValue = max($min, min($max, $newValue));
+            $genome = Genome::query()
+                ->where('entity_id', $entity->id)
+                ->where('gene_id', $gene->id)
+                ->first();
 
-                        if ($newValue !== $oldValue) {
-                            $entityInfo->update(['value' => $newValue]);
-                        }
+            if ($genome) {
+                $entityInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+                if ($entityInfo) {
+                    $oldValue = $entityInfo->value;
+                    $newValue = $oldValue + $effect->effect;
+                    $min = $genome->min;
+                    $max = $genome->max + ($genome->modifier ?? 0);
+                    $newValue = max($min, min($max, $newValue));
+
+                    if ($newValue !== $oldValue) {
+                        $entityInfo->update(['value' => $newValue]);
                     }
                 }
             }
@@ -3034,14 +3031,21 @@ class GameController extends Controller
     public function applyGeneEffects(Request $request): \Illuminate\Http\JsonResponse
     {
         $entityUid = $request->entity_uid;
-        $elementId = $request->element_id;
 
         $entity = Entity::query()->where('uid', $entityUid)->first();
         if (!$entity) {
             return response()->json(['success' => false, 'message' => 'Entity not found']);
         }
 
-        $elementEffects = ElementHasGene::query()->where('element_id', $elementId)->get();
+        $elementHasPositionUid = $request->element_has_position_uid;
+        $elementHasPosition = ElementHasPosition::where('uid', $elementHasPositionUid)->first();
+        $elementEffects = $elementHasPosition ? $elementHasPosition->rewards->map(function ($r) {
+            return (object) [
+                'gene_id' => $r->gene_id,
+                'effect' => $r->effect
+            ];
+        }) : [];
+
         foreach ($elementEffects as $effect) {
             $gene = Gene::find($effect->gene_id);
             if (!$gene)
@@ -3075,14 +3079,18 @@ class GameController extends Controller
     public function applyElementGeneEffects(Request $request): \Illuminate\Http\JsonResponse
     {
         $elementHasPositionUid = $request->element_has_position_uid;
-        $targetElementId = $request->target_element_id;
 
         $elementHasPosition = ElementHasPosition::query()->where('uid', $elementHasPositionUid)->first();
-        if (!$elementHasPosition) {
-            return response()->json(['success' => false, 'message' => 'ElementHasPosition not found']);
-        }
 
-        $elementEffects = ElementHasGene::query()->where('element_id', $targetElementId)->get();
+        $targetElementHasPositionUid = $request->target_element_has_position_uid;
+        $targetHasPosition = ElementHasPosition::where('uid', $targetElementHasPositionUid)->first();
+        $elementEffects = $targetHasPosition ? $targetHasPosition->rewards->map(function ($r) {
+            return (object) [
+                'gene_id' => $r->gene_id,
+                'effect' => $r->effect
+            ];
+        }) : [];
+
         foreach ($elementEffects as $effect) {
             $gene = Gene::find($effect->gene_id);
             if (!$gene)

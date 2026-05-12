@@ -74,6 +74,7 @@ class ElementDraw
                 'uid' => $uid,
                 'tile_i' => $this->tileI,
                 'tile_j' => $this->tileJ,
+                'state' => ElementHasPosition::STATE_LIFE,
             ]);
         } else {
             // Keep draw uid aligned with existing DB uid.

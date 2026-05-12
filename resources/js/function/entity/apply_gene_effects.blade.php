@@ -6,8 +6,7 @@
             type: 'POST',
             data: {
                 entity_uid: '__ENTITY_UID__',
-                element_uid: '__ELEMENT_UID__',
-                element_id: '__ELEMENT_ID__'
+                element_has_position_uid: '__ELEMENT_HAS_POSITION_UID__'
             }
         });
     }
