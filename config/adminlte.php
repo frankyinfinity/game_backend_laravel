@@ -325,6 +325,11 @@ return [
             'icon'    => 'fas fa-th',
             'submenu' => [
                 [
+                    'text' => 'Famiglie Tile',
+                    'url'  => '/family-tiles',
+                    'icon' => 'fas fa-th-large',
+                ],
+                [
                     'text' => 'Tile',
                     'url'  => '/tiles',
                     'icon' => 'fas fa-th',

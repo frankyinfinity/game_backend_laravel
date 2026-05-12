@@ -59,6 +59,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/tiles/list/table', [App\Http\Controllers\TileController::class, 'listDataTable'])->name('tiles.datatable');
     Route::post('/tiles/delete', [App\Http\Controllers\TileController::class, 'delete'])->name('tiles.delete');
 
+    //Family Tile
+    Route::resource('family-tiles', App\Http\Controllers\FamilyTileController::class);
+    Route::post('/family-tiles/list/table', [App\Http\Controllers\FamilyTileController::class, 'listDataTable'])->name('family-tiles.datatable');
+    Route::post('/family-tiles/delete', [App\Http\Controllers\FamilyTileController::class, 'delete'])->name('family-tiles.delete');
+
     //Climate
     Route::resource('climates', App\Http\Controllers\ClimateController::class);
     Route::post('/climates/list/table', [App\Http\Controllers\ClimateController::class, 'listDataTable'])->name('climates.datatable');
