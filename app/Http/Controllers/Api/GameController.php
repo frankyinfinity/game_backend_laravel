@@ -1862,6 +1862,7 @@ class GameController extends Controller
 
             $updateItems[] = [
                 'id' => $elementLifeInfo->id,
+                'type' => 'element',
                 'attributes' => [
                     'value' => $newHealth,
                 ]
@@ -3226,6 +3227,10 @@ class GameController extends Controller
         if (!is_array($updateItems)) {
             return response()->json(['success' => false, 'message' => 'Invalid update_items format']);
         }
+
+        Log::info('updateInformation', [
+            'updateItems' => $updateItems
+        ]);
 
         foreach ($updateItems as $item) {
             $id = $item['id'] ?? null;
