@@ -321,14 +321,20 @@ return [
             ]
         ],
         [
-            'text'    => 'Gestione Pianeti',
-            'icon'    => 'fas fa-globe',
+            'text'    => 'Gestione Tile',
+            'icon'    => 'fas fa-th',
             'submenu' => [
                 [
                     'text' => 'Tile',
                     'url'  => '/tiles',
-                    'icon' => 'fas fa-square',
+                    'icon' => 'fas fa-th',
                 ],
+            ]
+        ],
+        [
+            'text'    => 'Gestione Pianeti',
+            'icon'    => 'fas fa-globe',
+            'submenu' => [
                 [
                     'text' => 'Clima',
                     'url'  => '/climates',
