@@ -98,8 +98,8 @@ class PlayerCreatedJob implements ShouldQueue
      */
     protected function initializePlayerWithRegistrationData(Player $player): array
     {
-        $data = $this->registrationData;
 
+        $data = $this->registrationData;
         if (!$data) {
             return [];
         }

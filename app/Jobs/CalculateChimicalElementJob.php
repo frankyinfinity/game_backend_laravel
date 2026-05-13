@@ -5,8 +5,10 @@ namespace App\Jobs;
 use App\Models\BirthRegion;
 use App\Models\BirthRegionDetail;
 use App\Models\BirthRegionDetailData;
-use App\Models\GeneratorChimicalElement;
+use App\Models\BirthRegionLimit;
 use App\Models\ComplexChimicalElement;
+use App\Models\FamilyTile;
+use App\Models\GeneratorChimicalElement;
 use App\Models\PlayerValue;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,6 +40,7 @@ class CalculateChimicalElementJob implements ShouldQueue
             Log::warning('[CalculateChimicalElementJob] Birth region non trovata', [
                 'birth_region_id' => $birthRegionId,
             ]);
+
             return;
         }
 
@@ -46,6 +49,7 @@ class CalculateChimicalElementJob implements ShouldQueue
             Log::warning('[CalculateChimicalElementJob] Player non trovato', [
                 'birth_region_id' => $birthRegionId,
             ]);
+
             return;
         }
 
@@ -118,9 +122,9 @@ class CalculateChimicalElementJob implements ShouldQueue
                 ->whereHas('birthRegionDetail', function ($q) use ($birthRegion) {
                     $q->where('birth_region_id', $birthRegion->id);
                 })
-                ->where(function($q) {
+                ->where(function ($q) {
                     $q->whereNotNull('json_chimical_element')
-                      ->orWhereNotNull('json_complex_chimical_element');
+                        ->orWhereNotNull('json_complex_chimical_element');
                 })
                 ->get()
                 ->groupBy('birth_region_detail_id');
@@ -132,17 +136,20 @@ class CalculateChimicalElementJob implements ShouldQueue
                 foreach ($complexElement->details as $detail) {
                     $requiredElement = $elements->first(function ($el) use ($detail) {
                         if ($detail->chimical_element_id) {
-                            $jsonEl = is_string($el->json_chimical_element) 
-                                ? json_decode($el->json_chimical_element, true) 
+                            $jsonEl = is_string($el->json_chimical_element)
+                                ? json_decode($el->json_chimical_element, true)
                                 : $el->json_chimical_element;
+
                             return $jsonEl && ($jsonEl['id'] ?? null) == $detail->chimical_element_id;
                         }
                         if ($detail->complex_chimical_element_id) {
-                            $jsonEl = is_string($el->json_complex_chimical_element) 
-                                ? json_decode($el->json_complex_chimical_element, true) 
+                            $jsonEl = is_string($el->json_complex_chimical_element)
+                                ? json_decode($el->json_complex_chimical_element, true)
                                 : $el->json_complex_chimical_element;
+
                             return $jsonEl && ($jsonEl['id'] ?? null) == $detail->complex_chimical_element_id;
                         }
+
                         return false;
                     });
 
@@ -153,7 +160,7 @@ class CalculateChimicalElementJob implements ShouldQueue
 
                     $consumedQuantities[] = [
                         'element' => $requiredElement,
-                        'required' => $detail->quantity
+                        'required' => $detail->quantity,
                     ];
                 }
 
@@ -179,7 +186,9 @@ class CalculateChimicalElementJob implements ShouldQueue
                         ->first();
 
                     if ($existingComplex) {
-                        if ($existingComplex->quantity < 100) {
+                        $birthRegionDetail = BirthRegionDetail::find($detailId);
+                        $limit = $birthRegionDetail ? $this->getLimitValue($birthRegion, $birthRegionDetail, $jsonComplexElement) : FamilyTile::DEFAULT_LIMIT_VALUE;
+                        if ($existingComplex->quantity < $limit) {
                             $existingComplex->update([
                                 'quantity' => $existingComplex->quantity + 1,
                             ]);
@@ -195,6 +204,42 @@ class CalculateChimicalElementJob implements ShouldQueue
                 }
             }
         }
+    }
+
+    private function getLimitValue(BirthRegion $birthRegion, BirthRegionDetail $birthRegionDetail, string $jsonElement): int
+    {
+        $tileData = is_string($birthRegionDetail->json_tile)
+            ? json_decode($birthRegionDetail->json_tile, true)
+            : $birthRegionDetail->json_tile;
+
+        $familyTileId = is_array($tileData) ? ($tileData['family_tile_id'] ?? null) : $tileData;
+
+        if (!$familyTileId) {
+            return FamilyTile::DEFAULT_LIMIT_VALUE;
+        }
+
+        $birthRegionLimit = BirthRegionLimit::query()
+            ->where('birth_region_id', $birthRegion->id)
+            ->where('family_tile_id', $familyTileId)
+            ->first();
+
+        if (!$birthRegionLimit) {
+            return FamilyTile::DEFAULT_LIMIT_VALUE;
+        }
+
+        $elementData = json_decode($jsonElement, true);
+        $elementId = $elementData['id'] ?? null;
+
+        $limitDetail = $birthRegionLimit->birthRegionLimitDetails()
+            ->where(function ($q) use ($elementId) {
+                $q->where('json_chimical_element->id', $elementId)
+                    ->orWhere('json_complex_chimical_element->id', $elementId);
+            })
+            ->first();
+
+        $value = $limitDetail ? $limitDetail->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+        return $value;
+
     }
 
     private function processGeneratorDetail(BirthRegionDetail $birthRegionDetail): ?array
@@ -285,7 +330,9 @@ class CalculateChimicalElementJob implements ShouldQueue
                     ->where('json_chimical_element', $jsonChimicalElement)
                     ->first();
 
-                if (!$existingData || $existingData->quantity < 100) {
+                $limit = $this->getLimitValue($birthRegion, $tile, $jsonChimicalElement);
+
+                if (!$existingData || $existingData->quantity < $limit) {
                     $availableTiles[] = $tile;
                 }
             }
@@ -302,7 +349,8 @@ class CalculateChimicalElementJob implements ShouldQueue
                 ->first();
 
             $currentQty = $existingData ? $existingData->quantity : 0;
-            $spaceAvailable = 100 - $currentQty;
+            $limit = $this->getLimitValue($birthRegion, $target, $jsonChimicalElement);
+            $spaceAvailable = $limit - $currentQty;
 
             if ($spaceAvailable <= 0) {
                 continue;

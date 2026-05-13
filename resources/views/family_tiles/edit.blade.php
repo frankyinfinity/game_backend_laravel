@@ -46,6 +46,9 @@
 
             <!-- TAB LIMITI -->
             <div class="tab-pane fade" id="tab-limits" role="tabpanel" aria-labelledby="tab-limits-link">
+                <div class="alert alert-info">
+                    <strong>Informazioni sui Limiti:</strong> In questa sezione puoi impostare i limiti di quantità per ogni elemento chimico e complesso su ciascun tipo di tile familiare. I limiti determinano la quantità massima che può essere distribuita o generata su un tile specifico. Un limite di 0 impedisce completamente la presenza dell'elemento su quel tile.
+                </div>
                 <div class="mb-3">
                     <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#updateAllModal">Aggiorna Tutti</button>
                 </div>

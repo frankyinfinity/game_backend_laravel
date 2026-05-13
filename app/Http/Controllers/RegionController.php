@@ -58,7 +58,7 @@ class RegionController extends Controller
     {
         $region = Region::query()->where('id', $id)->with(['climate.defaultTile', 'planet'])->first();
         $tiles = Tile::query()->orderBy('name')->get();
-        foreach($tiles as $tile) {
+        foreach ($tiles as $tile) {
             $tile->text_color = 'color: ' . $tile->color;
         }
 
@@ -71,15 +71,15 @@ class RegionController extends Controller
         })->values();
 
         $map = [];
-        if($region->filename !== null) {
-            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$region->filename);
+        if ($region->filename !== null) {
+            $jsonContent = Storage::disk('regions')->get($region->id . '/' . $region->filename);
             $map = json_decode($jsonContent, true);
         }
 
         return view("planet.region.edit-map", compact('region', 'tiles', 'generatorsData', 'map'));
     }
 
-/**
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
@@ -120,16 +120,19 @@ class RegionController extends Controller
 
     }
 
-    public function delete(Request $request){
+    public function delete(Request $request)
+    {
         foreach ($request->ids as $id) {
             $region = Region::find($id);
-            if($region == null) continue;
+            if ($region == null)
+                continue;
             $region->delete();
         }
         return response()->json(['success' => true]);
     }
 
-    public function updateTile(Request $request) {
+    public function updateTile(Request $request)
+    {
 
         $region = Region::query()->where('id', $request->region_id)->first();
         $tile = Tile::query()->where('id', $request->tile_id)->first();
@@ -138,16 +141,16 @@ class RegionController extends Controller
 
         $json = [];
         $filename = null;
-        if($region->filename === null) {
+        if ($region->filename === null) {
             $filename = uniqid('', true) . '.json';
         } else {
             $filename = $region->filename;
-            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
+            $jsonContent = Storage::disk('regions')->get($region->id . '/' . $filename);
             $json = json_decode($jsonContent, true);
         }
 
         //Delete
-        $json = array_filter($json, function($item) use ($tile_i, $tile_j) {
+        $json = array_filter($json, function ($item) use ($tile_i, $tile_j) {
             return !(((int) $item['i']) === $tile_i && ((int) $item['j']) === $tile_j);
         });
         $json = array_values($json);
@@ -160,28 +163,31 @@ class RegionController extends Controller
         ];
 
         $jsonData = json_encode($json, JSON_PRETTY_PRINT);
-        Storage::disk('regions')->put($region->id.'/'.$filename, $jsonData);
+        Storage::disk('regions')->put($region->id . '/' . $filename, $jsonData);
 
         $region->update(['filename' => $filename]);
         return response()->json(['success' => true]);
 
     }
 
-    public function updateTiles(Request $request) {
+    public function updateTiles(Request $request)
+    {
 
         $region = Region::query()->where('id', $request->region_id)->first();
-        if($region === null) {
+        if ($region === null) {
             return response()->json(['success' => false, 'msg' => 'Regione non trovata.'], 404);
         }
 
         $updates = $request->tiles;
-        if(!is_array($updates)) {
+        if (!is_array($updates)) {
             return response()->json(['success' => false, 'msg' => 'Formato tiles non valido.'], 422);
         }
 
         $tileIds = collect($updates)
             ->pluck('tile_id')
-            ->map(function ($id) { return (int) $id; })
+            ->map(function ($id) {
+                return (int) $id;
+            })
             ->unique()
             ->values();
 
@@ -192,8 +198,12 @@ class RegionController extends Controller
 
         $generatorIds = collect($updates)
             ->pluck('generator_id')
-            ->filter(function ($id) { return $id !== null && $id !== '' && $id !== 0; })
-            ->map(function ($id) { return (int) $id; })
+            ->filter(function ($id) {
+                return $id !== null && $id !== '' && $id !== 0;
+            })
+            ->map(function ($id) {
+                return (int) $id;
+            })
             ->unique()
             ->values();
 
@@ -207,28 +217,28 @@ class RegionController extends Controller
 
         $json = [];
         $filename = null;
-        if($region->filename === null) {
+        if ($region->filename === null) {
             $filename = uniqid('', true) . '.json';
         } else {
             $filename = $region->filename;
-            $jsonContent = Storage::disk('regions')->get($region->id.'/'.$filename);
+            $jsonContent = Storage::disk('regions')->get($region->id . '/' . $filename);
             $json = json_decode($jsonContent, true);
-            if(!is_array($json)) {
+            if (!is_array($json)) {
                 $json = [];
             }
         }
 
         $mapByKey = [];
-        foreach($json as $item) {
-            if(!isset($item['i']) || !isset($item['j'])) {
+        foreach ($json as $item) {
+            if (!isset($item['i']) || !isset($item['j'])) {
                 continue;
             }
-            $key = ((int) $item['i']).'_'.((int) $item['j']);
+            $key = ((int) $item['i']) . '_' . ((int) $item['j']);
             $mapByKey[$key] = $item;
         }
 
-        foreach($updates as $item) {
-            if(!isset($item['tile_i']) || !isset($item['tile_j']) || !isset($item['tile_id'])) {
+        foreach ($updates as $item) {
+            if (!isset($item['tile_i']) || !isset($item['tile_j']) || !isset($item['tile_id'])) {
                 continue;
             }
 
@@ -236,7 +246,7 @@ class RegionController extends Controller
             $tile_j = (int) $item['tile_j'];
             $tile_id = (int) $item['tile_id'];
             $tile = $tilesById->get($tile_id);
-            if($tile === null) {
+            if ($tile === null) {
                 continue;
             }
 
@@ -256,11 +266,11 @@ class RegionController extends Controller
                 ];
             }
 
-            $mapByKey[$tile_i.'_'.$tile_j] = $entry;
+            $mapByKey[$tile_i . '_' . $tile_j] = $entry;
         }
 
         $jsonData = json_encode(array_values($mapByKey), JSON_PRETTY_PRINT);
-        Storage::disk('regions')->put($region->id.'/'.$filename, $jsonData);
+        Storage::disk('regions')->put($region->id . '/' . $filename, $jsonData);
 
         $region->update(['filename' => $filename]);
         return response()->json(['success' => true]);
