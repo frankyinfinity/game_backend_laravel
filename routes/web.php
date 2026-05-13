@@ -64,6 +64,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/family-tiles/list/table', [App\Http\Controllers\FamilyTileController::class, 'listDataTable'])->name('family-tiles.datatable');
     Route::post('/family-tiles/delete', [App\Http\Controllers\FamilyTileController::class, 'delete'])->name('family-tiles.delete');
     Route::post('/family-tiles/{familyTile}/update-limits', [App\Http\Controllers\FamilyTileController::class, 'updateLimits'])->name('family-tiles.update-limits');
+    Route::get('/family-tiles/{familyTile}/diffusions', [App\Http\Controllers\FamilyTileController::class, 'diffusions'])->name('family-tiles.diffusions');
+    Route::post('/family-tiles/{familyTile}/diffusions', [App\Http\Controllers\FamilyTileController::class, 'storeDiffusion'])->name('family-tiles.diffusions.store');
+    Route::put('/family-tiles/{familyTile}/diffusions/{diffusion}', [App\Http\Controllers\FamilyTileController::class, 'updateDiffusion'])->name('family-tiles.diffusions.update');
+    Route::delete('/family-tiles/{familyTile}/diffusions/{diffusion}', [App\Http\Controllers\FamilyTileController::class, 'destroyDiffusion'])->name('family-tiles.diffusions.destroy');
+    Route::get('/family-tiles/{familyTile}/element-limit/{elementId}/{type}', [App\Http\Controllers\FamilyTileController::class, 'getElementLimit'])->name('family-tiles.element-limit');
 
     //Climate
     Route::resource('climates', App\Http\Controllers\ClimateController::class);

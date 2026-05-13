@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ChimicalElement;
 use App\Models\ComplexChimicalElement;
 use App\Models\FamilyTile;
+use App\Models\FamilyTileDiffusion;
 use App\Models\FamilyTileLimit;
 use Illuminate\Http\Request;
 
@@ -60,12 +61,31 @@ class FamilyTileController extends Controller
         $chimicalElements = ChimicalElement::orderBy('name')->get()->map(function ($element) use ($familyTile) {
             $limit = $familyTile->limits->where('chimical_element_id', $element->id)->first();
             $element->limit_value = $limit ? $limit->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+            $element->display_name = $element->name.' ('.$element->symbol.') [0 - '.$element->limit_value.']';
 
             return $element;
         });
         $complexChimicalElements = ComplexChimicalElement::orderBy('name')->get()->map(function ($element) use ($familyTile) {
             $limit = $familyTile->limits->where('complex_chimical_element_id', $element->id)->first();
             $element->limit_value = $limit ? $limit->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+            $element->display_name = $element->name.' [0 - '.$element->limit_value.']';
+
+            return $element;
+        });
+        $complexChimicalElements = ComplexChimicalElement::orderBy('name')->get()->map(function ($element) use ($familyTile) {
+            $limit = $familyTile->limits->where('complex_chimical_element_id', $element->id)->first();
+            $element->limit_value = $limit ? $limit->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+            $maxTo = FamilyTileDiffusion::where('family_tile_id', $familyTile->id)
+                ->where('complex_chimical_element_id', $element->id)
+                ->max('to') ?? 0;
+            $element->display_name = $element->name.' [0 - '.$maxTo.']';
+
+            return $element;
+        });
+        $complexChimicalElements = ComplexChimicalElement::orderBy('name')->get()->map(function ($element) use ($familyTile) {
+            $limit = $familyTile->limits->where('complex_chimical_element_id', $element->id)->first();
+            $element->limit_value = $limit ? $limit->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+            $element->display_name = $element->name.($element->symbol ? ' ('.$element->symbol.')' : '').' [0 - '.$element->limit_value.']';
 
             return $element;
         });
@@ -175,5 +195,96 @@ class FamilyTileController extends Controller
         }
 
         return redirect()->route('family-tiles.edit', $familyTile)->with('success', 'Limiti aggiornati con successo.');
+    }
+
+    public function diffusions(Request $request, FamilyTile $familyTile)
+    {
+        $query = FamilyTileDiffusion::where('family_tile_id', $familyTile->id)
+            ->with(['chimicalElement', 'complexChimicalElement']);
+
+        return datatables($query)
+            ->addColumn('element_type', function ($diffusion) {
+                return $diffusion->element_type === 'chimical' ? 'Elemento Chimico' : 'Elemento Complesso';
+            })
+            ->addColumn('element_name', function ($diffusion) {
+                return $diffusion->element ? $diffusion->element->name : '';
+            })
+            ->addColumn('range', function ($diffusion) {
+                return $diffusion->from.' - '.$diffusion->to;
+            })
+            ->addColumn('chimical_element_id', function ($diffusion) {
+                return $diffusion->chimical_element_id;
+            })
+            ->addColumn('complex_chimical_element_id', function ($diffusion) {
+                return $diffusion->complex_chimical_element_id;
+            })
+            ->rawColumns([])
+            ->toJson();
+    }
+
+    public function storeDiffusion(Request $request, FamilyTile $familyTile)
+    {
+        $request->validate([
+            'element_type' => 'required|in:chimical,complex',
+            'chimical_element_id' => 'required_if:element_type,chimical|nullable|exists:chimical_elements,id',
+            'complex_chimical_element_id' => 'required_if:element_type,complex|nullable|exists:complex_chimical_elements,id',
+            'from' => 'required|integer|min:0',
+            'to' => 'required|integer|gt:from',
+        ]);
+
+        FamilyTileDiffusion::create([
+            'family_tile_id' => $familyTile->id,
+            'chimical_element_id' => $request->element_type === 'chimical' ? $request->chimical_element_id : null,
+            'complex_chimical_element_id' => $request->element_type === 'complex' ? $request->complex_chimical_element_id : null,
+            'from' => $request->from,
+            'to' => $request->to,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function updateDiffusion(Request $request, FamilyTile $familyTile, FamilyTileDiffusion $diffusion)
+    {
+        if ($diffusion->family_tile_id !== $familyTile->id) {
+            return response()->json(['success' => false, 'message' => 'Diffusione non trovata'], 404);
+        }
+
+        $request->validate([
+            'element_type' => 'required|in:chimical,complex',
+            'chimical_element_id' => 'required_if:element_type,chimical|nullable|exists:chimical_elements,id',
+            'complex_chimical_element_id' => 'required_if:element_type,complex|nullable|exists:complex_chimical_elements,id',
+            'from' => 'required|integer|min:0',
+            'to' => 'required|integer|gt:from',
+        ]);
+
+        $diffusion->update([
+            'chimical_element_id' => $request->element_type === 'chimical' ? $request->chimical_element_id : null,
+            'complex_chimical_element_id' => $request->element_type === 'complex' ? $request->complex_chimical_element_id : null,
+            'from' => $request->from,
+            'to' => $request->to,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function destroyDiffusion(Request $request, FamilyTile $familyTile, FamilyTileDiffusion $diffusion)
+    {
+        if ($diffusion->family_tile_id !== $familyTile->id) {
+            return response()->json(['success' => false, 'message' => 'Diffusione non trovata'], 404);
+        }
+
+        $diffusion->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function getElementLimit(FamilyTile $familyTile, $elementId, $type)
+    {
+        $column = $type === 'chimical' ? 'chimical_element_id' : 'complex_chimical_element_id';
+        $limit = FamilyTileLimit::where('family_tile_id', $familyTile->id)
+            ->where($column, $elementId)
+            ->value('limit_value');
+
+        return response()->json(['limit' => $limit ?: FamilyTile::DEFAULT_LIMIT_VALUE]);
     }
 }
