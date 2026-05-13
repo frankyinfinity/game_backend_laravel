@@ -41,7 +41,7 @@
                                     </div>
                                 </th>
                             <th>Nome</th>
-                            <th>Colore</th>
+                            <th>Grafica</th>
                             <th>Famiglia Tile</th>
                             <th>Azioni</th>
                             </tr>
@@ -110,7 +110,7 @@
                 },
                 {
                     render: function (data, type, row) {
-                        return '<div style="width: 20px; height: 20px; background-color: ' + data + '; border: 1px solid #000; display: inline-block;"></div>';
+                        return '<img src="/storage/tiles/' + row.id + '.png" style="width: 20px; height: 20px; image-rendering: pixelated; border: 1px solid #000;" alt="Grafica" onerror="this.style.display=\'none\'">';
                     },
                     targets: 2
                 },

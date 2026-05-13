@@ -24,11 +24,38 @@
                 </div>
                 <div class="col-6">
                     <div class="form-group">
-                        <label for="color">Colore*</label>
+                        <label for="family_tile_id">Famiglia Tile*</label>
+                        <select id="family_tile_id" name="family_tile_id" class="form-control" required>
+                            @foreach(\App\Models\FamilyTile::all() as $family)
+                                <option value="{{ $family->id }}">{{ $family->name }} ({{ \App\Models\FamilyTile::getTypeLabels()[$family->type] }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row" style="display: none;">
+                <div class="col-6">
+                    <div class="form-group">
+                        <label for="color">Colore</label>
                         <div class="input-group my-colorpicker colorpicker-element" data-colorpicker-id="2">
-                          <input type="text" id="color" name="color" class="form-control" data-original-title="" title="">
+                          <input type="text" id="color" name="color" class="form-control" value="#ffffff" data-original-title="" title="">
                           <div class="input-group-append">
-                            <span class="input-group-text"><i class="fas fa-square" style="color: rgb(28, 79, 236);"></i></span>
+                            <span class="input-group-text"><i class="fas fa-square" style="color: rgb(255, 255, 255);"></i></span>
+                          </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                        <input type="text" id="name" name="name" class="form-control" placeholder="Nome" required>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="form-group" style="display: none;">
+                        <label for="color">Colore</label>
+                        <div class="input-group my-colorpicker colorpicker-element" data-colorpicker-id="2">
+                          <input type="text" id="color" name="color" class="form-control" value="#ffffff" data-original-title="" title="">
+                          <div class="input-group-append">
+                            <span class="input-group-text"><i class="fas fa-square" style="color: rgb(255, 255, 255);"></i></span>
                           </div>
                         </div>
                     </div>

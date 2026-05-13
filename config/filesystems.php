@@ -76,6 +76,14 @@ return [
             'throw' => false,
         ],
 
+        'tile' => [
+            'driver' => 'local',
+            'root' => storage_path('app/uploads/tiles'),
+            'url' => env('APP_URL').'/storage/tiles',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         'rewards' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/rewards'),

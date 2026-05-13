@@ -56,7 +56,6 @@ class TileController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'family_tile_id' => 'required|exists:family_tiles,id',
-            'color' => 'required|string|max:7',
         ]);
 
         $family = \App\Models\FamilyTile::find($request->family_tile_id);
@@ -65,7 +64,7 @@ class TileController extends Controller
         Tile::query()->create([
             "name" => $request->name,
             "family_tile_id" => $request->family_tile_id,
-            "color" => $request->color,
+            "color" => "#ffffff",
             "type" => $type,
         ]);
 
@@ -100,7 +99,7 @@ class TileController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'family_tile_id' => 'required|exists:family_tiles,id',
-            'color' => 'required|string|max:7',
+            'image_base64' => 'nullable|string',
         ]);
 
         $tile = Tile::query()->findOrFail($id);
@@ -108,10 +107,23 @@ class TileController extends Controller
         $fields = [
             "name" => $request->name,
             "family_tile_id" => $request->family_tile_id,
-            "color" => $request->color,
+            "color" => "#ffffff",
         ];
 
         $tile->update($fields);
+
+        // Save Image if provided
+        if ($request->has('image_base64') && ! empty($request->image_base64)) {
+            $imageData = $request->image_base64;
+            $imageData = str_replace('data:image/png;base64,', '', $imageData);
+            $imageData = str_replace(' ', '+', $imageData);
+            $imageName = $tile->id.'.png';
+            \Storage::disk('tile')->put($imageName, base64_decode($imageData));
+
+            // Also copy to public disk for web access if needed
+            \Storage::disk('public')->put('tiles/'.$imageName, base64_decode($imageData));
+        }
+
         return redirect(route('tiles.index'));
 
     }

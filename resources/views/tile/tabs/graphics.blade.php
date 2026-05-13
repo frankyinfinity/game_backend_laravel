@@ -1,0 +1,1 @@
+@include('shared.graphics_editor', ['model' => $tile, 'modelType' => 'tile'])
