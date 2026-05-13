@@ -8,7 +8,8 @@ use App\Models\BirthClimate;
 use App\Models\BirthPlanet;
 use App\Models\BirthRegion;
 use App\Models\BirthRegionDetail;
-use App\Models\BirthRegionDetailData;
+use App\Models\BirthRegionDiffusion;
+use App\Models\BirthRegionDiffusionDetail;
 use App\Models\BirthRegionLimit;
 use App\Models\BirthRegionLimitDetail;
 use App\Models\ChimicalElement;
@@ -16,8 +17,8 @@ use App\Models\ComplexChimicalElement;
 use App\Models\Entity;
 use App\Models\EntityInformation;
 use App\Models\FamilyTile;
+use App\Models\FamilyTileDiffusion;
 use App\Models\FamilyTileLimit;
-use App\Models\GeneratorChimicalElement;
 use App\Models\Genome;
 use App\Models\Phase;
 use App\Models\PhaseColumn;
@@ -83,8 +84,8 @@ class PlayerCreatedJob implements ShouldQueue
 
         // Initialize player
         $birthRegionIds = $this->initializePlayerWithRegistrationData($player);
-        Log::info('Player ID: ' . $player->id . ' Birth Region IDs: ' . implode(',', $birthRegionIds));
         $this->populateBirthRegionLimits($player, $birthRegionIds);
+        $this->populateBirthRegionDiffusions($player, $birthRegionIds);
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
@@ -100,7 +101,7 @@ class PlayerCreatedJob implements ShouldQueue
     {
 
         $data = $this->registrationData;
-        if (!$data) {
+        if (! $data) {
             return [];
         }
 
@@ -141,16 +142,16 @@ class PlayerCreatedJob implements ShouldQueue
 
             $jsonEntries = [];
             if ($filename !== null) {
-                $jsonContent = Storage::disk('regions')->get($itemRegion->id . '/' . $filename);
+                $jsonContent = Storage::disk('regions')->get($itemRegion->id.'/'.$filename);
                 $json = json_decode($jsonContent, true);
                 $jsonData = json_encode($json, JSON_PRETTY_PRINT);
-                Storage::disk('birth_regions')->put($birthRegion->id . '/' . $filename, $jsonData);
+                Storage::disk('birth_regions')->put($birthRegion->id.'/'.$filename, $jsonData);
 
                 if (is_array($json)) {
                     foreach ($json as $entry) {
                         $tileI = $entry['i'] ?? 0;
                         $tileJ = $entry['j'] ?? 0;
-                        $jsonEntries[$tileI . ':' . $tileJ] = $entry;
+                        $jsonEntries[$tileI.':'.$tileJ] = $entry;
                     }
                 }
             }
@@ -158,7 +159,7 @@ class PlayerCreatedJob implements ShouldQueue
             $defaultTile = $birthClimate->default_tile;
             for ($ti = 0; $ti < $itemRegion->height; $ti++) {
                 for ($tj = 0; $tj < $itemRegion->width; $tj++) {
-                    $entry = $jsonEntries[$ti . ':' . $tj] ?? null;
+                    $entry = $jsonEntries[$ti.':'.$tj] ?? null;
                     $tileData = $entry['tile'] ?? $defaultTile;
                     $generatorData = $entry['generator'] ?? null;
 
@@ -170,22 +171,6 @@ class PlayerCreatedJob implements ShouldQueue
                         'json_generator' => $generatorData ? json_encode($generatorData) : null,
                     ]);
 
-                    if ($generatorData !== null && isset($generatorData['id'])) {
-                        $generator = GeneratorChimicalElement::with('chimicalElement')->find($generatorData['id']);
-                        if ($generator !== null) {
-                            $chimicalElement = $generator->chimicalElement;
-                            BirthRegionDetailData::query()->create([
-                                'birth_region_detail_id' => $birthRegionDetail->id,
-                                'json_chimical_element' => $chimicalElement ? json_encode([
-                                    'id' => $chimicalElement->id,
-                                    'name' => $chimicalElement->name,
-                                    'symbol' => $chimicalElement->symbol,
-                                ]) : null,
-                                'json_complex_chimical_element' => null,
-                                'quantity' => $generator->tick_quantity,
-                            ]);
-                        }
-                    }
                 }
             }
         }
@@ -230,9 +215,9 @@ class PlayerCreatedJob implements ShouldQueue
         // Create Genomes and Entity Information
         $gene_ids = explode(',', $data['gene_ids']);
         foreach ($gene_ids as $gene_id) {
-            $min = $data['gene_min_' . $gene_id];
-            $max = $data['gene_value_' . $gene_id];
-            $value = $data['gene_value_' . $gene_id];
+            $min = $data['gene_min_'.$gene_id];
+            $max = $data['gene_value_'.$gene_id];
+            $value = $data['gene_value_'.$gene_id];
 
             $genome = Genome::query()->create([
                 'entity_id' => $entity->id,
@@ -334,8 +319,8 @@ class PlayerCreatedJob implements ShouldQueue
             $targetMap[$target->id] = $targetPlayer->id;
 
             // Clone reward script from template target disk to player target disk
-            $sourceFilename = $target->id . '.php';
-            $destinationFilename = $targetPlayer->id . '.php';
+            $sourceFilename = $target->id.'.php';
+            $destinationFilename = $targetPlayer->id.'.php';
             try {
                 if (Storage::disk('rewards')->exists($sourceFilename)) {
                     $rewardContent = Storage::disk('rewards')->get($sourceFilename);
@@ -386,7 +371,7 @@ class PlayerCreatedJob implements ShouldQueue
         $ruleIds = array_filter(array_map('trim', explode(',', $ruleChimicalElementIds)));
         foreach ($ruleIds as $ruleId) {
             $rule = RuleChimicalElement::with(['details', 'details.effects'])->find($ruleId);
-            if (!$rule) {
+            if (! $rule) {
                 continue;
             }
 
@@ -491,6 +476,75 @@ class PlayerCreatedJob implements ShouldQueue
                             'json_complex_chimical_element' => $element->toArray(),
                             'limit_value' => $limitValue,
                         ]);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Populate BirthRegionDiffusion and BirthRegionDiffusionDetail for the player's birth regions.
+     */
+    protected function populateBirthRegionDiffusions(Player $player, ?array $birthRegionIds = null): void
+    {
+        Log::info('populateBirthRegionDiffusions called', ['player_id' => $player->id]);
+
+        if ($birthRegionIds !== null) {
+            $birthRegions = BirthRegion::whereIn('id', $birthRegionIds)->limit(30)->get();
+        } else {
+            Log::info('No birth_planet_id in registrationData', ['registrationData' => $player->registrationData]);
+
+            return;
+        }
+
+        foreach ($birthRegions as $birthRegion) {
+            Log::info('Processing birth region for diffusions', ['birth_region_id' => $birthRegion->id]);
+
+            $familyTiles = FamilyTile::query()->get();
+            Log::info('Found family tiles for diffusions', ['count' => $familyTiles->count()]);
+
+            foreach ($familyTiles as $familyTile) {
+                Log::info('Creating BirthRegionDiffusion for family tile', ['family_tile_id' => $familyTile->id]);
+
+                $birthRegionDiffusion = BirthRegionDiffusion::firstOrCreate([
+                    'birth_region_id' => $birthRegion->id,
+                    'family_tile_id' => $familyTile->id,
+                ], [
+                    'json_family_tile' => $familyTile->toArray(),
+                ]);
+
+                Log::info('BirthRegionDiffusion created or found', ['id' => $birthRegionDiffusion->id]);
+
+                // Only create details if not exists
+                if ($birthRegionDiffusion->birthRegionDiffusionDetails->isEmpty()) {
+                    $diffusions = FamilyTileDiffusion::where('family_tile_id', $familyTile->id)->get();
+                    foreach ($diffusions as $diffusion) {
+                        $jsonElement = null;
+                        if ($diffusion->chimical_element_id) {
+                            $element = $diffusion->chimicalElement;
+                            $jsonElement = $element ? json_encode([
+                                'id' => $element->id,
+                                'name' => $element->name,
+                                'symbol' => $element->symbol,
+                            ]) : null;
+                        } elseif ($diffusion->complex_chimical_element_id) {
+                            $element = $diffusion->complexChimicalElement;
+                            $jsonElement = $element ? json_encode([
+                                'id' => $element->id,
+                                'name' => $element->name,
+                                'symbol' => $element->symbol,
+                            ]) : null;
+                        }
+
+                        if ($jsonElement) {
+                            BirthRegionDiffusionDetail::create([
+                                'birth_region_diffusion_id' => $birthRegionDiffusion->id,
+                                'json_chimical_element' => $diffusion->chimical_element_id ? $jsonElement : null,
+                                'json_complex_chimical_element' => $diffusion->complex_chimical_element_id ? $jsonElement : null,
+                                'from' => $diffusion->from,
+                                'to' => $diffusion->to,
+                            ]);
+                        }
                     }
                 }
             }
