@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FamilyTile;
-use App\Models\FamilyTileLimit;
 use App\Models\ChimicalElement;
 use App\Models\ComplexChimicalElement;
+use App\Models\FamilyTile;
+use App\Models\FamilyTileLimit;
 use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
 
 class FamilyTileController extends Controller
 {
@@ -55,11 +54,21 @@ class FamilyTileController extends Controller
      */
     public function edit(FamilyTile $familyTile)
     {
-        $familyTile->load('limits.chimicalElement', 'limits.complexChimicalElement');
+        $familyTile->load('limits');
 
-        // Get all chimical elements and complex chimical elements
-        $chimicalElements = ChimicalElement::orderBy('name')->get();
-        $complexChimicalElements = ComplexChimicalElement::orderBy('name')->get();
+        // Get all chimical elements and complex chimical elements with limit values
+        $chimicalElements = ChimicalElement::orderBy('name')->get()->map(function ($element) use ($familyTile) {
+            $limit = $familyTile->limits->where('chimical_element_id', $element->id)->first();
+            $element->limit_value = $limit ? $limit->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+
+            return $element;
+        });
+        $complexChimicalElements = ComplexChimicalElement::orderBy('name')->get()->map(function ($element) use ($familyTile) {
+            $limit = $familyTile->limits->where('complex_chimical_element_id', $element->id)->first();
+            $element->limit_value = $limit ? $limit->limit_value : FamilyTile::DEFAULT_LIMIT_VALUE;
+
+            return $element;
+        });
 
         return view('family_tiles.edit', compact('familyTile', 'chimicalElements', 'complexChimicalElements'));
     }
@@ -111,6 +120,8 @@ class FamilyTileController extends Controller
 
     public function updateLimits(Request $request, FamilyTile $familyTile)
     {
+        \Log::info('updateLimits called', ['family_tile_id' => $familyTile->id, 'request' => $request->all()]);
+
         $allLimitValue = $request->input('all_limit_value');
 
         if ($allLimitValue !== null) {
@@ -147,13 +158,13 @@ class FamilyTileController extends Controller
 
             // Insert new limits
             foreach ($limits as $limitData) {
-                if (isset($limitData['chimical_element_id']) && $limitData['limit_value'] > 0) {
+                if (isset($limitData['chimical_element_id']) && $limitData['limit_value'] !== '' && $limitData['limit_value'] >= 0) {
                     FamilyTileLimit::create([
                         'family_tile_id' => $familyTile->id,
                         'chimical_element_id' => $limitData['chimical_element_id'],
                         'limit_value' => $limitData['limit_value'],
                     ]);
-                } elseif (isset($limitData['complex_chimical_element_id']) && $limitData['limit_value'] > 0) {
+                } elseif (isset($limitData['complex_chimical_element_id']) && $limitData['limit_value'] !== '' && $limitData['limit_value'] >= 0) {
                     FamilyTileLimit::create([
                         'family_tile_id' => $familyTile->id,
                         'complex_chimical_element_id' => $limitData['complex_chimical_element_id'],

@@ -6,30 +6,25 @@ use Illuminate\Database\Eloquent\Model;
 
 class Player extends Model
 {
-
     protected $guarded = ['id', 'created_at', 'updated_at'];
-    
-    /**
-     * Temporary property to store registration data during creation.
-     * This is used by the PlayerObserver to dispatch the initialization job.
-     * 
-     * @var array|null
-     */
-    public $registrationData = null;
 
-    public function user(){
+    public function user()
+    {
         return $this->belongsTo(User::class);
     }
 
-    public function birthPlanet(){
+    public function birthPlanet()
+    {
         return $this->belongsTo(BirthPlanet::class);
     }
 
-    public function birthRegion(){
+    public function birthRegion()
+    {
         return $this->belongsTo(BirthRegion::class);
     }
 
-    public function species(){
+    public function species()
+    {
         return $this->hasMany(Specie::class);
     }
 
@@ -90,5 +85,4 @@ class Player extends Model
     {
         return $this->hasMany(PlayerValue::class);
     }
-
 }

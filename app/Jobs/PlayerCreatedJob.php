@@ -2,45 +2,44 @@
 
 namespace App\Jobs;
 
-use App\Models\Player;
-use App\Jobs\CreatePlayerContainerJob;
 use App\Models\Age;
 use App\Models\AgePlayer;
+use App\Models\BirthClimate;
+use App\Models\BirthPlanet;
+use App\Models\BirthRegion;
+use App\Models\BirthRegionDetail;
+use App\Models\BirthRegionDetailData;
+use App\Models\BirthRegionLimit;
+use App\Models\BirthRegionLimitDetail;
+use App\Models\ChimicalElement;
+use App\Models\ComplexChimicalElement;
+use App\Models\Entity;
+use App\Models\EntityInformation;
+use App\Models\FamilyTile;
+use App\Models\FamilyTileLimit;
+use App\Models\GeneratorChimicalElement;
+use App\Models\Genome;
 use App\Models\Phase;
-use App\Models\PhasePlayer;
 use App\Models\PhaseColumn;
 use App\Models\PhaseColumnPlayer;
+use App\Models\PhasePlayer;
+use App\Models\Planet;
+use App\Models\Player;
+use App\Models\PlayerHasScore;
+use App\Models\PlayerRuleChimicalElement;
+use App\Models\PlayerRuleChimicalElementDetail;
+use App\Models\PlayerRuleChimicalElementDetailEffect;
+use App\Models\PlayerValue;
+use App\Models\Region;
+use App\Models\RuleChimicalElement;
+use App\Models\Score;
+use App\Models\Specie;
 use App\Models\Target;
-use App\Models\TargetPlayer;
 use App\Models\TargetHasScore;
 use App\Models\TargetHasScorePlayer;
 use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
-use App\Models\PlayerValue;
-use App\Models\RuleChimicalElement;
-use App\Models\PlayerRuleChimicalElement;
-use App\Models\PlayerRuleChimicalElementDetail;
-use App\Models\PlayerRuleChimicalElementDetailEffect;
-use App\Models\BirthRegion;
-use App\Models\BirthRegionLimit;
-use App\Models\BirthRegionLimitDetail;
-use App\Models\FamilyTile;
-use App\Models\FamilyTileLimit;
-use App\Models\ChimicalElement;
-use App\Models\ComplexChimicalElement;
-use App\Models\Specie;
-use App\Models\Entity;
-use App\Models\Genome;
-use App\Models\Planet;
-use App\Models\Region;
-use App\Models\BirthPlanet;
-use App\Models\BirthClimate;
-use App\Models\BirthRegionDetail;
-use App\Models\BirthRegionDetailData;
-use App\Models\GeneratorChimicalElement;
-use App\Models\Score;
-use App\Models\PlayerHasScore;
-use App\Models\EntityInformation;
+use App\Models\TargetPlayer;
 use App\Services\DockerContainerService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -56,12 +55,15 @@ class PlayerCreatedJob implements ShouldQueue
 
     protected $player;
 
+    protected $registrationData;
+
     /**
      * Create a new job instance.
      */
-    public function __construct(Player $player)
+    public function __construct(Player $player, ?array $registrationData = null)
     {
         $this->player = $player;
+        $this->registrationData = $registrationData;
     }
 
     /**
@@ -81,6 +83,7 @@ class PlayerCreatedJob implements ShouldQueue
 
         // Initialize player
         $birthRegionIds = $this->initializePlayerWithRegistrationData($player);
+        Log::info('Player ID: ' . $player->id . ' Birth Region IDs: ' . implode(',', $birthRegionIds));
         $this->populateBirthRegionLimits($player, $birthRegionIds);
 
         // Clone the objective structure for the player
@@ -95,7 +98,11 @@ class PlayerCreatedJob implements ShouldQueue
      */
     protected function initializePlayerWithRegistrationData(Player $player): array
     {
-        $data = $player->registrationData;
+        $data = $this->registrationData;
+
+        if (!$data) {
+            return [];
+        }
 
         // Clone Planet
         $planet = Planet::find($data['birth_planet_id']);
@@ -108,14 +115,14 @@ class PlayerCreatedJob implements ShouldQueue
         ]);
 
         $birthRegionIds = [];
-        foreach ($planet->regions->take(20) as $itemRegion) {
+        foreach ($planet->regions as $itemRegion) {
             $birthClimate = BirthClimate::query()->create([
-                "climate_id" => $itemRegion->climate->id,
-                "name" => $itemRegion->climate->name,
-                "started" => $itemRegion->climate->started,
-                "min_temperature" => $itemRegion->climate->min_temperature,
-                "max_temperature" => $itemRegion->climate->max_temperature,
-                "default_tile" => $itemRegion->climate->defaultTile,
+                'climate_id' => $itemRegion->climate->id,
+                'name' => $itemRegion->climate->name,
+                'started' => $itemRegion->climate->started,
+                'min_temperature' => $itemRegion->climate->min_temperature,
+                'max_temperature' => $itemRegion->climate->max_temperature,
+                'default_tile' => $itemRegion->climate->defaultTile,
             ]);
 
             $filename = $itemRegion->filename;
@@ -191,7 +198,7 @@ class PlayerCreatedJob implements ShouldQueue
         // Update Player with birth planet and region
         $player->update([
             'birth_planet_id' => $birthPlanet->id,
-            'birth_region_id' => $searchBirthRegion ? $searchBirthRegion->id : $birthRegionIds[0]
+            'birth_region_id' => $searchBirthRegion ? $searchBirthRegion->id : $birthRegionIds[0],
         ]);
 
         // Create Player Scores
@@ -199,7 +206,7 @@ class PlayerCreatedJob implements ShouldQueue
         foreach ($scores as $score) {
             PlayerHasScore::query()->create([
                 'player_id' => $player->id,
-                'score_id' => $score->id
+                'score_id' => $score->id,
             ]);
         }
 
@@ -207,7 +214,7 @@ class PlayerCreatedJob implements ShouldQueue
         $specie = Specie::query()->create([
             'player_id' => $player->id,
             'name' => $data['name_specie'],
-            'luca' => true
+            'luca' => true,
         ]);
 
         // Create Entity
@@ -217,7 +224,7 @@ class PlayerCreatedJob implements ShouldQueue
             'birth_region_id' => $searchBirthRegion ? $searchBirthRegion->id : $birthRegionIds[0],
             'uid' => $uid,
             'tile_i' => $data['tile_i'],
-            'tile_j' => $data['tile_j']
+            'tile_j' => $data['tile_j'],
         ]);
 
         // Create Genomes and Entity Information
@@ -231,12 +238,12 @@ class PlayerCreatedJob implements ShouldQueue
                 'entity_id' => $entity->id,
                 'gene_id' => $gene_id,
                 'min' => $min,
-                'max' => $max
+                'max' => $max,
             ]);
 
             EntityInformation::query()->create([
                 'genome_id' => $genome->id,
-                'value' => $value
+                'value' => $value,
             ]);
         }
 
@@ -401,7 +408,7 @@ class PlayerCreatedJob implements ShouldQueue
                     'player_rule_chimical_element_id' => $playerRule->id,
                     'min' => $detail->min,
                     'max' => $detail->max,
-                    'color' => $detail->color
+                    'color' => $detail->color,
                 ]);
 
                 foreach ($detail->effects as $effect) {
@@ -410,7 +417,7 @@ class PlayerCreatedJob implements ShouldQueue
                         'type' => $effect->type,
                         'gene_id' => $effect->gene_id,
                         'value' => $effect->value,
-                        'duration' => $effect->duration
+                        'duration' => $effect->duration,
                     ]);
                 }
             }
@@ -420,7 +427,7 @@ class PlayerCreatedJob implements ShouldQueue
     /**
      * Populate BirthRegionLimit and BirthRegionLimitDetail for the player's birth regions.
      */
-    protected function populateBirthRegionLimits(Player $player, array $birthRegionIds = null): void
+    protected function populateBirthRegionLimits(Player $player, ?array $birthRegionIds = null): void
     {
         Log::info('populateBirthRegionLimits called', ['player_id' => $player->id]);
 
@@ -428,6 +435,7 @@ class PlayerCreatedJob implements ShouldQueue
             $birthRegions = BirthRegion::whereIn('id', $birthRegionIds)->limit(30)->get();
         } else {
             Log::info('No birth_planet_id in registrationData', ['registrationData' => $player->registrationData]);
+
             return;
         }
 
@@ -458,8 +466,7 @@ class PlayerCreatedJob implements ShouldQueue
                             ->where('chimical_element_id', $element->id)
                             ->value('limit_value');
                         if ($limitValue === null) {
-                            $rule = RuleChimicalElement::where('chimical_element_id', $element->id)->first();
-                            $limitValue = $rule ? $rule->default_value : 0;
+                            $limitValue = FamilyTile::DEFAULT_LIMIT_VALUE;
                         }
 
                         BirthRegionLimitDetail::create([
@@ -476,8 +483,7 @@ class PlayerCreatedJob implements ShouldQueue
                             ->where('complex_chimical_element_id', $element->id)
                             ->value('limit_value');
                         if ($limitValue === null) {
-                            $rule = RuleChimicalElement::where('complex_chimical_element_id', $element->id)->first();
-                            $limitValue = $rule ? $rule->default_value : 0;
+                            $limitValue = FamilyTile::DEFAULT_LIMIT_VALUE;
                         }
 
                         BirthRegionLimitDetail::create([

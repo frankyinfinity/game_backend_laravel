@@ -2,24 +2,23 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Custom\Manipulation\ObjectCache;
+use App\Http\Controllers\Controller;
+use App\Jobs\PlayerCreatedJob;
 use App\Jobs\StopPlayerContainersJob;
-use Illuminate\Http\Request;
-use App\Models\User;
 use App\Models\Player;
-use App\Models\RuleChimicalElement;
+use App\Models\User;
+use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
-
     public function register(Request $request)
     {
         // Create User
         $user = User::query()->create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => bcrypt($request->password)
+            'password' => bcrypt($request->password),
         ]);
 
         // Prepare registration data for the job
@@ -29,7 +28,7 @@ class AuthController extends Controller
             'name_specie' => $request->name_specie,
             'tile_i' => intval($request->tile_i),
             'tile_j' => intval($request->tile_j),
-            'gene_ids' => $request->gene_ids
+            'gene_ids' => $request->gene_ids,
         ];
 
         // Add gene data to registration data
@@ -41,13 +40,15 @@ class AuthController extends Controller
         }
 
         // Create Player with registration data
-        $player = new Player();
+        $player = new Player;
         $player->user_id = $user->id;
         $player->str_rule_chimical_element_ids = $request->str_rule_chimical_element_ids;
-        $player->registrationData = $registrationData;
         $player->save();
 
+        // Dispatch job with registration data
+        PlayerCreatedJob::dispatch($player, $registrationData);
         return response()->json(['success' => true]);
+
     }
 
     public function login(Request $request)
@@ -63,14 +64,14 @@ class AuthController extends Controller
                 'success' => true,
                 'is_player' => !is_null($player),
                 'player' => $player,
-                'user' => $user
+                'user' => $user,
             ]);
 
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Credenziali non valide.'
+            'message' => 'Credenziali non valide.',
         ], 401);
     }
 

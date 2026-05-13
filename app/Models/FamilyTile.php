@@ -17,7 +17,10 @@ class FamilyTile extends Model
     }
 
     const TYPE_SOLID = 0;
+
     const TYPE_LIQUID = 1;
+
+    const DEFAULT_LIMIT_VALUE = 200;
 
     public static function getTypeLabels(): array
     {

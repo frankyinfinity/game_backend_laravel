@@ -61,27 +61,19 @@
                             </thead>
                             <tbody>
                                 @foreach($chimicalElements as $element)
-                                    @php
-                                        $limit = $familyTile->limits->where('chimical_element_id', $element->id)->first();
-                                        $value = $limit ? $limit->limit_value : 200;
-                                    @endphp
                                     <tr>
                                         <td>{{ $element->name }} ({{ $element->symbol }})</td>
                                         <td>
-                                            <input type="number" name="limits[ch{{ $element->id }}][limit_value]" value="{{ $value }}" min="0" class="form-control">
+                                            <input type="number" name="limits[ch{{ $element->id }}][limit_value]" value="{{ $element->limit_value }}" min="0" class="form-control">
                                             <input type="hidden" name="limits[ch{{ $element->id }}][chimical_element_id]" value="{{ $element->id }}">
                                         </td>
                                     </tr>
                                 @endforeach
                                 @foreach($complexChimicalElements as $element)
-                                    @php
-                                        $limit = $familyTile->limits->where('complex_chimical_element_id', $element->id)->first();
-                                        $value = $limit ? $limit->limit_value : 200;
-                                    @endphp
                                     <tr>
                                         <td>{{ $element->name }} (Complesso)</td>
                                         <td>
-                                            <input type="number" name="limits[cc{{ $element->id }}][limit_value]" value="{{ $value }}" min="0" class="form-control">
+                                            <input type="number" name="limits[cc{{ $element->id }}][limit_value]" value="{{ $element->limit_value }}" min="0" class="form-control">
                                             <input type="hidden" name="limits[cc{{ $element->id }}][complex_chimical_element_id]" value="{{ $element->id }}">
                                         </td>
                                     </tr>
