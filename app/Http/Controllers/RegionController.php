@@ -57,6 +57,10 @@ class RegionController extends Controller
     public function editMap($id)
     {
         $region = Region::query()->where('id', $id)->with(['climate.defaultTile', 'planet'])->first();
+
+        if (!$region->isMapEditable()) {
+            return redirect()->route('regions.edit', $id)->with('error', 'Non è possibile modificare la mappa in questo stato.');
+        }
         $tiles = Tile::query()->orderBy('name')->get();
         foreach ($tiles as $tile) {
             $tile->text_color = 'color: ' . $tile->color;
@@ -92,6 +96,7 @@ class RegionController extends Controller
             "width" => $request->width,
             "height" => $request->height,
             "description" => $request->description,
+            "state" => Region::STATE_CREATED,
         ]);
 
         return redirect(route('planets.show', [$request->planet_id]));
@@ -109,7 +114,6 @@ class RegionController extends Controller
         $fields = [
             "name" => $request->name,
             "climate_id" => $request->climate_id,
-            "name" => $request->name,
             "width" => $request->width,
             "height" => $request->height,
             "description" => $request->description,
@@ -274,6 +278,113 @@ class RegionController extends Controller
 
         $region->update(['filename' => $filename]);
         return response()->json(['success' => true]);
+    }
+
+    public function generateImages(Request $request, string $id)
+    {
+        $region = Region::query()->findOrFail($id);
+
+        // If already has images, can't generate again
+        if (!$region->canGenerateImages()) {
+            return redirect()->back()->with('error', 'Non è possibile generare le immagini in questo stato.');
+        }
+
+        // Generate map images
+        $this->generateMapImages($region);
+
+        // Update state to generated
+        $region->state = Region::STATE_GENERATED;
+        $region->save();
+
+        return redirect()->back()->with('success', 'Immagini generate con successo.');
+    }
+
+    public function completeRegion(Request $request, string $id)
+    {
+        $region = Region::query()->findOrFail($id);
+
+        // If not in generated state, can't complete
+        if (!$region->canComplete()) {
+            return redirect()->back()->with('error', 'Non è possibile completare la regione in questo stato.');
+        }
+
+        // Update state to completed
+        $region->state = Region::STATE_COMPLETED;
+        $region->save();
+
+        return redirect()->back()->with('success', 'Regione completata con successo.');
+    }
+
+    private function generateMapImages(Region $region)
+    {
+        // Load map data
+        $map = [];
+        if ($region->filename !== null && Storage::disk('regions')->exists($region->id . '/' . $region->filename)) {
+            $jsonContent = Storage::disk('regions')->get($region->id . '/' . $region->filename);
+            $map = json_decode($jsonContent, true);
+        }
+
+        // If no map exists, create a default map with all positions as default tile
+        if (empty($map)) {
+            $defaultTileId = $region->climate->defaultTile->id ?? null;
+            if (!$defaultTileId) {
+                return; // No default tile
+            }
+            $width = $region->width;
+            $height = $region->height;
+            $map = [];
+            for ($y = 0; $y < $height; $y++) {
+                for ($x = 0; $x < $width; $x++) {
+                    $map[$y][$x] = $defaultTileId;
+                }
+            }
+            // Save the default map
+            $filename = 'map_' . time() . '.json';
+            $jsonData = json_encode($map, JSON_PRETTY_PRINT);
+            Storage::disk('regions')->put($region->id . '/' . $filename, $jsonData);
+            $region->filename = $filename;
+            $region->save();
+        }
+
+        $width = $region->width;
+        $height = $region->height;
+        $tileSize = 32;
+
+        // Create canvas using Intervention Image
+        $canvas = \Intervention\Image\ImageManagerStatic::canvas($width * $tileSize, $height * $tileSize);
+
+        // For each position in map
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $tileId = $map[$y][$x] ?? null;
+                if ($tileId) {
+                    $tile = Tile::find($tileId);
+                    if ($tile && Storage::disk('tile')->exists($tile->id . '.png')) {
+                        $tileImagePath = Storage::disk('tile')->path($tile->id . '.png');
+                        $tileImage = \Intervention\Image\ImageManagerStatic::make($tileImagePath);
+                        $canvas->insert($tileImage, 'top-left', $x * $tileSize, $y * $tileSize);
+                    }
+                }
+            }
+        }
+
+        // Generate unique id
+        $uid = time() . '_' . $region->id;
+
+        $originalFilename = 'original_' . $uid . '.png';
+        $modifiedFilename = 'modified_' . $uid . '.png';
+
+        // Save original_uid.png
+        $canvas->save(Storage::disk('map_tile')->path($region->id . '/' . $originalFilename));
+
+        // Save modified_uid.png (identical for now)
+        $canvas->copy()->save(Storage::disk('map_tile')->path($region->id . '/' . $modifiedFilename));
+
+        // Update region with filenames
+        $region->update([
+            'original_image' => $originalFilename,
+            'modified_image' => $modifiedFilename,
+        ]);
     }
 
 }

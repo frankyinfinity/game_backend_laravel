@@ -61,6 +61,7 @@
                         <textarea class="form-control" rows="4" id="description" name="description">{{$region->description}}</textarea>
                     </div>
                 </div>
+
                 <div class="col-12">
                     <div class="row">
                         <div class="col-3">
@@ -77,4 +78,17 @@
         </form>
     </div>
 </div>
+@stop
+
+@section('js')
+<script>
+$(document).ready(function() {
+    // Disable fields if not editable
+    var isEditable = {{ $region->isEditable() ? 'true' : 'false' }};
+
+    if (!isEditable) {
+        $('#name, #climate_id, #width, #height, #description').prop('disabled', true);
+    }
+});
+</script>
 @stop

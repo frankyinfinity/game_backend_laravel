@@ -1,8 +1,4 @@
-<div class="card">
-    <div class="card-header pb-0">
-        <h4 class="mb-0">Regioni</h5>
-    </div>
-    <div class="card-body">
+<div>
         <div class="row">
             <div class="col-md-12 mb-4">
                 <div class="row">
@@ -20,8 +16,8 @@
                 </div>
             </div>
             <div class="col-12">
-                <div class="material-datatables">
-                    <table id="table_list" class="js-grid table table-no-bordered table-hover" cellspacing="0" width="100%" style="width:100%">
+                <div class="table-responsive">
+                    <table id="table_list" class="js-grid table table-bordered table-hover w-100" cellspacing="0" width="100%" style="width:100%">
                         <thead>
                         <tr>
                             <th class="column_with_checkbox">
@@ -31,6 +27,7 @@
                             </th>
                             <th>Nome</th>
                             <th>Clima</th>
+                            <th>Stato</th>
                             <th>Azioni</th>
                         </tr>
                         </thead>
@@ -39,7 +36,6 @@
                 </div>
             </div>
         </div>
-    </div>
 </div>
 
 @section('js')
@@ -52,13 +48,13 @@
             var table = $("#table_list").DataTable({
                 order: [1, 'asc'],
                 pageLength: -1,
+                autoWidth: false,
                 ajax: {
                     type: 'POST',
                     url: url_table,
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
-                    data: {},
                 },
                 columns: [
                     {
@@ -68,10 +64,12 @@
                         name:           "checkbox",
                         defaultContent: "",
                         class:          "disableEdit",
+                        width: "5%"
                     },
-                    {data:"name", name:"name"},
-                    {data:"climate.name", name:"climate.name"},
-                    {data:"id", name:"id"},
+                    {data:"name", name:"name", width: "25%"},
+                    {data:"climate.name", name:"climate.name", width: "25%"},
+                    {data:"state", name:"state", width: "15%"},
+                    {data:"id", name:"id", width: "30%"},
                 ],
                 sDom: '<"dataTables_top"lfBr>t<"dataTables_bottom"ip><"clear">',
                 initComplete: function(a, b) {
@@ -92,22 +90,38 @@
                     },
                     {
                         render: function(data, type, row){
-                            let editDataUrl = "{{ route('regions.edit', ['_id_']) }}";
-                            editDataUrl = editDataUrl.replace('_id_', data);
-
-                            let editMapUrl = "{{ route('regions.edit-map', ['_id_']) }}";
-                            editMapUrl = editMapUrl.replace('_id_', data);
-
-                            return '<div class="d-flex flex-column" style="gap: 4px;">' +
-                                '<a href="' + editDataUrl + '">' +
-                                    '<button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-edit"></i> Dati</button>' +
-                                '</a>' +
-                                '<a href="' + editMapUrl + '">' +
-                                    '<button type="button" class="btn btn-info btn-block btn-sm"><i class="fa fa-map"></i> Mappa</button>' +
-                                '</a>' +
-                            '</div>';
+                            // State badge
+                            let badge = '';
+                            if (data == 0) badge = '<span class="badge badge-secondary">Creato</span>';
+                            else if (data == 1) badge = '<span class="badge badge-info">Immagine Generata</span>';
+                            else if (data == 2) badge = '<span class="badge badge-success">Completato</span>';
+                            else badge = '<span class="badge badge-light">Sconosciuto</span>';
+                            return badge;
                         },
                         targets:   3
+                    },
+                    {
+                        render: function(data, type, row){
+                            let editDataUrl = "{{ route('regions.show', ['_id_']) }}";
+                            editDataUrl = editDataUrl.replace('_id_', data);
+
+                            let html = '<div class="d-flex flex-column" style="gap: 4px;">' +
+                                '<a href="' + editDataUrl + '">' +
+                                    '<button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-edit"></i> Dati</button>' +
+                                '</a>';
+
+                            if (row.state == {{ \App\Models\Region::STATE_GENERATED }}) { // STATE_GENERATED
+                                let editMapUrl = "{{ route('regions.edit-map', ['_id_']) }}";
+                                editMapUrl = editMapUrl.replace('_id_', data);
+                                html += '<a href="' + editMapUrl + '">' +
+                                    '<button type="button" class="btn btn-info btn-block btn-sm"><i class="fa fa-map"></i> Mappa</button>' +
+                                '</a>';
+                            }
+
+                            html += '</div>';
+                            return html;
+                        },
+                        targets:   4
                     },
                 ],
             });

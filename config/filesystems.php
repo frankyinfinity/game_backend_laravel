@@ -60,6 +60,11 @@ return [
             'root' => storage_path('app/uploads/birth_regions'),
         ],
 
+        'map_tile' => [
+            'driver' => 'local',
+            'root' => storage_path('app/uploads/map_tiles'),
+        ],
+
         'elements' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/elements'),
