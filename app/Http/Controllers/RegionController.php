@@ -277,6 +277,31 @@ class RegionController extends Controller
         Storage::disk('regions')->put($region->id . '/' . $filename, $jsonData);
 
         $region->update(['filename' => $filename]);
+
+        if ($region->modified_image && Storage::disk('map_tile')->exists($region->id . '/' . $region->modified_image)) {
+            $manager = \Intervention\Image\ImageManager::usingDriver(\Intervention\Image\Drivers\Gd\Driver::class);
+            $modifiedImagePath = Storage::disk('map_tile')->path($region->id . '/' . $region->modified_image);
+            $canvas = $manager->decode($modifiedImagePath);
+            $tileSize = \App\Helper\Helper::TILE_SIZE;
+
+            foreach ($updates as $item) {
+                if (!isset($item['tile_i']) || !isset($item['tile_j']) || !isset($item['tile_id'])) {
+                    continue;
+                }
+                $tile_i = (int) $item['tile_i'];
+                $tile_j = (int) $item['tile_j'];
+                $tile_id = (int) $item['tile_id'];
+                $tile = $tilesById->get($tile_id);
+                if ($tile && Storage::disk('tile')->exists($tile->id . '.png')) {
+                    $tileImagePath = Storage::disk('tile')->path($tile->id . '.png');
+                    $tileImage = $manager->decode($tileImagePath);
+                    $tileImage->resize($tileSize, $tileSize);
+                    $canvas->insert($tileImage, $tile_j * $tileSize, $tile_i * $tileSize, 'top-left');
+                }
+            }
+            $canvas->save($modifiedImagePath);
+        }
+
         return response()->json(['success' => true]);
     }
 

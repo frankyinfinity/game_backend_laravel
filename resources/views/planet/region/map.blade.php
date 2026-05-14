@@ -64,7 +64,8 @@
             height: {{ $region->height }},
             defaultTileId: {{ $region->climate->defaultTile->id }},
             defaultTileColor: "{{ $region->climate->defaultTile->color }}",
-            tileSize: 35,
+            originalImage: "{{ $region->original_image }}",
+            tileSize: {{ \App\Helper\Helper::TILE_SIZE }},
             map: {!! json_encode($map) !!},
             tiles: {!! json_encode($tiles->map(function ($tile) {
                 return [
@@ -153,9 +154,37 @@
             backgroundAlpha: 0
         });
         document.getElementById('region-map-pixi').appendChild(mapApp.view);
+
+        const mapBackgroundLayer = new PIXI.Container();
+        mapApp.stage.addChild(mapBackgroundLayer);
+
+        if (regionConfig.originalImage) {
+            const bgSprite = PIXI.Sprite.from('/storage/map_tiles/' + regionConfig.id + '/' + regionConfig.originalImage);
+            bgSprite.width = regionConfig.width * regionConfig.tileSize;
+            bgSprite.height = regionConfig.height * regionConfig.tileSize;
+            mapBackgroundLayer.addChild(bgSprite);
+        }
+
         const mapTilesLayer = new PIXI.Container();
-        const mapPreviewLayer = new PIXI.Container();
         mapApp.stage.addChild(mapTilesLayer);
+
+        const mapGridLayer = new PIXI.Container();
+        mapGridLayer.eventMode = 'none';
+        mapApp.stage.addChild(mapGridLayer);
+
+        const gridGraphics = new PIXI.Graphics();
+        gridGraphics.lineStyle(1, 0xFFFFFF, 0.7);
+        for(let i = 0; i <= regionConfig.height; i++) {
+            gridGraphics.moveTo(0, i * regionConfig.tileSize);
+            gridGraphics.lineTo(regionConfig.width * regionConfig.tileSize, i * regionConfig.tileSize);
+        }
+        for(let j = 0; j <= regionConfig.width; j++) {
+            gridGraphics.moveTo(j * regionConfig.tileSize, 0);
+            gridGraphics.lineTo(j * regionConfig.tileSize, regionConfig.height * regionConfig.tileSize);
+        }
+        mapGridLayer.addChild(gridGraphics);
+
+        const mapPreviewLayer = new PIXI.Container();
         mapApp.stage.addChild(mapPreviewLayer);
 
         const pickerCols = 3;
@@ -257,25 +286,23 @@
                 previousGraphic.destroy();
             }
 
-            const graphic = new PIXI.Graphics();
-            graphic.beginFill(hexToNumber(state.color));
-            graphic.lineStyle(1, 0xFFFFFF, 0.5);
-            graphic.drawRect(
-                j * regionConfig.tileSize,
-                i * regionConfig.tileSize,
-                regionConfig.tileSize,
-                regionConfig.tileSize
-            );
-            graphic.endFill();
+            const graphic = new PIXI.Container();
+            graphic.x = j * regionConfig.tileSize;
+            graphic.y = i * regionConfig.tileSize;
+            graphic.hitArea = new PIXI.Rectangle(0, 0, regionConfig.tileSize, regionConfig.tileSize);
+
+            if (pendingChanges[key] || String(state.id) !== String(regionConfig.defaultTileId)) {
+                 const sprite = PIXI.Sprite.from('/storage/tiles/' + state.id + '.png');
+                 sprite.width = regionConfig.tileSize;
+                 sprite.height = regionConfig.tileSize;
+                 graphic.addChild(sprite);
+            }
 
             if (state.generatorId && state.generatorSymbol) {
-                graphic.lineStyle(2, 0x000000, 1);
-                graphic.drawRect(
-                    j * regionConfig.tileSize + 1,
-                    i * regionConfig.tileSize + 1,
-                    regionConfig.tileSize - 2,
-                    regionConfig.tileSize - 2
-                );
+                const symBg = new PIXI.Graphics();
+                symBg.lineStyle(2, 0x000000, 1);
+                symBg.drawRect(1, 1, regionConfig.tileSize - 2, regionConfig.tileSize - 2);
+                graphic.addChild(symBg);
 
                 const symbolText = new PIXI.Text(state.generatorSymbol, {
                     fontFamily: 'Arial',
@@ -285,8 +312,8 @@
                     align: 'center'
                 });
                 symbolText.anchor.set(0.5);
-                symbolText.x = j * regionConfig.tileSize + regionConfig.tileSize / 2;
-                symbolText.y = i * regionConfig.tileSize + regionConfig.tileSize / 2;
+                symbolText.x = regionConfig.tileSize / 2;
+                symbolText.y = regionConfig.tileSize / 2;
                 graphic.addChild(symbolText);
             }
 
@@ -504,10 +531,11 @@
                 const background = new PIXI.Graphics();
                 itemContainer.addChild(background);
 
-                const swatch = new PIXI.Graphics();
-                swatch.beginFill(hexToNumber(tile.color));
-                swatch.drawRoundedRect(10, 10, 18, 18, 4);
-                swatch.endFill();
+                const swatch = PIXI.Sprite.from('/storage/tiles/' + tile.id + '.png');
+                swatch.x = 10;
+                swatch.y = 10;
+                swatch.width = 18;
+                swatch.height = 18;
                 itemContainer.addChild(swatch);
 
                 const labelStyle = { fontFamily: 'Arial', fontSize: 13, fill: 0x1F2937 };
@@ -739,8 +767,8 @@
             }
 
             tileStates[key] = { id: newState.id, color: newState.color, generatorId: newState.generatorId || null, generatorSymbol: newState.generatorSymbol || '' };
-            drawMapTile(i, j, tileStates[key]);
             updateDirtyState(key);
+            drawMapTile(i, j, tileStates[key]);
         }
 
         function getBrushCells(centerI, centerJ) {
@@ -903,8 +931,8 @@
             last.forEach(function (item) {
                 const key = getKey(item.i, item.j);
                 tileStates[key] = { id: item.before.id, color: item.before.color, generatorId: item.before.generatorId || null, generatorSymbol: item.before.generatorSymbol || '' };
-                drawMapTile(item.i, item.j, tileStates[key]);
                 updateDirtyState(key);
+                drawMapTile(item.i, item.j, tileStates[key]);
             });
             refreshSaveButtonState();
         }

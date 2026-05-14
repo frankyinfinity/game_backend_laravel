@@ -62,7 +62,9 @@ return [
 
         'map_tile' => [
             'driver' => 'local',
-            'root' => storage_path('app/uploads/map_tiles'),
+            'root' => storage_path('app/public/map_tiles'),
+            'url' => env('APP_URL').'/storage/map_tiles',
+            'visibility' => 'public',
         ],
 
         'elements' => [
