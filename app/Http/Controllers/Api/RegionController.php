@@ -42,8 +42,10 @@ class RegionController extends Controller
 
         $regions = Region::query()
             ->where('planet_id', $planet_id)
+            ->where('state', Region::STATE_COMPLETED)
             ->orderBy('name')
             ->whereNotNull('filename')
+            ->whereNotNull('modified_image')
             ->get()->toArray();
 
         $playerId = 1;

@@ -118,7 +118,15 @@ class PlayerCreatedJob implements ShouldQueue
         ]);
 
         $birthRegionIds = [];
-        foreach ($planet->regions as $itemRegion) {
+        $regions = Region::query()
+            ->where('planet_id', $planet->id)
+            ->where('state', Region::STATE_COMPLETED)
+            ->orderBy('name')
+            ->whereNotNull('filename')
+            ->whereNotNull('modified_image')
+            ->get();
+
+        foreach ($regions as $itemRegion) {
             $birthClimate = BirthClimate::query()->create([
                 'climate_id' => $itemRegion->climate->id,
                 'name' => $itemRegion->climate->name,
@@ -129,6 +137,7 @@ class PlayerCreatedJob implements ShouldQueue
             ]);
 
             $filename = $itemRegion->filename;
+            $imagename = $itemRegion->modified_image;
             $birthRegion = BirthRegion::query()->create([
                 'region_id' => $itemRegion->id,
                 'birth_planet_id' => $birthPlanet->id,
@@ -138,6 +147,7 @@ class PlayerCreatedJob implements ShouldQueue
                 'height' => $itemRegion->height,
                 'description' => $itemRegion->description,
                 'filename' => $filename,
+                'imagename' => $imagename,
             ]);
 
             $birthRegionIds[] = $birthRegion->id;
@@ -156,6 +166,11 @@ class PlayerCreatedJob implements ShouldQueue
                         $jsonEntries[$tileI . ':' . $tileJ] = $entry;
                     }
                 }
+            }
+
+            if ($imagename !== null && Storage::disk('map_tile')->exists($itemRegion->id . '/' . $imagename)) {
+                $imageContent = Storage::disk('map_tile')->get($itemRegion->id . '/' . $imagename);
+                Storage::disk('birth_regions')->put($birthRegion->id . '/' . $imagename, $imageContent);
             }
 
             $defaultTile = $birthClimate->default_tile;
