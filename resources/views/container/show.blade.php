@@ -2311,6 +2311,8 @@
             const REGION_WIDTH = {{ $regionWidth ?? 0 }};
             const REGION_HEIGHT = {{ $regionHeight ?? 0 }};
             const TILE_SIZE = 28;
+            const BIRTH_REGION_ID = {{ $player->birthRegion->id ?? 'null' }};
+            const BIRTH_REGION_IMAGENAME = '{{ $player->birthRegion->imagename ?? '' }}';
             let selectedTileI = 0;
             let selectedTileJ = 0;
             let selectionApp = null;
@@ -2335,103 +2337,58 @@
                  container.style.overflow = 'auto';
                  container.style.display = 'block';
 
-                 selectionApp = new PIXI.Application({
-                     width: width,
-                     height: height,
-                     antialias: false,
-                     backgroundAlpha: 0
-                 });
-                 container.appendChild(selectionApp.view);
-                  selectionApp.view.style.display = 'block';
-                  selectionApp.view.style.margin = '0 auto'; // Center it if smaller
-                  selectionApp.view.style.cursor = 'pointer';
- 
-                 const gridLayer = new PIXI.Container();
-                 selectionApp.stage.addChild(gridLayer);
- 
-                 // Make the whole stage clickable
-                 selectionApp.stage.eventMode = 'static';
-                 selectionApp.stage.hitArea = new PIXI.Rectangle(0, 0, width, height);
-                 selectionApp.stage.on('pointertap', function (event) {
-                     const pos = event.getLocalPosition(selectionApp.stage);
-                     const j = Math.floor(pos.x / TILE_SIZE);
-                     const i = Math.floor(pos.y / TILE_SIZE);
-                     if (i >= 0 && i < REGION_HEIGHT && j >= 0 && j < REGION_WIDTH) {
-                         selectTile(i, j);
-                     }
-                 });
+                  selectionApp = new PIXI.Application({
+                      width: width,
+                      height: height,
+                      antialias: false,
+                      backgroundAlpha: 0
+                  });
+                  container.appendChild(selectionApp.view);
+                   selectionApp.view.style.display = 'block';
+                   selectionApp.view.style.margin = '0 auto'; // Center it if smaller
+                   selectionApp.view.style.cursor = 'pointer';
 
-                 // Show loading state
-                 const loadingText = new PIXI.Text('Caricamento colori tile...', {
-                     fontFamily: 'Arial',
-                     fontSize: 14,
-                     fill: 0xffffff
-                 });
-                 loadingText.x = width / 2 - loadingText.width / 2;
-                 loadingText.y = height / 2 - loadingText.height / 2;
-                 selectionApp.stage.addChild(loadingText);
- 
-                 // Fetch actual tiles from birth region
-                 $.ajax({
-                     url: '{{ route('game.birth-region.tiles') }}',
-                     type: 'GET',
-                     dataType: 'json',
-                     data: {
-                         player_id: PLAYER_ID
-                     },
-                     success: function(response) {
-                         // Remove loading text
-                         selectionApp.stage.removeChild(loadingText);
-                         
-                         if (!response.success || !response.tiles) {
-                             console.error('Failed to load tiles:', response.message);
-                             return;
-                         }
+                   const backgroundLayer = new PIXI.Container();
+                   selectionApp.stage.addChild(backgroundLayer);
 
-                         const tiles = response.tiles;
-                         const borderColor = 0xe2e8f0;
-                         const defaultTileColor = 0xf8fafc;
+                   const gridLayer = new PIXI.Container();
+                   gridLayer.eventMode = 'none';
+                   selectionApp.stage.addChild(gridLayer);
 
-                         tiles.forEach(function(tileData) {
-                             const i = tileData.i;
-                             const j = tileData.j;
-                             const tile = tileData.tile;
-                             
-                             // Get color from tile data, fallback to default
-                             let tileColor = defaultTileColor;
-                             if (tile && tile.color) {
-                                 const hex = tile.color.replace('#', '');
-                                 tileColor = parseInt(hex, 16);
-                             }
+                   // Add background image if available
+                   if (BIRTH_REGION_ID && BIRTH_REGION_IMAGENAME) {
+                       const bgSprite = PIXI.Sprite.from('/storage/birth_regions/' + BIRTH_REGION_ID + '/' + BIRTH_REGION_IMAGENAME);
+                       bgSprite.width = width;
+                       bgSprite.height = height;
+                       backgroundLayer.addChild(bgSprite);
+                   }
 
-                             const g = new PIXI.Graphics();
-                             g.beginFill(tileColor);
-                             g.lineStyle(1, borderColor, 1);
-                             g.drawRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                             g.endFill();
-                             gridLayer.addChild(g);
-                         });
-                     },
-                     error: function() {
-                         // Remove loading text
-                         selectionApp.stage.removeChild(loadingText);
-                         
-                         // Fallback to default colors if AJAX fails
-                         const tileColor = 0xf8fafc;
-                         const borderColor = 0xe2e8f0;
+                   // Add white grid
+                   const gridGraphics = new PIXI.Graphics();
+                   gridGraphics.lineStyle(1, 0xFFFFFF, 0.7);
+                   for(let i = 0; i <= REGION_HEIGHT; i++) {
+                       gridGraphics.moveTo(0, i * TILE_SIZE);
+                       gridGraphics.lineTo(width, i * TILE_SIZE);
+                   }
+                   for(let j = 0; j <= REGION_WIDTH; j++) {
+                       gridGraphics.moveTo(j * TILE_SIZE, 0);
+                       gridGraphics.lineTo(j * TILE_SIZE, height);
+                   }
+                   gridLayer.addChild(gridGraphics);
 
-                         for (let i = 0; i < REGION_HEIGHT; i++) {
-                             for (let j = 0; j < REGION_WIDTH; j++) {
-                                 const g = new PIXI.Graphics();
-                                 g.beginFill(tileColor);
-                                 g.lineStyle(1, borderColor, 1);
-                                 g.drawRect(j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                                 g.endFill();
-                                 gridLayer.addChild(g);
-                             }
-                         }
-                     }
-                 });
+                   // Make the whole stage clickable
+                   selectionApp.stage.eventMode = 'static';
+                   selectionApp.stage.hitArea = new PIXI.Rectangle(0, 0, width, height);
+                   selectionApp.stage.on('pointertap', function (event) {
+                       const pos = event.getLocalPosition(selectionApp.stage);
+                       const j = Math.floor(pos.x / TILE_SIZE);
+                       const i = Math.floor(pos.y / TILE_SIZE);
+                       if (i >= 0 && i < REGION_HEIGHT && j >= 0 && j < REGION_WIDTH) {
+                           selectTile(i, j);
+                       }
+                   });
+
+
  
                  // Sync inputs with map selection
                  $('#tileI, #tileJ').on('input change', function () {

@@ -58,6 +58,9 @@ return [
         'birth_regions' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/birth_regions'),
+            'url' => env('APP_URL').'/storage/birth_regions',
+            'visibility' => 'public',
+            'throw' => false,
         ],
 
         'map_tile' => [
@@ -140,6 +143,7 @@ return [
 
     'links' => [
         public_path('storage') => storage_path('app/public'),
+        public_path('storage/birth_regions') => storage_path('app/uploads/birth_regions'),
     ],
 
 ];
