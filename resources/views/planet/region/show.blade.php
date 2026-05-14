@@ -86,6 +86,10 @@
                         <a href="{{route('regions.edit-map', [$region->id])}}">
                             <button type="button" class="btn btn-info btn-block btn-sm"><i class="fa fa-map"></i> Modifica Mappa</button>
                         </a>
+                        @elseif($region->state === \App\Models\Region::STATE_COMPLETED)
+                        <a href="{{route('regions.edit-map', [$region->id])}}">
+                            <button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-eye"></i> Visualizza Mappa</button>
+                        </a>
                         @else
                         <button type="button" class="btn btn-secondary btn-block btn-sm" disabled><i class="fa fa-map"></i> Modifica Mappa</button>
                         @endif

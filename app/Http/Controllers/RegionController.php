@@ -58,8 +58,8 @@ class RegionController extends Controller
     {
         $region = Region::query()->where('id', $id)->with(['climate.defaultTile', 'planet'])->first();
 
-        if (!$region->isMapEditable()) {
-            return redirect()->route('regions.edit', $id)->with('error', 'Non è possibile modificare la mappa in questo stato.');
+        if (!$region->isMapEditable() && $region->state !== \App\Models\Region::STATE_COMPLETED) {
+            return redirect()->route('regions.edit', $id)->with('error', 'Non è possibile modificare o visualizzare la mappa in questo stato.');
         }
         $tiles = Tile::query()->orderBy('name')->get();
         foreach ($tiles as $tile) {
@@ -80,7 +80,9 @@ class RegionController extends Controller
             $map = json_decode($jsonContent, true);
         }
 
-        return view("planet.region.edit-map", compact('region', 'tiles', 'generatorsData', 'map'));
+        $isReadOnly = $region->state === \App\Models\Region::STATE_COMPLETED;
+
+        return view("planet.region.edit-map", compact('region', 'tiles', 'generatorsData', 'map', 'isReadOnly'));
     }
 
     /**

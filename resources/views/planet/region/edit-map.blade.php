@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'Modifica Mappa Regione')
+@section('title', isset($isReadOnly) && $isReadOnly ? 'Visualizza Mappa Regione' : 'Modifica Mappa Regione')
 
 @section('content_header')@stop
 
@@ -9,15 +9,17 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header pb-0">
-                <h4 class="mb-0">Modifica Mappa Regione: {{$region->name}}</h5>
+                <h4 class="mb-0">{{ isset($isReadOnly) && $isReadOnly ? 'Visualizza Mappa Regione' : 'Modifica Mappa Regione' }}: {{$region->name}}</h5>
             </div>
             <div class="card-body">
                 <div class="row">
+                    @if(!isset($isReadOnly) || !$isReadOnly)
                     <div class="col-md-3">
                         <button type="button" id="map-save-all" class="btn btn-primary btn-block btn-sm">
                             <i class="fa fa-save"></i> Salva
                         </button>
                     </div>
+                    @endif
                     <div class="col-md-3">
                         <a href="{{route('planets.show', [$region->planet->id])}}">
                             <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>

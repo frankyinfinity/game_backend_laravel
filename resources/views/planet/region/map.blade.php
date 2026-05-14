@@ -6,7 +6,7 @@
         <div id="map-tooltip"
             style="display:none; position:fixed; background:#1F2937; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; pointer-events:none; z-index:9999; white-space:nowrap;">
         </div>
-        <div class="row">
+        <div class="row" {!! isset($isReadOnly) && $isReadOnly ? 'style="display:none;"' : '' !!}>
             <div class="col-12 mb-3">
                 <div class="d-flex flex-wrap" style="gap: 8px;">
                     <button type="button" class="btn btn-primary btn-sm js-map-tool" data-tool="paint">
@@ -46,6 +46,8 @@
                 <div id="region-tile-picker-pixi"
                     style="display: inline-block; border: 1px solid #d9d9d9; border-radius: 4px;"></div>
             </div>
+        </div>
+        <div class="row">
             <div class="col-12" style="overflow: auto">
                 <div id="region-map-pixi" style="display: inline-block; border: 1px solid #d9d9d9; border-radius: 4px;">
                 </div>
@@ -77,7 +79,8 @@
             })->values()) !!},
             generators: @json($generatorsData),
             updateTilesBatchUrl: "{{ route('regions.tiles-batch') }}",
-            csrfToken: $('meta[name="csrf-token"]').attr('content')
+            csrfToken: $('meta[name="csrf-token"]').attr('content'),
+            isReadOnly: {{ isset($isReadOnly) && $isReadOnly ? 'true' : 'false' }}
         };
         const mapItems = Array.isArray(regionConfig.map)
             ? regionConfig.map
@@ -902,6 +905,10 @@
         }
 
         function handleTileInteraction(i, j, fromDrag) {
+            if (regionConfig.isReadOnly) {
+                return;
+            }
+            
             const changeSet = {};
             if (activeTool === 'paint') {
                 paintAt(i, j, changeSet);
