@@ -348,10 +348,11 @@ class RegionController extends Controller
 
         $width = $region->width;
         $height = $region->height;
-        $tileSize = 32;
+        $tileSize = \App\Helper\Helper::TILE_SIZE;
 
-        // Create canvas using Intervention Image
-        $canvas = \Intervention\Image\ImageManagerStatic::canvas($width * $tileSize, $height * $tileSize);
+        // Create canvas using Intervention Image v4
+        $manager = \Intervention\Image\ImageManager::usingDriver(\Intervention\Image\Drivers\Gd\Driver::class);
+        $canvas = $manager->createImage($width * $tileSize, $height * $tileSize);
 
         // For each position in map
         for ($y = 0; $y < $height; $y++) {
@@ -361,8 +362,10 @@ class RegionController extends Controller
                     $tile = Tile::find($tileId);
                     if ($tile && Storage::disk('tile')->exists($tile->id . '.png')) {
                         $tileImagePath = Storage::disk('tile')->path($tile->id . '.png');
-                        $tileImage = \Intervention\Image\ImageManagerStatic::make($tileImagePath);
-                        $canvas->insert($tileImage, 'top-left', $x * $tileSize, $y * $tileSize);
+                        $tileImage = $manager->decode($tileImagePath);
+                        // Resize the tile to fill the grid slot exactly and avoid borders/gaps
+                        $tileImage->resize($tileSize, $tileSize);
+                        $canvas->insert($tileImage, $x * $tileSize, $y * $tileSize, 'top-left');
                     }
                 }
             }
@@ -374,11 +377,16 @@ class RegionController extends Controller
         $originalFilename = 'original_' . $uid . '.png';
         $modifiedFilename = 'modified_' . $uid . '.png';
 
+        // Make sure the directory exists before saving
+        if (!Storage::disk('map_tile')->exists((string) $region->id)) {
+            Storage::disk('map_tile')->makeDirectory((string) $region->id);
+        }
+
         // Save original_uid.png
         $canvas->save(Storage::disk('map_tile')->path($region->id . '/' . $originalFilename));
 
         // Save modified_uid.png (identical for now)
-        $canvas->copy()->save(Storage::disk('map_tile')->path($region->id . '/' . $modifiedFilename));
+        $canvas->save(Storage::disk('map_tile')->path($region->id . '/' . $modifiedFilename));
 
         // Update region with filenames
         $region->update([
