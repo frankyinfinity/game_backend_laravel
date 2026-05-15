@@ -8,6 +8,7 @@ use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\Appbar\HomeAppbarDraw;
 use App\Custom\Draw\Complex\TilePanelDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Rectangle;
@@ -122,6 +123,17 @@ class GenerateMapJob implements ShouldQueue
             $drawItems[] = $objectDraw->get();
         }
 
+        // Draw background image
+        if ($birthRegion->imagename) {
+            $bgImage = new Image('map_background');
+            $bgImage->setSrc('/storage/birth_regions/' . $birthRegion->id . '/' . $birthRegion->imagename);
+            $bgImage->setOrigin($startPixelX, $pixelY);
+            $bgImage->setSize($birthRegion->width * $tileSize, $birthRegion->height * $tileSize);
+            $bgImageJson = ScrollGroup::attach($bgImage->buildJson(), Helper::MAP_SCROLL_GROUP_MAIN);
+            $objectDraw = new ObjectDraw($bgImageJson, $player->actual_session_id);
+            $drawItems[] = $objectDraw->get();
+        }
+
         for ($i = 0; $i < $birthRegion->height; $i++) {
             for ($j = 0; $j < $birthRegion->width; $j++) {
 
@@ -165,6 +177,7 @@ class GenerateMapJob implements ShouldQueue
                 $square->setOrigin($pixelX, $pixelY);
                 $square->setSize($tileSize);
                 $square->setColor($squareColor);
+                $square->addAttributes('alpha', 0.1);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
