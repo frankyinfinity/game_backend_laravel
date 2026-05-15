@@ -21,6 +21,7 @@ use App\Models\Container;
 use App\Models\Player;
 use App\Models\Tile;
 use App\Models\ElementHasPosition;
+use App\Models\FamilyTile;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Log;
@@ -178,7 +179,8 @@ class GenerateMapJob implements ShouldQueue
                 $square->setOrigin($pixelX, $pixelY);
                 $square->setSize($tileSize);
                 $square->setColor($squareColor);
-                $square->addAttributes('alpha', 0.1);
+                $isLiquid = is_array($tile) ? (($tile['type'] ?? null) === FamilyTile::TYPE_LIQUID) : (($tile->type ?? null) === FamilyTile::TYPE_LIQUID);
+                $square->addAttributes('alpha', $isLiquid ? 0.1 : 0);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickTile);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OVER, $jsContentPointerOverTile);
                 $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_OUT, $jsContentPointerOutTile);
