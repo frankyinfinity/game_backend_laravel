@@ -7,7 +7,7 @@
 @section('content')
 <div class="card">
     <div class="card-header pb-0">
-        <h4 class="mb-0">Tile</h5>
+        <h4 class="mb-0">Tile</h4>
     </div>
     <div class="card-body">
         <div class="row">
@@ -21,14 +21,17 @@
                         </button>
                     </div>
                     <div class="col-3">
-                        <a href="{{route('tiles.create')}}">
-                            <button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-plus"></i>
-                                Nuovo</button>
-                        </a>
+                        <button type="button" id="tiles-create-btn" class="btn btn-primary btn-block btn-sm"><i class="fa fa-plus"></i>
+                            Nuovo</button>
                     </div>
                 </div>
             </div>
             <div class="col-12">
+                <ul class="nav nav-tabs mb-3" id="tileFilterTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-family-tile-id="all">Tutte</a>
+                    </li>
+                </ul>
                 <div class="material-datatables">
                     <table id="table_list" class="js-grid table table-no-bordered table-hover" cellspacing="0"
                         width="100%" style="width:100%">
@@ -58,11 +61,38 @@
 @section('js')
 <script>
     var typeLabels = @json(\App\Models\FamilyTile::getTypeLabels());
+    var familyTiles = @json(\App\Models\FamilyTile::all()->pluck('name', 'id')->toArray());
+    var currentFilter = 'all';
+    var createUrl = '{{ route("tiles.create") }}';
+
     $(document).ready(function () {
+        // Build filter tabs
+        $.each(familyTiles, function (id, name) {
+            $('#tileFilterTabs').append('<li class="nav-item"><a class="nav-link" href="#" data-family-tile-id="' + id + '">' + name + '</a></li>');
+        });
+
+        // Handle tab clicks
+        $(document).on('click', '#tileFilterTabs .nav-link', function (e) {
+            e.preventDefault();
+            $('.nav-link', '#tileFilterTabs').removeClass('active');
+            $(this).addClass('active');
+            currentFilter = $(this).data('family-tile-id');
+            table.ajax.url('{{ route('tiles.datatable') }}').load();
+        });
 
         $(document).on('click', '.btn_edit', function (e) {
             var url = "{{ route('tiles.show', ['_id_']) }}";
             url = url.replace('_id_', $(this).data('id'));
+            window.location.href = url;
+        });
+
+        // Handle new button - generate URL with current filter
+        $('#tiles-create-btn').on('click', function (e) {
+            e.preventDefault();
+            var url = createUrl;
+            if (currentFilter !== 'all') {
+                url += '?family_tile_id=' + currentFilter;
+            }
             window.location.href = url;
         });
 
@@ -73,9 +103,13 @@
                 type: 'POST',
                 url: '{{ route('tiles.datatable') }}',
                 headers: {
-                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    'X-CSRF-TOKEN': $('meta[name=csrf-token]').attr('content')
                 },
-                data: {},
+                data: function (d) {
+                    if (currentFilter !== 'all') {
+                        d.family_tile_id = currentFilter;
+                    }
+                },
             },
             columns: [
                 {

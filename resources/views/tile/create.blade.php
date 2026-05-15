@@ -7,7 +7,7 @@
 @section('content')
 <div class="card">
     <div class="card-header pb-0">
-        <h4 class="mb-0">Nuovo Tile</h5>
+        <h4 class="mb-0">Nuovo Tile</h4>
     </div>
     <div class="card-body">
         <form method="POST" action="{{ route('tiles.store') }}">
@@ -26,8 +26,9 @@
                     <div class="form-group">
                         <label for="family_tile_id">Famiglia Tile*</label>
                         <select id="family_tile_id" name="family_tile_id" class="form-control" required>
+                            <option value="">-- Seleziona --</option>
                             @foreach(\App\Models\FamilyTile::all() as $family)
-                                <option value="{{ $family->id }}">{{ $family->name }} ({{ \App\Models\FamilyTile::getTypeLabels()[$family->type] }})</option>
+                                <option value="{{ $family->id }}" @if(isset($family_tile_id) && $family_tile_id == $family->id) selected @endif>{{ $family->name }} ({{ \App\Models\FamilyTile::getTypeLabels()[$family->type] }})</option>
                             @endforeach
                         </select>
                     </div>
@@ -46,40 +47,15 @@
                     </div>
                 </div>
             </div>
-                        <input type="text" id="name" name="name" class="form-control" placeholder="Nome" required>
+            <div class="col-12">
+                <div class="row">
+                    <div class="col-3">
+                        <button type="submit" class="btn btn-primary btn-block btn-sm"><i class="fa fa-save"></i> Salva</button>
                     </div>
-                </div>
-                <div class="col-6">
-                    <div class="form-group" style="display: none;">
-                        <label for="color">Colore</label>
-                        <div class="input-group my-colorpicker colorpicker-element" data-colorpicker-id="2">
-                          <input type="text" id="color" name="color" class="form-control" value="#ffffff" data-original-title="" title="">
-                          <div class="input-group-append">
-                            <span class="input-group-text"><i class="fas fa-square" style="color: rgb(255, 255, 255);"></i></span>
-                          </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="form-group">
-                        <label for="family_tile_id">Famiglia Tile*</label>
-                        <select id="family_tile_id" name="family_tile_id" class="form-control" required>
-                            @foreach(\App\Models\FamilyTile::all() as $family)
-                                <option value="{{ $family->id }}">{{ $family->name }} ({{ \App\Models\FamilyTile::getTypeLabels()[$family->type] }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="row">
-                        <div class="col-3">
-                            <button type="submit" class="btn btn-primary btn-block btn-sm"><i class="fa fa-save"></i> Salva</button>
-                        </div>
-                        <div class="col-3">
-                            <a href="{{route('tiles.index')}}">
-                                <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>                    
-                            </a>
-                        </div>
+                    <div class="col-3">
+                        <a href="{{route('tiles.index')}}">
+                            <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -89,14 +65,12 @@
 @stop
 
 @section('js')
-    <script> 
+    <script>
         $(document).ready(function () {
-
             $('.my-colorpicker').colorpicker();
             $('.my-colorpicker').on('colorpickerChange', function(event) {
                 $('.my-colorpicker .fa-square').css('color', event.color.toString());
             });
-
         });
     </script>
 @stop

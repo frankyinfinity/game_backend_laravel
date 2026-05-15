@@ -28,8 +28,13 @@ class TileController extends Controller
 
     public function listDataTable(Request $request)
     {
-        $query = Tile::with('familyTile')->get();
-        return datatables($query)
+        $query = Tile::with('familyTile');
+        
+        if ($request->has('family_tile_id') && $request->family_tile_id !== 'all') {
+            $query->where('family_tile_id', $request->family_tile_id);
+        }
+        
+        return datatables($query->get())
             ->addColumn('family_tile_name', function ($row) {
                 if ($row->familyTile) {
                     $typeLabel = FamilyTile::getTypeLabels()[$row->familyTile->type] ?? $row->familyTile->type;
@@ -43,9 +48,10 @@ class TileController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
-        return view("tile.create");
+        $family_tile_id = $request->query('family_tile_id');
+        return view("tile.create", compact('family_tile_id'));
     }
 
     /**
