@@ -26,6 +26,7 @@ class ExecuteBrainScheduleJob implements ShouldQueue
 
     public function handle(BrainFlowRunner $runner): void
     {
+        ini_set('memory_limit', '-1');
         $brainSchedule = BrainSchedule::query()->find($this->brainScheduleId);
         if ($brainSchedule === null) {
             return;

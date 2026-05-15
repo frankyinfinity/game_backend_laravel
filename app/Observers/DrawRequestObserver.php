@@ -19,7 +19,7 @@ class DrawRequestObserver
         $playerId = $drawRequest->player_id;
         $player = Player::find($playerId);
 
-        // Send only the request id; items are fetched via Workerman WS.
+        // Send only the request id; items are fetched via API.
         event(new DrawInterfaceEvent($player, $requestId));
 
     }

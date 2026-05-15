@@ -73,6 +73,7 @@ class PlayerCreatedJob implements ShouldQueue
      */
     public function handle(): void
     {
+        ini_set('memory_limit', '-1');
         $player = $this->player;
 
         PlayerValue::ensureDefaultsForPlayer($player->id);

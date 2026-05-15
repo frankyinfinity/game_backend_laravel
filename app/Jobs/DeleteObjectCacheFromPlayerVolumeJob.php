@@ -23,6 +23,7 @@ class DeleteObjectCacheFromPlayerVolumeJob implements ShouldQueue
 
     public function handle(): void
     {
+        ini_set('memory_limit', '-1');
         if ($this->player->id === 1) {
             return;
         }

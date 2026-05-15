@@ -29,6 +29,7 @@ class ExecuteCompletedTargetRewardScriptJob implements ShouldQueue
      */
     public function handle(): void
     {
+        ini_set('memory_limit', '-1');
         $player = Player::find($this->playerId);
         if (!$player) {
             return;

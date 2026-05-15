@@ -86,6 +86,7 @@ class GameController extends Controller
 
     public function login(Request $request)
     {
+        ini_set('memory_limit', '-1');
 
         $playerId = $request->player_id;
         $player = Player::find($playerId);
@@ -221,6 +222,7 @@ class GameController extends Controller
 
     public function register(Request $request)
     {
+        ini_set('memory_limit', '-1');
 
         $playerId = $request->player_id;
         $player = Player::find($playerId);
@@ -467,6 +469,7 @@ class GameController extends Controller
 
     public function clearLogin(Request $request)
     {
+        ini_set('memory_limit', '-1');
 
         $playerId = $request->player_id;
         $player = Player::find($playerId);
@@ -498,14 +501,16 @@ class GameController extends Controller
 
     public function home(Request $request)
     {
+        ini_set('memory_limit', '-1');
         GenerateMapJob::dispatch($request->all());
         return response()->json(['success' => true]);
     }
 
     public function getDrawItem(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
 
-        $itemsJson = '[]';
+        $items = [];
         $drawRequest = DrawRequest::query()
             ->where('session_id', $request->session_id)
             ->where('request_id', $request->request_id)
@@ -513,16 +518,20 @@ class GameController extends Controller
             ->first();
 
         if ($drawRequest !== null) {
-            $itemsJson = (string) ($drawRequest->getRawOriginal('items') ?? '[]');
+            $items = $drawRequest->items ?? [];
+            if (is_string($items)) {
+                $items = json_decode($items, true) ?? [];
+            }
             $drawRequest->delete();
         }
 
-        return response()->json(['success' => true, 'items' => $itemsJson]);
+        return response()->json(['success' => true, 'items' => $items]);
 
     }
 
     public function close(Request $request)
     {
+        ini_set('memory_limit', '-1');
         $player_id = $request->input('player_id');
 
         \Log::info("Player connection closed", [
@@ -561,6 +570,7 @@ class GameController extends Controller
 
     public function clear(Request $request)
     {
+        ini_set('memory_limit', '-1');
         $playerId = $request->input('player_id');
         $sessionId = $request->input('session_id');
 
@@ -587,6 +597,7 @@ class GameController extends Controller
 
     public function setElementInMap(Request $request)
     {
+        ini_set('memory_limit', '-1');
 
         $birth_region_id = $request->birth_region_id;
         $birthRegion = BirthRegion::find($birth_region_id);
@@ -665,6 +676,7 @@ class GameController extends Controller
 
     public function getTilesByBirthRegion(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $birthRegionId = (int) $request->input('birth_region_id');
         if ($birthRegionId <= 0) {
             return response()->json([
@@ -767,6 +779,7 @@ class GameController extends Controller
 
     public function getBirthRegionDetails(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $birthRegionId = (int) $request->input('birth_region_id');
         if ($birthRegionId <= 0) {
             return response()->json([
@@ -789,6 +802,7 @@ class GameController extends Controller
 
     public function calculateChimicalElement(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $birthRegionId = (int) $request->input('birth_region_id');
         if ($birthRegionId <= 0) {
             return response()->json([
@@ -826,6 +840,7 @@ class GameController extends Controller
 
     public function consumeChimicalElement(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $birthRegionId = (int) $request->input('birth_region_id');
 
         ConsumeChimicalElementJob::dispatch($birthRegionId);
@@ -1147,6 +1162,7 @@ class GameController extends Controller
      */
     public function movement(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
 
         $entityUid = $request->entity_uid;
         $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
@@ -1331,6 +1347,7 @@ class GameController extends Controller
 
     public function resetPlayerValues(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
 
         Log::info('resetPlayerValues');
 
@@ -1361,6 +1378,7 @@ class GameController extends Controller
 
     public function getPlayerValues(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $playerId = (int) ($request->input('player_id') ?? $request->input('playerId'));
         if ($playerId <= 0) {
             return response()->json(['success' => false, 'message' => 'player_id is required'], 422);
@@ -1384,6 +1402,7 @@ class GameController extends Controller
 
     public function checkModifier(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $playerId = (int) ($request->input('player_id') ?? $request->input('playerId'));
         $elementHasPositionId = (int) $request->input('element_has_position_id');
 
@@ -1447,6 +1466,7 @@ class GameController extends Controller
      */
     public function consume(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $entityUid = $request->entity_uid;
         $elementHasPositionUid = $request->element_has_position_uid ?: $request->element_uid;
 
@@ -1648,18 +1668,21 @@ class GameController extends Controller
 
     public function startObjective(Request $request, ObjectiveService $objectiveService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $result = $objectiveService->startObjective($request);
         return response()->json($result['body'], $result['status']);
     }
 
     public function setObjectiveModalVisibility(Request $request, ObjectiveService $objectiveService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $result = $objectiveService->setObjectiveModalVisibility($request);
         return response()->json($result['body'], $result['status']);
     }
 
     public function attack(Request $request)
     {
+        ini_set('memory_limit', '-1');
         $entityUid = $request->entity_uid;
         $elementUid = $request->element_uid;
 
@@ -2131,6 +2154,7 @@ class GameController extends Controller
 
     public function division(Request $request)
     {
+        ini_set('memory_limit', '-1');
         $entityUid = (string) $request->input('entity_uid');
         if ($entityUid === '') {
             return response()->json([
@@ -2437,12 +2461,14 @@ class GameController extends Controller
 
     public function checkObjective(Request $request, ObjectiveService $objectiveService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $result = $objectiveService->dispatchObjectiveCheck($request);
         return response()->json($result['body'], $result['status']);
     }
 
     public function brain(Request $request, BrainScheduleService $brainScheduleService)
     {
+        ini_set('memory_limit', '-1');
 
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
@@ -2455,6 +2481,7 @@ class GameController extends Controller
 
     public function finishBrainSchedule(Request $request, BrainScheduleService $brainScheduleService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
@@ -2465,6 +2492,7 @@ class GameController extends Controller
 
     public function websocketInfo(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'player_id' => ['required', 'integer'],
         ]);
@@ -2605,6 +2633,7 @@ class GameController extends Controller
 
     public function buildApplyGeneEffectsCode(string $entityUid, string $elementHasPositionUid, int $elementId): string
     {
+        ini_set('memory_limit', '-1');
         $jsContent = File::get(resource_path('js/function/entity/apply_gene_effects.blade.php'));
         $jsContent = str_replace('__ENTITY_UID__', $entityUid, $jsContent);
         $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
@@ -2616,6 +2645,7 @@ class GameController extends Controller
 
     public function buildApplyElementGeneEffectsCode(string $elementHasPositionUid, string $targetElementHasPositionUid): string
     {
+        ini_set('memory_limit', '-1');
         $jsContent = File::get(resource_path('js/function/element/apply_gene_effects.blade.php'));
         $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
         $jsContent = str_replace('__TARGET_ELEMENT_HAS_POSITION_UID__', $targetElementHasPositionUid, $jsContent);
@@ -2671,6 +2701,7 @@ class GameController extends Controller
 
     public function getPlayerContainerData(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'player_id' => ['required', 'integer'],
         ]);
@@ -2745,6 +2776,7 @@ class GameController extends Controller
 
     public function containerAction(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'container_id' => ['required', 'integer'],
             'action' => ['required', 'string', 'in:restart,recreate,stop,start'],
@@ -2782,6 +2814,7 @@ class GameController extends Controller
 
     public function syncObjectCache(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'player_id' => ['required', 'integer'],
         ]);
@@ -2824,6 +2857,7 @@ class GameController extends Controller
      */
     public function checkEntityDegradation(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $entityUid = $request->entity_uid;
 
         Log::info("checkEntityDegradation called for Entity: {$entityUid}");
@@ -2871,6 +2905,7 @@ class GameController extends Controller
      */
     public function checkElementDegradation(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $elementHasPositionUid = $request->element_has_position_uid;
 
         Log::info("checkElementDegradation called for ElementHasPosition: {$elementHasPositionUid}");
@@ -2915,6 +2950,7 @@ class GameController extends Controller
 
     public function applyGeneEffects(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $entityUid = $request->entity_uid;
 
         $entity = Entity::query()->where('uid', $entityUid)->first();
@@ -2963,6 +2999,7 @@ class GameController extends Controller
 
     public function applyElementGeneEffects(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $elementHasPositionUid = $request->element_has_position_uid;
 
         $elementHasPosition = ElementHasPosition::query()->where('uid', $elementHasPositionUid)->first();
@@ -3005,6 +3042,7 @@ class GameController extends Controller
 
     public function updateElementInformation(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $updateItemsJson = $request->input('update_items');
         if (empty($updateItemsJson)) {
             return response()->json(['success' => false, 'message' => 'update_items is required']);
@@ -3053,6 +3091,7 @@ class GameController extends Controller
 
     public function updateEntityInformation(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $updateItemsJson = $request->input('update_items');
         if (empty($updateItemsJson)) {
             return response()->json(['success' => false, 'message' => 'update_items is required']);
@@ -3101,6 +3140,7 @@ class GameController extends Controller
 
     public function updateInformation(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $updateItemsJson = $request->input('update_items');
 
         if (empty($updateItemsJson)) {
@@ -3146,6 +3186,7 @@ class GameController extends Controller
      */
     public function getBirthRegionTiles(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'player_id' => ['required', 'integer', 'exists:players,id'],
         ]);
@@ -3167,6 +3208,7 @@ class GameController extends Controller
 
     public function createElementHasPosition(Request $request): \Illuminate\Http\JsonResponse
     {
+        ini_set('memory_limit', '-1');
         $request->validate([
             'player_id' => 'required|integer|exists:players,id',
             'element_id' => 'required|integer|exists:elements,id',

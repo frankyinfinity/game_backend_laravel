@@ -45,6 +45,7 @@ class CheckObjectiveJob implements ShouldQueue
      */
     public function handle(): void
     {
+        ini_set('memory_limit', '-1');
         $request = new Request($this->payload);
         $playerId = (int) $request->player_id;
 

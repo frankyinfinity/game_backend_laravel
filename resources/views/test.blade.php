@@ -155,30 +155,33 @@
             };
         }
 
-        function fetchDrawItemsWs(requestId, playerIdFromEvent) {
+        function fetchDrawItems(requestId, playerIdFromEvent) {
             return new Promise((resolve, reject) => {
-                const payload = {
-                    action: 'get_draw_item',
-                    request_id: requestId,
-                    player_id: playerIdFromEvent,
-                    session_id: sessionId
-                };
-
-                drawWsPending.set(requestId, { resolve, reject });
-
-                if (drawWsReady && drawWs) {
-                    drawWs.send(JSON.stringify(payload));
-                } else {
-                    drawWsQueue.push(payload);
-                    initDrawItemsSocket();
-                }
-
-                setTimeout(() => {
-                    if (drawWsPending.has(requestId)) {
-                        drawWsPending.delete(requestId);
-                        reject(new Error('draw_ws_timeout'));
+                $.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     }
-                }, 10000);
+                });
+
+                $.ajax({
+                    url: '/api/game/get_draw_item',
+                    type: 'POST',
+                    data: {
+                        request_id: requestId,
+                        player_id: playerIdFromEvent,
+                        session_id: sessionId
+                    },
+                    success: function (result) {
+                        if (result.success) {
+                            resolve({ items: result.items });
+                        } else {
+                            reject(new Error('API error'));
+                        }
+                    },
+                    error: function () {
+                        reject(new Error('API request failed'));
+                    }
+                });
             });
         }
 
@@ -903,31 +906,16 @@
                     return;
                 }
 
-                fetchDrawItemsWs(requestId, playerIdFromEvent)
+                fetchDrawItems(requestId, playerIdFromEvent)
                     .then((result) => {
                         let items = result && result.items ? result.items : null;
                         if (!items) {
                             console.warn('draw_interface missing items payload');
                             return;
                         }
-                        if (typeof items === 'string' || items instanceof String) {
-                            try {
-                                items = JSON.parse(items);
-                            } catch (error) {
-                                console.error('Error parsing draw items JSON:', error);
-                                items = [];
-                            }
-                        }
                         if (!Array.isArray(items)) {
-                            const maybeJson = (items !== null && items !== undefined) ? String(items).trim() : '';
-                            if (maybeJson.startsWith('[') || maybeJson.startsWith('{')) {
-                                try {
-                                    items = JSON.parse(maybeJson);
-                                } catch (error) {
-                                    console.error('Error parsing draw items JSON:', error);
-                                    items = [];
-                                }
-                            }
+                            console.warn('Draw items is not an array:', items);
+                            items = [];
                         }
                         processItems(items);
                     })

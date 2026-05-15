@@ -46,6 +46,7 @@ class GenerateMapJob implements ShouldQueue
      */
     public function handle(): void
     {
+        ini_set('memory_limit', '-1');
 
         ini_set('memory_limit', '-1');
         set_time_limit(0);
@@ -350,7 +351,7 @@ class GenerateMapJob implements ShouldQueue
             'session_id' => $player->actual_session_id,
             'request_id' => $request_id,
             'player_id' => $player_id,
-            'items' => json_encode($drawItems),
+            'items' => $drawItems,
         ]);
 
     }

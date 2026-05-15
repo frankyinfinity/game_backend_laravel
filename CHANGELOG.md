@@ -4,7 +4,6 @@
 # backend
 # php artisan serve --host=0.0.0.0 --port=8085
 # php artisan reverb:start
-# php workerman-draw-items.php start
 # php artisan queue:listen
 
 # frontend
