@@ -2,16 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Models\DrawRequest;
-use App\Models\Player;
-use App\Models\ElementHasPositionChimicalElement;
-use App\Custom\Draw\Complex\BarChimicalElementDraw;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
-use function GuzzleHttp\json_encode;
 
 class TestDrawCommand extends Command
 {
@@ -37,12 +34,13 @@ class TestDrawCommand extends Command
         $requestId = Str::uuid()->toString();
         $sessionId = 'test_session_fixed';
 
-        $eventPlayerId = 61;
+        $eventPlayerId = 1;
 
         ObjectCache::buffer($sessionId);
 
         $drawItems = [];
 
+        // Cancella gli oggetti precedenti
         $existingObjects = ObjectCache::all($sessionId);
         foreach ($existingObjects as $uid => $object) {
             $objectClear = new ObjectClear($uid, $sessionId);
@@ -51,21 +49,15 @@ class TestDrawCommand extends Command
 
         ObjectCache::clear($sessionId);
 
-        $positionChimicalElement = ElementHasPositionChimicalElement::query()
-            ->where('id', 2)
-            ->first();
+        // Disegna un quadrato rosso
+        $square = new Square();
+        $square->setOrigin(100, 100);
+        $square->setSize(100);
+        $square->setColor(0xFF0000);
+        $square->setRenderable(true);
 
-        if ($positionChimicalElement) {
-            $barDraw = new BarChimicalElementDraw($positionChimicalElement);
-            $barDraw->setOrigin(50, 150);
-            $barDraw->setRenderable(true);
-            $barDraw->build();
-
-            foreach ($barDraw->getDrawItems() as $drawItem) {
-                $objectDraw = new ObjectDraw($drawItem->buildJson(), $sessionId);
-                $drawItems[] = $objectDraw->get();
-            }
-        }
+        $objectDraw = new ObjectDraw($square->buildJson(), $sessionId);
+        $drawItems[] = $objectDraw->get();
 
         ObjectCache::flush($sessionId);
 
