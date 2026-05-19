@@ -6,6 +6,54 @@
 
 @section('content')
 
+    @if($entityBody->state == \App\Models\EntityBody::STATE_FINISH_ZONE)
+        <div class="alert alert-success shadow-sm mb-4" style="border-left: 4px solid #28a745 !important; background-color: #f4faf6; color: #1e7e34;">
+            <div>
+                <i class="fas fa-lock mr-2 text-success"></i> Questo corpo è in stato <strong>Zone Terminate</strong>. La grafica e le zone sono bloccate. La scheda Ancore è abilitata.
+            </div>
+        </div>
+    @elseif($entityBody->state == \App\Models\EntityBody::STATE_FINISH_DRAW)
+        <div class="alert alert-info shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #17a2b8 !important; background-color: #f3fafd; color: #117a8b;">
+            <div>
+                <i class="fas fa-pencil-ruler mr-2 text-info"></i> Questo corpo è in stato <strong>Disegno Terminato</strong>. La grafica è bloccata. Puoi configurare e manipolare le zone.
+            </div>
+            @if($entityBody->zones()->count() === 0)
+                <button type="button" class="btn btn-info btn-sm shadow-sm text-white disabled" disabled data-toggle="tooltip" title="Crea almeno una zona per poter terminare la configurazione delle zone">
+                    <i class="fas fa-lock mr-1"></i> Termina Zone e Blocca
+                </button>
+            @else
+                <form action="{{ route('entity-bodies.toggle-state') }}" method="POST" class="js-confirm-complete-zone">
+                    @csrf
+                    <input type="hidden" name="id" value="{{ $entityBody->id }}">
+                    <input type="hidden" name="state" value="{{ \App\Models\EntityBody::STATE_FINISH_ZONE }}">
+                    <button type="submit" class="btn btn-info btn-sm shadow-sm text-white">
+                        <i class="fas fa-lock mr-1"></i> Termina Zone e Blocca
+                    </button>
+                </form>
+            @endif
+        </div>
+    @else
+        <div class="alert alert-light border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #ffc107 !important;">
+            <div>
+                <i class="fas fa-info-circle mr-2 text-warning"></i> Questo corpo è in stato <strong>Creato</strong>. Puoi modificare il nome e disegnare la grafica 32x32.
+            </div>
+            @if(!$entityBody->image || !\Storage::disk('entity_bodies')->exists($entityBody->image))
+                <button type="button" class="btn btn-success btn-sm shadow-sm disabled" disabled data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del corpo">
+                    <i class="fas fa-check-circle mr-1"></i> Termina Disegno e Blocca
+                </button>
+            @else
+                <form action="{{ route('entity-bodies.toggle-state') }}" method="POST" class="js-confirm-complete-draw">
+                    @csrf
+                    <input type="hidden" name="id" value="{{ $entityBody->id }}">
+                    <input type="hidden" name="state" value="{{ \App\Models\EntityBody::STATE_FINISH_DRAW }}">
+                    <button type="submit" class="btn btn-success btn-sm shadow-sm">
+                        <i class="fas fa-check-circle mr-1"></i> Termina Disegno e Blocca
+                    </button>
+                </form>
+            @endif
+        </div>
+    @endif
+
     <form action="{{ route('entity-bodies.update', $entityBody) }}" method="POST">
         @csrf
         @method('PUT')
@@ -19,9 +67,14 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
                     </li>
-                    @if($entityBody->isFinishDraw())
+                    @if($entityBody->state >= 1)
                     <li class="nav-item">
                         <a class="nav-link" id="tab-zones-link" data-toggle="pill" href="#tab-zones" role="tab" aria-controls="tab-zones" aria-selected="false">Zone</a>
+                    </li>
+                    @endif
+                    @if($entityBody->state >= 2)
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-ancore-link" data-toggle="pill" href="#tab-ancore" role="tab" aria-controls="tab-ancore" aria-selected="false">Ancore</a>
                     </li>
                     @endif
                 </ul>
@@ -40,7 +93,7 @@
                                        id="name" 
                                        name="name" 
                                        value="{{ old('name', $entityBody->name) }}" 
-                                        {{ $entityBody->isFinishDraw() ? 'disabled readonly' : '' }}
+                                        {{ $entityBody->state >= 1 ? 'disabled readonly' : '' }}
                                         required>
                                 @error('name')
                                     <span class="invalid-feedback" role="alert">
@@ -53,7 +106,7 @@
 
                     <!-- TAB GRAPHICS -->
                     <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
-                        @if($entityBody->isFinishDraw())
+                        @if($entityBody->state >= 1)
                             <div class="row">
                                 <div class="col-md-6 col-12">
                                     <div class="card card-outline card-secondary shadow-sm text-center py-4">
@@ -76,10 +129,23 @@
                     @endif
                         </div>
 
-                @if($entityBody->isFinishDraw())
+                @if($entityBody->state >= 1)
                     <!-- TAB ZONE -->
                     <div class="tab-pane fade" id="tab-zones" role="tabpanel" aria-labelledby="tab-zones-link">
                         @include('entity_bodies.zones')
+                    </div>
+                @endif
+
+                @if($entityBody->state >= 2)
+                    <!-- TAB ANCORE -->
+                    <div class="tab-pane fade" id="tab-ancore" role="tabpanel" aria-labelledby="tab-ancore-link">
+                        <div class="card card-outline card-secondary shadow-sm text-center py-5">
+                            <div class="card-body">
+                                <i class="fas fa-anchor fa-3x text-muted mb-3"></i>
+                                <h5 class="font-weight-bold text-dark mb-2">Sezione Ancore</h5>
+                                <p class="text-muted">Questa sezione sarà adibita alla configurazione delle ancore dell'EntityBody.</p>
+                            </div>
+                        </div>
                     </div>
                 @endif
 
@@ -88,7 +154,7 @@
             </div>
             <div class="card-footer bg-light border-top">
                 <div class="row">
-                    @if(!$entityBody->isFinishDraw())
+                    @if($entityBody->state === 0)
                         <div class="col-md-3 col-sm-6 mb-2">
                             <button type="submit" class="btn btn-primary btn-block btn-sm shadow-sm" id="btn-save-all">
                                 <i class="fa fa-save"></i> Aggiorna
@@ -111,6 +177,7 @@
 (function () {
     'use strict';
     var entityBodyId = {{ $entityBody->id }};
+    var isZonesLocked = {{ $entityBody->state >= 2 ? 'true' : 'false' }};
     var currentPoints = [];
     var isDrawing     = false;
     var zoneName      = '';
@@ -486,23 +553,31 @@
                 ),
                 $('<td>').append(
                     
-                        $('<input>', {
-                            type: 'text',
-                            class: 'form-control form-control-sm border-0 bg-transparent px-0 py-0 font-weight-bold',
-                            style: 'width:100%;',
-                            value: zone.name
-                        }).on('change', function () {
-                            var nn = $(this).val().trim();
-                            if (!nn) { loadZones(); return; }
-                            $.ajax({
-                                url: '/entity-bodies/' + entityBodyId + '/zones/' + zone.id,
-                                type: 'PUT',
-                                data: { name: nn },
-                                headers: { 'X-CSRF-TOKEN': getCsrf() },
-                                success: function () { loadZones(); },
-                                error: function () { alert("Errore."); loadZones(); }
+                        (function() {
+                            var inp = $('<input>', {
+                                type: 'text',
+                                class: 'form-control form-control-sm border-0 bg-transparent px-0 py-0 font-weight-bold',
+                                style: 'width:100%;',
+                                value: zone.name
                             });
-                        })
+                            if (isZonesLocked) {
+                                inp.prop('disabled', true).prop('readonly', true);
+                            } else {
+                                inp.on('change', function () {
+                                    var nn = $(this).val().trim();
+                                    if (!nn) { loadZones(); return; }
+                                    $.ajax({
+                                        url: '/entity-bodies/' + entityBodyId + '/zones/' + zone.id,
+                                        type: 'PUT',
+                                        data: { name: nn },
+                                        headers: { 'X-CSRF-TOKEN': getCsrf() },
+                                        success: function () { loadZones(); },
+                                        error: function () { alert("Errore."); loadZones(); }
+                                    });
+                                });
+                            }
+                            return inp;
+                        })()
                     
                 ),
                 $('<td>').addClass('text-center').append(dotHtml(zone.details))
@@ -577,7 +652,7 @@
 
                 if (foundZoneId) {
                     if (foundZoneId == selectedZoneId) {
-                        if (pixelBrushMode === 'remove') {
+                        if (pixelBrushMode === 'remove' && !isZonesLocked) {
                             // Rimuovi pixel dalla zona selezionata
                             allZonePixels[selectedZoneId] = $.grep(allZonePixels[selectedZoneId], function (px) {
                                 return !(px.x === pt.x && px.y === pt.y);
@@ -604,6 +679,8 @@
                 return;
             }
 
+            if (isZonesLocked) return;
+
             // Se c'è una zona selezionata e il pixel cliccato è libero, controlla se è nero puro per aggiungerlo
             if (selectedZoneId !== null) {
                 if (pixelBrushMode === 'add') {
@@ -628,7 +705,7 @@
                 return;
             }
 
-            var existingName = $('#new-zone-name').val().trim();
+            var existingName = $('#new-zone-name').length ? $('#new-zone-name').val().trim() : '';
             if (existingName) {
                 zoneName = existingName;
                 $('#editor-zone-name').text(existingName).css('color', zoneColorFor(0));
@@ -737,18 +814,20 @@
             if ($(e.target).is('input,button,a')) return;
             $('#zones-tbody tr').removeClass('selected');
             var $tr = $(this).addClass('selected');
-            $('#btn-delete-selected-zone').prop('disabled', false);
+            if (!isZonesLocked) {
+                $('#btn-delete-selected-zone').prop('disabled', false);
 
-            // Attiva automaticamente la modalità di aggiunta pixel per impostazione predefinita
-            pixelBrushMode = 'add';
-            $('#btn-brush-add')
-                .prop('disabled', false)
-                .removeClass('btn-outline-success')
-                .addClass('btn-success');
-            $('#btn-brush-remove')
-                .prop('disabled', false)
-                .removeClass('btn-danger')
-                .addClass('btn-outline-danger');
+                // Attiva automaticamente la modalità di aggiunta pixel per impostazione predefinita
+                pixelBrushMode = 'add';
+                $('#btn-brush-add')
+                    .prop('disabled', false)
+                    .removeClass('btn-outline-success')
+                    .addClass('btn-success');
+                $('#btn-brush-remove')
+                    .prop('disabled', false)
+                    .removeClass('btn-danger')
+                    .addClass('btn-outline-danger');
+            }
 
             // Update "Zona selezionata" label
             var zid    = $tr.data('zone-id');
@@ -762,6 +841,18 @@
             var dots = allZoneDots[zid];
             if (dots) {
                 drawZonePolygon(zid, dots, zoneColorFor(zid), 3, SCALE * 0.45);
+            }
+        });
+
+        $(document).on('submit', '.js-confirm-complete-draw', function(e) {
+            if(!confirm('Sei sicuro di voler terminare il disegno di questo corpo? Questa azione bloccherà la grafica.')) {
+                e.preventDefault();
+            }
+        });
+
+        $(document).on('submit', '.js-confirm-complete-zone', function(e) {
+            if(!confirm('Sei sicuro di voler terminare la configurazione delle zone? Questa azione bloccherà le modifiche alle zone.')) {
+                e.preventDefault();
             }
         });
 

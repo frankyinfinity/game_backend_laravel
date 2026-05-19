@@ -7,13 +7,15 @@
 @section('content')
 
     @if($entityComponent->isFinishDraw())
-        <div class="alert alert-info shadow-sm mb-4">
-            <i class="fas fa-lock mr-2"></i> Questo componente è contrassegnato come <strong>Disegno Terminato</strong>. Tutte le modifiche e l'editor di grafica sono bloccati.
+        <div class="alert alert-info shadow-sm mb-4" style="border-left: 4px solid #17a2b8 !important; background-color: #f3fafd; color: #117a8b;">
+            <div>
+                <i class="fas fa-lock mr-2 text-info"></i> Questo componente è contrassegnato come <strong>Disegno Terminato</strong>. Tutte le modifiche e l'editor di grafica sono bloccati. La scheda Ancore è abilitata.
+            </div>
         </div>
     @else
-        <div class="alert alert-light border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #17a2b8 !important;">
+        <div class="alert alert-light border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #ffc107 !important;">
             <div>
-                <i class="fas fa-info-circle mr-2 text-info"></i> Questo componente è in stato <strong>Creato</strong>. Puoi modificare il nome e disegnare la grafica 32x32.
+                <i class="fas fa-info-circle mr-2 text-warning"></i> Questo componente è in stato <strong>Creato</strong>. Puoi modificare il nome e disegnare la grafica 32x32.
             </div>
             @if(!$entityComponent->image || !\Storage::disk('entity_components')->exists($entityComponent->image))
                 <button type="button" class="btn btn-success btn-sm shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del componente">
@@ -49,6 +51,11 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-rules-link" data-toggle="pill" href="#tab-rules" role="tab" aria-controls="tab-rules" aria-selected="false">Elementi Chimici</a>
                     </li>
+                    @if($entityComponent->isFinishDraw())
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-ancore-link" data-toggle="pill" href="#tab-ancore" role="tab" aria-controls="tab-ancore" aria-selected="false">Ancore</a>
+                    </li>
+                    @endif
                 </ul>
             </div>
             
@@ -164,6 +171,18 @@
                         </div>
                     </div>
 
+                    @if($entityComponent->isFinishDraw())
+                    <!-- TAB ANCORE -->
+                    <div class="tab-pane fade" id="tab-ancore" role="tabpanel" aria-labelledby="tab-ancore-link">
+                        <div class="card card-outline card-secondary shadow-sm text-center py-5">
+                            <div class="card-body">
+                                <i class="fas fa-anchor fa-3x text-muted mb-3"></i>
+                                <h5 class="font-weight-bold text-dark mb-2">Sezione Ancore</h5>
+                                <p class="text-muted">Questa sezione sarà adibita alla configurazione delle ancore dell'EntityComponent.</p>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
             

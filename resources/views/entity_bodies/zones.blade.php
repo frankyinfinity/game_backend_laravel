@@ -10,6 +10,7 @@
 #zones-tbody tr { cursor: pointer; }
 </style>
 
+    @if($entityBody->state < 2)
     <!-- ===== HEADER ===== -->
     <div class="row mb-3">
         <div class="col-md-7">
@@ -43,6 +44,23 @@
             </button>
         </div>
     </div>
+    @else
+    <!-- ===== HEADER IN SOLA LETTURA ===== -->
+    <div class="row mb-3">
+        <div class="col-md-7">
+            <div class="d-flex align-items-center mb-1">
+                <strong class="mr-2">Zona selezionata:</strong>
+                <span class="font-weight-bold text-primary" id="editor-zone-name">nessuna</span>
+            </div>
+            <span class="badge badge-warning p-2"><i class="fas fa-lock mr-1"></i> Zone in sola lettura (Stato: Bloccato)</span>
+        </div>
+        <div class="col-md-5 text-md-right mt-2 mt-md-0 d-none">
+            <button class="btn btn-outline-success mr-2" type="button" id="btn-brush-add" disabled></button>
+            <button class="btn btn-outline-danger mr-2" type="button" id="btn-brush-remove" disabled></button>
+            <button class="btn btn-danger" type="button" id="btn-delete-selected-zone" disabled></button>
+        </div>
+    </div>
+    @endif
 
     <!-- ===== MAIN CONTENT (Canvas + Tabella affiancati) ===== -->
     <div class="row">

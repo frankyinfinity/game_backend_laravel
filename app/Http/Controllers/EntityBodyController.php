@@ -21,7 +21,7 @@ class EntityBodyController extends Controller
      */
     public function listDataTable(Request $request)
     {
-        $query = EntityBody::query();
+        $query = EntityBody::query()->withCount('zones');
 
         return datatables($query)
             ->addColumn('image_display', function ($row) {
@@ -32,8 +32,10 @@ class EntityBodyController extends Controller
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
             ->addColumn('state_display', function ($row) {
-                if ($row->isFinishDraw()) {
-                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Disegno Terminato</span>';
+                if ($row->state == 2) {
+                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Zone Terminate</span>';
+                } elseif ($row->state == 1) {
+                    return '<span class="badge badge-info"><i class="fas fa-pencil-ruler"></i> Disegno Terminato</span>';
                 }
                 return '<span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>';
             })
@@ -163,21 +165,54 @@ class EntityBodyController extends Controller
     public function toggleState(Request $request)
     {
         $id = $request->input('id');
+        $state = $request->input('state');
+        
         if (!$id) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'ID non valido.'], 422);
+            }
             return redirect()->back()->with('error', 'ID non valido.');
         }
 
         $entityBody = EntityBody::findOrFail($id);
 
-        if ($entityBody->isCreated()) {
-            if (!$entityBody->image) {
-                return redirect()->back()->with('error', 'Disegna la grafica prima di completare.');
+        if ($state === null) {
+            if ($entityBody->state === EntityBody::STATE_CREATED) {
+                $state = EntityBody::STATE_FINISH_DRAW;
+            } else {
+                $state = EntityBody::STATE_CREATED;
             }
-            $entityBody->update(['state' => EntityBody::STATE_FINISH_DRAW]);
-            return redirect()->route('entity-bodies.index')->with('success', 'Corpo completato e bloccato.');
-        } else {
-            $entityBody->update(['state' => EntityBody::STATE_CREATED]);
-            return redirect()->route('entity-bodies.index')->with('success', 'Stato del corpo ripristinato a Creato.');
         }
+
+        $state = (int) $state;
+
+        if ($state === EntityBody::STATE_FINISH_DRAW || $state === EntityBody::STATE_FINISH_ZONE) {
+            if (!$entityBody->image || !\Storage::disk('entity_bodies')->exists($entityBody->image)) {
+                $msg = 'Disegna la grafica prima di poter completare il disegno del corpo.';
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return redirect()->back()->with('error', $msg);
+            }
+        }
+
+        if ($state === EntityBody::STATE_FINISH_ZONE) {
+            if ($entityBody->zones()->count() === 0) {
+                $msg = 'Crea almeno una zona prima di poter impostare lo stato su Zone Terminate.';
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return redirect()->back()->with('error', $msg);
+            }
+        }
+
+        $entityBody->update(['state' => $state]);
+
+        $msg = 'Stato del corpo aggiornato con successo.';
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => $msg]);
+        }
+
+        return redirect()->route('entity-bodies.index')->with('success', $msg);
     }
 }

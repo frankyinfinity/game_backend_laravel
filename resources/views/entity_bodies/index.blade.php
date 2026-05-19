@@ -62,6 +62,10 @@
                 window.location.href = url;
             });
 
+            var STATE_CREATED = {{ \App\Models\EntityBody::STATE_CREATED }};
+            var STATE_FINISH_DRAW = {{ \App\Models\EntityBody::STATE_FINISH_DRAW }};
+            var STATE_FINISH_ZONE = {{ \App\Models\EntityBody::STATE_FINISH_ZONE }};
+
             var table = $("#table_list").DataTable({
                 order: [1, 'asc'],
                 pageLength: 10,
@@ -99,8 +103,8 @@
                 columnDefs: [
                     {
                         render: function(data, type, row){
-                            // If component is finished, we disable the checkbox
-                            var disabledAttr = row.state == 1 ? 'disabled title="I corpi con disegno terminato non possono essere eliminati"' : '';
+                            // If body is finished draw or finished zone, disable the checkbox
+                            var disabledAttr = row.state >= 1 ? 'disabled title="I corpi con disegno o zone terminati non possono essere eliminati"' : '';
                             return '<div class="form-check">' +
                                 '<input class="form-check-input" type="checkbox" id="sel-'+row.id+'" name="selected[]" value="' + row.id + '" ' + disabledAttr + '>' +
                                 '</div>';
@@ -112,14 +116,26 @@
                             var editBtn = '<button type="button" class="btn btn-primary btn-sm btn_edit mr-1" data-id="' + data + '" data-toggle="tooltip" title="Modifica"><i class="fa fa-edit"></i></button>';
                             
                             var toggleBtn = '';
-                            if (row.state == 0) {
+                            if (row.state == STATE_CREATED) {
                                 if (!row.image) {
                                     toggleBtn = '<button type="button" class="btn btn-success btn-sm disabled-state-btn mr-1" data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del corpo"><i class="fas fa-check-circle" style="opacity: 0.5;"></i></button>';
                                 } else {
                                     toggleBtn = '<form action="{{ route('entity-bodies.toggle-state') }}" method="POST" style="display:inline-block;" class="state-form js-confirm-complete mr-1">' +
                                         '@csrf' +
                                         '<input type="hidden" name="id" value="' + data + '">' +
+                                        '<input type="hidden" name="state" value="' + STATE_FINISH_DRAW + '">' +
                                         '<button type="submit" class="btn btn-success btn-sm" data-toggle="tooltip" title="Termina Disegno e Blocca"><i class="fas fa-check-circle"></i></button>' +
+                                        '</form>';
+                                }
+                            } else if (row.state == STATE_FINISH_DRAW) {
+                                if ((row.zones_count || 0) == 0) {
+                                    toggleBtn = '<button type="button" class="btn btn-info btn-sm disabled-zones-btn mr-1" data-toggle="tooltip" title="Crea almeno una zona per poter terminare la configurazione delle zone"><i class="fas fa-lock" style="opacity: 0.5;"></i></button>';
+                                } else {
+                                    toggleBtn = '<form action="{{ route('entity-bodies.toggle-state') }}" method="POST" style="display:inline-block;" class="state-form js-confirm-complete-zone mr-1">' +
+                                        '@csrf' +
+                                        '<input type="hidden" name="id" value="' + data + '">' +
+                                        '<input type="hidden" name="state" value="' + STATE_FINISH_ZONE + '">' +
+                                        '<button type="submit" class="btn btn-info btn-sm" data-toggle="tooltip" title="Termina Zone e Blocca"><i class="fas fa-lock"></i></button>' +
                                         '</form>';
                                 }
                             }
@@ -136,12 +152,27 @@
                 if (typeof toastr !== 'undefined') {
                     toastr.warning('Disegna l\'immagine per poter terminare il disegno del corpo.');
                 } else {
-                        alert('Disegna l\'immagine per poter terminare il disegno del corpo.');
+                    alert('Disegna l\'immagine per poter terminare il disegno del corpo.');
+                }
+            });
+
+            $(document).on('click', '.disabled-zones-btn', function(e) {
+                e.preventDefault();
+                if (typeof toastr !== 'undefined') {
+                    toastr.warning('Crea almeno una zona prima di poter impostare lo stato su Zone Terminate.');
+                } else {
+                    alert('Crea almeno una zona prima di poter impostare lo stato su Zone Terminate.');
                 }
             });
 
             $(document).on('submit', '.js-confirm-complete', function(e) {
-                if(!confirm('Sei sicuro di voler terminare il disegno di questo corpo? Non sarà più modificabile.')) {
+                if(!confirm('Sei sicuro di voler terminare il disegno di questo corpo? Questa azione bloccherà la grafica.')) {
+                    e.preventDefault();
+                }
+            });
+
+            $(document).on('submit', '.js-confirm-complete-zone', function(e) {
+                if(!confirm('Sei sicuro di voler terminare la configurazione delle zone? Questa azione bloccherà le modifiche alle zone.')) {
                     e.preventDefault();
                 }
             });

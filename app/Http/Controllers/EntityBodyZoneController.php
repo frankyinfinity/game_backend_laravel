@@ -24,6 +24,10 @@ class EntityBodyZoneController extends Controller
      */
     public function store(Request $request, EntityBody $entityBody)
     {
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'color' => 'nullable|string|max:7',
@@ -46,6 +50,10 @@ class EntityBodyZoneController extends Controller
             return response()->json(['success' => false, 'message' => 'Zona non trovata.'], 404);
         }
 
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
         ]);
@@ -64,6 +72,10 @@ class EntityBodyZoneController extends Controller
             return response()->json(['success' => false, 'message' => 'Zona non trovata.'], 404);
         }
 
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
+        }
+
         $zone->delete();
 
         return response()->json(['success' => true]);
@@ -76,6 +88,10 @@ class EntityBodyZoneController extends Controller
     {
         if ($zone->entity_body_id !== $entityBody->id) {
             return response()->json(['success' => false, 'message' => 'Zona non trovata.'], 404);
+        }
+
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
         }
 
         $request->validate([
@@ -101,6 +117,10 @@ class EntityBodyZoneController extends Controller
             return response()->json(['success' => false, 'message' => 'Dettaglio non trovato.'], 404);
         }
 
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
+        }
+
         $detail->delete();
 
         return response()->json(['success' => true]);
@@ -113,6 +133,10 @@ class EntityBodyZoneController extends Controller
     {
         if ($zone->entity_body_id !== $entityBody->id) {
             return response()->json(['success' => false, 'message' => 'Zona non trovata.'], 404);
+        }
+
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
         }
 
         $request->validate([
@@ -142,6 +166,10 @@ class EntityBodyZoneController extends Controller
     {
         if ($zone->entity_body_id !== $entityBody->id) {
             return response()->json(['success' => false, 'message' => 'Zona non trovata.'], 404);
+        }
+
+        if ($entityBody->state >= 2) {
+            return response()->json(['success' => false, 'message' => 'Modifiche bloccate per questo corpo.'], 403);
         }
 
         $request->validate([
