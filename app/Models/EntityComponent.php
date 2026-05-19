@@ -14,10 +14,12 @@ class EntityComponent extends Model
         'name',
         'image',
         'state',
+        'entity_type_component_id',
     ];
 
     protected $casts = [
         'state' => 'integer',
+        'entity_type_component_id' => 'integer',
     ];
 
     /**
@@ -61,5 +63,13 @@ class EntityComponent extends Model
     public function ruleChimicalElements()
     {
         return $this->hasMany(EntityComponentHasRuleChimicalElement::class, 'entity_component_id');
+    }
+
+    /**
+     * Associated entity type component.
+     */
+    public function entityTypeComponent()
+    {
+        return $this->belongsTo(EntityTypeComponent::class, 'entity_type_component_id');
     }
 }

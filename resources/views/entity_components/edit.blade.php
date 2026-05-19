@@ -57,19 +57,33 @@
                     
                     <!-- TAB DATI GENERALI -->
                     <div class="tab-pane fade show active" id="tab-general" role="tabpanel" aria-labelledby="tab-general-link">
-                        <div class="form-group col-md-6 col-12 pl-0">
-                            <label for="name" class="text-dark font-weight-bold">Nome <span class="text-danger">*</span></label>
-                            <input type="text" 
-                                   class="form-control @error('name') is-invalid @enderror" 
-                                   id="name" 
-                                   name="name" 
-                                   value="{{ old('name', $entityComponent->name) }}" 
-                                   {{ $entityComponent->isFinished() ? 'disabled' : 'required' }}>
-                            @error('name')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
+                        <div class="row">
+                            <div class="form-group col-md-6 col-12">
+                                <label for="name" class="text-dark font-weight-bold">Nome <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control @error('name') is-invalid @enderror" 
+                                       id="name" 
+                                       name="name" 
+                                       value="{{ old('name', $entityComponent->name) }}" 
+                                       {{ $entityComponent->isFinished() ? 'disabled' : 'required' }}>
+                                @error('name')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ $message }}</strong>
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="form-group col-md-6 col-12">
+                                <label for="entity_type_component_id" class="text-dark font-weight-bold">Tipologia Componente</label>
+                                <select id="entity_type_component_id" name="entity_type_component_id" class="form-control select2" style="width: 100%;" {{ $entityComponent->isFinished() ? 'disabled' : '' }}>
+                                    <option value="">Nessuna Tipologia...</option>
+                                    @foreach($types as $type)
+                                        <option value="{{ $type->id }}" data-icon="{{ $type->symbol }}" {{ old('entity_type_component_id', $entityComponent->entity_type_component_id) == $type->id ? 'selected' : '' }}>
+                                            {{ $type->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -421,6 +435,51 @@
                     }
                 });
             });
+            // Initialize select2 for component type
+            function formatType(state) {
+                if (!state.id) {
+                    return state.text;
+                }
+                var icon = $(state.element).data('icon');
+                if (!icon) return state.text;
+                var $state = $(
+                    '<span><i class="' + icon + ' fa-fw mr-2 text-dark"></i>' + state.text + '</span>'
+                );
+                return $state;
+            }
+
+            $('#entity_type_component_id').select2({
+                templateResult: formatType,
+                templateSelection: formatType,
+                placeholder: "Seleziona una Tipologia...",
+                allowClear: true
+            });
         });
     </script>
+@stop
+
+@section('css')
+    <style>
+        .select2-container .select2-selection--single {
+            height: 38px !important;
+            border: 1px solid #ced4da !important;
+            border-radius: 0.25rem !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: normal !important;
+            padding-left: 12px !important;
+            color: #495057 !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 36px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+    </style>
 @stop

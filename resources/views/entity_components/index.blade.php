@@ -38,6 +38,7 @@
                                 </th>
                                 <th>ID</th>
                                 <th>Immagine</th>
+                                <th>Tipologia</th>
                                 <th>Nome</th>
                                 <th>Stato</th>
                                 <th>Azioni</th>
@@ -84,6 +85,7 @@
                     },
                     {data: "id", name: "id"},
                     {data: "image_display", name: "image_display", searchable: false, orderable: false},
+                    {data: "type_display", name: "type_display"},
                     {data: "name", name: "name"},
                     {data: "state_display", name: "state_display"},
                     {data: "id", name: "id"},
@@ -128,7 +130,7 @@
 
                             return '<div class="d-flex align-items-center">' + editBtn + toggleBtn + '</div>';
                         },
-                        targets:   5
+                        targets:   6
                     },
                 ],
             });

@@ -22,6 +22,16 @@
                         <td>{{ $entityComponent->name }}</td>
                     </tr>
                     <tr>
+                        <th class="text-dark font-weight-bold">Tipologia</th>
+                        <td>
+                            @if($entityComponent->entityTypeComponent)
+                                <span><i class="{{ $entityComponent->entityTypeComponent->symbol }} fa-fw mr-1 text-dark"></i>{{ $entityComponent->entityTypeComponent->name }}</span>
+                            @else
+                                <span class="text-muted">-</span>
+                            @endif
+                        </td>
+                    </tr>
+                    <tr>
                         <th class="text-dark font-weight-bold">Stato</th>
                         <td>
                             @if($entityComponent->isFinished())

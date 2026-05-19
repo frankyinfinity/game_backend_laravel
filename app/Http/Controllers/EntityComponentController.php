@@ -8,6 +8,7 @@ use App\Models\Gene;
 use App\Models\RuleChimicalElement;
 use App\Models\EntityComponentHasGene;
 use App\Models\EntityComponentHasRuleChimicalElement;
+use App\Models\EntityTypeComponent;
 use Illuminate\Http\Request;
 
 class EntityComponentController extends Controller
@@ -25,7 +26,7 @@ class EntityComponentController extends Controller
      */
     public function listDataTable(Request $request)
     {
-        $query = EntityComponent::query();
+        $query = EntityComponent::with('entityTypeComponent');
 
         return datatables($query)
             ->addColumn('image_display', function ($row) {
@@ -41,7 +42,13 @@ class EntityComponentController extends Controller
                 }
                 return '<span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>';
             })
-            ->rawColumns(['image_display', 'state_display'])
+            ->addColumn('type_display', function ($row) {
+                if ($row->entityTypeComponent) {
+                    return '<span><i class="' . e($row->entityTypeComponent->symbol) . ' fa-fw mr-1 text-dark"></i>' . e($row->entityTypeComponent->name) . '</span>';
+                }
+                return '<span class="text-muted">-</span>';
+            })
+            ->rawColumns(['image_display', 'state_display', 'type_display'])
             ->toJson();
     }
 
@@ -50,7 +57,8 @@ class EntityComponentController extends Controller
      */
     public function create()
     {
-        return view('entity_components.create');
+        $types = EntityTypeComponent::orderBy('name')->get();
+        return view('entity_components.create', compact('types'));
     }
 
     /**
@@ -60,10 +68,12 @@ class EntityComponentController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'entity_type_component_id' => 'nullable|exists:entity_type_components,id',
         ]);
 
         EntityComponent::create([
             'name' => $request->name,
+            'entity_type_component_id' => $request->entity_type_component_id,
             'state' => EntityComponent::STATE_CREATED,
         ]);
 
@@ -76,7 +86,7 @@ class EntityComponentController extends Controller
      */
     public function show(EntityComponent $entityComponent)
     {
-        $entityComponent->load(['genes.gene', 'ruleChimicalElements.ruleChimicalElement']);
+        $entityComponent->load(['entityTypeComponent', 'genes.gene', 'ruleChimicalElements.ruleChimicalElement']);
         return view('entity_components.show', compact('entityComponent'));
     }
 
@@ -85,7 +95,8 @@ class EntityComponentController extends Controller
      */
     public function edit(EntityComponent $entityComponent)
     {
-        return view('entity_components.edit', compact('entityComponent'));
+        $types = EntityTypeComponent::orderBy('name')->get();
+        return view('entity_components.edit', compact('entityComponent', 'types'));
     }
 
     /**
@@ -101,10 +112,14 @@ class EntityComponentController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
+            'entity_type_component_id' => 'nullable|exists:entity_type_components,id',
             'image_base64' => 'nullable|string',
         ]);
 
-        $data = ['name' => $request->name];
+        $data = [
+            'name' => $request->name,
+            'entity_type_component_id' => $request->entity_type_component_id,
+        ];
 
         // Handle base64 image from canvas editor
         if ($request->has('image_base64') && !empty($request->image_base64)) {
