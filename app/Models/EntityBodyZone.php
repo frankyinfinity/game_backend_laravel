@@ -9,6 +9,7 @@ class EntityBodyZone extends Model
     protected $fillable = [
         'entity_body_id',
         'name',
+        'color',
     ];
 
     protected $casts = [
@@ -29,5 +30,13 @@ class EntityBodyZone extends Model
     public function details()
     {
         return $this->hasMany(EntityBodyZoneDetail::class);
+    }
+
+    /**
+     * Get the pixels associated with the zone.
+     */
+    public function pixels()
+    {
+        return $this->hasMany(EntityBodyZonePixel::class);
     }
 }

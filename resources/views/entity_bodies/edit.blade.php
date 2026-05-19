@@ -125,8 +125,11 @@
         '#00acc1','#7e57c2','#c0ca33','#ef5350','#26c6da'
     ];
 
+    var allZoneColors = {};   // id -> hexColor string (colore salvato nel database)
+
     function zoneColorFor(id) {
-        return ZONE_COLORS[id % ZONE_COLORS.length];
+        if (id === 0) return ZONE_COLORS[0];
+        return allZoneColors[id] || ZONE_COLORS[id % ZONE_COLORS.length];
     }
 
     var $canvas, $img, ctx, imgData;
@@ -135,16 +138,124 @@
     var zoneName      = '';
     var selectedZoneId= null;
     var allZoneDots   = {};   // id -> [{x,y}, ...]   (punti salvati sul canvas)
+    var allZonePixels = {};   // id -> [{x,y}, ...]   (pixel neri all'interno del poligono)
 
     function getCsrf() {
         return $('meta[name="csrf-token"]').attr('content') || '';
     }
 
+    function isPointInPolygon(x, y, polygon) {
+        var inside = false;
+        for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            var xi = polygon[i].x, yi = polygon[i].y;
+            var xj = polygon[j].x, yj = polygon[j].y;
+            
+            var intersect = ((yi > y) != (yj > y))
+                && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function getDistanceToSegment(x, y, x1, y1, x2, y2) {
+        var A = x - x1;
+        var B = y - y1;
+        var C = x2 - x1;
+        var D = y2 - y1;
+
+        var dot = A * C + B * D;
+        var lenSq = C * C + D * D;
+        var param = -1;
+        if (lenSq !== 0) param = dot / lenSq;
+
+        var xx, yy;
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+
+        var dx = x - xx;
+        var dy = y - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function isPointCloseToPolygon(x, y, polygon) {
+        // 1. Check if strictly inside
+        if (isPointInPolygon(x, y, polygon)) return true;
+
+        // 2. Check if exactly on a vertex
+        for (var i = 0; i < polygon.length; i++) {
+            if (polygon[i].x === x && polygon[i].y === y) return true;
+        }
+
+        // 3. Check distance to each segment (threshold <= 1.0)
+        for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            var dist = getDistanceToSegment(x, y, polygon[i].x, polygon[i].y, polygon[j].x, polygon[j].y);
+            if (dist <= 1.0) return true;
+        }
+
+        return false;
+    }
+
+    function isPixelOccupied(gx, gy) {
+        var occupied = false;
+        $.each(allZonePixels, function (zid) {
+            $.each(allZonePixels[zid], function (_, pt) {
+                if (pt.x === gx && pt.y === gy) {
+                    occupied = true;
+                    return false;
+                }
+            });
+            if (occupied) return false;
+        });
+        return occupied;
+    }
+
+    function findBlackPixelsInPolygon(polygon) {
+        var blackPixels = [];
+        if (!imgData) return blackPixels;
+        
+        for (var gy = 0; gy < 64; gy++) {
+            for (var gx = 0; gx < 64; gx++) {
+                if (isPointCloseToPolygon(gx, gy, polygon)) {
+                    if (isPixelOccupied(gx, gy)) continue;
+                    var cx = Math.floor(gx * SCALE + SCALE / 2);
+                    var cy = Math.floor(gy * SCALE + SCALE / 2);
+                    
+                    if (cx >= 0 && cx < imgData.width && cy >= 0 && cy < imgData.height) {
+                        var idx = (cy * imgData.width + cx) * 4;
+                        var r = imgData.data[idx];
+                        var g = imgData.data[idx+1];
+                        var b = imgData.data[idx+2];
+                        var a = imgData.data[idx+3];
+                        
+                        // Check if pure black pixel
+                        if (r === 0 && g === 0 && b === 0 && a > 0) {
+                            blackPixels.push({ x: gx, y: gy });
+                        }
+                    }
+                }
+            }
+        }
+        return blackPixels;
+    }
+
     function isDrawnPixel(cx, cy) {
-        if (!imgData) return true; // Fallback di sicurezza se i dati dell'immagine non sono disponibili
+        if (!imgData) return false; // Non consentire click se i dati dell'immagine non sono caricati
         cx = Math.floor(cx); cy = Math.floor(cy);
         if (cx < 0 || cx >= imgData.width || cy < 0 || cy >= imgData.height) return false;
-        return imgData.data[(cy * imgData.width + cx) * 4 + 3] > 0;
+        
+        var pt = canvasToImg(cx, cy);
+        if (isPixelOccupied(pt.x, pt.y)) return false;
+
+        var idx = (cy * imgData.width + cx) * 4;
+        return imgData.data[idx] === 0 && imgData.data[idx+1] === 0 && imgData.data[idx+2] === 0 && imgData.data[idx+3] > 0;
     }
 
     function canvasToImg(cx, cy) {
@@ -161,6 +272,7 @@
 
     function drawPreview() {
         clearCanvas();
+        redrawZoneDots();
         if (currentPoints.length === 0) return;
         ctx.strokeStyle = '#0056e0';
         ctx.lineWidth   = 3;
@@ -236,6 +348,20 @@
 
     // Ridisegna TUTTI i punti salvati colorati
     function redrawZoneDots() {
+        // Ridisegna tutti i pixel neri presi in considerazione in grigio semitrasparente
+        $.each(allZonePixels, function (zid) {
+            var baseTone = 110;
+            var offset = (parseInt(zid) * 23) % 60 - 30; // varia di +/- 30
+            var tone = baseTone + offset;
+            ctx.fillStyle = 'rgba(' + tone + ', ' + tone + ', ' + tone + ', 0.7)';
+
+            $.each(allZonePixels[zid], function (_, pt) {
+                var rx = Math.floor(pt.x / 2) * 2 * SCALE;
+                var ry = Math.floor(pt.y / 2) * 2 * SCALE;
+                ctx.fillRect(rx, ry, SCALE * 2, SCALE * 2);
+            });
+        });
+
         // cancellare solo le zone salvate (non il disegno corrente)
         $.each(allZoneDots, function (zid) {
             var color = zoneColorFor(zid);
@@ -279,6 +405,10 @@
                 tempCanvas.width = 512;
                 tempCanvas.height = 512;
                 var tempCtx = tempCanvas.getContext('2d');
+                tempCtx.imageSmoothingEnabled = false;
+                tempCtx.mozImageSmoothingEnabled = false;
+                tempCtx.webkitImageSmoothingEnabled = false;
+                tempCtx.msImageSmoothingEnabled = false;
                 tempCtx.drawImage($img[0], 0, 0, 512, 512);
                 imgData = tempCtx.getImageData(0, 0, 512, 512);
             } catch(err) {
@@ -313,6 +443,8 @@
         var tbody = $('#zones-tbody');
         tbody.empty();
         allZoneDots = {};
+        allZonePixels = {};
+        clearCanvas();
         if (!zones || zones.length === 0) {
             $('#zones-empty').show();
             return;
@@ -320,8 +452,10 @@
         $('#zones-empty').hide();
         $('#zones-list-wrapper').show();
         $.each(zones, function (_, zone) {
+            allZoneColors[zone.id] = zone.color || ZONE_COLORS[zone.id % ZONE_COLORS.length];
             var color = zoneColorFor(zone.id);
             allZoneDots[zone.id] = $.map(zone.details, function (d) { return { x: d.x, y: d.y }; });
+            allZonePixels[zone.id] = $.map(zone.pixels || [], function (px) { return { x: px.x, y: px.y }; });
 
             var dotHtml = function (dots) { return dots ? dots.length : 0; };
             /*
@@ -369,12 +503,17 @@
     function saveCurrentZone() {
         if (!zoneName.trim()) { alert('Inserisci un nome.'); return; }
         if (currentPoints.length < 3) { alert('Disegna almeno 3 punti.'); return; }
+        
+        var nextColor = ZONE_COLORS[Object.keys(allZoneDots).length % ZONE_COLORS.length];
+        
         $.post('/entity-bodies/' + entityBodyId + '/zones',
-            { name: zoneName.trim(), _token: getCsrf() },
+            { name: zoneName.trim(), color: nextColor, _token: getCsrf() },
             function (zone) {
+                allZoneColors[zone.id] = zone.color || nextColor;
                 var color = zoneColorFor(zone.id);
                 // Draw polygon on canvas immediately
                 drawZonePolygon(zone.id, $.map(currentPoints, function(pt){ return {x:pt.x,y:pt.y}; }), color);
+                var blackPixels = findBlackPixelsInPolygon(currentPoints);
                 var promises = [];
                 $.each(currentPoints, function (_, pt) {
                     promises.push(
@@ -382,6 +521,10 @@
                             { x: pt.x, y: pt.y, _token: getCsrf() })
                     );
                 });
+                promises.push(
+                    $.post('/entity-bodies/' + entityBodyId + '/zones/' + zone.id + '/save-pixels',
+                        { pixels: blackPixels, _token: getCsrf() })
+                );
                 $.when.apply($, promises).done(function () {
                     zoneName = '';
                     $('#new-zone-name').val('');
@@ -399,8 +542,35 @@
         extractImageData();
 
         // 1-click on image → modal to name zone
-        $canvas.on('click', function () {
+        $canvas.on('click', function (e) {
             if (isDrawing) return;
+
+            var rect = $canvas[0].getBoundingClientRect();
+            var cx   = (e.clientX - rect.left) * ($canvas.width() / rect.width);
+            var cy   = (e.clientY - rect.top)  * ($canvas.height() / rect.height);
+            var pt   = canvasToImg(cx, cy);
+
+            if (isPixelOccupied(pt.x, pt.y)) {
+                var foundZoneId = null;
+                $.each(allZonePixels, function (zid) {
+                    $.each(allZonePixels[zid], function (_, px) {
+                        if (px.x === pt.x && px.y === pt.y) {
+                            foundZoneId = zid;
+                            return false;
+                        }
+                    });
+                    if (foundZoneId) return false;
+                });
+
+                if (foundZoneId) {
+                    var tr = $('#zones-tbody tr[data-zone-id="' + foundZoneId + '"]');
+                    if (tr.length) {
+                        tr.trigger('click');
+                    }
+                }
+                return;
+            }
+
             var existingName = $('#new-zone-name').val().trim();
             if (existingName) {
                 zoneName = existingName;

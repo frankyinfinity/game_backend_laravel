@@ -54,6 +54,7 @@
                     <div style="position:relative; display:inline-block;">
                         <img id="body-image"
                              src="{{ $imageUrl }}"
+                             crossorigin="anonymous"
                              alt="Entity Body"
                              style="width:512px; height:512px; image-rendering:pixelated; display:block; cursor:crosshair;">
                         <canvas id="zone-canvas"

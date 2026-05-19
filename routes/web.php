@@ -114,6 +114,7 @@ Route::group(['middleware' => ['auth']], function () {
         Route::post('/{zone}/add-detail', [App\Http\Controllers\EntityBodyZoneController::class, 'addDetail'])->name('add-detail');
         Route::post('/{zone}/remove-detail/{detail}', [App\Http\Controllers\EntityBodyZoneController::class, 'removeDetail'])->name('remove-detail');
         Route::post('/{zone}/replace-details', [App\Http\Controllers\EntityBodyZoneController::class, 'replaceDetails'])->name('replace-details');
+        Route::post('/{zone}/save-pixels', [App\Http\Controllers\EntityBodyZoneController::class, 'savePixels'])->name('save-pixels');
         Route::put('/{zone}', [App\Http\Controllers\EntityBodyZoneController::class, 'update'])->name('update');
         Route::delete('/{zone}', [App\Http\Controllers\EntityBodyZoneController::class, 'destroy'])->name('destroy');
     });
