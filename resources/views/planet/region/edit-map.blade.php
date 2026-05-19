@@ -30,7 +30,7 @@
         </div>
     </div>
     <div class="col-12">
-        @include('planet.region.map', compact('region', 'tiles', 'map'))
+        @include('planet.region.map', compact('region', 'tiles', 'map', 'familyTiles'))
     </div>
 </div>
 @stop

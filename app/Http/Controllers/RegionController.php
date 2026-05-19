@@ -10,6 +10,7 @@ use App\Models\Climate;
 use App\Models\Tile;
 use App\Models\GeneratorChimicalElement;
 use Illuminate\Support\Facades\Storage;
+use App\Jobs\GenerateRegionImagesJob;
 
 class RegionController extends Controller
 {
@@ -74,6 +75,8 @@ class RegionController extends Controller
             ];
         })->values();
 
+        $familyTiles = \App\Models\FamilyTile::query()->orderBy('name')->get();
+
         $map = [];
         if ($region->filename !== null) {
             $jsonContent = Storage::disk('regions')->get($region->id . '/' . $region->filename);
@@ -82,7 +85,7 @@ class RegionController extends Controller
 
         $isReadOnly = $region->state === \App\Models\Region::STATE_COMPLETED;
 
-        return view("planet.region.edit-map", compact('region', 'tiles', 'generatorsData', 'map', 'isReadOnly'));
+        return view("planet.region.edit-map", compact('region', 'tiles', 'generatorsData', 'map', 'isReadOnly', 'familyTiles'));
     }
 
     /**
@@ -316,14 +319,10 @@ class RegionController extends Controller
             return redirect()->back()->with('error', 'Non è possibile generare le immagini in questo stato.');
         }
 
-        // Generate map images
-        $this->generateMapImages($region);
+        // Dispatch background generation job
+        GenerateRegionImagesJob::dispatch($region);
 
-        // Update state to generated
-        $region->state = Region::STATE_GENERATED;
-        $region->save();
-
-        return redirect()->back()->with('success', 'Immagini generate con successo.');
+        return redirect()->back()->with('success', 'Generazione immagini avviata in background.');
     }
 
     public function completeRegion(Request $request, string $id)
@@ -340,86 +339,6 @@ class RegionController extends Controller
         $region->save();
 
         return redirect()->back()->with('success', 'Regione completata con successo.');
-    }
-
-    private function generateMapImages(Region $region)
-    {
-        // Load map data
-        $map = [];
-        if ($region->filename !== null && Storage::disk('regions')->exists($region->id . '/' . $region->filename)) {
-            $jsonContent = Storage::disk('regions')->get($region->id . '/' . $region->filename);
-            $map = json_decode($jsonContent, true);
-        }
-
-        // If no map exists, create a default map with all positions as default tile
-        if (empty($map)) {
-            $defaultTileId = $region->climate->defaultTile->id ?? null;
-            if (!$defaultTileId) {
-                return; // No default tile
-            }
-            $width = $region->width;
-            $height = $region->height;
-            $map = [];
-            for ($y = 0; $y < $height; $y++) {
-                for ($x = 0; $x < $width; $x++) {
-                    $map[$y][$x] = $defaultTileId;
-                }
-            }
-            // Save the default map
-            $filename = 'map_' . time() . '.json';
-            $jsonData = json_encode($map, JSON_PRETTY_PRINT);
-            Storage::disk('regions')->put($region->id . '/' . $filename, $jsonData);
-            $region->filename = $filename;
-            $region->save();
-        }
-
-        $width = $region->width;
-        $height = $region->height;
-        $tileSize = \App\Helper\Helper::TILE_SIZE;
-
-        // Create canvas using Intervention Image v4
-        $manager = \Intervention\Image\ImageManager::usingDriver(\Intervention\Image\Drivers\Gd\Driver::class);
-        $canvas = $manager->createImage($width * $tileSize, $height * $tileSize);
-
-        // For each position in map
-        for ($y = 0; $y < $height; $y++) {
-            for ($x = 0; $x < $width; $x++) {
-                $tileId = $map[$y][$x] ?? null;
-                if ($tileId) {
-                    $tile = Tile::find($tileId);
-                    if ($tile && Storage::disk('tile')->exists($tile->id . '.png')) {
-                        $tileImagePath = Storage::disk('tile')->path($tile->id . '.png');
-                        $tileImage = $manager->decode($tileImagePath);
-                        // Resize the tile to fill the grid slot exactly and avoid borders/gaps
-                        $tileImage->resize($tileSize, $tileSize);
-                        $canvas->insert($tileImage, $x * $tileSize, $y * $tileSize, 'top-left');
-                    }
-                }
-            }
-        }
-
-        // Generate unique id
-        $uid = time() . '_' . $region->id;
-
-        $originalFilename = 'original_' . $uid . '.png';
-        $modifiedFilename = 'modified_' . $uid . '.png';
-
-        // Make sure the directory exists before saving
-        if (!Storage::disk('map_tile')->exists((string) $region->id)) {
-            Storage::disk('map_tile')->makeDirectory((string) $region->id);
-        }
-
-        // Save original_uid.png
-        $canvas->save(Storage::disk('map_tile')->path($region->id . '/' . $originalFilename));
-
-        // Save modified_uid.png (identical for now)
-        $canvas->save(Storage::disk('map_tile')->path($region->id . '/' . $modifiedFilename));
-
-        // Update region with filenames
-        $region->update([
-            'original_image' => $originalFilename,
-            'modified_image' => $modifiedFilename,
-        ]);
     }
 
 }

@@ -1,32 +1,132 @@
-<div class="card">
-    <div class="card-header pb-0">
-        <h4 class="mb-0">Mappa</h5>
-    </div>
-    <div class="card-body" style="overflow: auto;">
-        <div id="map-tooltip"
-            style="display:none; position:fixed; background:#1F2937; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; pointer-events:none; z-index:9999; white-space:nowrap;">
-        </div>
-        <div class="row" {!! isset($isReadOnly) && $isReadOnly ? 'style="display:none;"' : '' !!}>
-            <div class="col-12 mb-3">
-                <div class="d-flex flex-wrap" style="gap: 8px;">
-                    <button type="button" class="btn btn-primary btn-sm js-map-tool" data-tool="paint">
-                        <i class="fa fa-paint-brush"></i> Pennello
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm js-map-tool" data-tool="fill">
-                        <i class="fa fa-fill-drip"></i> Riempi
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm js-map-tool" data-tool="eraser">
-                        <i class="fa fa-eraser"></i> Gomma
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm js-map-tool" data-tool="picker">
-                        <i class="fa fa-eye-dropper"></i> Pipetta
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="map-tool-undo">
-                        <i class="fa fa-undo"></i> Annulla
-                    </button>
-                    <div class="d-flex align-items-center ml-2">
-                        <label for="map-brush-size" class="mb-0 mr-2">Dimensione</label>
-                        <select id="map-brush-size" class="form-control form-control-sm" style="width: 90px;">
+<style>
+    /* Custom styles for modern editor layout */
+    .tile-picker-item, .generator-picker-item {
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        border: 1.5px solid #e2e8f0;
+        background-color: #ffffff;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        user-select: none;
+    }
+    
+    .tile-picker-item:hover, .generator-picker-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border-color: #cbd5e1;
+    }
+
+    .tile-picker-item.active, .generator-picker-item.active {
+        border-color: #2563eb !important;
+        background-color: #eff6ff !important;
+        font-weight: 600 !important;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .tile-picker-item img {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid #cbd5e1;
+        object-fit: cover;
+    }
+
+    .generator-avatar {
+        width: 24px;
+        height: 24px;
+        background-color: #f8fafc;
+        border: 2px solid #0f172a;
+        border-radius: 4px;
+        font-weight: 900;
+        font-size: 11px;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #pending-changes-badge {
+        animation: pulse-glow 2s infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+        0% {
+            box-shadow: 0 0 4px rgba(217, 119, 6, 0.2);
+        }
+        100% {
+            box-shadow: 0 0 10px rgba(217, 119, 6, 0.6);
+        }
+    }
+
+    /* Scrollbar styling for palette lists */
+    #tab-tiles > div, #tab-generators > div {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+
+    #tab-tiles > div::-webkit-scrollbar, #tab-generators > div::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    #tab-tiles > div::-webkit-scrollbar-track, #tab-generators > div::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+
+    #tab-tiles > div::-webkit-scrollbar-thumb, #tab-generators > div::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 3px;
+    }
+</style>
+
+<div id="map-tooltip"
+    style="display:none; position:fixed; background:#1F2937; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; pointer-events:none; z-index:9999; white-space:nowrap;">
+</div>
+
+<div class="row">
+    @if(!isset($isReadOnly) || !$isReadOnly)
+    <!-- Sidebar -->
+    <div class="col-md-4 col-lg-3 mb-3">
+        <!-- Tools Card -->
+        <div class="card card-outline card-primary shadow-sm mb-3">
+            <div class="card-header pb-2">
+                <h5 class="card-title font-weight-bold m-0"><i class="fa fa-tools mr-1 text-primary"></i> Strumenti</h5>
+            </div>
+            <div class="card-body p-3">
+                <!-- Action Buttons Grid -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6 mb-2">
+                        <button type="button" class="btn btn-primary btn-block btn-sm py-2 js-map-tool" data-tool="paint" title="Pennello (Disegna tile singole o con dimensione)">
+                            <i class="fa fa-paint-brush d-block mb-1"></i> Pennello
+                        </button>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <button type="button" class="btn btn-outline-primary btn-block btn-sm py-2 js-map-tool" data-tool="fill" title="Secchiello (Riempi area contigua)">
+                            <i class="fa fa-fill-drip d-block mb-1"></i> Riempi
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" class="btn btn-outline-primary btn-block btn-sm py-2 js-map-tool" data-tool="eraser" title="Gomma (Cancella tile)">
+                            <i class="fa fa-eraser d-block mb-1"></i> Gomma
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" class="btn btn-outline-primary btn-block btn-sm py-2 js-map-tool" data-tool="picker" title="Pipetta (Seleziona tile dalla mappa)">
+                            <i class="fa fa-eye-dropper d-block mb-1"></i> Pipetta
+                        </button>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <!-- Brush and Undo Row -->
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold text-muted text-uppercase mb-1">Dimensione Pennello</label>
+                    <div class="d-flex align-items-center">
+                        <select id="map-brush-size" class="form-control form-control-sm custom-select" style="flex: 1;">
                             <option value="1" selected>1x1</option>
                             <option value="2">2x2</option>
                             <option value="3">3x3</option>
@@ -34,23 +134,107 @@
                             <option value="5">5x5</option>
                             <option value="custom">Custom</option>
                         </select>
-                        <input type="number" id="map-brush-size-custom-w" class="form-control form-control-sm ml-2"
-                            min="1" max="25" value="6" style="width: 70px; display: none;">
-                        <span id="map-brush-size-custom-sep" class="ml-1 mr-1" style="display: none;">x</span>
-                        <input type="number" id="map-brush-size-custom-h" class="form-control form-control-sm" min="1"
-                            max="25" value="6" style="width: 70px; display: none;">
+                        <button type="button" class="btn btn-outline-secondary btn-sm ml-2" id="map-tool-undo" title="Annulla ultima azione">
+                            <i class="fa fa-undo"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Brush Sizes -->
+                <div id="custom-brush-dims" class="form-row mt-2" style="display: none;">
+                    <div class="col-6">
+                        <input type="number" id="map-brush-size-custom-w" class="form-control form-control-sm" min="1" max="25" value="6" placeholder="W">
+                    </div>
+                    <div class="col-6">
+                        <input type="number" id="map-brush-size-custom-h" class="form-control form-control-sm" min="1" max="25" value="6" placeholder="H">
                     </div>
                 </div>
             </div>
-            <div class="col-12 mb-3" style="overflow: auto">
-                <div id="region-tile-picker-pixi"
-                    style="display: inline-block; border: 1px solid #d9d9d9; border-radius: 4px;"></div>
+        </div>
+
+        <!-- Palette Card -->
+        <div class="card card-outline card-success shadow-sm mb-0">
+            <div class="card-header pb-2">
+                <h5 class="card-title font-weight-bold m-0"><i class="fa fa-palette mr-1 text-success"></i> Tavolozza</h5>
+            </div>
+            <div class="card-body p-3">
+                <!-- Nav Tabs for Tiles / Generators -->
+                <ul class="nav nav-pills nav-justified mb-3" id="palette-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active py-1 px-2 small font-weight-bold" id="tiles-tab" data-toggle="pill" href="#tab-tiles" role="tab" aria-controls="tab-tiles" aria-selected="true">
+                            <i class="fa fa-th mr-1"></i> Tile
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-1 px-2 small font-weight-bold" id="generators-tab" data-toggle="pill" href="#tab-generators" role="tab" aria-controls="tab-generators" aria-selected="false">
+                            <i class="fa fa-bolt mr-1"></i> Generatori
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="palette-tabs-content">
+                    <!-- Tiles Tab -->
+                    <div class="tab-pane show active" id="tab-tiles" role="tabpanel" aria-labelledby="tiles-tab">
+                        <!-- Family Filter -->
+                        <div class="form-group mb-2">
+                            <label for="tile-family-filter" class="small font-weight-bold text-muted text-uppercase mb-1">Famiglia Tile</label>
+                            <select id="tile-family-filter" class="form-control form-control-sm custom-select">
+                                <option value="all">Tutte le famiglie</option>
+                                @foreach($familyTiles as $ft)
+                                    <option value="{{ $ft->id }}">{{ $ft->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Tiles Search -->
+                        <div class="form-group mb-3">
+                            <input type="text" id="tile-search-input" class="form-control form-control-sm" placeholder="Cerca tile per nome...">
+                        </div>
+
+                        <!-- HTML Tiles List -->
+                        <div class="pr-1" style="max-height: 350px; overflow-y: auto;">
+                            <div id="html-tiles-container">
+                                <!-- Will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generators Tab -->
+                    <div class="tab-pane" id="tab-generators" role="tabpanel" aria-labelledby="generators-tab">
+                        <!-- Generators Search -->
+                        <div class="form-group mb-3">
+                            <input type="text" id="generator-search-input" class="form-control form-control-sm" placeholder="Cerca generatore...">
+                        </div>
+
+                        <!-- HTML Generators List -->
+                        <div class="pr-1" style="max-height: 350px; overflow-y: auto;">
+                            <div id="html-generators-container">
+                                <!-- Will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="row">
-            <div class="col-12" style="overflow: auto">
-                <div id="region-map-pixi" style="display: inline-block; border: 1px solid #d9d9d9; border-radius: 4px;">
+    </div>
+    @endif
+
+    <!-- Map Workspace -->
+    <div class="{{ (!isset($isReadOnly) || !$isReadOnly) ? 'col-md-8 col-lg-9' : 'col-12' }}">
+        <div class="card card-outline card-secondary shadow-sm mb-0">
+            <div class="card-header pb-2 d-flex align-items-center justify-content-between">
+                <h5 class="card-title font-weight-bold m-0"><i class="fa fa-map mr-1 text-secondary"></i> Area di Disegno</h5>
+                @if(!isset($isReadOnly) || !$isReadOnly)
+                <div class="card-tools ml-auto">
+                    <span class="badge badge-warning shadow-sm font-weight-normal py-1 px-2" id="pending-changes-badge" style="display:none; font-size: 85%;">
+                        <i class="fa fa-exclamation-triangle mr-1"></i> <span id="pending-count">0</span> modifiche
+                    </span>
                 </div>
+                @endif
+            </div>
+            <div class="card-body p-0 d-flex align-items-center justify-content-center" style="background-color: #f1f5f9; min-height: 550px; overflow: auto; position: relative;">
+                <div id="region-map-pixi" class="shadow-sm my-3 mx-auto" style="border: 1px solid #cbd5e1; border-radius: 4px; background: #ffffff;"></div>
             </div>
         </div>
     </div>
@@ -190,39 +374,24 @@
         const mapPreviewLayer = new PIXI.Container();
         mapApp.stage.addChild(mapPreviewLayer);
 
-        const pickerCols = 3;
-        const pickerPadding = 10;
-        const pickerGap = 8;
-        const pickerButtonW = 180;
-        const pickerButtonH = 38;
-        const pickerSectionGap = 30;
-        const pickerTitleH = 28;
-        const pickerSectionWidth = pickerPadding + pickerCols * pickerButtonW + (pickerCols - 1) * pickerGap;
-        const pickerWidth = pickerSectionWidth * 2 + pickerSectionGap;
-        const pickerHeight = 800;
-
-        const pickerApp = new PIXI.Application({
-            width: pickerWidth,
-            height: pickerHeight,
-            antialias: true,
-            backgroundColor: 0xF8FAFC
-        });
-        document.getElementById('region-tile-picker-pixi').appendChild(pickerApp.view);
-
         function setActiveTool(toolName) {
             activeTool = toolName;
-            $('.js-map-tool').removeClass('btn-primary').addClass('btn-outline-primary');
-            $('.js-map-tool[data-tool="' + toolName + '"]').removeClass('btn-outline-primary').addClass('btn-primary');
+            $('.js-map-tool').each(function() {
+                const tool = $(this).data('tool');
+                if (tool === toolName) {
+                    $(this).removeClass('btn-outline-primary btn-outline-danger btn-outline-warning btn-primary').addClass('btn-primary');
+                } else {
+                    $(this).removeClass('btn-primary');
+                    if (tool === 'eraser') {
+                        $(this).addClass('btn-outline-danger');
+                    } else if (tool === 'picker') {
+                        $(this).addClass('btn-outline-warning');
+                    } else {
+                        $(this).addClass('btn-outline-primary');
+                    }
+                }
+            });
             refreshPreviewFromHover();
-        }
-
-        function showTooltip(event, text) {
-            const tip = document.getElementById('map-tooltip');
-            tip.textContent = text;
-            tip.style.display = 'block';
-            const rect = pickerApp.view.getBoundingClientRect();
-            tip.style.left = (rect.left + event.global.x + 10) + 'px';
-            tip.style.top = (rect.top + event.global.y - 30) + 'px';
         }
 
         function showTooltipMap(event, text) {
@@ -277,8 +446,19 @@
                 return;
             }
 
-            const hasPending = getPendingPayload().length > 0;
+            const pending = getPendingPayload();
+            const hasPending = pending.length > 0;
             saveButton.prop('disabled', isSaving || !hasPending);
+
+            const badge = $('#pending-changes-badge');
+            if (badge.length) {
+                if (hasPending) {
+                    $('#pending-count').text(pending.length);
+                    badge.show();
+                } else {
+                    badge.hide();
+                }
+            }
         }
 
         function drawMapTile(i, j, state) {
@@ -469,199 +649,86 @@
             }
         }
 
-        function drawPickerItem(item, isSelected) {
-            item.background.clear();
-            item.background.lineStyle(1, isSelected ? 0x2563EB : 0xCBD5E1, 1);
-            item.background.beginFill(isSelected ? 0x2563EB : 0xFFFFFF);
-            item.background.drawRoundedRect(0, 0, pickerButtonW, pickerButtonH, 8);
-            item.background.endFill();
-            item.label.style.fill = isSelected ? 0xFFFFFF : 0x1F2937;
-        }
-
         function updatePickerSelection() {
-            const selectedKey = tile_selected_generator_id ? ('gen_' + tile_selected_generator_id) : tile_selected_id;
-            Object.keys(tilePickerItems).forEach(function (key) {
-                drawPickerItem(tilePickerItems[key], key === selectedKey);
-            });
+            // Remove active classes
+            $('.tile-picker-item').removeClass('active');
+            $('.generator-picker-item').removeClass('active');
+            
+            // Add active to selected items
+            if (tile_selected_generator_id) {
+                $(`.generator-picker-item[data-generator-id="${tile_selected_generator_id}"]`).addClass('active');
+                // Switch to generators tab in the pills if not active
+                $('#generators-tab').tab('show');
+            } else {
+                $(`.tile-picker-item[data-tile-id="${tile_selected_id}"]`).addClass('active');
+                // Switch to tiles tab in the pills if not active
+                $('#tiles-tab').tab('show');
+            }
         }
 
         function buildPicker() {
-            const labelMaxW = pickerButtonW - 46;
+            const familyFilter = $('#tile-family-filter').val() || 'all';
+            const tileSearch = ($('#tile-search-input').val() || '').toLowerCase();
+            const genSearch = ($('#generator-search-input').val() || '').toLowerCase();
 
-            function truncateText(text, maxWidth, style) {
-                const measure = new PIXI.Text(text, style);
-                if (measure.width <= maxWidth) {
-                    measure.destroy();
-                    return text;
+            // Render Tiles
+            const filteredTiles = regionConfig.tiles.filter(function (tile) {
+                if (familyFilter !== 'all' && String(tile.family_tile_id) !== String(familyFilter)) {
+                    return false;
                 }
-                let truncated = text;
-                while (truncated.length > 0) {
-                    truncated = truncated.slice(0, -1);
-                    measure.text = truncated + '...';
-                    if (measure.width <= maxWidth) {
-                        measure.destroy();
-                        return truncated + '...';
-                    }
+                if (tileSearch && !tile.name.toLowerCase().includes(tileSearch)) {
+                    return false;
                 }
-                measure.destroy();
-                return '...';
-            }
-
-            const tilesTitle = new PIXI.Text('Tile', {
-                fontFamily: 'Arial',
-                fontSize: 14,
-                fontWeight: 'bold',
-                fill: 0x374151
-            });
-            tilesTitle.x = pickerPadding;
-            tilesTitle.y = pickerPadding;
-            pickerApp.stage.addChild(tilesTitle);
-
-            const tilesStartY = pickerPadding + pickerTitleH;
-
-            regionConfig.tiles.forEach(function (tile, index) {
-                const row = Math.floor(index / pickerCols);
-                const col = index % pickerCols;
-                const x = pickerPadding + col * (pickerButtonW + pickerGap);
-                const y = tilesStartY + row * (pickerButtonH + pickerGap);
-
-                const itemContainer = new PIXI.Container();
-                itemContainer.x = x;
-                itemContainer.y = y;
-                itemContainer.eventMode = 'static';
-                itemContainer.cursor = 'pointer';
-
-                const background = new PIXI.Graphics();
-                itemContainer.addChild(background);
-
-                const swatch = PIXI.Sprite.from('/storage/tiles/' + tile.id + '.png');
-                swatch.x = 10;
-                swatch.y = 10;
-                swatch.width = 18;
-                swatch.height = 18;
-                itemContainer.addChild(swatch);
-
-                const labelStyle = { fontFamily: 'Arial', fontSize: 13, fill: 0x1F2937 };
-                const labelText = truncateText(tile.name, labelMaxW, labelStyle);
-                const label = new PIXI.Text(labelText, labelStyle);
-                label.x = 36;
-                label.y = 10;
-                itemContainer.addChild(label);
-
-                itemContainer.on('pointertap', function () {
-                    setSelectedTile(tile.id, tile.color, null, '');
-                    setActiveTool('paint');
-                });
-
-                itemContainer.on('pointerover', function (event) {
-                    showTooltip(event, tile.name);
-                });
-                itemContainer.on('pointerout', function () {
-                    hideTooltip();
-                });
-
-                const pickerItem = {
-                    background: background,
-                    label: label,
-                    itemId: String(tile.id)
-                };
-                tilePickerItems[String(tile.id)] = pickerItem;
-                drawPickerItem(pickerItem, String(tile.id) === tile_selected_id && !tile_selected_generator_id);
-                pickerApp.stage.addChild(itemContainer);
+                return true;
             });
 
-            const tilesEndY = tilesStartY + Math.ceil(regionConfig.tiles.length / pickerCols) * (pickerButtonH + pickerGap);
-
-            let genEndY = tilesStartY;
-
-            if (regionConfig.generators.length > 0) {
-                const genOffsetX = pickerSectionWidth + pickerSectionGap;
-
-                const genTitle = new PIXI.Text('Generatori', {
-                    fontFamily: 'Arial',
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    fill: 0x374151
+            let tilesHtml = '';
+            if (filteredTiles.length === 0) {
+                tilesHtml = '<div class="text-center text-muted py-3 small w-100">Nessuna tile trovata</div>';
+            } else {
+                tilesHtml = '<div class="row w-100 m-0">';
+                filteredTiles.forEach(function (tile) {
+                    const isSelected = (String(tile.id) === tile_selected_id && !tile_selected_generator_id);
+                    tilesHtml += `
+                        <div class="col-6 mb-2 px-1">
+                            <div class="tile-picker-item ${isSelected ? 'active' : ''}" data-tile-id="${tile.id}" data-tile-color="${tile.color}" title="${tile.name}">
+                                <img src="/storage/tiles/${tile.id}.png" class="mr-2">
+                                <span class="text-truncate small" style="max-width: calc(100% - 32px); font-size: 11px;">${tile.name}</span>
+                            </div>
+                        </div>
+                    `;
                 });
-                genTitle.x = genOffsetX;
-                genTitle.y = pickerPadding;
-                pickerApp.stage.addChild(genTitle);
-
-                regionConfig.generators.forEach(function (gen, index) {
-                    const row = Math.floor(index / pickerCols);
-                    const col = index % pickerCols;
-                    const x = genOffsetX + col * (pickerButtonW + pickerGap);
-                    const y = tilesStartY + row * (pickerButtonH + pickerGap);
-
-                    const itemContainer = new PIXI.Container();
-                    itemContainer.x = x;
-                    itemContainer.y = y;
-                    itemContainer.eventMode = 'static';
-                    itemContainer.cursor = 'pointer';
-
-                    const background = new PIXI.Graphics();
-                    itemContainer.addChild(background);
-
-                    const swatch = new PIXI.Graphics();
-                    swatch.beginFill(0xE5E7EB);
-                    swatch.lineStyle(2, 0x000000, 1);
-                    swatch.drawRoundedRect(10, 10, 18, 18, 4);
-                    swatch.endFill();
-                    itemContainer.addChild(swatch);
-
-                    if (gen.symbol) {
-                        const symText = new PIXI.Text(gen.symbol, {
-                            fontFamily: 'Arial',
-                            fontSize: 10,
-                            fontWeight: 'bold',
-                            fill: 0x000000,
-                            align: 'center'
-                        });
-                        symText.anchor.set(0.5);
-                        symText.x = 19;
-                        symText.y = 19;
-                        itemContainer.addChild(symText);
-                    }
-
-                    const labelStyle = { fontFamily: 'Arial', fontSize: 13, fill: 0x1F2937 };
-                    const fullText = gen.name + ' (' + gen.symbol + ')';
-                    const labelText = truncateText(fullText, labelMaxW, labelStyle);
-                    const label = new PIXI.Text(labelText, labelStyle);
-                    label.x = 36;
-                    label.y = 10;
-                    itemContainer.addChild(label);
-
-                    const genId = 'gen_' + gen.id;
-                    itemContainer.on('pointertap', function () {
-                        tile_selected_generator_id = gen.id;
-                        tile_selected_generator_symbol = gen.symbol;
-                        updatePickerSelection();
-                        refreshPreviewFromHover();
-                        setActiveTool('paint');
-                    });
-
-                    itemContainer.on('pointerover', function (event) {
-                        showTooltip(event, gen.name + ' (' + gen.symbol + ')');
-                    });
-                    itemContainer.on('pointerout', function () {
-                        hideTooltip();
-                    });
-
-                    const pickerItem = {
-                        background: background,
-                        label: label,
-                        itemId: genId
-                    };
-                    tilePickerItems[genId] = pickerItem;
-                    drawPickerItem(pickerItem, tile_selected_generator_id === gen.id);
-                    pickerApp.stage.addChild(itemContainer);
-                });
-
-                genEndY = tilesStartY + Math.ceil(regionConfig.generators.length / pickerCols) * (pickerButtonH + pickerGap);
+                tilesHtml += '</div>';
             }
+            $('#html-tiles-container').html(tilesHtml);
 
-            const finalHeight = Math.max(tilesEndY, genEndY) + pickerPadding;
-            pickerApp.renderer.resize(pickerWidth, finalHeight);
+            // Render Generators
+            const filteredGenerators = regionConfig.generators.filter(function (gen) {
+                if (genSearch && !gen.name.toLowerCase().includes(genSearch) && !gen.symbol.toLowerCase().includes(genSearch)) {
+                    return false;
+                }
+                return true;
+            });
+
+            let gensHtml = '';
+            if (filteredGenerators.length === 0) {
+                gensHtml = '<div class="text-center text-muted py-3 small w-100">Nessun generatore trovato</div>';
+            } else {
+                gensHtml = '<div class="row w-100 m-0">';
+                filteredGenerators.forEach(function (gen) {
+                    const isSelected = (String(gen.id) === String(tile_selected_generator_id));
+                    gensHtml += `
+                        <div class="col-6 mb-2 px-1">
+                            <div class="generator-picker-item ${isSelected ? 'active' : ''}" data-generator-id="${gen.id}" data-generator-symbol="${gen.symbol}" title="${gen.name} (${gen.symbol})">
+                                <div class="generator-avatar mr-2">${gen.symbol}</div>
+                                <span class="text-truncate small" style="max-width: calc(100% - 32px); font-size: 11px;">${gen.name}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                gensHtml += '</div>';
+            }
+            $('#html-generators-container').html(gensHtml);
         }
 
         function saveTilesBatch(tiles, onError, onComplete) {
@@ -1020,12 +1087,39 @@
             setActiveTool($(this).data('tool'));
         });
 
+        $(document).on('click', '.tile-picker-item', function () {
+            const tileId = $(this).data('tile-id');
+            const tileColor = $(this).data('tile-color');
+            setSelectedTile(tileId, tileColor, null, '');
+            setActiveTool('paint');
+        });
+
+        $(document).on('click', '.generator-picker-item', function () {
+            const genId = $(this).data('generator-id');
+            const genSymbol = $(this).data('generator-symbol');
+            tile_selected_generator_id = genId;
+            tile_selected_generator_symbol = genSymbol;
+            updatePickerSelection();
+            refreshPreviewFromHover();
+            setActiveTool('paint');
+        });
+
+        $(document).on('change', '#tile-family-filter', function () {
+            buildPicker();
+        });
+
+        $(document).on('input', '#tile-search-input', function () {
+            buildPicker();
+        });
+
+        $(document).on('input', '#generator-search-input', function () {
+            buildPicker();
+        });
+
         $(document).on('change', '#map-brush-size', function () {
             const value = String($(this).val());
             if (value === 'custom') {
-                $('#map-brush-size-custom-w').show();
-                $('#map-brush-size-custom-sep').show();
-                $('#map-brush-size-custom-h').show();
+                $('#custom-brush-dims').show();
                 const customW = parseInt($('#map-brush-size-custom-w').val(), 10);
                 const customH = parseInt($('#map-brush-size-custom-h').val(), 10);
                 brushWidth = Number.isInteger(customW) ? Math.max(1, Math.min(25, customW)) : 1;
@@ -1034,9 +1128,7 @@
                 return;
             }
 
-            $('#map-brush-size-custom-w').hide();
-            $('#map-brush-size-custom-sep').hide();
-            $('#map-brush-size-custom-h').hide();
+            $('#custom-brush-dims').hide();
             const size = parseInt(value, 10);
             const safeSize = Number.isInteger(size) ? Math.max(1, Math.min(25, size)) : 1;
             brushWidth = safeSize;
