@@ -24,4 +24,12 @@ class EntityBody extends Model
     {
         return $this->state === self::STATE_FINISH_DRAW;
     }
+
+    /**
+     * Get the zones associated with this entity body.
+     */
+    public function zones()
+    {
+        return $this->hasMany(EntityBodyZone::class);
+    }
 }

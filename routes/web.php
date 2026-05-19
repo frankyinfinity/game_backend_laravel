@@ -105,6 +105,19 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/entity-bodies/delete', [App\Http\Controllers\EntityBodyController::class, 'bulkDelete'])->name('entity-bodies.delete');
     Route::post('/entity-bodies/action/toggle-state', [App\Http\Controllers\EntityBodyController::class, 'toggleState'])->name('entity-bodies.toggle-state');
 
+    Route::group([
+        'as' => 'entity-bodies.zones.',
+        'prefix' => '/entity-bodies/{entityBody}/zones',
+    ], function () {
+        Route::get('/', [App\Http\Controllers\EntityBodyZoneController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\EntityBodyZoneController::class, 'store'])->name('store');
+        Route::post('/{zone}/add-detail', [App\Http\Controllers\EntityBodyZoneController::class, 'addDetail'])->name('add-detail');
+        Route::post('/{zone}/remove-detail/{detail}', [App\Http\Controllers\EntityBodyZoneController::class, 'removeDetail'])->name('remove-detail');
+        Route::post('/{zone}/replace-details', [App\Http\Controllers\EntityBodyZoneController::class, 'replaceDetails'])->name('replace-details');
+        Route::put('/{zone}', [App\Http\Controllers\EntityBodyZoneController::class, 'update'])->name('update');
+        Route::delete('/{zone}', [App\Http\Controllers\EntityBodyZoneController::class, 'destroy'])->name('destroy');
+    });
+
     //Element
     Route::get('elements/genes', [App\Http\Controllers\ElementController::class, 'genes']);
     Route::get('elements/chimical-elements', [App\Http\Controllers\ElementController::class, 'chimicalElements']);
