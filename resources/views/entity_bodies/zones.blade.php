@@ -32,6 +32,12 @@
             <small class="text-muted d-block mt-1">Clicca sul disegno per tracciare i vertici. I punti delle zone salvate sono visibili in colori diversi sul disegno.</small>
         </div>
         <div class="col-md-5 text-md-right mt-2 mt-md-0">
+            <button class="btn btn-outline-success mr-2" type="button" id="btn-brush-add" title="Pennello Aggiungi: clicca sui pixel neri per aggiungerli alla zona" disabled>
+                <i class="fas fa-plus"></i> Aggiungi Pixel
+            </button>
+            <button class="btn btn-outline-danger mr-2" type="button" id="btn-brush-remove" title="Pennello Rimuovi: clicca sui pixel grigi/colorati per rimuoverli" disabled>
+                <i class="fas fa-minus"></i> Rimuovi Pixel
+            </button>
             <button class="btn btn-danger" type="button" id="btn-delete-selected-zone" title="Elimina la zona selezionata" disabled>
                 <i class="fas fa-trash"></i> Elimina Zona
             </button>

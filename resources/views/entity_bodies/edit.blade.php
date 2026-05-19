@@ -79,7 +79,7 @@
                 @if($entityBody->isFinishDraw())
                     <!-- TAB ZONE -->
                     <div class="tab-pane fade" id="tab-zones" role="tabpanel" aria-labelledby="tab-zones-link">
-                        @include('entity_bodies._zones')
+                        @include('entity_bodies.zones')
                     </div>
                 @endif
 
@@ -139,6 +139,7 @@
     var selectedZoneId= null;
     var allZoneDots   = {};   // id -> [{x,y}, ...]   (punti salvati sul canvas)
     var allZonePixels = {};   // id -> [{x,y}, ...]   (pixel neri all'interno del poligono)
+    var pixelBrushMode = null; // 'add', 'remove', o null
 
     function getCsrf() {
         return $('meta[name="csrf-token"]').attr('content') || '';
@@ -389,6 +390,18 @@
         isDrawing     = false;
         zoneName      = '';
         selectedZoneId= null;
+        pixelBrushMode = null;
+        
+        // Reset brush buttons
+        $('#btn-brush-add')
+            .prop('disabled', true)
+            .removeClass('btn-success')
+            .addClass('btn-outline-success');
+        $('#btn-brush-remove')
+            .prop('disabled', true)
+            .removeClass('btn-danger')
+            .addClass('btn-outline-danger');
+
         $('#new-zone-name').val('');
         $('#editor-zone-name').text('nessuna').css('color', '');
         // Rimosso riferimento a pulsante salva
@@ -563,9 +576,53 @@
                 });
 
                 if (foundZoneId) {
-                    var tr = $('#zones-tbody tr[data-zone-id="' + foundZoneId + '"]');
-                    if (tr.length) {
-                        tr.trigger('click');
+                    if (foundZoneId == selectedZoneId) {
+                        if (pixelBrushMode === 'remove') {
+                            // Rimuovi pixel dalla zona selezionata
+                            allZonePixels[selectedZoneId] = $.grep(allZonePixels[selectedZoneId], function (px) {
+                                return !(px.x === pt.x && px.y === pt.y);
+                            });
+                            $.post('/entity-bodies/' + entityBodyId + '/zones/' + selectedZoneId + '/save-pixels',
+                                { pixels: allZonePixels[selectedZoneId], _token: getCsrf() },
+                                function () {
+                                    clearCanvas();
+                                    redrawZoneDots();
+                                    var dots = allZoneDots[selectedZoneId];
+                                    if (dots) {
+                                        drawZonePolygon(selectedZoneId, dots, zoneColorFor(selectedZoneId), 3, SCALE * 0.45);
+                                    }
+                                }
+                            );
+                        }
+                    } else {
+                        var tr = $('#zones-tbody tr[data-zone-id="' + foundZoneId + '"]');
+                        if (tr.length) {
+                            tr.trigger('click');
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Se c'è una zona selezionata e il pixel cliccato è libero, controlla se è nero puro per aggiungerlo
+            if (selectedZoneId !== null) {
+                if (pixelBrushMode === 'add') {
+                    var idx = (Math.floor(cy) * imgData.width + Math.floor(cx)) * 4;
+                    var isBlack = (imgData.data[idx] === 0 && imgData.data[idx+1] === 0 && imgData.data[idx+2] === 0 && imgData.data[idx+3] > 0);
+                    if (isBlack) {
+                        if (!allZonePixels[selectedZoneId]) allZonePixels[selectedZoneId] = [];
+                        allZonePixels[selectedZoneId].push({ x: pt.x, y: pt.y });
+                        $.post('/entity-bodies/' + entityBodyId + '/zones/' + selectedZoneId + '/save-pixels',
+                            { pixels: allZonePixels[selectedZoneId], _token: getCsrf() },
+                            function () {
+                                clearCanvas();
+                                redrawZoneDots();
+                                var dots = allZoneDots[selectedZoneId];
+                                if (dots) {
+                                    drawZonePolygon(selectedZoneId, dots, zoneColorFor(selectedZoneId), 3, SCALE * 0.45);
+                                }
+                            }
+                        );
                     }
                 }
                 return;
@@ -664,11 +721,34 @@
             });
         });
 
+        $('#btn-brush-add').on('click', function () {
+            pixelBrushMode = 'add';
+            $(this).removeClass('btn-outline-success').addClass('btn-success');
+            $('#btn-brush-remove').removeClass('btn-danger').addClass('btn-outline-danger');
+        });
+
+        $('#btn-brush-remove').on('click', function () {
+            pixelBrushMode = 'remove';
+            $(this).removeClass('btn-outline-danger').addClass('btn-danger');
+            $('#btn-brush-add').removeClass('btn-success').addClass('btn-outline-success');
+        });
+
         $(document).on('click', '#zones-tbody tr', function (e) {
             if ($(e.target).is('input,button,a')) return;
             $('#zones-tbody tr').removeClass('selected');
             var $tr = $(this).addClass('selected');
             $('#btn-delete-selected-zone').prop('disabled', false);
+
+            // Attiva automaticamente la modalità di aggiunta pixel per impostazione predefinita
+            pixelBrushMode = 'add';
+            $('#btn-brush-add')
+                .prop('disabled', false)
+                .removeClass('btn-outline-success')
+                .addClass('btn-success');
+            $('#btn-brush-remove')
+                .prop('disabled', false)
+                .removeClass('btn-danger')
+                .addClass('btn-outline-danger');
 
             // Update "Zona selezionata" label
             var zid    = $tr.data('zone-id');
