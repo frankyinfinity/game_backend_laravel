@@ -174,6 +174,12 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/scores/delete', [App\Http\Controllers\ScoreController::class, 'destroy'])->name('scores.delete');
     Route::post('/scores/{score}/save-graphics', [App\Http\Controllers\ScoreController::class, 'saveGraphics'])->name('scores.save-graphics');
 
+    //Entity Components
+    Route::resource('entity-components', App\Http\Controllers\EntityComponentController::class);
+    Route::post('/entity-components/list/table', [App\Http\Controllers\EntityComponentController::class, 'listDataTable'])->name('entity-components.datatable');
+    Route::post('/entity-components/delete', [App\Http\Controllers\EntityComponentController::class, 'delete'])->name('entity-components.delete');
+    Route::post('/entity-components/{entityComponent}/toggle-state', [App\Http\Controllers\EntityComponentController::class, 'toggleState'])->name('entity-components.toggle-state');
+
     //Ages
     Route::resource('ages', App\Http\Controllers\AgeController::class);
     Route::post('/ages/list/table', [App\Http\Controllers\AgeController::class, 'listDataTable'])->name('ages.datatable');

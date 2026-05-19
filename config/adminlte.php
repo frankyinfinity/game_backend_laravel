@@ -364,6 +364,17 @@ return [
             ]
         ],
         [
+            'text'    => 'Entity',
+            'icon'    => 'fas fa-dna',
+            'submenu' => [
+                [
+                    'text' => 'Componente Entity',
+                    'url'  => '/entity-components',
+                    'icon' => 'fas fa-puzzle-piece',
+                ]
+            ]
+        ],
+        [
             'text'    => 'Elementi',
             'icon'    => 'fas fa-cubes',
             'submenu' => [
