@@ -1,5 +1,6 @@
 @php
-    $imagePath = 'storage/' . $modelType . 's/' . $model->id . '.png';
+    $storageDir = \Illuminate\Support\Str::plural($modelType);
+    $imagePath = 'storage/' . $storageDir . '/' . $model->id . '.png';
     $fileExists = file_exists(public_path($imagePath));
 @endphp
 
@@ -34,26 +35,40 @@
                 <h3 class="card-title">Strumenti</h3>
             </div>
             <div class="card-body">
-                <div class="form-group">
-                    <label>Colore</label>
-                    <input type="color" id="editor-color-{{$modelType}}" class="form-control" value="#000000" style="height: 40px;">
-                </div>
-
-                <div class="form-group">
-                    <label>Palette Colori</label>
-                    <div class="d-flex flex-wrap">
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #000000; width: 30px; height: 30px;" data-color="#000000"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #FFFFFF; width: 30px; height: 30px;" data-color="#FFFFFF"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #FF0000; width: 30px; height: 30px;" data-color="#FF0000"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #00FF00; width: 30px; height: 30px;" data-color="#00FF00"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #0000FF; width: 30px; height: 30px;" data-color="#0000FF"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #FFFF00; width: 30px; height: 30px;" data-color="#FFFF00"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #FF00FF; width: 30px; height: 30px;" data-color="#FF00FF"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #00FFFF; width: 30px; height: 30px;" data-color="#00FFFF"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #FFA500; width: 30px; height: 30px;" data-color="#FFA500"></button>
-                        <button type="button" class="btn btn-sm m-1" style="background-color: #800080; width: 30px; height: 30px;" data-color="#800080"></button>
+                @if(isset($availableColors) && is_array($availableColors) && count($availableColors) > 0)
+                    <div class="form-group" style="display: none;">
+                        <input type="color" id="editor-color-{{$modelType}}" value="{{ $availableColors[0] }}">
                     </div>
-                </div>
+                    <div class="form-group">
+                        <label>Palette Colori (Vincolata) <i class="fas fa-lock text-warning" title="I colori sono limitati per questo tipo di grafica"></i></label>
+                        <div class="d-flex flex-wrap">
+                            @foreach($availableColors as $color)
+                                <button type="button" class="btn btn-sm m-1" style="background-color: {{ $color }}; width: 30px; height: 30px;" data-color="{{ $color }}"></button>
+                            @endforeach
+                        </div>
+                    </div>
+                @else
+                    <div class="form-group">
+                        <label>Colore</label>
+                        <input type="color" id="editor-color-{{$modelType}}" class="form-control" value="#000000" style="height: 40px;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Palette Colori</label>
+                        <div class="d-flex flex-wrap">
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #000000; width: 30px; height: 30px;" data-color="#000000"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #FFFFFF; width: 30px; height: 30px;" data-color="#FFFFFF"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #FF0000; width: 30px; height: 30px;" data-color="#FF0000"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #00FF00; width: 30px; height: 30px;" data-color="#00FF00"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #0000FF; width: 30px; height: 30px;" data-color="#0000FF"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #FFFF00; width: 30px; height: 30px;" data-color="#FFFF00"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #FF00FF; width: 30px; height: 30px;" data-color="#FF00FF"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #00FFFF; width: 30px; height: 30px;" data-color="#00FFFF"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #FFA500; width: 30px; height: 30px;" data-color="#FFA500"></button>
+                            <button type="button" class="btn btn-sm m-1" style="background-color: #800080; width: 30px; height: 30px;" data-color="#800080"></button>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="form-group">
                     <label>Strumenti</label>

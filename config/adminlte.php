@@ -376,6 +376,11 @@ return [
                     'text' => 'Componente Entity',
                     'url'  => '/entity-components',
                     'icon' => 'fas fa-puzzle-piece',
+                ],
+                [
+                    'text' => 'Corpo Entity',
+                    'url'  => '/entity-bodies',
+                    'icon' => 'fas fa-child',
                 ]
             ]
         ],

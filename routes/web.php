@@ -99,6 +99,12 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('entities/genes', [App\Http\Controllers\EntityController::class, 'genes']);
     Route::get('entities/chimical-elements', [App\Http\Controllers\EntityController::class, 'chimicalElements']);
 
+    //Entity Bodies
+    Route::resource('entity-bodies', App\Http\Controllers\EntityBodyController::class);
+    Route::post('/entity-bodies/list/table', [App\Http\Controllers\EntityBodyController::class, 'listDataTable'])->name('entity-bodies.datatable');
+    Route::post('/entity-bodies/delete', [App\Http\Controllers\EntityBodyController::class, 'bulkDelete'])->name('entity-bodies.delete');
+    Route::post('/entity-bodies/action/toggle-state', [App\Http\Controllers\EntityBodyController::class, 'toggleState'])->name('entity-bodies.toggle-state');
+
     //Element
     Route::get('elements/genes', [App\Http\Controllers\ElementController::class, 'genes']);
     Route::get('elements/chimical-elements', [App\Http\Controllers\ElementController::class, 'chimicalElements']);

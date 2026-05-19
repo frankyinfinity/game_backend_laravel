@@ -102,6 +102,14 @@ return [
             'throw' => false,
         ],
 
+        'entity_bodies' => [
+            'driver' => 'local',
+            'root' => storage_path('app/uploads/entity_bodies'),
+            'url' => env('APP_URL').'/storage/entity_bodies',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         'rewards' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/rewards'),
