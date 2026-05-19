@@ -368,6 +368,11 @@ return [
             'icon'    => 'fas fa-dna',
             'submenu' => [
                 [
+                    'text' => 'Tipologia Componente',
+                    'url'  => '/entity-type-components',
+                    'icon' => 'fas fa-tags',
+                ],
+                [
                     'text' => 'Componente Entity',
                     'url'  => '/entity-components',
                     'icon' => 'fas fa-puzzle-piece',

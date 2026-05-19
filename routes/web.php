@@ -174,6 +174,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/scores/delete', [App\Http\Controllers\ScoreController::class, 'destroy'])->name('scores.delete');
     Route::post('/scores/{score}/save-graphics', [App\Http\Controllers\ScoreController::class, 'saveGraphics'])->name('scores.save-graphics');
 
+    // Entity Type Components
+    Route::resource('entity-type-components', App\Http\Controllers\EntityTypeComponentController::class);
+    Route::post('/entity-type-components/list/table', [App\Http\Controllers\EntityTypeComponentController::class, 'listDataTable'])->name('entity-type-components.datatable');
+    Route::post('/entity-type-components/delete', [App\Http\Controllers\EntityTypeComponentController::class, 'delete'])->name('entity-type-components.delete');
+
     //Entity Components
     Route::resource('entity-components', App\Http\Controllers\EntityComponentController::class);
     Route::post('/entity-components/list/table', [App\Http\Controllers\EntityComponentController::class, 'listDataTable'])->name('entity-components.datatable');
