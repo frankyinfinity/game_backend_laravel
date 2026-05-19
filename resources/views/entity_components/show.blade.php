@@ -71,6 +71,68 @@
                 @endif
             </div>
         </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6 col-12">
+                <div class="card card-outline card-secondary shadow-sm">
+                    <div class="card-header pb-2">
+                        <h5 class="card-title font-weight-bold m-0"><i class="fas fa-dna mr-2 text-info"></i> Geni Associati</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-striped table-hover m-0">
+                            <thead>
+                                <tr>
+                                    <th>Nome Gene</th>
+                                    <th>Key</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($entityComponent->genes as $assoc)
+                                    <tr>
+                                        <td>{{ $assoc->gene->name ?? 'N/A' }}</td>
+                                        <td><code>{{ $assoc->gene->key ?? 'N/A' }}</code></td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="3" class="text-muted text-center py-3">Nessun gene associato.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-12">
+                <div class="card card-outline card-secondary shadow-sm">
+                    <div class="card-header pb-2">
+                        <h5 class="card-title font-weight-bold m-0"><i class="fas fa-flask mr-2 text-warning"></i> Regole Elementi Chimici</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-striped table-hover m-0">
+                            <thead>
+                                <tr>
+                                    <th>Nome Regola</th>
+                                    <th>Titolo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($entityComponent->ruleChimicalElements as $assoc)
+                                    <tr>
+                                        <td>{{ $assoc->ruleChimicalElement->name ?? 'N/A' }}</td>
+                                        <td>{{ $assoc->ruleChimicalElement->title ?? 'N/A' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="2" class="text-muted text-center py-3">Nessuna regola elemento chimico associata.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @stop

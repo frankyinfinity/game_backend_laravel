@@ -43,6 +43,12 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-graphics-link" data-toggle="pill" href="#tab-graphics" role="tab" aria-controls="tab-graphics" aria-selected="false">Grafica</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-genes-link" data-toggle="pill" href="#tab-genes" role="tab" aria-controls="tab-genes" aria-selected="false">Geni</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-rules-link" data-toggle="pill" href="#tab-rules" role="tab" aria-controls="tab-rules" aria-selected="false">Elementi Chimici</a>
+                    </li>
                 </ul>
             </div>
             
@@ -92,6 +98,58 @@
                         @endif
                     </div>
 
+                    <!-- TAB GENI -->
+                    <div class="tab-pane fade" id="tab-genes" role="tabpanel" aria-labelledby="tab-genes-link">
+                        <div class="mb-3 d-flex justify-content-between align-items-center">
+                            <h5 class="text-dark font-weight-bold mb-0">Associazione Geni</h5>
+                            @if(!$entityComponent->isFinished())
+                                <button type="button" class="btn btn-sm btn-success shadow-sm" id="btn-add-gene">
+                                    <i class="fas fa-plus"></i> Aggiungi Gene
+                                </button>
+                            @endif
+                        </div>
+                        <div class="table-responsive">
+                            <table id="genes-table" class="table table-bordered table-hover w-100">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nome Gene</th>
+                                        <th>Key</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TAB ELEMENTI CHIMICI -->
+                    <div class="tab-pane fade" id="tab-rules" role="tabpanel" aria-labelledby="tab-rules-link">
+                        <div class="mb-3 d-flex justify-content-between align-items-center">
+                            <h5 class="text-dark font-weight-bold mb-0">Associazione Elementi Chimici (Regole)</h5>
+                            @if(!$entityComponent->isFinished())
+                                <button type="button" class="btn btn-sm btn-success shadow-sm" id="btn-add-rule">
+                                    <i class="fas fa-plus"></i> Aggiungi Regola Elemento Chimico
+                                </button>
+                            @endif
+                        </div>
+                        <div class="table-responsive">
+                            <table id="rules-table" class="table table-bordered table-hover w-100">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nome Regola</th>
+                                        <th>Titolo</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
             
@@ -107,6 +165,64 @@
             </div>
         </div>
     </form>
+
+    <!-- MODALS FOR GENES CRUD -->
+    <div class="modal fade" id="addGeneModal" tabindex="-1" role="dialog" aria-labelledby="addGeneModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title font-weight-bold" id="addGeneModalLabel">Aggiungi Associazione Gene</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="addGeneForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="select-gene-id" class="font-weight-bold">Gene <span class="text-danger">*</span></label>
+                            <select class="form-control" id="select-gene-id" name="gene_id" required>
+                                <option value="">Seleziona un Gene...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
+                        <button type="submit" class="btn btn-success">Salva</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FOR RULES CRUD -->
+    <div class="modal fade" id="addRuleModal" tabindex="-1" role="dialog" aria-labelledby="addRuleModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title font-weight-bold" id="addRuleModalLabel">Aggiungi Associazione Elemento Chimico (Regola)</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="addRuleForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="select-rule-id" class="font-weight-bold">Regola Elemento Chimico (Tipo Entity) <span class="text-danger">*</span></label>
+                            <select class="form-control" id="select-rule-id" name="rule_chimical_element_id" required>
+                                <option value="">Seleziona una Regola...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
+                        <button type="submit" class="btn btn-success">Salva</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @stop
 
 @section('js')
@@ -127,6 +243,183 @@
                 if (!confirm("Sei sicuro di voler completare e bloccare questo componente? Questa azione è irreversibile.")) {
                     e.preventDefault();
                 }
+            });
+
+            // Geni & Elementi Chimici DataTable and Ajax Handlers
+            var isComponentFinished = @json($entityComponent->isFinished());
+            
+            var genesTable = $('#genes-table').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: "{{ route('entity-components.genes.datatable', $entityComponent) }}",
+                    type: 'POST',
+                    data: { _token: '{{ csrf_token() }}' }
+                },
+                columns: [
+                    { data: 'id', name: 'id' },
+                    { data: 'gene_name', name: 'gene_name', orderable: false, searchable: false },
+                    { data: 'gene_key', name: 'gene_key', orderable: false, searchable: false },
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        render: function (data, type, row) {
+                            if (isComponentFinished) {
+                                return '<span class="text-muted"><i class="fas fa-lock"></i> Bloccato</span>';
+                            }
+                            return '<button type="button" class="btn btn-xs btn-danger delete-gene-btn" data-id="' + row.id + '"><i class="fas fa-trash"></i> Elimina</button>';
+                        }
+                    }
+                ]
+            });
+
+            var rulesTable = $('#rules-table').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: "{{ route('entity-components.rules.datatable', $entityComponent) }}",
+                    type: 'POST',
+                    data: { _token: '{{ csrf_token() }}' }
+                },
+                columns: [
+                    { data: 'id', name: 'id' },
+                    { data: 'rule_name', name: 'rule_name', orderable: false, searchable: false },
+                    { data: 'rule_title', name: 'rule_title', orderable: false, searchable: false },
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        render: function (data, type, row) {
+                            if (isComponentFinished) {
+                                return '<span class="text-muted"><i class="fas fa-lock"></i> Bloccato</span>';
+                            }
+                            return '<button type="button" class="btn btn-xs btn-danger delete-rule-btn" data-id="' + row.id + '"><i class="fas fa-trash"></i> Elimina</button>';
+                        }
+                    }
+                ]
+            });
+
+            // Add Gene Modal populating and submit
+            $('#btn-add-gene').click(function() {
+                $.get("{{ route('entity-components.genes.available', $entityComponent) }}", function(data) {
+                    var select = $('#select-gene-id');
+                    select.empty().append('<option value="">Seleziona un Gene...</option>');
+                    $.each(data, function(index, gene) {
+                        select.append('<option value="' + gene.id + '">' + gene.name + ' (' + gene.key + ')</option>');
+                    });
+                    $('#addGeneModal').modal('show');
+                });
+            });
+
+            $('#addGeneForm').submit(function(e) {
+                e.preventDefault();
+                $.ajax({
+                    url: "{{ route('entity-components.genes.store', $entityComponent) }}",
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        if (response.success) {
+                            $('#addGeneModal').modal('hide');
+                            genesTable.ajax.reload();
+                            if (typeof toastr !== 'undefined') {
+                                toastr.success('Gene associato con successo.');
+                            } else {
+                                alert('Gene associato con successo.');
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        var msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Errore durante l\'operazione.';
+                        alert('Errore: ' + msg);
+                    }
+                });
+            });
+
+            // Delete Gene
+            $(document).on('click', '.delete-gene-btn', function() {
+                if (!confirm('Sei sicuro di voler eliminare questa associazione gene?')) return;
+                var id = $(this).data('id');
+                var url = "{{ route('entity-components.genes.destroy', ':id') }}".replace(':id', id);
+                $.ajax({
+                    url: url,
+                    type: 'DELETE',
+                    data: { _token: '{{ csrf_token() }}' },
+                    success: function(response) {
+                        if (response.success) {
+                            genesTable.ajax.reload();
+                            if (typeof toastr !== 'undefined') {
+                                toastr.success('Associazione gene eliminata.');
+                            } else {
+                                alert('Associazione gene eliminata.');
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        alert('Errore durante l\'eliminazione.');
+                    }
+                });
+            });
+
+            // Add Rule Modal populating and submit
+            $('#btn-add-rule').click(function() {
+                $.get("{{ route('entity-components.rules.available', $entityComponent) }}", function(data) {
+                    var select = $('#select-rule-id');
+                    select.empty().append('<option value="">Seleziona una Regola...</option>');
+                    $.each(data, function(index, rule) {
+                        select.append('<option value="' + rule.id + '">' + rule.name + ' (' + rule.title + ')</option>');
+                    });
+                    $('#addRuleModal').modal('show');
+                });
+            });
+
+            $('#addRuleForm').submit(function(e) {
+                e.preventDefault();
+                $.ajax({
+                    url: "{{ route('entity-components.rules.store', $entityComponent) }}",
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        if (response.success) {
+                            $('#addRuleModal').modal('hide');
+                            rulesTable.ajax.reload();
+                            if (typeof toastr !== 'undefined') {
+                                toastr.success('Regola elemento associata con successo.');
+                            } else {
+                                alert('Regola elemento associata con successo.');
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        var msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Errore durante l\'operazione.';
+                        alert('Errore: ' + msg);
+                    }
+                });
+            });
+
+            // Delete Rule
+            $(document).on('click', '.delete-rule-btn', function() {
+                if (!confirm('Sei sicuro di voler eliminare questa associazione regola?')) return;
+                var id = $(this).data('id');
+                var url = "{{ route('entity-components.rules.destroy', ':id') }}".replace(':id', id);
+                $.ajax({
+                    url: url,
+                    type: 'DELETE',
+                    data: { _token: '{{ csrf_token() }}' },
+                    success: function(response) {
+                        if (response.success) {
+                            rulesTable.ajax.reload();
+                            if (typeof toastr !== 'undefined') {
+                                toastr.success('Associazione regola eliminata.');
+                            } else {
+                                alert('Associazione regola eliminata.');
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        alert('Errore durante l\'eliminazione.');
+                    }
+                });
             });
         });
     </script>

@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\EntityComponent;
+use App\Models\Gene;
+use App\Models\RuleChimicalElement;
+use App\Models\EntityComponentHasGene;
+use App\Models\EntityComponentHasRuleChimicalElement;
 use Illuminate\Http\Request;
 
 class EntityComponentController extends Controller
@@ -72,6 +76,7 @@ class EntityComponentController extends Controller
      */
     public function show(EntityComponent $entityComponent)
     {
+        $entityComponent->load(['genes.gene', 'ruleChimicalElements.ruleChimicalElement']);
         return view('entity_components.show', compact('entityComponent'));
     }
 
@@ -164,6 +169,170 @@ class EntityComponentController extends Controller
                 $entityComponent->delete();
             }
         }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Display JSON data for Genes Datatable.
+     */
+    public function genesDataTable(Request $request, EntityComponent $entityComponent)
+    {
+        $query = EntityComponentHasGene::where('entity_component_id', $entityComponent->id)
+            ->with('gene');
+
+        return datatables($query)
+            ->addColumn('gene_name', function ($row) {
+                return $row->gene ? $row->gene->name : '';
+            })
+            ->addColumn('gene_key', function ($row) {
+                return $row->gene ? $row->gene->key : '';
+            })
+            ->rawColumns([])
+            ->toJson();
+    }
+
+    /**
+     * Get available genes for adding.
+     */
+    public function getAvailableGenes(Request $request, EntityComponent $entityComponent)
+    {
+        $alreadyAssociatedIds = EntityComponentHasGene::where('entity_component_id', $entityComponent->id)
+            ->pluck('gene_id')
+            ->toArray();
+
+        $genes = Gene::whereNotIn('id', $alreadyAssociatedIds)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($genes);
+    }
+
+    /**
+     * Store new gene association.
+     */
+    public function storeGene(Request $request, EntityComponent $entityComponent)
+    {
+        if ($entityComponent->isFinished()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        }
+
+        $request->validate([
+            'gene_id' => 'required|exists:genes,id',
+        ]);
+
+        $exists = EntityComponentHasGene::where('entity_component_id', $entityComponent->id)
+            ->where('gene_id', $request->gene_id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['success' => false, 'message' => 'Questo gene è già associato al componente.'], 422);
+        }
+
+        EntityComponentHasGene::create([
+            'entity_component_id' => $entityComponent->id,
+            'gene_id' => $request->gene_id,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Destroy gene association.
+     */
+    public function destroyGene(Request $request, EntityComponentHasGene $entityComponentHasGene)
+    {
+        $entityComponent = $entityComponentHasGene->entityComponent;
+        if ($entityComponent->isFinished()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        }
+
+        $entityComponentHasGene->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Display JSON data for Rules Datatable.
+     */
+    public function rulesDataTable(Request $request, EntityComponent $entityComponent)
+    {
+        $query = EntityComponentHasRuleChimicalElement::where('entity_component_id', $entityComponent->id)
+            ->with('ruleChimicalElement');
+
+        return datatables($query)
+            ->addColumn('rule_name', function ($row) {
+                return $row->ruleChimicalElement ? $row->ruleChimicalElement->name : '';
+            })
+            ->addColumn('rule_title', function ($row) {
+                return $row->ruleChimicalElement ? $row->ruleChimicalElement->title : '';
+            })
+            ->rawColumns([])
+            ->toJson();
+    }
+
+    /**
+     * Get available rules for adding.
+     */
+    public function getAvailableRules(Request $request, EntityComponent $entityComponent)
+    {
+        $alreadyAssociatedIds = EntityComponentHasRuleChimicalElement::where('entity_component_id', $entityComponent->id)
+            ->pluck('rule_chimical_element_id')
+            ->toArray();
+
+        $rules = RuleChimicalElement::where('type', RuleChimicalElement::TYPE_ENTITY)
+            ->whereNotIn('id', $alreadyAssociatedIds)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($rules);
+    }
+
+    /**
+     * Store new rule association.
+     */
+    public function storeRule(Request $request, EntityComponent $entityComponent)
+    {
+        if ($entityComponent->isFinished()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        }
+
+        $request->validate([
+            'rule_chimical_element_id' => 'required|exists:rule_chimical_elements,id',
+        ]);
+
+        $rule = RuleChimicalElement::findOrFail($request->rule_chimical_element_id);
+        if ($rule->type !== RuleChimicalElement::TYPE_ENTITY) {
+            return response()->json(['success' => false, 'message' => 'È possibile selezionare solo regole di tipo entity.'], 422);
+        }
+
+        $exists = EntityComponentHasRuleChimicalElement::where('entity_component_id', $entityComponent->id)
+            ->where('rule_chimical_element_id', $request->rule_chimical_element_id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['success' => false, 'message' => 'Questa regola è già associata al componente.'], 422);
+        }
+
+        EntityComponentHasRuleChimicalElement::create([
+            'entity_component_id' => $entityComponent->id,
+            'rule_chimical_element_id' => $request->rule_chimical_element_id,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Destroy rule association.
+     */
+    public function destroyRule(Request $request, EntityComponentHasRuleChimicalElement $entityComponentHasRule)
+    {
+        $entityComponent = $entityComponentHasRule->entityComponent;
+        if ($entityComponent->isFinished()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        }
+
+        $entityComponentHasRule->delete();
 
         return response()->json(['success' => true]);
     }

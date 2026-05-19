@@ -16,6 +16,10 @@ class EntityComponent extends Model
         'state',
     ];
 
+    protected $casts = [
+        'state' => 'integer',
+    ];
+
     /**
      * Check if the component is in created state.
      */
@@ -41,5 +45,21 @@ class EntityComponent extends Model
             self::STATE_CREATED => 'Creato',
             self::STATE_FINISHED => 'Completato',
         ];
+    }
+
+    /**
+     * Associated genes.
+     */
+    public function genes()
+    {
+        return $this->hasMany(EntityComponentHasGene::class, 'entity_component_id');
+    }
+
+    /**
+     * Associated rule chemical elements.
+     */
+    public function ruleChimicalElements()
+    {
+        return $this->hasMany(EntityComponentHasRuleChimicalElement::class, 'entity_component_id');
     }
 }

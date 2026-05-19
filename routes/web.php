@@ -180,6 +180,18 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/entity-components/delete', [App\Http\Controllers\EntityComponentController::class, 'delete'])->name('entity-components.delete');
     Route::post('/entity-components/{entityComponent}/toggle-state', [App\Http\Controllers\EntityComponentController::class, 'toggleState'])->name('entity-components.toggle-state');
 
+    // Entity Components Geni
+    Route::post('/entity-components/{entityComponent}/genes/table', [App\Http\Controllers\EntityComponentController::class, 'genesDataTable'])->name('entity-components.genes.datatable');
+    Route::get('/entity-components/{entityComponent}/genes/available', [App\Http\Controllers\EntityComponentController::class, 'getAvailableGenes'])->name('entity-components.genes.available');
+    Route::post('/entity-components/{entityComponent}/genes', [App\Http\Controllers\EntityComponentController::class, 'storeGene'])->name('entity-components.genes.store');
+    Route::delete('/entity-components/genes/{entityComponentHasGene}', [App\Http\Controllers\EntityComponentController::class, 'destroyGene'])->name('entity-components.genes.destroy');
+
+    // Entity Components Elementi Chimici
+    Route::post('/entity-components/{entityComponent}/rules/table', [App\Http\Controllers\EntityComponentController::class, 'rulesDataTable'])->name('entity-components.rules.datatable');
+    Route::get('/entity-components/{entityComponent}/rules/available', [App\Http\Controllers\EntityComponentController::class, 'getAvailableRules'])->name('entity-components.rules.available');
+    Route::post('/entity-components/{entityComponent}/rules', [App\Http\Controllers\EntityComponentController::class, 'storeRule'])->name('entity-components.rules.store');
+    Route::delete('/entity-components/rules/{entityComponentHasRule}', [App\Http\Controllers\EntityComponentController::class, 'destroyRule'])->name('entity-components.rules.destroy');
+
     //Ages
     Route::resource('ages', App\Http\Controllers\AgeController::class);
     Route::post('/ages/list/table', [App\Http\Controllers\AgeController::class, 'listDataTable'])->name('ages.datatable');
