@@ -100,7 +100,7 @@
                     {
                         render: function(data, type, row){
                             // If component is finished, we disable the checkbox
-                            var disabledAttr = row.state == 1 ? 'disabled title="I corpi completati non possono essere eliminati"' : '';
+                            var disabledAttr = row.state == 1 ? 'disabled title="I corpi con disegno terminato non possono essere eliminati"' : '';
                             return '<div class="form-check">' +
                                 '<input class="form-check-input" type="checkbox" id="sel-'+row.id+'" name="selected[]" value="' + row.id + '" ' + disabledAttr + '>' +
                                 '</div>';
@@ -114,12 +114,12 @@
                             var toggleBtn = '';
                             if (row.state == 0) {
                                 if (!row.image) {
-                                    toggleBtn = '<button type="button" class="btn btn-success btn-sm disabled-state-btn mr-1" data-toggle="tooltip" title="Disegna la grafica per poter completare"><i class="fas fa-check-circle" style="opacity: 0.5;"></i></button>';
+                                    toggleBtn = '<button type="button" class="btn btn-success btn-sm disabled-state-btn mr-1" data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del corpo"><i class="fas fa-check-circle" style="opacity: 0.5;"></i></button>';
                                 } else {
                                     toggleBtn = '<form action="{{ route('entity-bodies.toggle-state') }}" method="POST" style="display:inline-block;" class="state-form js-confirm-complete mr-1">' +
                                         '@csrf' +
                                         '<input type="hidden" name="id" value="' + data + '">' +
-                                        '<button type="submit" class="btn btn-success btn-sm" data-toggle="tooltip" title="Completa e blocca"><i class="fas fa-check-circle"></i></button>' +
+                                        '<button type="submit" class="btn btn-success btn-sm" data-toggle="tooltip" title="Termina Disegno e Blocca"><i class="fas fa-check-circle"></i></button>' +
                                         '</form>';
                                 }
                             }
@@ -134,14 +134,14 @@
             $(document).on('click', '.disabled-state-btn', function(e) {
                 e.preventDefault();
                 if (typeof toastr !== 'undefined') {
-                    toastr.warning('Disegna l\'immagine per poter completare il corpo.');
+                    toastr.warning('Disegna l\'immagine per poter terminare il disegno del corpo.');
                 } else {
-                    alert('Disegna l\'immagine per poter completare il corpo.');
+                        alert('Disegna l\'immagine per poter terminare il disegno del corpo.');
                 }
             });
 
             $(document).on('submit', '.js-confirm-complete', function(e) {
-                if(!confirm('Sei sicuro di voler completare questo corpo? Non sarà più modificabile.')) {
+                if(!confirm('Sei sicuro di voler terminare il disegno di questo corpo? Non sarà più modificabile.')) {
                     e.preventDefault();
                 }
             });

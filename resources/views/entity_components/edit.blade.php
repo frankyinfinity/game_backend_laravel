@@ -6,9 +6,9 @@
 
 @section('content')
 
-    @if($entityComponent->isFinished())
+    @if($entityComponent->isFinishDraw())
         <div class="alert alert-info shadow-sm mb-4">
-            <i class="fas fa-lock mr-2"></i> Questo componente è contrassegnato come <strong>Completato</strong>. Tutte le modifiche e l'editor di grafica sono bloccati.
+            <i class="fas fa-lock mr-2"></i> Questo componente è contrassegnato come <strong>Disegno Terminato</strong>. Tutte le modifiche e l'editor di grafica sono bloccati.
         </div>
     @else
         <div class="alert alert-light border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #17a2b8 !important;">
@@ -16,14 +16,14 @@
                 <i class="fas fa-info-circle mr-2 text-info"></i> Questo componente è in stato <strong>Creato</strong>. Puoi modificare il nome e disegnare la grafica 32x32.
             </div>
             @if(!$entityComponent->image || !\Storage::disk('entity_components')->exists($entityComponent->image))
-                <button type="button" class="btn btn-success btn-sm shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter completare il componente">
-                    <i class="fas fa-check-circle"></i> Completa e Blocca
+                <button type="button" class="btn btn-success btn-sm shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del componente">
+                    <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
                 </button>
             @else
                 <form action="{{ route('entity-components.toggle-state', $entityComponent) }}" method="POST" class="m-0 js-confirm-complete">
                     @csrf
                     <button type="submit" class="btn btn-success btn-sm shadow-sm">
-                        <i class="fas fa-check-circle"></i> Completa e Blocca
+                        <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
                     </button>
                 </form>
             @endif
@@ -65,7 +65,7 @@
                                        id="name" 
                                        name="name" 
                                        value="{{ old('name', $entityComponent->name) }}" 
-                                       {{ $entityComponent->isFinished() ? 'disabled' : 'required' }}>
+                                       {{ $entityComponent->isFinishDraw() ? 'disabled' : 'required' }}>
                                 @error('name')
                                     <span class="invalid-feedback" role="alert">
                                         <strong>{{ $message }}</strong>
@@ -75,7 +75,7 @@
 
                             <div class="form-group col-md-6 col-12">
                                 <label for="entity_type_component_id" class="text-dark font-weight-bold">Tipologia Componente</label>
-                                <select id="entity_type_component_id" name="entity_type_component_id" class="form-control select2" style="width: 100%;" {{ $entityComponent->isFinished() ? 'disabled' : '' }}>
+                                <select id="entity_type_component_id" name="entity_type_component_id" class="form-control select2" style="width: 100%;" {{ $entityComponent->isFinishDraw() ? 'disabled' : '' }}>
                                     <option value="">Nessuna Tipologia...</option>
                                     @foreach($types as $type)
                                         <option value="{{ $type->id }}" data-icon="{{ $type->symbol }}" {{ old('entity_type_component_id', $entityComponent->entity_type_component_id) == $type->id ? 'selected' : '' }}>
@@ -89,7 +89,7 @@
 
                     <!-- TAB GRAPHICS -->
                     <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
-                        @if($entityComponent->isFinished())
+                        @if($entityComponent->isFinishDraw())
                             <div class="row">
                                 <div class="col-md-6 col-12">
                                     <div class="card card-outline card-secondary shadow-sm text-center py-4">
@@ -115,8 +115,8 @@
                     <!-- TAB GENI -->
                     <div class="tab-pane fade" id="tab-genes" role="tabpanel" aria-labelledby="tab-genes-link">
                         <div class="mb-3 d-flex justify-content-between align-items-center">
-                            <h5 class="text-dark font-weight-bold mb-0">Associazione Geni</h5>
-                            @if(!$entityComponent->isFinished())
+                             <h5 class="text-dark font-weight-bold mb-0">Associazione Geni</h5>
+                            @if(!$entityComponent->isFinishDraw())
                                 <button type="button" class="btn btn-sm btn-success shadow-sm" id="btn-add-gene">
                                     <i class="fas fa-plus"></i> Aggiungi Gene
                                 </button>
@@ -141,8 +141,8 @@
                     <!-- TAB ELEMENTI CHIMICI -->
                     <div class="tab-pane fade" id="tab-rules" role="tabpanel" aria-labelledby="tab-rules-link">
                         <div class="mb-3 d-flex justify-content-between align-items-center">
-                            <h5 class="text-dark font-weight-bold mb-0">Associazione Elementi Chimici (Regole)</h5>
-                            @if(!$entityComponent->isFinished())
+                                <h5 class="text-dark font-weight-bold mb-0">Associazione Elementi Chimici (Regole)</h5>
+                            @if(!$entityComponent->isFinishDraw())
                                 <button type="button" class="btn btn-sm btn-success shadow-sm" id="btn-add-rule">
                                     <i class="fas fa-plus"></i> Aggiungi Regola Elemento Chimico
                                 </button>
@@ -168,7 +168,7 @@
             </div>
             
             <div class="card-footer border-top pt-3">
-                @if(!$entityComponent->isFinished())
+                 @if(!$entityComponent->isFinishDraw())
                     <button type="submit" class="btn btn-primary shadow-sm mr-2">
                         <i class="fas fa-save"></i> Aggiorna
                     </button>
@@ -247,20 +247,20 @@
             $(document).on('click', '.disabled-state-btn', function(e) {
                 e.preventDefault();
                 if (typeof toastr !== 'undefined') {
-                    toastr.warning('Non è possibile impostare lo stato su "Completato" senza prima aver generato la grafica del componente.');
+                    toastr.warning('Non è possibile impostare lo stato su "Disegno Terminato" senza prima aver generato la grafica del componente.');
                 } else {
-                    alert('Non è possibile impostare lo stato su "Completato" senza prima aver generato la grafica del componente.');
+                    alert('Non è possibile impostare lo stato su "Disegno Terminato" senza prima aver generato la grafica del componente.');
                 }
             });
 
             $(document).on('submit', '.js-confirm-complete', function(e) {
-                if (!confirm("Sei sicuro di voler completare e bloccare questo componente? Questa azione è irreversibile.")) {
+                if (!confirm("Sei sicuro di voler terminare il disegno e bloccare questo componente? Questa azione è irreversibile.")) {
                     e.preventDefault();
                 }
             });
 
             // Geni & Elementi Chimici DataTable and Ajax Handlers
-            var isComponentFinished = @json($entityComponent->isFinished());
+            var isComponentFinishDraw = @json($entityComponent->isFinishDraw());
             
             var genesTable = $('#genes-table').DataTable({
                 processing: true,
@@ -279,7 +279,7 @@
                         orderable: false,
                         searchable: false,
                         render: function (data, type, row) {
-                            if (isComponentFinished) {
+                            if (isComponentFinishDraw) {
                                 return '<span class="text-muted"><i class="fas fa-lock"></i> Bloccato</span>';
                             }
                             return '<button type="button" class="btn btn-xs btn-danger delete-gene-btn" data-id="' + row.id + '"><i class="fas fa-trash"></i> Elimina</button>';
@@ -305,7 +305,7 @@
                         orderable: false,
                         searchable: false,
                         render: function (data, type, row) {
-                            if (isComponentFinished) {
+                            if (isComponentFinishDraw) {
                                 return '<span class="text-muted"><i class="fas fa-lock"></i> Bloccato</span>';
                             }
                             return '<button type="button" class="btn btn-xs btn-danger delete-rule-btn" data-id="' + row.id + '"><i class="fas fa-trash"></i> Elimina</button>';

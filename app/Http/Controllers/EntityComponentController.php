@@ -37,8 +37,8 @@ class EntityComponentController extends Controller
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
             ->addColumn('state_display', function ($row) {
-                if ($row->isFinished()) {
-                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Completato</span>';
+                if ($row->isFinishDraw()) {
+                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Disegno Terminato</span>';
                 }
                 return '<span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>';
             })
@@ -104,10 +104,10 @@ class EntityComponentController extends Controller
      */
     public function update(Request $request, EntityComponent $entityComponent)
     {
-        // Block updates if component is completed/finished
-        if ($entityComponent->isFinished()) {
+        // Block updates if component is finished draw
+        if ($entityComponent->isFinishDraw()) {
             return redirect()->route('entity-components.index')
-                ->with('error', 'Non è possibile modificare un componente completato.');
+                ->with('error', 'Non è possibile modificare un componente con disegno terminato.');
         }
 
         $request->validate([
@@ -146,16 +146,16 @@ class EntityComponentController extends Controller
     public function toggleState(Request $request, EntityComponent $entityComponent)
     {
         if ($entityComponent->isCreated()) {
-            // Can only complete if image is generated
+            // Can only finish draw if image is generated
             if (!$entityComponent->image || !\Storage::disk('entity_components')->exists($entityComponent->image)) {
-                return redirect()->back()->with('error', 'Non è possibile impostare lo stato su "Completato" senza prima aver generato la grafica del componente.');
+                return redirect()->back()->with('error', 'Non è possibile impostare lo stato su "Disegno Terminato" senza prima aver generato la grafica del componente.');
             }
-            $entityComponent->state = EntityComponent::STATE_FINISHED;
+            $entityComponent->state = EntityComponent::STATE_FINISH_DRAW;
             $entityComponent->save();
             return redirect()->back()->with('success', 'Componente completato e bloccato.');
         }
 
-        return redirect()->back()->with('error', 'Non è possibile riaprire un componente completato.');
+        return redirect()->back()->with('error', 'Non è possibile riaprire un componente con disegno terminato.');
     }
 
     /**
@@ -170,8 +170,8 @@ class EntityComponentController extends Controller
                     continue;
                 }
 
-                // Block deletion if completed/finished
-                if ($entityComponent->isFinished()) {
+                // Block deletion if finished draw
+                if ($entityComponent->isFinishDraw()) {
                     continue;
                 }
 
@@ -228,8 +228,8 @@ class EntityComponentController extends Controller
      */
     public function storeGene(Request $request, EntityComponent $entityComponent)
     {
-        if ($entityComponent->isFinished()) {
-            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        if ($entityComponent->isFinishDraw()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente con disegno terminato.'], 403);
         }
 
         $request->validate([
@@ -258,8 +258,8 @@ class EntityComponentController extends Controller
     public function destroyGene(Request $request, EntityComponentHasGene $entityComponentHasGene)
     {
         $entityComponent = $entityComponentHasGene->entityComponent;
-        if ($entityComponent->isFinished()) {
-            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        if ($entityComponent->isFinishDraw()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente con disegno terminato.'], 403);
         }
 
         $entityComponentHasGene->delete();
@@ -308,8 +308,8 @@ class EntityComponentController extends Controller
      */
     public function storeRule(Request $request, EntityComponent $entityComponent)
     {
-        if ($entityComponent->isFinished()) {
-            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        if ($entityComponent->isFinishDraw()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente con disegno terminato.'], 403);
         }
 
         $request->validate([
@@ -343,8 +343,8 @@ class EntityComponentController extends Controller
     public function destroyRule(Request $request, EntityComponentHasRuleChimicalElement $entityComponentHasRule)
     {
         $entityComponent = $entityComponentHasRule->entityComponent;
-        if ($entityComponent->isFinished()) {
-            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente completato.'], 403);
+        if ($entityComponent->isFinishDraw()) {
+            return response()->json(['success' => false, 'message' => 'Non è possibile modificare un componente con disegno terminato.'], 403);
         }
 
         $entityComponentHasRule->delete();

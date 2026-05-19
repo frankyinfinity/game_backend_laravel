@@ -35,8 +35,8 @@
                                        id="name" 
                                        name="name" 
                                        value="{{ old('name', $entityBody->name) }}" 
-                                       {{ $entityBody->isFinished() ? 'disabled readonly' : '' }}
-                                       required>
+                                        {{ $entityBody->isFinishDraw() ? 'disabled readonly' : '' }}
+                                        required>
                                 @error('name')
                                     <span class="invalid-feedback" role="alert">
                                         <strong>{{ $message }}</strong>
@@ -48,7 +48,7 @@
 
                     <!-- TAB GRAPHICS -->
                     <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
-                        @if($entityBody->isFinished())
+                        @if($entityBody->isFinishDraw())
                             <div class="row">
                                 <div class="col-md-6 col-12">
                                     <div class="card card-outline card-secondary shadow-sm text-center py-4">
@@ -75,7 +75,7 @@
             </div>
             <div class="card-footer bg-light border-top">
                 <div class="row">
-                    @if(!$entityBody->isFinished())
+                    @if(!$entityBody->isFinishDraw())
                         <div class="col-md-3 col-sm-6 mb-2">
                             <button type="submit" class="btn btn-primary btn-block btn-sm shadow-sm" id="btn-save-all">
                                 <i class="fa fa-save"></i> Aggiorna

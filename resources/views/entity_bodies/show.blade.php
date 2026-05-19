@@ -21,16 +21,16 @@
                         <th class="text-dark font-weight-bold">Nome</th>
                         <td>{{ $entityBody->name }}</td>
                     </tr>
-                    <tr>
-                        <th class="text-dark font-weight-bold">Stato</th>
-                        <td>
-                            @if($entityBody->isFinished())
-                                <span class="badge badge-success"><i class="fas fa-lock"></i> Completato</span>
-                            @else
-                                <span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>
-                            @endif
-                        </td>
-                    </tr>
+                        <tr>
+                            <th class="text-dark font-weight-bold">Stato</th>
+                            <td>
+                                @if($entityBody->isFinishDraw())
+                                    <span class="badge badge-success"><i class="fas fa-lock"></i> Disegno Terminato</span>
+                                @else
+                                    <span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>
+                                @endif
+                            </td>
+                        </tr>
                 </table>
 
                 <div class="mt-4">
@@ -44,15 +44,15 @@
                         </a>
                         
                         @if(!$entityBody->image || !\Storage::disk('entity_bodies')->exists($entityBody->image))
-                            <button type="button" class="btn btn-success shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter completare il corpo">
-                                <i class="fas fa-check-circle"></i> Completa e Blocca
-                            </button>
+                        <button type="button" class="btn btn-success shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del corpo">
+                            <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
+                        </button>
                         @else
                             <form action="{{ route('entity-bodies.toggle-state') }}" method="POST" style="display:inline-block;" class="m-0 js-confirm-complete">
                                 @csrf
                                 <input type="hidden" name="id" value="{{ $entityBody->id }}">
                                 <button type="submit" class="btn btn-success shadow-sm">
-                                    <i class="fas fa-check-circle"></i> Completa e Blocca
+                                    <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
                                 </button>
                             </form>
                         @endif

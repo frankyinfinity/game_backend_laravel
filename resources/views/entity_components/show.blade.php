@@ -34,8 +34,8 @@
                     <tr>
                         <th class="text-dark font-weight-bold">Stato</th>
                         <td>
-                            @if($entityComponent->isFinished())
-                                <span class="badge badge-success"><i class="fas fa-lock"></i> Completato</span>
+                            @if($entityComponent->isFinishDraw())
+                                    <span class="badge badge-success"><i class="fas fa-lock"></i> Disegno Terminato</span>
                             @else
                                 <span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>
                             @endif
@@ -54,14 +54,14 @@
                         </a>
                         
                         @if(!$entityComponent->image || !\Storage::disk('entity_components')->exists($entityComponent->image))
-                            <button type="button" class="btn btn-success shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter completare il componente">
-                                <i class="fas fa-check-circle"></i> Completa e Blocca
+                            <button type="button" class="btn btn-success shadow-sm disabled-state-btn" data-toggle="tooltip" title="Disegna la grafica per poter terminare il disegno del componente">
+                                <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
                             </button>
                         @else
                             <form action="{{ route('entity-components.toggle-state', $entityComponent) }}" method="POST" style="display:inline-block;" class="m-0 js-confirm-complete">
                                 @csrf
                                 <button type="submit" class="btn btn-success shadow-sm">
-                                    <i class="fas fa-check-circle"></i> Completa e Blocca
+                                    <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
                                 </button>
                             </form>
                         @endif
@@ -155,14 +155,14 @@
             $(document).on('click', '.disabled-state-btn', function(e) {
                 e.preventDefault();
                 if (typeof toastr !== 'undefined') {
-                    toastr.warning('Non è possibile impostare lo stato su "Completato" senza prima aver generato la grafica del componente.');
+                    toastr.warning('Non è possibile impostare lo stato su "Disegno Terminato" senza prima aver generato la grafica del componente.');
                 } else {
-                    alert('Non è possibile impostare lo stato su "Completato" senza prima aver generato la grafica del componente.');
+                    alert('Non è possibile impostare lo stato su "Disegno Terminato" senza prima aver generato la grafica del componente.');
                 }
             });
 
             $(document).on('submit', '.js-confirm-complete', function(e) {
-                if (!confirm("Sei sicuro di voler completare e bloccare questo componente? Questa azione è irreversibile.")) {
+                if (!confirm("Sei sicuro di voler terminare il disegno e bloccare questo componente? Questa azione è irreversibile.")) {
                     e.preventDefault();
                 }
             });

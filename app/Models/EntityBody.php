@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class EntityBody extends Model
 {
     const STATE_CREATED = 0;
-    const STATE_FINISHED = 1;
+    const STATE_FINISH_DRAW = 1;
 
     protected $fillable = [
         'name',
@@ -20,8 +20,8 @@ class EntityBody extends Model
         return $this->state === self::STATE_CREATED;
     }
 
-    public function isFinished()
+    public function isFinishDraw()
     {
-        return $this->state === self::STATE_FINISHED;
+        return $this->state === self::STATE_FINISH_DRAW;
     }
 }

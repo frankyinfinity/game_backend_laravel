@@ -32,8 +32,8 @@ class EntityBodyController extends Controller
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
             ->addColumn('state_display', function ($row) {
-                if ($row->isFinished()) {
-                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Completato</span>';
+                if ($row->isFinishDraw()) {
+                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Disegno Terminato</span>';
                 }
                 return '<span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>';
             })
@@ -87,9 +87,9 @@ class EntityBodyController extends Controller
      */
     public function update(Request $request, EntityBody $entityBody)
     {
-        if ($entityBody->isFinished()) {
+        if ($entityBody->isFinishDraw()) {
             return redirect()->route('entity-bodies.index')
-                ->with('error', 'Il corpo completato non può essere modificato.');
+                ->with('error', 'Il corpo con disegno terminato non può essere modificato.');
         }
         $request->validate([
             'name' => 'required|string|max:255',
@@ -122,8 +122,8 @@ class EntityBodyController extends Controller
      */
     public function destroy(EntityBody $entityBody)
     {
-        if ($entityBody->isFinished()) {
-            return response()->json(['success' => false, 'message' => 'Impossibile eliminare un corpo completato.']);
+        if ($entityBody->isFinishDraw()) {
+            return response()->json(['success' => false, 'message' => 'Impossibile eliminare un corpo con disegno terminato.']);
         }
         if ($entityBody->image) {
             \Storage::disk('entity_bodies')->delete($entityBody->image);
@@ -173,7 +173,7 @@ class EntityBodyController extends Controller
             if (!$entityBody->image) {
                 return redirect()->back()->with('error', 'Disegna la grafica prima di completare.');
             }
-            $entityBody->update(['state' => EntityBody::STATE_FINISHED]);
+            $entityBody->update(['state' => EntityBody::STATE_FINISH_DRAW]);
             return redirect()->route('entity-bodies.index')->with('success', 'Corpo completato e bloccato.');
         } else {
             $entityBody->update(['state' => EntityBody::STATE_CREATED]);
