@@ -114,10 +114,47 @@ class EntityAssemblerDraw
         $body->setSize($modalWidth, $modalHeight);
         $body->setColor(0xFFFFFF);
         $body->setBorderRadius(10);
-        $body->setBorderColor(0x000000);
         $body->setRenderable(false);
         $body->addAttributes('z_index', 20000);
         $this->drawItems[] = $body;
+
+        // Border using 4 separate rectangles (top, bottom, left, right)
+        $borderThickness = 2;
+        // Top border
+        $borderTop = new Rectangle($modalUid . '_border_top');
+        $borderTop->setOrigin($modalX, $modalY);
+        $borderTop->setSize($modalWidth, $borderThickness);
+        $borderTop->setColor(0x000000);
+        $borderTop->setRenderable(false);
+        $borderTop->addAttributes('z_index', 20050);
+        $this->drawItems[] = $borderTop;
+
+        // Bottom border
+        $borderBottom = new Rectangle($modalUid . '_border_bottom');
+        $borderBottom->setOrigin($modalX, $modalY + $modalHeight - $borderThickness);
+        $borderBottom->setSize($modalWidth, $borderThickness);
+        $borderBottom->setColor(0x000000);
+        $borderBottom->setRenderable(false);
+        $borderBottom->addAttributes('z_index', 20050);
+        $this->drawItems[] = $borderBottom;
+
+        // Left border
+        $borderLeft = new Rectangle($modalUid . '_border_left');
+        $borderLeft->setOrigin($modalX, $modalY);
+        $borderLeft->setSize($borderThickness, $modalHeight);
+        $borderLeft->setColor(0x000000);
+        $borderLeft->setRenderable(false);
+        $borderLeft->addAttributes('z_index', 20050);
+        $this->drawItems[] = $borderLeft;
+
+        // Right border
+        $borderRight = new Rectangle($modalUid . '_border_right');
+        $borderRight->setOrigin($modalX + $modalWidth - $borderThickness, $modalY);
+        $borderRight->setSize($borderThickness, $modalHeight);
+        $borderRight->setColor(0x000000);
+        $borderRight->setRenderable(false);
+        $borderRight->addAttributes('z_index', 20050);
+        $this->drawItems[] = $borderRight;
 
         // Modal header
         $headerHeight = 60;
@@ -176,21 +213,49 @@ class EntityAssemblerDraw
         $this->drawItems[] = $closeButton;
         $this->drawItems[] = $closeText;
 
-        // Content area (empty for now, no scroll)
-        $contentPadding = 16;
+        // Content area divided into two parts (4/6 grid)
+        $contentPadding = 0;
         $contentX = $modalX + $contentPadding;
         $contentY = $modalY + $headerHeight + $contentPadding;
         $contentWidth = $modalWidth - ($contentPadding * 2);
         $contentHeight = $modalHeight - $headerHeight - ($contentPadding * 2);
 
+        // Main content viewport (gray container)
         $contentViewport = new Rectangle($modalUid . '_content_viewport');
         $contentViewport->setOrigin($contentX, $contentY);
         $contentViewport->setSize($contentWidth, $contentHeight);
-        $contentViewport->setColor(0xF4F4F4);
+        $contentViewport->setColor(0xD0D0D0);
         $contentViewport->setRenderable(false);
-        $contentViewport->setBorderRadius(6);
+        $contentViewport->setBorderRadius(0);
         $contentViewport->addAttributes('z_index', 20005);
+        $contentViewport->addAttributes('scroll_child_uids', [
+            $modalUid . '_separator_1',
+            $modalUid . '_border_top',
+            $modalUid . '_border_bottom',
+            $modalUid . '_border_left',
+            $modalUid . '_border_right'
+        ]);
+        $contentViewport->addAttributes('scroll_initial_renderables', [
+            $modalUid . '_separator_1' => true,
+            $modalUid . '_border_top' => true,
+            $modalUid . '_border_bottom' => true,
+            $modalUid . '_border_left' => true,
+            $modalUid . '_border_right' => true
+        ]);
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
+
+        // Vertical separator (thin rectangle) at 60% position
+        $leftWidth = (int) ($contentWidth * 0.6);
+        $separatorX = $contentX + $leftWidth - 1;
+        $separator = new Rectangle($modalUid . '_separator_1');
+        $separator->setOrigin($separatorX, $contentY);
+        $separator->setSize(2, $contentHeight);
+        $separator->setColor(0x000000);
+        $separator->setRenderable(false);
+        $separator->setBorderRadius(0);
+        $separator->addAttributes('z_index', 20050);
+        $contentViewport->addChild($separator);
+        $this->drawItems[] = $separator;
     }
 }
