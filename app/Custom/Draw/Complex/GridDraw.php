@@ -25,6 +25,8 @@ class GridDraw
     private int $currentScrollRow = 0;
     private array $scrollUids = [];
     private string $scrollInitJs = '';
+    private array $elementValues = [];
+    private array $allElementUids = [];
 
     public function __construct(string $uid)
     {
@@ -51,6 +53,11 @@ class GridDraw
     public function setElements(array $elements): void
     {
         $this->elements = $elements;
+    }
+
+    public function setElementValues(array $values): void
+    {
+        $this->elementValues = $values;
     }
 
     public function generateElements(int $count, string $uidPrefix): void
@@ -140,7 +147,10 @@ class GridDraw
 
         // Position elements in grid
         $elementUids = [];
-        foreach ($this->elements as $index => $element) {
+        $this->allElementUids = [];
+        $totalElements = count($this->elements);
+        for ($index = 0; $index < $totalElements; $index++) {
+            $element = $this->elements[$index];
             if ($element instanceof BasicDraw) {
                 $row = (int) floor($index / $elementsPerRow);
                 $col = $index % $elementsPerRow;
@@ -150,11 +160,32 @@ class GridDraw
 
                 $element->setOrigin($elementX, $elementY);
                 $element->setSize($elementWidth, $elementHeight);
-                $element->setRenderable($this->renderable); // Controlled by parent
+                $element->setRenderable($this->renderable);
                 $element->addAttributes('z_index', $this->baseZIndex + 1);
-                $element->addAttributes('grid_uid', $uid); // Add grid_uid for identification
+                $element->addAttributes('grid_uid', $uid);
                 $this->drawItems[] = $element;
                 $elementUids[] = $element->getUid();
+                $this->allElementUids[] = $element->getUid();
+
+                // Draw value text centered in the square
+                if (isset($this->elementValues[$index])) {
+                    $text = new Text($uid . '_text_' . $index);
+                    $text->setCenterAnchor(true);
+                    $text->setOrigin(
+                        (int)($elementX + $elementWidth / 2),
+                        (int)($elementY + $elementHeight / 2)
+                    );
+                    $text->setText((string)$this->elementValues[$index]);
+                    $text->setColor(0x000000);
+                    $text->setFontSize(max(10, (int)($elementWidth / 4)));
+                    $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+                    $text->setRenderable($this->renderable);
+                    $text->addAttributes('z_index', $this->baseZIndex + 2);
+                    $text->addAttributes('grid_uid', $uid);
+                    $this->drawItems[] = $text;
+                    $elementUids[] = $text->getUid();
+                    $this->allElementUids[] = $text->getUid();
+                }
             }
         }
 
@@ -277,13 +308,7 @@ class GridDraw
 
     public function getElementUids(): array
     {
-        $uids = [];
-        foreach ($this->elements as $element) {
-            if ($element instanceof BasicDraw) {
-                $uids[] = $element->getUid();
-            }
-        }
-        return $uids;
+        return $this->allElementUids;
     }
 
     public function getScrollUids(): array
