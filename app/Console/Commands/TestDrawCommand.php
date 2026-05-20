@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Custom\Draw\Complex\EntityAssemblerDraw;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
@@ -58,6 +59,16 @@ class TestDrawCommand extends Command
 
         $objectDraw = new ObjectDraw($square->buildJson(), $sessionId);
         $drawItems[] = $objectDraw->get();
+
+        // Disegna EntityAssemblerDraw
+        $entityAssembler = new EntityAssemblerDraw('entity_assembler');
+        $entityAssembler->setOrigin(100, 250);
+        $entityAssembler->build();
+
+        foreach ($entityAssembler->getDrawItems() as $item) {
+            $objectDraw = new ObjectDraw($item->buildJson(), $sessionId);
+            $drawItems[] = $objectDraw->get();
+        }
 
         ObjectCache::flush($sessionId);
 
