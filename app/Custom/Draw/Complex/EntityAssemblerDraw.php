@@ -213,7 +213,7 @@ class EntityAssemblerDraw
         $this->drawItems[] = $closeButton;
         $this->drawItems[] = $closeText;
 
-        // Content area divided into two parts (4/6 grid)
+        // Content area divided into two parts (6/4 grid)
         $contentPadding = 0;
         $contentX = $modalX + $contentPadding;
         $contentY = $modalY + $headerHeight + $contentPadding;
@@ -233,14 +233,48 @@ class EntityAssemblerDraw
             $modalUid . '_border_top',
             $modalUid . '_border_bottom',
             $modalUid . '_border_left',
-            $modalUid . '_border_right'
+            $modalUid . '_border_right',
+            $modalUid . '_tabs_tab_tab_corpo',
+            $modalUid . '_tabs_tab_text_tab_corpo',
+            $modalUid . '_tabs_tab_tab_componenti',
+            $modalUid . '_tabs_tab_text_tab_componenti',
+            $modalUid . '_tabs_container_bg',
+            $modalUid . '_tab_container_corpo',
+            $modalUid . '_tab_text_corpo',
+            $modalUid . '_tab_container_componenti',
+            $modalUid . '_tab_text_componenti',
+            $modalUid . '_tabs_tab_border_top_tab_corpo',
+            $modalUid . '_tabs_tab_border_bottom_tab_corpo',
+            $modalUid . '_tabs_tab_border_left_tab_corpo',
+            $modalUid . '_tabs_tab_border_right_tab_corpo',
+            $modalUid . '_tabs_tab_border_top_tab_componenti',
+            $modalUid . '_tabs_tab_border_bottom_tab_componenti',
+            $modalUid . '_tabs_tab_border_left_tab_componenti',
+            $modalUid . '_tabs_tab_border_right_tab_componenti'
         ]);
         $contentViewport->addAttributes('scroll_initial_renderables', [
             $modalUid . '_separator_1' => true,
             $modalUid . '_border_top' => true,
             $modalUid . '_border_bottom' => true,
             $modalUid . '_border_left' => true,
-            $modalUid . '_border_right' => true
+            $modalUid . '_border_right' => true,
+            $modalUid . '_tabs_tab_tab_corpo' => true,
+            $modalUid . '_tabs_tab_text_tab_corpo' => true,
+            $modalUid . '_tabs_tab_tab_componenti' => true,
+            $modalUid . '_tabs_tab_text_tab_componenti' => true,
+            $modalUid . '_tabs_container_bg' => true,
+            $modalUid . '_tab_container_corpo' => true,
+            $modalUid . '_tab_text_corpo' => true,
+            $modalUid . '_tab_container_componenti' => false,
+            $modalUid . '_tab_text_componenti' => false,
+            $modalUid . '_tabs_tab_border_top_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_bottom_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_left_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_right_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_top_tab_componenti' => false,
+            $modalUid . '_tabs_tab_border_bottom_tab_componenti' => false,
+            $modalUid . '_tabs_tab_border_left_tab_componenti' => false,
+            $modalUid . '_tabs_tab_border_right_tab_componenti' => false
         ]);
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
@@ -257,5 +291,58 @@ class EntityAssemblerDraw
         $separator->addAttributes('z_index', 20050);
         $contentViewport->addChild($separator);
         $this->drawItems[] = $separator;
+
+        // Right side (40%) - TabDraw with 'Corpo' (primary) and 'Componenti' tabs
+        $rightWidth = $contentWidth - $leftWidth;
+        $rightX = $contentX + $leftWidth;
+
+        // Create containers for tabs
+        $corpoContainer = new Rectangle($modalUid . '_tab_container_corpo');
+        $corpoContainer->setOrigin($rightX, $contentY + 40);
+        $corpoContainer->setSize($rightWidth, $contentHeight - 40);
+        $corpoContainer->setColor(0xF4A460); // Giallo sabbia (sand yellow)
+        $corpoContainer->setRenderable(false);
+        $corpoContainer->addAttributes('z_index', 20060);
+
+        $corpoText = new Text($modalUid . '_tab_text_corpo');
+        $corpoText->setOrigin($rightX + 10, $contentY + 50);
+        $corpoText->setText('Contenuto Corpo');
+        $corpoText->setColor(0x000000);
+        $corpoText->setFontSize(16);
+        $corpoText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $corpoText->setRenderable(false);
+        $corpoText->addAttributes('z_index', 20061);
+
+        $componentiContainer = new Rectangle($modalUid . '_tab_container_componenti');
+        $componentiContainer->setOrigin($rightX, $contentY + 40);
+        $componentiContainer->setSize($rightWidth, $contentHeight - 40);
+        $componentiContainer->setColor(0x87CEEB); // Celeste (sky blue)
+        $componentiContainer->setRenderable(false);
+        $componentiContainer->addAttributes('z_index', 20062);
+
+        $componentiText = new Text($modalUid . '_tab_text_componenti');
+        $componentiText->setOrigin($rightX + 10, $contentY + 50);
+        $componentiText->setText('Contenuto Componenti');
+        $componentiText->setColor(0x000000);
+        $componentiText->setFontSize(16);
+        $componentiText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $componentiText->setRenderable(false);
+        $componentiText->addAttributes('z_index', 20063);
+
+        // Create TabDraw
+        $tabDraw = new TabDraw($modalUid . '_tabs');
+        $tabDraw->setOrigin($rightX, $contentY);
+        $tabDraw->setSize($rightWidth, $contentHeight);
+        $tabDraw->setRenderable(false);
+        $tabDraw->setBaseZIndex(20070);
+        $tabDraw->addTab('Corpo', 'tab_corpo', [$corpoContainer, $corpoText]);
+        $tabDraw->addTab('Componenti', 'tab_componenti', [$componentiContainer, $componentiText]);
+        $tabDraw->setPrimaryTab('tab_corpo');
+        $tabDraw->build();
+
+        // Add tab draw items
+        foreach ($tabDraw->getDrawItems() as $item) {
+            $this->drawItems[] = $item;
+        }
     }
 }
