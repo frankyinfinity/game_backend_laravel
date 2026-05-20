@@ -260,8 +260,7 @@ class EntityAssemblerDraw
         $gridDraw->setBaseZIndex(20060);
         $gridDraw->setElementsPerRow(3);
         $gridDraw->setElementSpacing(2);
-        $gridDraw->generateElements(100, $modalUid . '_grid');
-        $gridDraw->setElementValues(range(1, 100));
+        $gridDraw->setElementValues(range(1, 150));
         $gridDraw->build();
         $gridElementUids = $gridDraw->getElementUids();
         $gridScrollUids = $gridDraw->getScrollUids();

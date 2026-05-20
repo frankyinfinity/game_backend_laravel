@@ -60,18 +60,6 @@ class GridDraw
         $this->elementValues = $values;
     }
 
-    public function generateElements(int $count, string $uidPrefix): void
-    {
-        $this->elements = [];
-        for ($i = 0; $i < $count; $i++) {
-            $element = new Rectangle($uidPrefix . '_element_' . $i);
-            $element->setColor(0xFFFFFF); // White background
-            $element->setBorderColor(0x000000);
-            $element->setThickness(2);
-            $this->elements[] = $element;
-        }
-    }
-
     public function setElementSpacing(int $spacing): void
     {
         $this->elementSpacing = $spacing;
@@ -105,7 +93,7 @@ class GridDraw
         $elementHeight = $elementWidth; // Square elements
 
         // Calculate total rows and content height
-        $totalElements = count($this->elements);
+        $totalElements = count($this->elementValues);
         $rows = (int) ceil($totalElements / $elementsPerRow);
         $totalContentHeight = ($rows * $elementHeight) + (($rows - 1) * $elementSpacing);
 
@@ -148,45 +136,45 @@ class GridDraw
         // Position elements in grid
         $elementUids = [];
         $this->allElementUids = [];
-        $totalElements = count($this->elements);
-        for ($index = 0; $index < $totalElements; $index++) {
-            $element = $this->elements[$index];
-            if ($element instanceof BasicDraw) {
-                $row = (int) floor($index / $elementsPerRow);
-                $col = $index % $elementsPerRow;
+        
+        foreach ($this->elementValues as $index => $value) {
+            $row = (int) floor($index / $elementsPerRow);
+            $col = $index % $elementsPerRow;
 
-                $elementX = $x + ($col * ($elementWidth + $elementSpacing));
-                $elementY = $y + ($row * ($elementHeight + $elementSpacing));
+            $elementX = $x + ($col * ($elementWidth + $elementSpacing));
+            $elementY = $y + ($row * ($elementHeight + $elementSpacing));
 
-                $element->setOrigin($elementX, $elementY);
-                $element->setSize($elementWidth, $elementHeight);
-                $element->setRenderable($this->renderable);
-                $element->addAttributes('z_index', $this->baseZIndex + 1);
-                $element->addAttributes('grid_uid', $uid);
-                $this->drawItems[] = $element;
-                $elementUids[] = $element->getUid();
-                $this->allElementUids[] = $element->getUid();
+            // Create rectangle
+            $rect = new Rectangle($uid . '_element_' . $index);
+            $rect->setOrigin($elementX, $elementY);
+            $rect->setSize($elementWidth, $elementHeight);
+            $rect->setColor(0xFFFFFF);
+            $rect->setBorderColor(0x000000);
+            $rect->setThickness(2);
+            $rect->setRenderable($this->renderable);
+            $rect->addAttributes('z_index', $this->baseZIndex + 1);
+            $rect->addAttributes('grid_uid', $uid);
+            $this->drawItems[] = $rect;
+            $elementUids[] = $rect->getUid();
+            $this->allElementUids[] = $rect->getUid();
 
-                // Draw value text centered in the square
-                if (isset($this->elementValues[$index])) {
-                    $text = new Text($uid . '_text_' . $index);
-                    $text->setCenterAnchor(true);
-                    $text->setOrigin(
-                        (int)($elementX + $elementWidth / 2),
-                        (int)($elementY + $elementHeight / 2)
-                    );
-                    $text->setText((string)$this->elementValues[$index]);
-                    $text->setColor(0x000000);
-                    $text->setFontSize(max(10, (int)($elementWidth / 4)));
-                    $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
-                    $text->setRenderable($this->renderable);
-                    $text->addAttributes('z_index', $this->baseZIndex + 2);
-                    $text->addAttributes('grid_uid', $uid);
-                    $this->drawItems[] = $text;
-                    $elementUids[] = $text->getUid();
-                    $this->allElementUids[] = $text->getUid();
-                }
-            }
+            // Create text centered
+            $text = new Text($uid . '_text_' . $index);
+            $text->setCenterAnchor(true);
+            $text->setOrigin(
+                (int)($elementX + $elementWidth / 2),
+                (int)($elementY + $elementHeight / 2)
+            );
+            $text->setText((string)$value);
+            $text->setColor(0x000000);
+            $text->setFontSize(max(10, (int)($elementWidth / 4)));
+            $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+            $text->setRenderable($this->renderable);
+            $text->addAttributes('z_index', $this->baseZIndex + 2);
+            $text->addAttributes('grid_uid', $uid);
+            $this->drawItems[] = $text;
+            $elementUids[] = $text->getUid();
+            $this->allElementUids[] = $text->getUid();
         }
 
         // Build scrollbar
