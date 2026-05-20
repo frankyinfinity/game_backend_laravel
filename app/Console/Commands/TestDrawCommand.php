@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Complex\EntityAssemblerDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
@@ -49,15 +49,11 @@ class TestDrawCommand extends Command
 
         ObjectCache::clear($sessionId);
 
-        // Disegna un quadrato rosso
-        $square = new Square();
-        $square->setOrigin(100, 100);
-        $square->setSize(100);
-        $square->setColor(0xFF0000);
-        $square->setRenderable(true);
-
-        $objectDraw = new ObjectDraw($square->buildJson(), $sessionId);
-        $drawItems[] = $objectDraw->get();
+        // Use EntityAssemblerDraw
+        $entityAssembler = new EntityAssemblerDraw('assembler_button');
+        $entityAssembler->setBorderRadius(8);
+        $entityAssembler->build();
+        $drawItems = array_merge($drawItems, $entityAssembler->getDrawItemsWithObjectDraw($sessionId));
 
         ObjectCache::flush($sessionId);
 
