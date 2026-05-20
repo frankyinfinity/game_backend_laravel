@@ -38,4 +38,12 @@ class EntityBody extends Model
     {
         return $this->hasMany(EntityBodyZone::class);
     }
+
+    /**
+     * Get all of the body's anchors.
+     */
+    public function anchors()
+    {
+        return $this->morphMany(EntityAnchor::class, 'anchorable');
+    }
 }

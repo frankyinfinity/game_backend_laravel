@@ -139,13 +139,7 @@
                 @if($entityBody->state >= 2)
                     <!-- TAB ANCORE -->
                     <div class="tab-pane fade" id="tab-ancore" role="tabpanel" aria-labelledby="tab-ancore-link">
-                        <div class="card card-outline card-secondary shadow-sm text-center py-5">
-                            <div class="card-body">
-                                <i class="fas fa-anchor fa-3x text-muted mb-3"></i>
-                                <h5 class="font-weight-bold text-dark mb-2">Sezione Ancore</h5>
-                                <p class="text-muted">Questa sezione sarà adibita alla configurazione delle ancore dell'EntityBody.</p>
-                            </div>
-                        </div>
+                        @include('shared.anchors_editor', ['modelType' => 'entity_body', 'model' => $entityBody])
                     </div>
                 @endif
 

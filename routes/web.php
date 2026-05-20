@@ -257,4 +257,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('/neurons/{neuron}/border-uid', [App\Http\Controllers\NeuronController::class, 'getBorderUid'])->name('neurons.border-uid');
     Route::post('/neurons/broadcast-update', [App\Http\Controllers\NeuronController::class, 'broadcastNeuronUpdate'])->name('neurons.broadcast-update');
 
+    // Entity Anchors
+    Route::get('/entity-anchors', [App\Http\Controllers\EntityAnchorController::class, 'index'])->name('entity-anchors.index');
+    Route::post('/entity-anchors', [App\Http\Controllers\EntityAnchorController::class, 'store'])->name('entity-anchors.store');
+    Route::delete('/entity-anchors/{entityAnchor}', [App\Http\Controllers\EntityAnchorController::class, 'destroy'])->name('entity-anchors.destroy');
 });

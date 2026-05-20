@@ -72,4 +72,12 @@ class EntityComponent extends Model
     {
         return $this->belongsTo(EntityTypeComponent::class, 'entity_type_component_id');
     }
+
+    /**
+     * Get all of the component's anchors.
+     */
+    public function anchors()
+    {
+        return $this->morphMany(EntityAnchor::class, 'anchorable');
+    }
 }
