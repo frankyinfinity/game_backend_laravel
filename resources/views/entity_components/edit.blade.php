@@ -6,11 +6,24 @@
 
 @section('content')
 
-    @if($entityComponent->isFinishDraw())
-        <div class="alert alert-info shadow-sm mb-4" style="border-left: 4px solid #17a2b8 !important; background-color: #f3fafd; color: #117a8b;">
+    @if($entityComponent->isCompleted())
+        <div class="alert alert-success shadow-sm mb-4" style="border-left: 4px solid #28a745 !important; background-color: #f3fdf6; color: #155724;">
             <div>
-                <i class="fas fa-lock mr-2 text-info"></i> Questo componente è contrassegnato come <strong>Disegno Terminato</strong>. Tutte le modifiche e l'editor di grafica sono bloccati. La scheda Ancore è abilitata.
+                <i class="fas fa-check-double mr-2 text-success"></i> Questo componente è in stato <strong>Completato</strong>. Tutte le modifiche, la grafica e le ancore sono definitivamente bloccati.
             </div>
+        </div>
+    @elseif($entityComponent->isFinishDraw())
+        <div class="alert alert-info border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #17a2b8 !important; background-color: #f3fafd; color: #117a8b;">
+            <div>
+                <i class="fas fa-lock mr-2 text-info"></i> Questo componente è contrassegnato come <strong>Disegno Terminato</strong>. Tutte le modifiche e l'editor di grafica sono bloccati. Configura le ancore.
+            </div>
+            <form action="{{ route('entity-components.toggle-state', $entityComponent) }}" method="POST" class="m-0 js-confirm-complete">
+                @csrf
+                <input type="hidden" name="state" value="{{ \App\Models\EntityComponent::STATE_COMPLETED }}">
+                <button type="submit" class="btn btn-primary btn-sm shadow-sm" onclick="return confirm('Sei sicuro? Questo bloccherà definitivamente le ancore.');">
+                    <i class="fas fa-check-double"></i> Termina Ancore e Blocca
+                </button>
+            </form>
         </div>
     @else
         <div class="alert alert-light border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #ffc107 !important;">
@@ -24,7 +37,8 @@
             @else
                 <form action="{{ route('entity-components.toggle-state', $entityComponent) }}" method="POST" class="m-0 js-confirm-complete">
                     @csrf
-                    <button type="submit" class="btn btn-success btn-sm shadow-sm">
+                    <input type="hidden" name="state" value="{{ \App\Models\EntityComponent::STATE_FINISH_DRAW }}">
+                    <button type="submit" class="btn btn-success btn-sm shadow-sm" onclick="return confirm('Vuoi terminare il disegno e bloccarlo?');">
                         <i class="fas fa-check-circle"></i> Termina Disegno e Blocca
                     </button>
                 </form>
@@ -51,7 +65,7 @@
                     <li class="nav-item">
                         <a class="nav-link" id="tab-rules-link" data-toggle="pill" href="#tab-rules" role="tab" aria-controls="tab-rules" aria-selected="false">Elementi Chimici</a>
                     </li>
-                    @if($entityComponent->isFinishDraw())
+                    @if($entityComponent->isFinishDraw() || $entityComponent->isCompleted())
                     <li class="nav-item">
                         <a class="nav-link" id="tab-ancore-link" data-toggle="pill" href="#tab-ancore" role="tab" aria-controls="tab-ancore" aria-selected="false">Ancore</a>
                     </li>
@@ -171,10 +185,10 @@
                         </div>
                     </div>
 
-                    @if($entityComponent->isFinishDraw())
+                    @if($entityComponent->isFinishDraw() || $entityComponent->isCompleted())
                     <!-- TAB ANCORE -->
                     <div class="tab-pane fade" id="tab-ancore" role="tabpanel" aria-labelledby="tab-ancore-link">
-                        @include('shared.anchors_editor', ['modelType' => 'entity_component', 'model' => $entityComponent])
+                        @include('shared.anchors_editor', ['modelType' => 'entity_component', 'model' => $entityComponent, 'isLocked' => $entityComponent->isCompleted()])
                     </div>
                     @endif
                 </div>

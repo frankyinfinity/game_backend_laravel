@@ -9,6 +9,7 @@ class EntityBody extends Model
     const STATE_CREATED = 0;
     const STATE_FINISH_DRAW = 1;
     const STATE_FINISH_ZONE = 2;
+    const STATE_COMPLETED = 3;
 
     protected $fillable = [
         'name',
@@ -23,12 +24,17 @@ class EntityBody extends Model
 
     public function isFinishDraw()
     {
-        return $this->state === self::STATE_FINISH_DRAW;
+        return $this->state >= self::STATE_FINISH_DRAW;
     }
 
     public function isFinishZone()
     {
-        return $this->state === self::STATE_FINISH_ZONE;
+        return $this->state >= self::STATE_FINISH_ZONE;
+    }
+
+    public function isCompleted()
+    {
+        return $this->state === self::STATE_COMPLETED;
     }
 
     /**

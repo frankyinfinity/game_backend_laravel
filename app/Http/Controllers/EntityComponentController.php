@@ -37,8 +37,11 @@ class EntityComponentController extends Controller
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
             ->addColumn('state_display', function ($row) {
+                if ($row->isCompleted()) {
+                    return '<span class="badge badge-success"><i class="fas fa-check-double"></i> Completato</span>';
+                }
                 if ($row->isFinishDraw()) {
-                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Disegno Terminato</span>';
+                    return '<span class="badge badge-info"><i class="fas fa-lock"></i> Disegno Terminato</span>';
                 }
                 return '<span class="badge badge-warning"><i class="fas fa-edit"></i> Creato</span>';
             })
@@ -145,17 +148,25 @@ class EntityComponentController extends Controller
      */
     public function toggleState(Request $request, EntityComponent $entityComponent)
     {
-        if ($entityComponent->isCreated()) {
+        $targetState = $request->input('state');
+
+        if ($targetState == EntityComponent::STATE_FINISH_DRAW && $entityComponent->isCreated()) {
             // Can only finish draw if image is generated
             if (!$entityComponent->image || !\Storage::disk('entity_components')->exists($entityComponent->image)) {
                 return redirect()->back()->with('error', 'Non è possibile impostare lo stato su "Disegno Terminato" senza prima aver generato la grafica del componente.');
             }
             $entityComponent->state = EntityComponent::STATE_FINISH_DRAW;
             $entityComponent->save();
-            return redirect()->back()->with('success', 'Componente completato e bloccato.');
+            return redirect()->back()->with('success', 'Grafica del componente bloccata.');
         }
 
-        return redirect()->back()->with('error', 'Non è possibile riaprire un componente con disegno terminato.');
+        if ($targetState == EntityComponent::STATE_COMPLETED && $entityComponent->isFinishDraw()) {
+            $entityComponent->state = EntityComponent::STATE_COMPLETED;
+            $entityComponent->save();
+            return redirect()->back()->with('success', 'Componente completato e bloccato definitivamente.');
+        }
+
+        return redirect()->back()->with('error', 'Operazione di stato non valida.');
     }
 
     /**

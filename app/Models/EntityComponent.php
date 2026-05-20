@@ -9,6 +9,7 @@ class EntityComponent extends Model
     // State Constants
     const STATE_CREATED = 0;
     const STATE_FINISH_DRAW = 1;
+    const STATE_COMPLETED = 2;
 
     protected $fillable = [
         'name',
@@ -31,11 +32,19 @@ class EntityComponent extends Model
     }
 
     /**
-     * Check if the component is in finished state.
+     * Check if the component is in finished draw state.
      */
     public function isFinishDraw(): bool
     {
-        return $this->state === self::STATE_FINISH_DRAW;
+        return $this->state >= self::STATE_FINISH_DRAW;
+    }
+
+    /**
+     * Check if the component is in completed state.
+     */
+    public function isCompleted(): bool
+    {
+        return $this->state === self::STATE_COMPLETED;
     }
 
     /**
@@ -46,6 +55,7 @@ class EntityComponent extends Model
         return [
             self::STATE_CREATED => 'Creato',
             self::STATE_FINISH_DRAW => 'Disegno Terminato',
+            self::STATE_COMPLETED => 'Completato',
         ];
     }
 

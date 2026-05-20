@@ -32,8 +32,10 @@ class EntityBodyController extends Controller
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
             ->addColumn('state_display', function ($row) {
-                if ($row->state == 2) {
-                    return '<span class="badge badge-success"><i class="fas fa-lock"></i> Zone Terminate</span>';
+                if ($row->isCompleted()) {
+                    return '<span class="badge badge-success"><i class="fas fa-check-double"></i> Completato</span>';
+                } elseif ($row->state == 2) {
+                    return '<span class="badge badge-info"><i class="fas fa-lock"></i> Zone Terminate</span>';
                 } elseif ($row->state == 1) {
                     return '<span class="badge badge-info"><i class="fas fa-pencil-ruler"></i> Disegno Terminato</span>';
                 }
@@ -199,6 +201,16 @@ class EntityBodyController extends Controller
         if ($state === EntityBody::STATE_FINISH_ZONE) {
             if ($entityBody->zones()->count() === 0) {
                 $msg = 'Crea almeno una zona prima di poter impostare lo stato su Zone Terminate.';
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return redirect()->back()->with('error', $msg);
+            }
+        }
+
+        if ($state === EntityBody::STATE_COMPLETED) {
+            if ($entityBody->state !== EntityBody::STATE_FINISH_ZONE) {
+                $msg = 'Impossibile completare il corpo: stato precedente non valido.';
                 if ($request->ajax()) {
                     return response()->json(['success' => false, 'message' => $msg], 422);
                 }

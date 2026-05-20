@@ -6,11 +6,25 @@
 
 @section('content')
 
-    @if($entityBody->state == \App\Models\EntityBody::STATE_FINISH_ZONE)
-        <div class="alert alert-success shadow-sm mb-4" style="border-left: 4px solid #28a745 !important; background-color: #f4faf6; color: #1e7e34;">
+    @if($entityBody->isCompleted())
+        <div class="alert alert-success shadow-sm mb-4" style="border-left: 4px solid #28a745 !important; background-color: #f3fdf6; color: #155724;">
             <div>
-                <i class="fas fa-lock mr-2 text-success"></i> Questo corpo è in stato <strong>Zone Terminate</strong>. La grafica e le zone sono bloccate. La scheda Ancore è abilitata.
+                <i class="fas fa-check-double mr-2 text-success"></i> Questo corpo è in stato <strong>Completato</strong>. Tutte le modifiche, la grafica, le zone e le ancore sono definitivamente bloccate.
             </div>
+        </div>
+    @elseif($entityBody->state == \App\Models\EntityBody::STATE_FINISH_ZONE)
+        <div class="alert alert-info border shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #17a2b8 !important; background-color: #f3fafd; color: #117a8b;">
+            <div>
+                <i class="fas fa-lock mr-2 text-info"></i> Questo corpo è in stato <strong>Zone Terminate</strong>. La grafica e le zone sono bloccate. Configura le ancore.
+            </div>
+            <form action="{{ route('entity-bodies.toggle-state') }}" method="POST" class="m-0 js-confirm-complete">
+                @csrf
+                <input type="hidden" name="id" value="{{ $entityBody->id }}">
+                <input type="hidden" name="state" value="{{ \App\Models\EntityBody::STATE_COMPLETED }}">
+                <button type="submit" class="btn btn-primary btn-sm shadow-sm" onclick="return confirm('Sei sicuro? Questo bloccherà definitivamente le ancore.');">
+                    <i class="fas fa-check-double"></i> Termina Ancore e Blocca
+                </button>
+            </form>
         </div>
     @elseif($entityBody->state == \App\Models\EntityBody::STATE_FINISH_DRAW)
         <div class="alert alert-info shadow-sm d-flex align-items-center justify-content-between mb-4" style="border-left: 4px solid #17a2b8 !important; background-color: #f3fafd; color: #117a8b;">
@@ -139,7 +153,7 @@
                 @if($entityBody->state >= 2)
                     <!-- TAB ANCORE -->
                     <div class="tab-pane fade" id="tab-ancore" role="tabpanel" aria-labelledby="tab-ancore-link">
-                        @include('shared.anchors_editor', ['modelType' => 'entity_body', 'model' => $entityBody])
+                        @include('shared.anchors_editor', ['modelType' => 'entity_body', 'model' => $entityBody, 'isLocked' => $entityBody->isCompleted()])
                     </div>
                 @endif
 

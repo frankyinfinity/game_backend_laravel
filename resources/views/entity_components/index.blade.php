@@ -121,12 +121,20 @@
                                     toggleBtn = '<form action="{{ route('entity-components.toggle-state', ['_id_']) }}" method="POST" style="display:inline-block;" class="state-form js-confirm-complete mr-1">' +
                                         '@csrf' +
                                         '<input type="hidden" name="id" value="' + data + '">' +
+                                        '<input type="hidden" name="state" value="1">' +
                                         '<button type="submit" class="btn btn-success btn-sm" data-toggle="tooltip" title="Termina Disegno e Blocca"><i class="fas fa-check-circle"></i></button>' +
                                         '</form>';
                                 }
+                            } else if (row.state == 1) {
+                                toggleBtn = '<form action="{{ route('entity-components.toggle-state', ['_id_']) }}" method="POST" style="display:inline-block;" class="state-form js-confirm-complete-ancore mr-1">' +
+                                    '@csrf' +
+                                    '<input type="hidden" name="id" value="' + data + '">' +
+                                    '<input type="hidden" name="state" value="2">' +
+                                    '<button type="submit" class="btn btn-primary btn-sm" data-toggle="tooltip" title="Termina Ancore e Blocca"><i class="fas fa-check-double"></i></button>' +
+                                    '</form>';
                             }
                             // Replace template with row ID
-                            toggleBtn = toggleBtn.replace('_id_', data);
+                            toggleBtn = toggleBtn.replace(/_id_/g, data);
 
                             return '<div class="d-flex align-items-center">' + editBtn + toggleBtn + '</div>';
                         },
@@ -146,6 +154,12 @@
 
             $(document).on('submit', '.js-confirm-complete', function(e) {
                 if (!confirm("Sei sicuro di voler terminare il disegno e bloccare questo componente? Questa azione è irreversibile.")) {
+                    e.preventDefault();
+                }
+            });
+
+            $(document).on('submit', '.js-confirm-complete-ancore', function(e) {
+                if (!confirm("Sei sicuro? Questo bloccherà definitivamente le ancore.")) {
                     e.preventDefault();
                 }
             });

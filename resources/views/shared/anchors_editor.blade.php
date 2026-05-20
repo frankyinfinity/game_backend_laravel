@@ -2,9 +2,15 @@
     $storageDir = \Illuminate\Support\Str::plural($modelType);
     $imagePath = 'storage/' . $storageDir . '/' . $model->image;
     $imageUrl = $model->image && \Storage::disk($storageDir)->exists($model->image) ? asset($imagePath) : null;
+    $locked = $isLocked ?? false;
 @endphp
 
 <div id="anchors-editor-component-{{ $modelType }}">
+    @if($locked)
+    <div class="alert alert-warning shadow-sm mb-3" style="border-left: 4px solid #ffc107 !important;">
+        <i class="fas fa-lock mr-2 text-warning"></i> Le ancore sono in <strong>sola visualizzazione</strong> poiché la configurazione è stata completata e bloccata.
+    </div>
+    @endif
     <div class="row">
         <!-- Canvas Editor Area -->
         <div class="col-lg-7 col-12">
@@ -26,7 +32,7 @@
                         <!-- Canvas trasparente in overlay -->
                         <canvas id="anchors-canvas-{{ $modelType }}" 
                                 width="512" height="512" 
-                                style="position:absolute; top:0; left:0; cursor:crosshair;"></canvas>
+                                style="position:absolute; top:0; left:0; cursor:{{ $locked ? 'not-allowed' : 'crosshair' }};"></canvas>
                     </div>
                     @else
                     <div class="alert alert-warning text-center w-100 m-3">
@@ -60,7 +66,9 @@
                                 <thead class="bg-light text-dark sticky-top">
                                     <tr>
                                         <th>Posizione (X, Y)</th>
+                                        @if(!$locked)
                                         <th style="width: 100px;" class="text-center">Azioni</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody id="anchors-tbody-{{ $modelType }}">
@@ -100,6 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Variabili di stato
     let anchorsList = [];
     let hoveredCell = null;
+    const isLocked = {{ $locked ? 'true' : 'false' }};
     
     // CSRF Token
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -147,18 +156,22 @@ document.addEventListener('DOMContentLoaded', function() {
             tdPos.className = 'align-middle font-weight-bold';
             tdPos.innerHTML = `<span class="badge badge-light border px-2 py-1"><i class="fas fa-crosshairs text-secondary mr-1"></i> X: ${anchor.x}, Y: ${anchor.y}</span>`;
             
-            // Colonna Azioni
-            const tdActions = document.createElement('td');
-            tdActions.className = 'text-center align-middle';
-            const btnDel = document.createElement('button');
-            btnDel.className = 'btn btn-xs btn-danger shadow-sm';
-            btnDel.innerHTML = '<i class="fas fa-trash"></i> Elimina';
-            btnDel.type = 'button';
-            btnDel.onclick = function() { deleteAnchor(anchor.id); };
-            
-            tdActions.appendChild(btnDel);
             tr.appendChild(tdPos);
-            tr.appendChild(tdActions);
+
+            if (!isLocked) {
+                // Colonna Azioni
+                const tdActions = document.createElement('td');
+                tdActions.className = 'text-center align-middle';
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn btn-xs btn-danger shadow-sm';
+                btnDel.innerHTML = '<i class="fas fa-trash"></i> Elimina';
+                btnDel.type = 'button';
+                btnDel.onclick = function() { deleteAnchor(anchor.id); };
+                
+                tdActions.appendChild(btnDel);
+                tr.appendChild(tdActions);
+            }
+            
             tbody.appendChild(tr);
         });
     }
@@ -281,6 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event Listeners Canvas
     canvas.addEventListener('mousemove', function(e) {
+        if (isLocked) return;
         const coords = getCellCoords(e);
         
         // Evita redraw inutili se non si cambia cella
@@ -291,11 +305,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     canvas.addEventListener('mouseout', function() {
+        if (isLocked) return;
         hoveredCell = null;
         drawCanvas();
     });
     
     canvas.addEventListener('click', function(e) {
+        if (isLocked) return;
         const coords = getCellCoords(e);
         
         // Controlla se esiste già un'ancora in questa cella
