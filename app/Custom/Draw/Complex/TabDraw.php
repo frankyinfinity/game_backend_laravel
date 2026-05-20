@@ -124,7 +124,7 @@ class TabDraw
             $borderTop->setOrigin($tabX, $tabY);
             $borderTop->setSize($tabWidth, $borderThickness);
             $borderTop->setColor(0x000000);
-            $borderTop->setRenderable($isActive);
+            $borderTop->setRenderable(false); // Always start hidden
             $borderTop->addAttributes('z_index', $this->baseZIndex + $index + 101);
             $this->drawItems[] = $borderTop;
 
@@ -133,7 +133,7 @@ class TabDraw
             $borderBottom->setOrigin($tabX, $tabY + $tabHeight - $borderThickness);
             $borderBottom->setSize($tabWidth, $borderThickness);
             $borderBottom->setColor(0x000000);
-            $borderBottom->setRenderable($isActive);
+            $borderBottom->setRenderable(false); // Always start hidden
             $borderBottom->addAttributes('z_index', $this->baseZIndex + $index + 101);
             $this->drawItems[] = $borderBottom;
 
@@ -142,7 +142,7 @@ class TabDraw
             $borderLeft->setOrigin($tabX, $tabY);
             $borderLeft->setSize($borderThickness, $tabHeight);
             $borderLeft->setColor(0x000000);
-            $borderLeft->setRenderable($isActive);
+            $borderLeft->setRenderable(false); // Always start hidden
             $borderLeft->addAttributes('z_index', $this->baseZIndex + $index + 101);
             $this->drawItems[] = $borderLeft;
 
@@ -151,7 +151,7 @@ class TabDraw
             $borderRight->setOrigin($tabX + $tabWidth - $borderThickness, $tabY);
             $borderRight->setSize($borderThickness, $tabHeight);
             $borderRight->setColor(0x000000);
-            $borderRight->setRenderable($isActive);
+            $borderRight->setRenderable(false); // Always start hidden
             $borderRight->addAttributes('z_index', $this->baseZIndex + $index + 101);
             $this->drawItems[] = $borderRight;
 
@@ -254,44 +254,6 @@ class TabDraw
     });
 })();";
         return Helper::setCommonJsCode($script, Str::random(20));
-    }
-
-    private function generateInitScript(): string
-    {
-        $primaryTabUid = $this->primaryTab;
-        $primaryTextUid = isset($this->tabs[$primaryTabUid]['content_text_uid']) ? $this->tabs[$primaryTabUid]['content_text_uid'] : '';
-        $primaryContainerUid = isset($this->tabs[$primaryTabUid]['container_uid']) ? $this->tabs[$primaryTabUid]['container_uid'] : '';
-        $script = "const primaryTabUid = '{$primaryTabUid}';
-const primaryTextUid = '{$primaryTextUid}';
-const primaryContainerUid = '{$primaryContainerUid}';
-const tabShapeUid = '{$this->uid}_tab_' + primaryTabUid;
-
-// Set primary tab border
-if (shapes[tabShapeUid]) {
-    shapes[tabShapeUid].borderColor = 0x000000;
-    shapes[tabShapeUid].thickness = 2;
-}
-if (objects[tabShapeUid]) {
-    objects[tabShapeUid].borderColor = 0x000000;
-    objects[tabShapeUid].thickness = 2;
-}
-
-// Show primary tab text
-if (primaryTextUid && shapes[primaryTextUid]) {
-    shapes[primaryTextUid].renderable = true;
-}
-if (primaryTextUid && objects[primaryTextUid] && objects[primaryTextUid].attributes) {
-    objects[primaryTextUid].attributes.renderable = true;
-}
-
-// Show primary container
-if (primaryContainerUid && shapes[primaryContainerUid]) {
-    shapes[primaryContainerUid].renderable = true;
-}
-if (primaryContainerUid && objects[primaryContainerUid] && objects[primaryContainerUid].attributes) {
-    objects[primaryContainerUid].attributes.renderable = true;
-}";
-        return $script;
     }
 
     private function getElementUidsArray(string $tabUid): string

@@ -2,6 +2,9 @@
 
 namespace App\Custom\Draw\Complex;
 
+use App\Custom\Draw\Complex\GridDraw;
+use App\Custom\Draw\Complex\TabDraw;
+
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
@@ -239,8 +242,8 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_tab_componenti',
             $modalUid . '_tabs_tab_text_tab_componenti',
             $modalUid . '_tabs_container_bg',
-            $modalUid . '_tab_container_corpo',
-            $modalUid . '_tab_text_corpo',
+            $modalUid . '_grid_corpo_viewport',
+            $modalUid . '_grid_corpo_content',
             $modalUid . '_tab_container_componenti',
             $modalUid . '_tab_text_componenti',
             $modalUid . '_tabs_tab_border_top_tab_corpo',
@@ -263,8 +266,8 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_tab_componenti' => true,
             $modalUid . '_tabs_tab_text_tab_componenti' => true,
             $modalUid . '_tabs_container_bg' => true,
-            $modalUid . '_tab_container_corpo' => true,
-            $modalUid . '_tab_text_corpo' => true,
+            $modalUid . '_grid_corpo_viewport' => true,
+            $modalUid . '_grid_corpo_content' => true,
             $modalUid . '_tab_container_componenti' => false,
             $modalUid . '_tab_text_componenti' => false,
             $modalUid . '_tabs_tab_border_top_tab_corpo' => true,
@@ -297,22 +300,6 @@ class EntityAssemblerDraw
         $rightX = $contentX + $leftWidth;
 
         // Create containers for tabs
-        $corpoContainer = new Rectangle($modalUid . '_tab_container_corpo');
-        $corpoContainer->setOrigin($rightX, $contentY + 40);
-        $corpoContainer->setSize($rightWidth, $contentHeight - 40);
-        $corpoContainer->setColor(0xF4A460); // Giallo sabbia (sand yellow)
-        $corpoContainer->setRenderable(false);
-        $corpoContainer->addAttributes('z_index', 20060);
-
-        $corpoText = new Text($modalUid . '_tab_text_corpo');
-        $corpoText->setOrigin($rightX + 10, $contentY + 50);
-        $corpoText->setText('Contenuto Corpo');
-        $corpoText->setColor(0x000000);
-        $corpoText->setFontSize(16);
-        $corpoText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
-        $corpoText->setRenderable(false);
-        $corpoText->addAttributes('z_index', 20061);
-
         $componentiContainer = new Rectangle($modalUid . '_tab_container_componenti');
         $componentiContainer->setOrigin($rightX, $contentY + 40);
         $componentiContainer->setSize($rightWidth, $contentHeight - 40);
@@ -329,13 +316,24 @@ class EntityAssemblerDraw
         $componentiText->setRenderable(false);
         $componentiText->addAttributes('z_index', 20063);
 
+        // Create GridDraw for tab_corpo with 100 elements
+        $gridDraw = new GridDraw($modalUid . '_grid_corpo');
+        $gridDraw->setOrigin($rightX, $contentY + 40);
+        $gridDraw->setSize($rightWidth, $contentHeight - 40);
+        $gridDraw->setRenderable(false);
+        $gridDraw->setBaseZIndex(20060);
+        $gridDraw->setElementsPerRow(3);
+        $gridDraw->setElementSpacing(5);
+        $gridDraw->generateElements(100, $modalUid . '_grid');
+        $gridDraw->build();
+
         // Create TabDraw
         $tabDraw = new TabDraw($modalUid . '_tabs');
         $tabDraw->setOrigin($rightX, $contentY);
         $tabDraw->setSize($rightWidth, $contentHeight);
         $tabDraw->setRenderable(false);
         $tabDraw->setBaseZIndex(20070);
-        $tabDraw->addTab('Corpo', 'tab_corpo', [$corpoContainer, $corpoText]);
+        $tabDraw->addTab('Corpo', 'tab_corpo', $gridDraw->getDrawItems());
         $tabDraw->addTab('Componenti', 'tab_componenti', [$componentiContainer, $componentiText]);
         $tabDraw->setPrimaryTab('tab_corpo');
         $tabDraw->build();
