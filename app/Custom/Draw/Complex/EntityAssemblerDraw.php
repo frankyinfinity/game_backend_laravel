@@ -223,77 +223,9 @@ class EntityAssemblerDraw
         $contentWidth = $modalWidth - ($contentPadding * 2);
         $contentHeight = $modalHeight - $headerHeight - ($contentPadding * 2);
 
-        // Main content viewport (gray container)
-        $contentViewport = new Rectangle($modalUid . '_content_viewport');
-        $contentViewport->setOrigin($contentX, $contentY);
-        $contentViewport->setSize($contentWidth, $contentHeight);
-        $contentViewport->setColor(0xD0D0D0);
-        $contentViewport->setRenderable(false);
-        $contentViewport->setBorderRadius(0);
-        $contentViewport->addAttributes('z_index', 20005);
-        $contentViewport->addAttributes('scroll_child_uids', [
-            $modalUid . '_separator_1',
-            $modalUid . '_border_top',
-            $modalUid . '_border_bottom',
-            $modalUid . '_border_left',
-            $modalUid . '_border_right',
-            $modalUid . '_tabs_tab_tab_corpo',
-            $modalUid . '_tabs_tab_text_tab_corpo',
-            $modalUid . '_tabs_tab_tab_componenti',
-            $modalUid . '_tabs_tab_text_tab_componenti',
-            $modalUid . '_tabs_container_bg',
-            $modalUid . '_grid_corpo_viewport',
-            $modalUid . '_grid_corpo_content',
-            $modalUid . '_tab_container_componenti',
-            $modalUid . '_tab_text_componenti',
-            $modalUid . '_tabs_tab_border_top_tab_corpo',
-            $modalUid . '_tabs_tab_border_bottom_tab_corpo',
-            $modalUid . '_tabs_tab_border_left_tab_corpo',
-            $modalUid . '_tabs_tab_border_right_tab_corpo',
-            $modalUid . '_tabs_tab_border_top_tab_componenti',
-            $modalUid . '_tabs_tab_border_bottom_tab_componenti',
-            $modalUid . '_tabs_tab_border_left_tab_componenti',
-            $modalUid . '_tabs_tab_border_right_tab_componenti'
-        ]);
-        $contentViewport->addAttributes('scroll_initial_renderables', [
-            $modalUid . '_separator_1' => true,
-            $modalUid . '_border_top' => true,
-            $modalUid . '_border_bottom' => true,
-            $modalUid . '_border_left' => true,
-            $modalUid . '_border_right' => true,
-            $modalUid . '_tabs_tab_tab_corpo' => true,
-            $modalUid . '_tabs_tab_text_tab_corpo' => true,
-            $modalUid . '_tabs_tab_tab_componenti' => true,
-            $modalUid . '_tabs_tab_text_tab_componenti' => true,
-            $modalUid . '_tabs_container_bg' => true,
-            $modalUid . '_grid_corpo_viewport' => true,
-            $modalUid . '_grid_corpo_content' => true,
-            $modalUid . '_tab_container_componenti' => false,
-            $modalUid . '_tab_text_componenti' => false,
-            $modalUid . '_tabs_tab_border_top_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_bottom_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_left_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_right_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_top_tab_componenti' => false,
-            $modalUid . '_tabs_tab_border_bottom_tab_componenti' => false,
-            $modalUid . '_tabs_tab_border_left_tab_componenti' => false,
-            $modalUid . '_tabs_tab_border_right_tab_componenti' => false
-        ]);
-        $body->addChild($contentViewport);
-        $this->drawItems[] = $contentViewport;
-
         // Vertical separator (thin rectangle) at 60% position
         $leftWidth = (int) ($contentWidth * 0.6);
         $separatorX = $contentX + $leftWidth - 1;
-        $separator = new Rectangle($modalUid . '_separator_1');
-        $separator->setOrigin($separatorX, $contentY);
-        $separator->setSize(2, $contentHeight);
-        $separator->setColor(0x000000);
-        $separator->setRenderable(false);
-        $separator->setBorderRadius(0);
-        $separator->addAttributes('z_index', 20050);
-        $contentViewport->addChild($separator);
-        $this->drawItems[] = $separator;
 
         // Right side (40%) - TabDraw with 'Corpo' (primary) and 'Componenti' tabs
         $rightWidth = $contentWidth - $leftWidth;
@@ -323,9 +255,82 @@ class EntityAssemblerDraw
         $gridDraw->setRenderable(false);
         $gridDraw->setBaseZIndex(20060);
         $gridDraw->setElementsPerRow(3);
-        $gridDraw->setElementSpacing(5);
+        $gridDraw->setElementSpacing(2);
         $gridDraw->generateElements(100, $modalUid . '_grid');
         $gridDraw->build();
+        $gridElementUids = $gridDraw->getElementUids();
+
+        // Main content viewport (gray container)
+        $contentViewport = new Rectangle($modalUid . '_content_viewport');
+        $contentViewport->setOrigin($contentX, $contentY);
+        $contentViewport->setSize($contentWidth, $contentHeight);
+        $contentViewport->setColor(0xD0D0D0);
+        $contentViewport->setRenderable(false);
+        $contentViewport->setBorderRadius(0);
+        $contentViewport->addAttributes('z_index', 20005);
+        $contentViewport->addAttributes('scroll_enabled', true);
+        $contentViewport->addAttributes('scroll_direction', 'vertical');
+        $contentViewport->addAttributes('scroll_child_uids', array_merge([
+            $modalUid . '_separator_1',
+            $modalUid . '_border_top',
+            $modalUid . '_border_bottom',
+            $modalUid . '_border_left',
+            $modalUid . '_border_right',
+            $modalUid . '_tabs_tab_tab_corpo',
+            $modalUid . '_tabs_tab_text_tab_corpo',
+            $modalUid . '_tabs_tab_tab_componenti',
+            $modalUid . '_tabs_tab_text_tab_componenti',
+            $modalUid . '_tabs_container_bg',
+            $modalUid . '_grid_corpo_viewport',
+            $modalUid . '_grid_corpo_panel',
+            $modalUid . '_tab_container_componenti',
+            $modalUid . '_tab_text_componenti',
+            $modalUid . '_tabs_tab_border_top_tab_corpo',
+            $modalUid . '_tabs_tab_border_bottom_tab_corpo',
+            $modalUid . '_tabs_tab_border_left_tab_corpo',
+            $modalUid . '_tabs_tab_border_right_tab_corpo',
+            $modalUid . '_tabs_tab_border_top_tab_componenti',
+            $modalUid . '_tabs_tab_border_bottom_tab_componenti',
+            $modalUid . '_tabs_tab_border_left_tab_componenti',
+            $modalUid . '_tabs_tab_border_right_tab_componenti'
+        ], $gridElementUids));
+        $contentViewport->addAttributes('scroll_initial_renderables', array_merge([
+            $modalUid . '_separator_1' => true,
+            $modalUid . '_border_top' => true,
+            $modalUid . '_border_bottom' => true,
+            $modalUid . '_border_left' => true,
+            $modalUid . '_border_right' => true,
+            $modalUid . '_tabs_tab_tab_corpo' => true,
+            $modalUid . '_tabs_tab_text_tab_corpo' => true,
+            $modalUid . '_tabs_tab_tab_componenti' => true,
+            $modalUid . '_tabs_tab_text_tab_componenti' => true,
+            $modalUid . '_tabs_container_bg' => true,
+            $modalUid . '_grid_corpo_viewport' => true,
+            $modalUid . '_grid_corpo_panel' => true,
+            $modalUid . '_tab_container_componenti' => false,
+            $modalUid . '_tab_text_componenti' => false,
+            $modalUid . '_tabs_tab_border_top_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_bottom_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_left_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_right_tab_corpo' => true,
+            $modalUid . '_tabs_tab_border_top_tab_componenti' => false,
+            $modalUid . '_tabs_tab_border_bottom_tab_componenti' => false,
+            $modalUid . '_tabs_tab_border_left_tab_componenti' => false,
+            $modalUid . '_tabs_tab_border_right_tab_componenti' => false
+        ], array_fill_keys($gridElementUids, true)));
+        $body->addChild($contentViewport);
+        $this->drawItems[] = $contentViewport;
+
+        // Vertical separator (thin rectangle) at 60% position
+        $separator = new Rectangle($modalUid . '_separator_1');
+        $separator->setOrigin($separatorX, $contentY);
+        $separator->setSize(2, $contentHeight);
+        $separator->setColor(0x000000);
+        $separator->setRenderable(false);
+        $separator->setBorderRadius(0);
+        $separator->addAttributes('z_index', 20050);
+        $contentViewport->addChild($separator);
+        $this->drawItems[] = $separator;
 
         // Create TabDraw
         $tabDraw = new TabDraw($modalUid . '_tabs');

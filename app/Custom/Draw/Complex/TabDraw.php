@@ -191,7 +191,7 @@ class TabDraw
             foreach ($elements as $element) {
                 if ($element instanceof BasicDraw) {
                     $element->setOrigin($x, $containerY);
-                    $element->setRenderable($this->renderable);
+                    // Don't override renderable - let it stay as set by the element itself
                     $element->addAttributes('z_index', $this->baseZIndex - 40);
                     $element->addAttributes('tab_uid', $tabUid);
                     $this->drawItems[] = $element;

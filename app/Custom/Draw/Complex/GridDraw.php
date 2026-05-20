@@ -51,8 +51,9 @@ class GridDraw
         $this->elements = [];
         for ($i = 0; $i < $count; $i++) {
             $element = new Rectangle($uidPrefix . '_element_' . $i);
+            $element->setColor(0xFFFFFF); // White background
             $element->setBorderColor(0x000000);
-            $element->setThickness(1);
+            $element->setThickness(2);
             $this->elements[] = $element;
         }
     }
@@ -87,29 +88,28 @@ class GridDraw
         $elementWidth = ($width - $totalSpacingX) / $elementsPerRow;
         $elementHeight = $elementWidth; // Square elements
 
-        // Create scroll viewport
-        $scrollViewport = new Rectangle($uid . '_viewport');
-        $scrollViewport->setOrigin($x, $y);
-        $scrollViewport->setSize($width, $height);
-        $scrollViewport->setColor(0xF4A460); // Sand yellow background
-        $scrollViewport->setRenderable($this->renderable);
-        $scrollViewport->addAttributes('z_index', $this->baseZIndex);
-        $scrollViewport->addAttributes('scroll_enabled', true);
-        $scrollViewport->addAttributes('scroll_direction', 'vertical');
-        $this->drawItems[] = $scrollViewport;
-
-        // Calculate total content height
+        // Calculate total rows and content height
         $totalElements = count($this->elements);
         $rows = ceil($totalElements / $elementsPerRow);
         $totalContentHeight = ($rows * $elementHeight) + (($rows - 1) * $elementSpacing);
 
-        // Create content container
-        $contentContainer = new Rectangle($uid . '_content');
-        $contentContainer->setOrigin($x, $y);
-        $contentContainer->setSize($width, max($totalContentHeight, $height));
-        $contentContainer->setRenderable($this->renderable);
-        $contentContainer->addAttributes('z_index', $this->baseZIndex - 1);
-        $this->drawItems[] = $contentContainer;
+        // Create viewport (visible area)
+        $viewport = new Rectangle($uid . '_viewport');
+        $viewport->setOrigin($x, $y);
+        $viewport->setSize($width, $height);
+        $viewport->setColor(0xF4A460); // Sand yellow background
+        $viewport->setRenderable(true); // Always visible when modal is open
+        $viewport->addAttributes('z_index', $this->baseZIndex);
+        $this->drawItems[] = $viewport;
+
+        // Create content panel (scrollable area)
+        $panel = new Rectangle($uid . '_panel');
+        $panel->setOrigin($x, $y);
+        $panel->setSize($width, max($totalContentHeight, $height));
+        $panel->setColor(0xF4A460);
+        $panel->setRenderable(true); // Always visible when modal is open
+        $panel->addAttributes('z_index', $this->baseZIndex - 1);
+        $this->drawItems[] = $panel;
 
         // Position elements in grid
         $elementUids = [];
@@ -123,25 +123,29 @@ class GridDraw
 
                 $element->setOrigin($elementX, $elementY);
                 $element->setSize($elementWidth, $elementHeight);
-                $element->setRenderable($this->renderable);
+                $element->setRenderable(true); // Always visible when modal is open
                 $element->addAttributes('z_index', $this->baseZIndex + 1);
+                $element->addAttributes('grid_uid', $uid); // Add grid_uid for identification
                 $this->drawItems[] = $element;
                 $elementUids[] = $element->getUid();
             }
         }
-
-        // Add scroll attributes to viewport
-        $scrollViewport->addAttributes('scroll_child_uids', $elementUids);
-        $initialRenderables = [];
-        foreach ($elementUids as $elementUid) {
-            $initialRenderables[$elementUid] = true;
-        }
-        $scrollViewport->addAttributes('scroll_initial_renderables', $initialRenderables);
     }
 
     public function getDrawItems(): array
     {
         return $this->drawItems;
+    }
+
+    public function getElementUids(): array
+    {
+        $uids = [];
+        foreach ($this->elements as $element) {
+            if ($element instanceof BasicDraw) {
+                $uids[] = $element->getUid();
+            }
+        }
+        return $uids;
     }
 
     public function getUid(): string
