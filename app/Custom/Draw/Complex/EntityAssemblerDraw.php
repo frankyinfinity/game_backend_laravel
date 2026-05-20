@@ -16,6 +16,7 @@ class EntityAssemblerDraw
     private $uid;
     private array $drawItems = [];
     private $borderRadius = 0;
+    private $gridScrollInitJs = '';
 
     public function __construct($uid)
     {
@@ -84,11 +85,17 @@ class EntityAssemblerDraw
         $square->setThickness(2);
         $square->setRenderable(true);
 
-        // Add click handler to open modal
+        // Build modal first (creates grid and generates scroll init JS)
         $modalUid = 'objective_modal_assembler_' . $this->uid;
+        $this->buildModal($modalUid);
+
+        // Add click handler to open modal (with grid scroll init appended)
         $jsOpen = file_get_contents(resource_path('js/function/modal/click_open_modal.blade.php'));
         $jsOpen = str_replace('__MODAL_UID__', $modalUid, $jsOpen);
         $jsOpen = str_replace('__name__', 'open_assembler_modal_' . $this->uid, $jsOpen);
+        if ($this->gridScrollInitJs) {
+            $jsOpen .= $this->gridScrollInitJs;
+        }
         $jsOpen = Helper::setCommonJsCode($jsOpen, Str::random(20));
         $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
         $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
@@ -96,9 +103,6 @@ class EntityAssemblerDraw
         $this->drawItems[] = $rect;
         $this->drawItems[] = $text;
         $this->drawItems[] = $square;
-
-        // Build modal (without scroll)
-        $this->buildModal($modalUid);
     }
 
     private function buildModal($modalUid): void
@@ -259,6 +263,8 @@ class EntityAssemblerDraw
         $gridDraw->generateElements(100, $modalUid . '_grid');
         $gridDraw->build();
         $gridElementUids = $gridDraw->getElementUids();
+        $gridScrollUids = $gridDraw->getScrollUids();
+        $this->gridScrollInitJs = $gridDraw->getScrollInitJs();
 
         // Main content viewport (gray container)
         $contentViewport = new Rectangle($modalUid . '_content_viewport');
@@ -293,7 +299,7 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_bottom_tab_componenti',
             $modalUid . '_tabs_tab_border_left_tab_componenti',
             $modalUid . '_tabs_tab_border_right_tab_componenti'
-        ], $gridElementUids));
+        ], $gridElementUids, $gridScrollUids));
         $contentViewport->addAttributes('scroll_initial_renderables', array_merge([
             $modalUid . '_separator_1' => true,
             $modalUid . '_border_top' => true,
@@ -317,7 +323,7 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_bottom_tab_componenti' => false,
             $modalUid . '_tabs_tab_border_left_tab_componenti' => false,
             $modalUid . '_tabs_tab_border_right_tab_componenti' => false
-        ], array_fill_keys($gridElementUids, true)));
+        ], array_fill_keys($gridElementUids, true), array_fill_keys($gridScrollUids, true)));
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
 
@@ -332,6 +338,13 @@ class EntityAssemblerDraw
         $contentViewport->addChild($separator);
         $this->drawItems[] = $separator;
 
+        // Save grid element positions before TabDraw overrides them
+        $gridPositions = [];
+        foreach ($gridDraw->getDrawItems() as $item) {
+            $json = $item->buildJson();
+            $gridPositions[$item->getUid()] = ['x' => $json['x'], 'y' => $json['y']];
+        }
+
         // Create TabDraw
         $tabDraw = new TabDraw($modalUid . '_tabs');
         $tabDraw->setOrigin($rightX, $contentY);
@@ -342,6 +355,13 @@ class EntityAssemblerDraw
         $tabDraw->addTab('Componenti', 'tab_componenti', [$componentiContainer, $componentiText]);
         $tabDraw->setPrimaryTab('tab_corpo');
         $tabDraw->build();
+
+        // Restore grid element positions overridden by TabDraw
+        foreach ($tabDraw->getDrawItems() as $item) {
+            if (isset($gridPositions[$item->getUid()])) {
+                $item->setOrigin($gridPositions[$item->getUid()]['x'], $gridPositions[$item->getUid()]['y']);
+            }
+        }
 
         // Add tab draw items
         foreach ($tabDraw->getDrawItems() as $item) {
