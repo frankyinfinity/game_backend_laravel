@@ -98,7 +98,7 @@ class GridDraw
         $viewport->setOrigin($x, $y);
         $viewport->setSize($width, $height);
         $viewport->setColor(0xF4A460); // Sand yellow background
-        $viewport->setRenderable(true); // Always visible when modal is open
+        $viewport->setRenderable($this->renderable); // Controlled by parent
         $viewport->addAttributes('z_index', $this->baseZIndex);
         $this->drawItems[] = $viewport;
 
@@ -107,7 +107,7 @@ class GridDraw
         $panel->setOrigin($x, $y);
         $panel->setSize($width, max($totalContentHeight, $height));
         $panel->setColor(0xF4A460);
-        $panel->setRenderable(true); // Always visible when modal is open
+        $panel->setRenderable($this->renderable); // Controlled by parent
         $panel->addAttributes('z_index', $this->baseZIndex - 1);
         $this->drawItems[] = $panel;
 
@@ -123,7 +123,7 @@ class GridDraw
 
                 $element->setOrigin($elementX, $elementY);
                 $element->setSize($elementWidth, $elementHeight);
-                $element->setRenderable(true); // Always visible when modal is open
+                $element->setRenderable($this->renderable); // Controlled by parent
                 $element->addAttributes('z_index', $this->baseZIndex + 1);
                 $element->addAttributes('grid_uid', $uid); // Add grid_uid for identification
                 $this->drawItems[] = $element;
