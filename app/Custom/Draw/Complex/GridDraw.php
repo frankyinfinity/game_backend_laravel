@@ -26,7 +26,6 @@ class GridDraw
     private int $currentScrollRow = 0;
     private array $scrollUids = [];
     private string $scrollInitJs = '';
-    private array $elementValues = [];
     private array $allElementUids = [];
     private array $templates = [];
     private array $elementData = [];
@@ -58,11 +57,6 @@ class GridDraw
     public function setElements(array $elements): void
     {
         $this->elements = $elements;
-    }
-
-    public function setElementValues(array $values): void
-    {
-        $this->elementValues = $values;
     }
 
     public function setElementData(array $data): void
@@ -119,7 +113,7 @@ class GridDraw
         $elementHeight = $elementWidth; // Square elements
 
         // Calculate total rows and content height
-        $totalElements = count($this->elementValues);
+        $totalElements = count($this->elementData);
         $rows = (int) ceil($totalElements / $elementsPerRow);
         $totalContentHeight = ($rows * $elementHeight) + (($rows - 1) * $elementSpacing);
 
@@ -163,7 +157,7 @@ class GridDraw
         $elementUids = [];
         $this->allElementUids = [];
         
-        foreach ($this->elementValues as $index => $value) {
+        foreach ($this->elementData as $index => $cellData) {
             $row = (int) floor($index / $elementsPerRow);
             $col = $index % $elementsPerRow;
 
@@ -234,7 +228,7 @@ class GridDraw
                     $clonedElement->addAttributes('z_index', $this->baseZIndex + 2 + $templateIndex);
                     $clonedElement->addAttributes('grid_uid', $uid);
                     $clonedElement->addAttributes('cell_index', $index);
-                    $clonedElement->addAttributes('cell_value', (string)$value);
+                    $clonedElement->addAttributes('cell_value', (string)($index + 1));
                     
                     // Replace placeholders in Text elements
                     if ($clonedElement instanceof Text) {
@@ -284,7 +278,7 @@ class GridDraw
                     (int)($cellX + $elementWidth / 2),
                     (int)($cellY + $elementHeight / 2)
                 );
-                $text->setText((string)$value);
+                $text->setText((string)($index + 1));
                 $text->setColor(0x000000);
                 $text->setFontSize(max(10, (int)($elementWidth / 4)));
                 $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);

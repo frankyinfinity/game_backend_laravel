@@ -246,7 +246,6 @@ class EntityAssemblerDraw
         $gridDrawBody->setElementSpacing(2);
 
         $elementDataBody = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)->get()->toArray();
-        $gridDrawBody->setElementValues(range(1, count($elementDataBody)));
         $gridDrawBody->setElementData($elementDataBody);
 
         $this->buildGridTemplate($gridDrawBody, $modalUid);
@@ -265,7 +264,6 @@ class EntityAssemblerDraw
         $gridDrawComponent->setElementSpacing(2);
 
         $elementDataComponent = \App\Models\EntityComponent::where('state', \App\Models\EntityComponent::STATE_COMPLETED)->get()->toArray();
-        $gridDrawComponent->setElementValues(range(1, count($elementDataComponent)));
         $gridDrawComponent->setElementData($elementDataComponent);
         $gridDrawComponent->setImageDisk('entity_components');
 
