@@ -135,7 +135,7 @@ class GridDraw
         $viewport = new Rectangle($uid . '_viewport');
         $viewport->setOrigin($x, $y);
         $viewport->setSize($width, $height);
-        $viewport->setColor(0xF4A460); // Sand yellow background
+        $viewport->setColor(0xD0D0D0);
         $viewport->setRenderable($this->renderable); // Controlled by parent
         $viewport->addAttributes('z_index', $this->baseZIndex);
         $viewport->addAttributes('currentScrollRow', 0);
@@ -148,7 +148,7 @@ class GridDraw
         $panel = new Rectangle($uid . '_panel');
         $panel->setOrigin($x, $y);
         $panel->setSize($gridWidth, max($totalContentHeight, $height));
-        $panel->setColor(0xF4A460);
+        $panel->setColor(0xD0D0D0);
         $panel->setRenderable($this->renderable); // Controlled by parent
         $panel->addAttributes('z_index', $this->baseZIndex - 1);
         $this->drawItems[] = $panel;
@@ -168,7 +168,7 @@ class GridDraw
             $rect = new Rectangle($uid . '_element_' . $index);
             $rect->setOrigin($cellX, $cellY);
             $rect->setSize($elementWidth, $elementHeight);
-            $rect->setColor(0xFFFFFF);
+            $rect->setColor(0xD0D0D0);
             $rect->setBorderColor(0x000000);
             $rect->setThickness(2);
             $rect->setRenderable($this->renderable);
