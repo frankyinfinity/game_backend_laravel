@@ -6,6 +6,7 @@ use App\Custom\Draw\Complex\GridDraw;
 use App\Custom\Draw\Complex\TabDraw;
 
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
@@ -278,11 +279,23 @@ class EntityAssemblerDraw
         $templateText->setColor(0x000000);
         $templateText->setFontSize(14);
         $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+
+        $templateWhiteSquare = new Rectangle('template_white_square');
+        $templateWhiteSquare->setColor(0xFFFFFF);
+        $templateWhiteSquare->setBorderColor(0x000000);
+        $templateWhiteSquare->setThickness(2);
+        $templateWhiteSquare->setBorderRadius(2);
+
+        $templateImage = new Image('template_image');
+        $templateImage->setSrc('{image}');
         
         $templateGrid = new TemplateGridDraw($modalUid . '_template');
         $templateGrid->addTemplate($templateContainer);
         $templateGrid->addTemplate($templateText);
+        $templateGrid->addTemplate($templateWhiteSquare);
+        $templateGrid->addTemplate($templateImage);
         $templateGrid->addTemplateWithMapping('{label}', 'name');
+        $templateGrid->addTemplateWithMapping('{image}', 'image');
         $gridDraw->setTemplateGrid($templateGrid);
 
         $gridDraw->build();

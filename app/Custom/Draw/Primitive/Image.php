@@ -22,6 +22,11 @@ class Image extends BasicDraw
         $this->src = $src;
     }
 
+    public function getSrc()
+    {
+        return $this->src;
+    }
+
     public function setSize($width, $height): void
     {
         $this->width = $width;

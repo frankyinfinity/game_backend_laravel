@@ -3,6 +3,7 @@
 namespace App\Custom\Draw\Complex;
 
 use App\Custom\Draw\Primitive\BasicDraw;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
@@ -188,9 +189,29 @@ class GridDraw
                     $clonedElement = clone $template;
                     $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
                     
+                    $innerPadding = 4;
+                    $textAreaHeight = 22;
+
                     if ($templateIndex === 0 && $clonedElement instanceof Rectangle) {
                         $clonedElement->setOrigin((int)($cellX + $margin), (int)($cellY + $margin));
                         $clonedElement->setSize((int)$containerW, (int)$containerH);
+                    } elseif ($templateIndex === 2 && $clonedElement instanceof Rectangle) {
+                        $wsX = (int)($cellX + $margin + $innerPadding);
+                        $wsY = (int)($cellY + $margin + $innerPadding);
+                        $wsW = (int)($containerW - 2 * $innerPadding);
+                        $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding);
+                        $clonedElement->setOrigin($wsX, $wsY);
+                        $clonedElement->setSize($wsW, $wsH);
+                    } elseif ($templateIndex === 3 && $clonedElement instanceof Image) {
+                        $imgPadding = 4;
+                        $wsW = (int)($containerW - 2 * $innerPadding);
+                        $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding);
+                        $imgX = (int)($cellX + $margin + $innerPadding + $imgPadding);
+                        $imgY = (int)($cellY + $margin + $innerPadding + $imgPadding);
+                        $imgW = (int)($wsW - 2 * $imgPadding);
+                        $imgH = (int)($wsH - 2 * $imgPadding);
+                        $clonedElement->setOrigin($imgX, $imgY);
+                        $clonedElement->setSize($imgW, $imgH);
                     } elseif ($clonedElement instanceof Text) {
                         $clonedElement->setOrigin(
                             (int)($cellX + $margin + 9),
@@ -227,6 +248,19 @@ class GridDraw
                             $originalText = mb_substr($originalText, 0, $maxChars - 1) . '...';
                         }
                         $clonedElement->setText($originalText);
+                    }
+
+                    // Replace placeholders in Image elements
+                    if ($clonedElement instanceof Image) {
+                        $src = $clonedElement->getSrc();
+                        foreach ($this->placeholderMappings as $mapping) {
+                            if (isset($mapping['placeholder'], $mapping['dataKey'], $cellData[$mapping['dataKey']])) {
+                                $imageFile = $cellData[$mapping['dataKey']];
+                                $imageUrl = asset('storage/entity_bodies/' . $imageFile);
+                                $src = str_replace($mapping['placeholder'], $imageUrl, $src);
+                            }
+                        }
+                        $clonedElement->setSrc($src);
                     }
                     
                     $rect->addChild($clonedElement);
