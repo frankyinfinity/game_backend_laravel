@@ -193,10 +193,10 @@ class GridDraw
                         $clonedElement->setSize((int)$containerW, (int)$containerH);
                     } elseif ($clonedElement instanceof Text) {
                         $clonedElement->setOrigin(
-                            (int)($cellX + $margin + $containerW / 2),
-                            (int)($cellY + $margin + $containerH / 2)
+                            (int)($cellX + $margin + 9),
+                            (int)($cellY + $margin + $containerH - 19)
                         );
-                        $clonedElement->setCenterAnchor(true);
+                        $clonedElement->setCenterAnchor(false);
                     } else {
                         $clonedElement->setOrigin(
                             (int)($cellX + $clonedElement->getOriginX()),
@@ -221,6 +221,10 @@ class GridDraw
                                     $mapping['dataKey']
                                 );
                             }
+                        }
+                        $maxChars = max(1, (int)(($containerW - 8) / 7));
+                        if (mb_strlen($originalText) > $maxChars) {
+                            $originalText = mb_substr($originalText, 0, $maxChars - 1) . '...';
                         }
                         $clonedElement->setText($originalText);
                     }

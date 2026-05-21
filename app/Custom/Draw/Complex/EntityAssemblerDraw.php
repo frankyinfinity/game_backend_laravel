@@ -269,7 +269,7 @@ class EntityAssemblerDraw
 
         // Template: gray rounded container + centered Text with {label}
         $templateContainer = new Rectangle('template_container');
-        $templateContainer->setColor(0xC0C0C0);
+        $templateContainer->setColor(0x87CEEB);
         $templateContainer->setBorderColor(0x000000);
         $templateContainer->setBorderRadius(5);
 
