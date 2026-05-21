@@ -241,6 +241,11 @@ class GridDraw
                     $clonedElement->addAttributes('cell_index', $index);
                     $clonedElement->addAttributes('cell_value', (string)($index + 1));
                     
+                    // Add tooltip if available in data
+                    if (isset($cellData['tooltip']) && !empty($cellData['tooltip'])) {
+                        $clonedElement->addAttributes('tooltip_text', $cellData['tooltip']);
+                    }
+                    
                     // Replace placeholders in Text elements
                     if ($clonedElement instanceof Text) {
                         $originalText = $clonedElement->getText();

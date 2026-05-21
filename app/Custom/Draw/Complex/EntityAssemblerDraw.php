@@ -263,12 +263,54 @@ class EntityAssemblerDraw
         $gridDrawComponent->setElementsPerRow(3);
         $gridDrawComponent->setElementSpacing(2);
 
-        $elementDataComponent = \App\Models\EntityComponent::with('entityTypeComponent')
+        $elementDataComponent = \App\Models\EntityComponent::with(['entityTypeComponent', 'genes.gene', 'ruleChimicalElements.ruleChimicalElement.details.effects.gene'])
             ->where('state', \App\Models\EntityComponent::STATE_COMPLETED)
             ->get()
             ->map(function ($item) {
                 $data = $item->toArray();
                 $data['symbol'] = $item->entityTypeComponent ? \App\Helper\FontAwesome::unicode($item->entityTypeComponent->symbol) : '';
+                
+                // Build tooltip with genes and chemical elements details
+                $tooltipParts = [];
+                
+                // Add genes
+                if ($item->genes->isNotEmpty()) {
+                    $tooltipParts[] = 'GENI:';
+                    foreach ($item->genes as $geneRel) {
+                        if ($geneRel->gene) {
+                            $tooltipParts[] = "  - {$geneRel->gene->name}";
+                        }
+                    }
+                }
+                
+                // Add chemical elements with ranges and effects
+                if ($item->ruleChimicalElements->isNotEmpty()) {
+                    $tooltipParts[] = 'ELEMENTI CHIMICI:';
+                    foreach ($item->ruleChimicalElements as $elemRel) {
+                        if ($elemRel->ruleChimicalElement) {
+                            $rule = $elemRel->ruleChimicalElement;
+                            $tooltipParts[] = "  - {$rule->name} ({$rule->title})";
+                            if ($rule->details->isNotEmpty()) {
+                                foreach ($rule->details as $detail) {
+                                    // Only show bands that have effects
+                                    if ($detail->effects->isNotEmpty()) {
+                                        $tooltipParts[] = "    Fascia: [{$detail->min} / {$detail->max}]";
+                                        foreach ($detail->effects as $effect) {
+                                            $geneName = $effect->gene ? $effect->gene->name : 'N/A';
+                                            $typeLabel = $effect->type === \App\Models\RuleChimicalElementDetailEffect::TYPE_FIXED ? 'Fisso' : 'A Tempo';
+                                            $durationLabel = $effect->type === \App\Models\RuleChimicalElementDetailEffect::TYPE_TIMED 
+                                                ? (\App\Models\RuleChimicalElementDetailEffect::DURATION_OPTIONS[$effect->duration] ?? $effect->duration . ' min')
+                                                : '-';
+                                            $tooltipParts[] = "      Effetto: {$geneName} (valore: {$effect->value}, tipo: {$typeLabel}, durata: {$durationLabel})";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                $data['tooltip'] = implode("\n", $tooltipParts);
                 return $data;
             })->toArray();
         $gridDrawComponent->setElementData($elementDataComponent);
@@ -422,6 +464,7 @@ class EntityAssemblerDraw
         if ($withSymbol) {
             $templateGrid->addTemplateWithMapping('{symbol}', 'symbol');
         }
+        $templateGrid->addTemplateWithMapping('{tooltip}', 'tooltip');
         $gridDraw->setTemplateGrid($templateGrid);
     }
 }
