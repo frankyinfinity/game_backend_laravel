@@ -10,6 +10,15 @@ class BasicDraw
     public function getUid() {
         return $this->uid;
     }
+    public function setUid($uid): void {
+        $this->uid = $uid;
+    }
+    public function getOriginX() {
+        return $this->x;
+    }
+    public function getOriginY() {
+        return $this->y;
+    }
     private $type;
     protected $color;
     protected $x;

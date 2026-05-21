@@ -252,7 +252,7 @@ class EntityAssemblerDraw
         $componentiText->setRenderable(false);
         $componentiText->addAttributes('z_index', 20063);
 
-        // Create GridDraw for tab_corpo with 100 elements
+        // Create GridDraw for tab_corpo with 150 elements
         $gridDraw = new GridDraw($modalUid . '_grid_corpo');
         $gridDraw->setOrigin($rightX, $contentY + 40);
         $gridDraw->setSize($rightWidth, $contentHeight - 40);
@@ -261,6 +261,20 @@ class EntityAssemblerDraw
         $gridDraw->setElementsPerRow(3);
         $gridDraw->setElementSpacing(2);
         $gridDraw->setElementValues(range(1, 150));
+
+        // Create template with Text "A"
+        $templateText = new Text('template_text');
+        $templateText->setCenterAnchor(true);
+        $templateText->setOrigin(10, 10);
+        $templateText->setText('A');
+        $templateText->setColor(0x000000);
+        $templateText->setFontSize(14);
+        
+        $templateGrid = new TemplateGridDraw($modalUid . '_template');
+        $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $templateGrid->addTemplate($templateText);
+        $gridDraw->setTemplateGrid($templateGrid);
+
         $gridDraw->build();
         $gridElementUids = $gridDraw->getElementUids();
         $gridScrollUids = $gridDraw->getScrollUids();

@@ -27,6 +27,7 @@ class GridDraw
     private string $scrollInitJs = '';
     private array $elementValues = [];
     private array $allElementUids = [];
+    private array $templates = [];
 
     public function __construct(string $uid)
     {
@@ -58,6 +59,16 @@ class GridDraw
     public function setElementValues(array $values): void
     {
         $this->elementValues = $values;
+    }
+
+    public function setTemplates(array $templates): void
+    {
+        $this->templates = $templates;
+    }
+
+    public function setTemplateGrid(TemplateGridDraw $templateGrid): void
+    {
+        $this->templates = $templateGrid->getTemplates();
     }
 
     public function setElementSpacing(int $spacing): void
@@ -141,12 +152,12 @@ class GridDraw
             $row = (int) floor($index / $elementsPerRow);
             $col = $index % $elementsPerRow;
 
-            $elementX = $x + ($col * ($elementWidth + $elementSpacing));
-            $elementY = $y + ($row * ($elementHeight + $elementSpacing));
+            $cellX = $x + ($col * ($elementWidth + $elementSpacing));
+            $cellY = $y + ($row * ($elementHeight + $elementSpacing));
 
-            // Create rectangle
+            // Create base rectangle (always)
             $rect = new Rectangle($uid . '_element_' . $index);
-            $rect->setOrigin($elementX, $elementY);
+            $rect->setOrigin($cellX, $cellY);
             $rect->setSize($elementWidth, $elementHeight);
             $rect->setColor(0xFFFFFF);
             $rect->setBorderColor(0x000000);
@@ -158,23 +169,46 @@ class GridDraw
             $elementUids[] = $rect->getUid();
             $this->allElementUids[] = $rect->getUid();
 
-            // Create text centered
-            $text = new Text($uid . '_text_' . $index);
-            $text->setCenterAnchor(true);
-            $text->setOrigin(
-                (int)($elementX + $elementWidth / 2),
-                (int)($elementY + $elementHeight / 2)
-            );
-            $text->setText((string)$value);
-            $text->setColor(0x000000);
-            $text->setFontSize(max(10, (int)($elementWidth / 4)));
-            $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
-            $text->setRenderable($this->renderable);
-            $text->addAttributes('z_index', $this->baseZIndex + 2);
-            $text->addAttributes('grid_uid', $uid);
-            $this->drawItems[] = $text;
-            $elementUids[] = $text->getUid();
-            $this->allElementUids[] = $text->getUid();
+            // Clone template elements on top
+            if (!empty($this->templates)) {
+                foreach ($this->templates as $templateIndex => $template) {
+                    $clonedElement = clone $template;
+                    $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
+                    
+                    // Position relative to cell
+                    $clonedElement->setOrigin(
+                        (int)($cellX + $clonedElement->getOriginX()),
+                        (int)($cellY + $clonedElement->getOriginY())
+                    );
+                    $clonedElement->setRenderable($this->renderable);
+                    $clonedElement->addAttributes('z_index', $this->baseZIndex + 2 + $templateIndex);
+                    $clonedElement->addAttributes('grid_uid', $uid);
+                    $clonedElement->addAttributes('cell_index', $index);
+                    $clonedElement->addAttributes('cell_value', (string)$value);
+                    
+                    $this->drawItems[] = $clonedElement;
+                    $elementUids[] = $clonedElement->getUid();
+                    $this->allElementUids[] = $clonedElement->getUid();
+                }
+            } else {
+                // Default: text centered
+                $text = new Text($uid . '_text_' . $index);
+                $text->setCenterAnchor(true);
+                $text->setOrigin(
+                    (int)($cellX + $elementWidth / 2),
+                    (int)($cellY + $elementHeight / 2)
+                );
+                $text->setText((string)$value);
+                $text->setColor(0x000000);
+                $text->setFontSize(max(10, (int)($elementWidth / 4)));
+                $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+                $text->setRenderable($this->renderable);
+                $text->addAttributes('z_index', $this->baseZIndex + 2);
+                $text->addAttributes('grid_uid', $uid);
+                $this->drawItems[] = $text;
+                $elementUids[] = $text->getUid();
+                $this->allElementUids[] = $text->getUid();
+            }
         }
 
         // Build scrollbar
