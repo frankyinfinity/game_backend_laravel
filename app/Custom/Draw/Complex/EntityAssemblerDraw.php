@@ -232,76 +232,47 @@ class EntityAssemblerDraw
         $leftWidth = (int) ($contentWidth * 0.6);
         $separatorX = $contentX + $leftWidth - 1;
 
-        // Right side (40%) - TabDraw with 'Corpo' (primary) and 'Componenti' tabs
+        // Right side (40%) - TabDraw with 'Body' (primary) and 'Components' tabs
         $rightWidth = $contentWidth - $leftWidth;
         $rightX = $contentX + $leftWidth;
 
-        // Create containers for tabs
-        $componentiContainer = new Rectangle($modalUid . '_tab_container_componenti');
-        $componentiContainer->setOrigin($rightX, $contentY + 40);
-        $componentiContainer->setSize($rightWidth, $contentHeight - 40);
-        $componentiContainer->setColor(0x87CEEB); // Celeste (sky blue)
-        $componentiContainer->setRenderable(false);
-        $componentiContainer->addAttributes('z_index', 20062);
+        // Create GridDraw for tab_body
+        $gridDrawBody = new GridDraw($modalUid . '_grid_body');
+        $gridDrawBody->setOrigin($rightX, $contentY + 40);
+        $gridDrawBody->setSize($rightWidth, $contentHeight - 40);
+        $gridDrawBody->setRenderable(false);
+        $gridDrawBody->setBaseZIndex(20060);
+        $gridDrawBody->setElementsPerRow(3);
+        $gridDrawBody->setElementSpacing(2);
 
-        $componentiText = new Text($modalUid . '_tab_text_componenti');
-        $componentiText->setOrigin($rightX + 10, $contentY + 50);
-        $componentiText->setText('Contenuto Componenti');
-        $componentiText->setColor(0x000000);
-        $componentiText->setFontSize(16);
-        $componentiText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
-        $componentiText->setRenderable(false);
-        $componentiText->addAttributes('z_index', 20063);
+        $elementDataBody = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)->get()->toArray();
+        $gridDrawBody->setElementValues(range(1, count($elementDataBody)));
+        $gridDrawBody->setElementData($elementDataBody);
 
-        // Create GridDraw for tab_corpo with 10 elements
-        $gridDraw = new GridDraw($modalUid . '_grid_corpo');
-        $gridDraw->setOrigin($rightX, $contentY + 40);
-        $gridDraw->setSize($rightWidth, $contentHeight - 40);
-        $gridDraw->setRenderable(false);
-        $gridDraw->setBaseZIndex(20060);
-        $gridDraw->setElementsPerRow(3);
-        $gridDraw->setElementSpacing(2);
-        $gridDraw->setElementValues(range(1, 10));
+        $this->buildGridTemplate($gridDrawBody, $modalUid);
+        $gridDrawBody->build();
+        $gridElementUidsBody = $gridDrawBody->getElementUids();
+        $gridScrollUidsBody = $gridDrawBody->getScrollUids();
+        $this->gridScrollInitJs = $gridDrawBody->getScrollInitJs();
 
-        // Query EntityBody with state completed
-        $elementData = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)->get()->toArray();
-        $gridDraw->setElementValues(range(1, count($elementData)));
-        $gridDraw->setElementData($elementData);
+        // Create GridDraw for tab_component
+        $gridDrawComponent = new GridDraw($modalUid . '_grid_component');
+        $gridDrawComponent->setOrigin($rightX, $contentY + 40);
+        $gridDrawComponent->setSize($rightWidth, $contentHeight - 40);
+        $gridDrawComponent->setRenderable(false);
+        $gridDrawComponent->setBaseZIndex(20080);
+        $gridDrawComponent->setElementsPerRow(3);
+        $gridDrawComponent->setElementSpacing(2);
 
-        // Template: gray rounded container + centered Text with {label}
-        $templateContainer = new Rectangle('template_container');
-        $templateContainer->setColor(0x87CEEB);
-        $templateContainer->setBorderColor(0x000000);
-        $templateContainer->setBorderRadius(5);
+        $elementDataComponent = \App\Models\EntityComponent::where('state', \App\Models\EntityComponent::STATE_COMPLETED)->get()->toArray();
+        $gridDrawComponent->setElementValues(range(1, count($elementDataComponent)));
+        $gridDrawComponent->setElementData($elementDataComponent);
+        $gridDrawComponent->setImageDisk('entity_components');
 
-        $templateText = new Text('template_text');
-        $templateText->setText('{label}');
-        $templateText->setColor(0x000000);
-        $templateText->setFontSize(14);
-        $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
-
-        $templateWhiteSquare = new Rectangle('template_white_square');
-        $templateWhiteSquare->setColor(0xFFFFFF);
-        $templateWhiteSquare->setBorderColor(0x000000);
-        $templateWhiteSquare->setThickness(2);
-        $templateWhiteSquare->setBorderRadius(2);
-
-        $templateImage = new Image('template_image');
-        $templateImage->setSrc('{image}');
-        
-        $templateGrid = new TemplateGridDraw($modalUid . '_template');
-        $templateGrid->addTemplate($templateContainer);
-        $templateGrid->addTemplate($templateText);
-        $templateGrid->addTemplate($templateWhiteSquare);
-        $templateGrid->addTemplate($templateImage);
-        $templateGrid->addTemplateWithMapping('{label}', 'name');
-        $templateGrid->addTemplateWithMapping('{image}', 'image');
-        $gridDraw->setTemplateGrid($templateGrid);
-
-        $gridDraw->build();
-        $gridElementUids = $gridDraw->getElementUids();
-        $gridScrollUids = $gridDraw->getScrollUids();
-        $this->gridScrollInitJs = $gridDraw->getScrollInitJs();
+        $this->buildGridTemplate($gridDrawComponent, $modalUid);
+        $gridDrawComponent->build();
+        $gridElementUidsComponent = $gridDrawComponent->getElementUids();
+        $gridScrollUidsComponent = $gridDrawComponent->getScrollUids();
 
         // Main content viewport (gray container)
         $contentViewport = new Rectangle($modalUid . '_content_viewport');
@@ -319,48 +290,48 @@ class EntityAssemblerDraw
             $modalUid . '_border_bottom',
             $modalUid . '_border_left',
             $modalUid . '_border_right',
-            $modalUid . '_tabs_tab_tab_corpo',
-            $modalUid . '_tabs_tab_text_tab_corpo',
-            $modalUid . '_tabs_tab_tab_componenti',
-            $modalUid . '_tabs_tab_text_tab_componenti',
+            $modalUid . '_tabs_tab_tab_body',
+            $modalUid . '_tabs_tab_text_tab_body',
+            $modalUid . '_tabs_tab_tab_component',
+            $modalUid . '_tabs_tab_text_tab_component',
             $modalUid . '_tabs_container_bg',
-            $modalUid . '_grid_corpo_viewport',
-            $modalUid . '_grid_corpo_panel',
-            $modalUid . '_tab_container_componenti',
-            $modalUid . '_tab_text_componenti',
-            $modalUid . '_tabs_tab_border_top_tab_corpo',
-            $modalUid . '_tabs_tab_border_bottom_tab_corpo',
-            $modalUid . '_tabs_tab_border_left_tab_corpo',
-            $modalUid . '_tabs_tab_border_right_tab_corpo',
-            $modalUid . '_tabs_tab_border_top_tab_componenti',
-            $modalUid . '_tabs_tab_border_bottom_tab_componenti',
-            $modalUid . '_tabs_tab_border_left_tab_componenti',
-            $modalUid . '_tabs_tab_border_right_tab_componenti'
-        ], $gridElementUids, $gridScrollUids));
+            $modalUid . '_grid_body_viewport',
+            $modalUid . '_grid_body_panel',
+            $modalUid . '_grid_component_viewport',
+            $modalUid . '_grid_component_panel',
+            $modalUid . '_tabs_tab_border_top_tab_body',
+            $modalUid . '_tabs_tab_border_bottom_tab_body',
+            $modalUid . '_tabs_tab_border_left_tab_body',
+            $modalUid . '_tabs_tab_border_right_tab_body',
+            $modalUid . '_tabs_tab_border_top_tab_component',
+            $modalUid . '_tabs_tab_border_bottom_tab_component',
+            $modalUid . '_tabs_tab_border_left_tab_component',
+            $modalUid . '_tabs_tab_border_right_tab_component'
+        ], $gridElementUidsBody, $gridScrollUidsBody, $gridElementUidsComponent, $gridScrollUidsComponent));
         $contentViewport->addAttributes('scroll_initial_renderables', array_merge([
             $modalUid . '_separator_1' => true,
             $modalUid . '_border_top' => true,
             $modalUid . '_border_bottom' => true,
             $modalUid . '_border_left' => true,
             $modalUid . '_border_right' => true,
-            $modalUid . '_tabs_tab_tab_corpo' => true,
-            $modalUid . '_tabs_tab_text_tab_corpo' => true,
-            $modalUid . '_tabs_tab_tab_componenti' => true,
-            $modalUid . '_tabs_tab_text_tab_componenti' => true,
+            $modalUid . '_tabs_tab_tab_body' => true,
+            $modalUid . '_tabs_tab_text_tab_body' => true,
+            $modalUid . '_tabs_tab_tab_component' => true,
+            $modalUid . '_tabs_tab_text_tab_component' => true,
             $modalUid . '_tabs_container_bg' => true,
-            $modalUid . '_grid_corpo_viewport' => true,
-            $modalUid . '_grid_corpo_panel' => true,
-            $modalUid . '_tab_container_componenti' => false,
-            $modalUid . '_tab_text_componenti' => false,
-            $modalUid . '_tabs_tab_border_top_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_bottom_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_left_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_right_tab_corpo' => true,
-            $modalUid . '_tabs_tab_border_top_tab_componenti' => false,
-            $modalUid . '_tabs_tab_border_bottom_tab_componenti' => false,
-            $modalUid . '_tabs_tab_border_left_tab_componenti' => false,
-            $modalUid . '_tabs_tab_border_right_tab_componenti' => false
-        ], array_fill_keys($gridElementUids, true), array_fill_keys($gridScrollUids, true)));
+            $modalUid . '_grid_body_viewport' => true,
+            $modalUid . '_grid_body_panel' => true,
+            $modalUid . '_grid_component_viewport' => false,
+            $modalUid . '_grid_component_panel' => false,
+            $modalUid . '_tabs_tab_border_top_tab_body' => true,
+            $modalUid . '_tabs_tab_border_bottom_tab_body' => true,
+            $modalUid . '_tabs_tab_border_left_tab_body' => true,
+            $modalUid . '_tabs_tab_border_right_tab_body' => true,
+            $modalUid . '_tabs_tab_border_top_tab_component' => false,
+            $modalUid . '_tabs_tab_border_bottom_tab_component' => false,
+            $modalUid . '_tabs_tab_border_left_tab_component' => false,
+            $modalUid . '_tabs_tab_border_right_tab_component' => false
+        ], array_fill_keys($gridElementUidsBody, true), array_fill_keys($gridScrollUidsBody, true), array_fill_keys($gridElementUidsComponent, false), array_fill_keys($gridScrollUidsComponent, false)));
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
 
@@ -377,7 +348,7 @@ class EntityAssemblerDraw
 
         // Save grid element positions before TabDraw overrides them
         $gridPositions = [];
-        foreach ($gridDraw->getDrawItems() as $item) {
+        foreach (array_merge($gridDrawBody->getDrawItems(), $gridDrawComponent->getDrawItems()) as $item) {
             $json = $item->buildJson();
             $gridPositions[$item->getUid()] = ['x' => $json['x'], 'y' => $json['y']];
         }
@@ -388,9 +359,9 @@ class EntityAssemblerDraw
         $tabDraw->setSize($rightWidth, $contentHeight);
         $tabDraw->setRenderable(false);
         $tabDraw->setBaseZIndex(20070);
-        $tabDraw->addTab('Corpo', 'tab_corpo', $gridDraw->getDrawItems());
-        $tabDraw->addTab('Componenti', 'tab_componenti', [$componentiContainer, $componentiText]);
-        $tabDraw->setPrimaryTab('tab_corpo');
+        $tabDraw->addTab('Corpo', 'tab_body', $gridDrawBody->getDrawItems());
+        $tabDraw->addTab('Componenti', 'tab_component', $gridDrawComponent->getDrawItems());
+        $tabDraw->setPrimaryTab('tab_body');
         $tabDraw->build();
 
         // Restore grid element positions overridden by TabDraw
@@ -404,5 +375,37 @@ class EntityAssemblerDraw
         foreach ($tabDraw->getDrawItems() as $item) {
             $this->drawItems[] = $item;
         }
+    }
+
+    private function buildGridTemplate($gridDraw, $modalUid): void
+    {
+        $templateContainer = new Rectangle('template_container');
+        $templateContainer->setColor(0xD0D0D0);
+        $templateContainer->setBorderColor(0x000000);
+        $templateContainer->setBorderRadius(5);
+
+        $templateText = new Text('template_text');
+        $templateText->setText('{label}');
+        $templateText->setColor(0x000000);
+        $templateText->setFontSize(14);
+        $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+
+        $templateWhiteSquare = new Rectangle('template_white_square');
+        $templateWhiteSquare->setColor(0xFFFFFF);
+        $templateWhiteSquare->setBorderColor(0x000000);
+        $templateWhiteSquare->setThickness(2);
+        $templateWhiteSquare->setBorderRadius(2);
+
+        $templateImage = new Image('template_image');
+        $templateImage->setSrc('{image}');
+
+        $templateGrid = new TemplateGridDraw($modalUid . '_template');
+        $templateGrid->addTemplate($templateContainer);
+        $templateGrid->addTemplate($templateText);
+        $templateGrid->addTemplate($templateWhiteSquare);
+        $templateGrid->addTemplate($templateImage);
+        $templateGrid->addTemplateWithMapping('{label}', 'name');
+        $templateGrid->addTemplateWithMapping('{image}', 'image');
+        $gridDraw->setTemplateGrid($templateGrid);
     }
 }

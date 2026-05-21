@@ -96,7 +96,7 @@ return [
 
         'entity_components' => [
             'driver' => 'local',
-            'root' => storage_path('app/uploads/entity_components'),
+            'root' => storage_path('app/public/entity_components'),
             'url' => env('APP_URL').'/storage/entity_components',
             'visibility' => 'public',
             'throw' => false,
@@ -104,7 +104,7 @@ return [
 
         'entity_bodies' => [
             'driver' => 'local',
-            'root' => storage_path('app/uploads/entity_bodies'),
+            'root' => storage_path('app/public/entity_bodies'),
             'url' => env('APP_URL').'/storage/entity_bodies',
             'visibility' => 'public',
             'throw' => false,

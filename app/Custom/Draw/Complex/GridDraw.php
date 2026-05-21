@@ -31,6 +31,7 @@ class GridDraw
     private array $templates = [];
     private array $elementData = [];
     private array $placeholderMappings = [];
+    private string $imageDisk = 'entity_bodies';
 
     public function __construct(string $uid)
     {
@@ -78,6 +79,11 @@ class GridDraw
     {
         $this->templates = $templateGrid->getTemplates();
         $this->placeholderMappings = $templateGrid->getPlaceholderMappings();
+    }
+
+    public function setImageDisk(string $disk): void
+    {
+        $this->imageDisk = $disk;
     }
 
     public function setElementSpacing(int $spacing): void
@@ -256,8 +262,10 @@ class GridDraw
                         foreach ($this->placeholderMappings as $mapping) {
                             if (isset($mapping['placeholder'], $mapping['dataKey'], $cellData[$mapping['dataKey']])) {
                                 $imageFile = $cellData[$mapping['dataKey']];
-                                $imageUrl = asset('storage/entity_bodies/' . $imageFile);
-                                $src = str_replace($mapping['placeholder'], $imageUrl, $src);
+                                if ($imageFile && \Storage::disk($this->imageDisk)->exists($imageFile)) {
+                                    $imageUrl = \Storage::disk($this->imageDisk)->url($imageFile);
+                                    $src = str_replace($mapping['placeholder'], $imageUrl, $src);
+                                }
                             }
                         }
                         $clonedElement->setSrc($src);
