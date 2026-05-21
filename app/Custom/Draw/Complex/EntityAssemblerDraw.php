@@ -262,24 +262,25 @@ class EntityAssemblerDraw
         $gridDraw->setElementSpacing(2);
         $gridDraw->setElementValues(range(1, 10));
 
-        // Generate structured data with random names
-        $elementData = [];
-        for ($i = 0; $i < 10; $i++) {
-            $randomName = substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 5);
-            $elementData[] = ['name' => $randomName];
-        }
+        // Query EntityBody with state completed
+        $elementData = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)->get()->toArray();
+        $gridDraw->setElementValues(range(1, count($elementData)));
         $gridDraw->setElementData($elementData);
 
-        // Create template with Text using {label} placeholder
+        // Template: gray rounded container + centered Text with {label}
+        $templateContainer = new Rectangle('template_container');
+        $templateContainer->setColor(0xC0C0C0);
+        $templateContainer->setBorderColor(0x000000);
+        $templateContainer->setBorderRadius(5);
+
         $templateText = new Text('template_text');
-        $templateText->setCenterAnchor(false);
-        $templateText->setOrigin(10, 10);
         $templateText->setText('{label}');
         $templateText->setColor(0x000000);
         $templateText->setFontSize(14);
+        $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
         
         $templateGrid = new TemplateGridDraw($modalUid . '_template');
-        $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $templateGrid->addTemplate($templateContainer);
         $templateGrid->addTemplate($templateText);
         $templateGrid->addTemplateWithMapping('{label}', 'name');
         $gridDraw->setTemplateGrid($templateGrid);

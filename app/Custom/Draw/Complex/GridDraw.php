@@ -180,15 +180,29 @@ class GridDraw
             // Clone template elements on top
             if (!empty($this->templates)) {
                 $cellData = isset($this->elementData[$index]) ? $this->elementData[$index] : [];
+                $margin = 4;
+                $containerW = $elementWidth - ($margin * 2);
+                $containerH = $elementHeight - ($margin * 2);
+                
                 foreach ($this->templates as $templateIndex => $template) {
                     $clonedElement = clone $template;
                     $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
                     
-                    // Position relative to cell
-                    $clonedElement->setOrigin(
-                        (int)($cellX + $clonedElement->getOriginX()),
-                        (int)($cellY + $clonedElement->getOriginY())
-                    );
+                    if ($templateIndex === 0 && $clonedElement instanceof Rectangle) {
+                        $clonedElement->setOrigin((int)($cellX + $margin), (int)($cellY + $margin));
+                        $clonedElement->setSize((int)$containerW, (int)$containerH);
+                    } elseif ($clonedElement instanceof Text) {
+                        $clonedElement->setOrigin(
+                            (int)($cellX + $margin + $containerW / 2),
+                            (int)($cellY + $margin + $containerH / 2)
+                        );
+                        $clonedElement->setCenterAnchor(true);
+                    } else {
+                        $clonedElement->setOrigin(
+                            (int)($cellX + $clonedElement->getOriginX()),
+                            (int)($cellY + $clonedElement->getOriginY())
+                        );
+                    }
                     $clonedElement->setRenderable($this->renderable);
                     $clonedElement->addAttributes('z_index', $this->baseZIndex + 2 + $templateIndex);
                     $clonedElement->addAttributes('grid_uid', $uid);
@@ -211,6 +225,7 @@ class GridDraw
                         $clonedElement->setText($originalText);
                     }
                     
+                    $rect->addChild($clonedElement);
                     $this->drawItems[] = $clonedElement;
                     $elementUids[] = $clonedElement->getUid();
                     $this->allElementUids[] = $clonedElement->getUid();
