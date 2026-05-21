@@ -378,7 +378,7 @@ class EntityAssemblerDraw
     private function buildGridTemplate($gridDraw, $modalUid): void
     {
         $templateContainer = new Rectangle('template_container');
-        $templateContainer->setColor(0xD0D0D0);
+        $templateContainer->setColor(0x87CEEB);
         $templateContainer->setBorderColor(0x000000);
         $templateContainer->setBorderRadius(5);
 
