@@ -252,7 +252,7 @@ class EntityAssemblerDraw
         $componentiText->setRenderable(false);
         $componentiText->addAttributes('z_index', 20063);
 
-        // Create GridDraw for tab_corpo with 150 elements
+        // Create GridDraw for tab_corpo with 10 elements
         $gridDraw = new GridDraw($modalUid . '_grid_corpo');
         $gridDraw->setOrigin($rightX, $contentY + 40);
         $gridDraw->setSize($rightWidth, $contentHeight - 40);
@@ -260,19 +260,28 @@ class EntityAssemblerDraw
         $gridDraw->setBaseZIndex(20060);
         $gridDraw->setElementsPerRow(3);
         $gridDraw->setElementSpacing(2);
-        $gridDraw->setElementValues(range(1, 150));
+        $gridDraw->setElementValues(range(1, 10));
 
-        // Create template with Text "A"
+        // Generate structured data with random names
+        $elementData = [];
+        for ($i = 0; $i < 10; $i++) {
+            $randomName = substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 5);
+            $elementData[] = ['name' => $randomName];
+        }
+        $gridDraw->setElementData($elementData);
+
+        // Create template with Text using {label} placeholder
         $templateText = new Text('template_text');
-        $templateText->setCenterAnchor(true);
+        $templateText->setCenterAnchor(false);
         $templateText->setOrigin(10, 10);
-        $templateText->setText('A');
+        $templateText->setText('{label}');
         $templateText->setColor(0x000000);
         $templateText->setFontSize(14);
         
         $templateGrid = new TemplateGridDraw($modalUid . '_template');
         $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
         $templateGrid->addTemplate($templateText);
+        $templateGrid->addTemplateWithMapping('{label}', 'name');
         $gridDraw->setTemplateGrid($templateGrid);
 
         $gridDraw->build();

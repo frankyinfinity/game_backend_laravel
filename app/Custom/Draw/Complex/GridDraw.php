@@ -28,6 +28,8 @@ class GridDraw
     private array $elementValues = [];
     private array $allElementUids = [];
     private array $templates = [];
+    private array $elementData = [];
+    private array $placeholderMappings = [];
 
     public function __construct(string $uid)
     {
@@ -61,6 +63,11 @@ class GridDraw
         $this->elementValues = $values;
     }
 
+    public function setElementData(array $data): void
+    {
+        $this->elementData = $data;
+    }
+
     public function setTemplates(array $templates): void
     {
         $this->templates = $templates;
@@ -69,6 +76,7 @@ class GridDraw
     public function setTemplateGrid(TemplateGridDraw $templateGrid): void
     {
         $this->templates = $templateGrid->getTemplates();
+        $this->placeholderMappings = $templateGrid->getPlaceholderMappings();
     }
 
     public function setElementSpacing(int $spacing): void
@@ -171,6 +179,7 @@ class GridDraw
 
             // Clone template elements on top
             if (!empty($this->templates)) {
+                $cellData = isset($this->elementData[$index]) ? $this->elementData[$index] : [];
                 foreach ($this->templates as $templateIndex => $template) {
                     $clonedElement = clone $template;
                     $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
@@ -185,6 +194,22 @@ class GridDraw
                     $clonedElement->addAttributes('grid_uid', $uid);
                     $clonedElement->addAttributes('cell_index', $index);
                     $clonedElement->addAttributes('cell_value', (string)$value);
+                    
+                    // Replace placeholders in Text elements
+                    if ($clonedElement instanceof Text) {
+                        $originalText = $clonedElement->getText();
+                        foreach ($this->placeholderMappings as $mapping) {
+                            if (isset($mapping['placeholder']) && isset($mapping['dataKey'])) {
+                                $originalText = TemplateGridDraw::replacePlaceholdersWithMapping(
+                                    $originalText, 
+                                    $cellData, 
+                                    $mapping['placeholder'], 
+                                    $mapping['dataKey']
+                                );
+                            }
+                        }
+                        $clonedElement->setText($originalText);
+                    }
                     
                     $this->drawItems[] = $clonedElement;
                     $elementUids[] = $clonedElement->getUid();

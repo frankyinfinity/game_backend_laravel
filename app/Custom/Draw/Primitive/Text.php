@@ -28,6 +28,11 @@ class Text extends BasicDraw
         $this->text = $text;
     }
 
+    public function getText()
+    {
+        return $this->text;
+    }
+
     public function setFontSize(int $value): void
     {
         $this->fontSize = $value;
