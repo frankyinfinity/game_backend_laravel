@@ -47,7 +47,7 @@ class EntityComponentController extends Controller
             })
             ->addColumn('type_display', function ($row) {
                 if ($row->entityTypeComponent) {
-                    return '<span><i class="' . e($row->entityTypeComponent->symbol) . ' fa-fw mr-1 text-dark"></i>' . e($row->entityTypeComponent->name) . '</span>';
+                    return '<span>' . \App\Helper\FontAwesome::html($row->entityTypeComponent->symbol, 'fa-fw mr-1 text-dark') . e($row->entityTypeComponent->name) . '</span>';
                 }
                 return '<span class="text-muted">-</span>';
             })

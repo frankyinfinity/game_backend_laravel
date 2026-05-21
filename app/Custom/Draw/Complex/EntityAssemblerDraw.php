@@ -248,7 +248,7 @@ class EntityAssemblerDraw
         $elementDataBody = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)->get()->toArray();
         $gridDrawBody->setElementData($elementDataBody);
 
-        $this->buildGridTemplate($gridDrawBody, $modalUid);
+        $this->buildGridTemplate($gridDrawBody, $modalUid, false);
         $gridDrawBody->build();
         $gridElementUidsBody = $gridDrawBody->getElementUids();
         $gridScrollUidsBody = $gridDrawBody->getScrollUids();
@@ -263,11 +263,18 @@ class EntityAssemblerDraw
         $gridDrawComponent->setElementsPerRow(3);
         $gridDrawComponent->setElementSpacing(2);
 
-        $elementDataComponent = \App\Models\EntityComponent::where('state', \App\Models\EntityComponent::STATE_COMPLETED)->get()->toArray();
+        $elementDataComponent = \App\Models\EntityComponent::with('entityTypeComponent')
+            ->where('state', \App\Models\EntityComponent::STATE_COMPLETED)
+            ->get()
+            ->map(function ($item) {
+                $data = $item->toArray();
+                $data['symbol'] = $item->entityTypeComponent ? \App\Helper\FontAwesome::unicode($item->entityTypeComponent->symbol) : '';
+                return $data;
+            })->toArray();
         $gridDrawComponent->setElementData($elementDataComponent);
         $gridDrawComponent->setImageDisk('entity_components');
 
-        $this->buildGridTemplate($gridDrawComponent, $modalUid);
+        $this->buildGridTemplate($gridDrawComponent, $modalUid, true);
         $gridDrawComponent->build();
         $gridElementUidsComponent = $gridDrawComponent->getElementUids();
         $gridScrollUidsComponent = $gridDrawComponent->getScrollUids();
@@ -375,7 +382,7 @@ class EntityAssemblerDraw
         }
     }
 
-    private function buildGridTemplate($gridDraw, $modalUid): void
+    private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false): void
     {
         $templateContainer = new Rectangle('template_container');
         $templateContainer->setColor(0x87CEEB);
@@ -399,11 +406,22 @@ class EntityAssemblerDraw
 
         $templateGrid = new TemplateGridDraw($modalUid . '_template');
         $templateGrid->addTemplate($templateContainer);
+        if ($withSymbol) {
+            $templateSymbol = new Text('template_symbol');
+            $templateSymbol->setText('{symbol}');
+            $templateSymbol->setColor(0x000000);
+            $templateSymbol->setFontSize(14);
+            $templateSymbol->setFontFamily(\App\Helper\FontAwesome::fontFamily());
+            $templateGrid->addTemplate($templateSymbol);
+        }
         $templateGrid->addTemplate($templateText);
         $templateGrid->addTemplate($templateWhiteSquare);
         $templateGrid->addTemplate($templateImage);
         $templateGrid->addTemplateWithMapping('{label}', 'name');
         $templateGrid->addTemplateWithMapping('{image}', 'image');
+        if ($withSymbol) {
+            $templateGrid->addTemplateWithMapping('{symbol}', 'symbol');
+        }
         $gridDraw->setTemplateGrid($templateGrid);
     }
 }

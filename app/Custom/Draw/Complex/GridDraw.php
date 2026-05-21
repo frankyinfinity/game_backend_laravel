@@ -185,6 +185,8 @@ class GridDraw
                 $containerW = $elementWidth - ($margin * 2);
                 $containerH = $elementHeight - ($margin * 2);
                 
+                $rectCount = 0;
+                $hasSymbol = !empty(array_filter($this->templates, fn($t) => $t instanceof Text && $t->getText() === '{symbol}'));
                 foreach ($this->templates as $templateIndex => $template) {
                     $clonedElement = clone $template;
                     $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
@@ -192,17 +194,32 @@ class GridDraw
                     $innerPadding = 4;
                     $textAreaHeight = 22;
 
-                    if ($templateIndex === 0 && $clonedElement instanceof Rectangle) {
+                    if ($clonedElement instanceof Rectangle && $rectCount === 0) {
+                        $rectCount++;
                         $clonedElement->setOrigin((int)($cellX + $margin), (int)($cellY + $margin));
                         $clonedElement->setSize((int)$containerW, (int)$containerH);
-                    } elseif ($templateIndex === 2 && $clonedElement instanceof Rectangle) {
+                    } elseif ($clonedElement instanceof Text && $clonedElement->getText() === '{symbol}') {
+                        $clonedElement->setOrigin(
+                            (int)($cellX + $margin + 6),
+                            (int)($cellY + $margin + $containerH - 19)
+                        );
+                        $clonedElement->setCenterAnchor(false);
+                    } elseif ($clonedElement instanceof Text) {
+                        $textX = $hasSymbol ? 24 : 6;
+                        $clonedElement->setOrigin(
+                            (int)($cellX + $margin + $textX),
+                            (int)($cellY + $margin + $containerH - 19)
+                        );
+                        $clonedElement->setCenterAnchor(false);
+                    } elseif ($clonedElement instanceof Rectangle) {
+                        $rectCount++;
                         $wsX = (int)($cellX + $margin + $innerPadding);
                         $wsY = (int)($cellY + $margin + $innerPadding);
                         $wsW = (int)($containerW - 2 * $innerPadding);
                         $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding);
                         $clonedElement->setOrigin($wsX, $wsY);
                         $clonedElement->setSize($wsW, $wsH);
-                    } elseif ($templateIndex === 3 && $clonedElement instanceof Image) {
+                    } elseif ($clonedElement instanceof Image) {
                         $imgPadding = 4;
                         $wsW = (int)($containerW - 2 * $innerPadding);
                         $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding);
@@ -212,12 +229,6 @@ class GridDraw
                         $imgH = (int)($wsH - 2 * $imgPadding);
                         $clonedElement->setOrigin($imgX, $imgY);
                         $clonedElement->setSize($imgW, $imgH);
-                    } elseif ($clonedElement instanceof Text) {
-                        $clonedElement->setOrigin(
-                            (int)($cellX + $margin + 9),
-                            (int)($cellY + $margin + $containerH - 19)
-                        );
-                        $clonedElement->setCenterAnchor(false);
                     } else {
                         $clonedElement->setOrigin(
                             (int)($cellX + $clonedElement->getOriginX()),
@@ -255,10 +266,12 @@ class GridDraw
                         $src = $clonedElement->getSrc();
                         foreach ($this->placeholderMappings as $mapping) {
                             if (isset($mapping['placeholder'], $mapping['dataKey'], $cellData[$mapping['dataKey']])) {
-                                $imageFile = $cellData[$mapping['dataKey']];
-                                if ($imageFile && \Storage::disk($this->imageDisk)->exists($imageFile)) {
-                                    $imageUrl = \Storage::disk($this->imageDisk)->url($imageFile);
-                                    $src = str_replace($mapping['placeholder'], $imageUrl, $src);
+                                if (str_contains($src, $mapping['placeholder'])) {
+                                    $imageFile = $cellData[$mapping['dataKey']];
+                                    if ($imageFile && \Storage::disk($this->imageDisk)->exists($imageFile)) {
+                                        $imageUrl = \Storage::disk($this->imageDisk)->url($imageFile);
+                                        $src = str_replace($mapping['placeholder'], $imageUrl, $src);
+                                    }
                                 }
                             }
                         }

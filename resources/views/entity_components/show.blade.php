@@ -25,7 +25,7 @@
                         <th class="text-dark font-weight-bold">Tipologia</th>
                         <td>
                             @if($entityComponent->entityTypeComponent)
-                                <span><i class="{{ $entityComponent->entityTypeComponent->symbol }} fa-fw mr-1 text-dark"></i>{{ $entityComponent->entityTypeComponent->name }}</span>
+                                <span>{!! \App\Helper\FontAwesome::html($entityComponent->entityTypeComponent->symbol, 'fa-fw mr-1 text-dark') !!}{{ $entityComponent->entityTypeComponent->name }}</span>
                             @else
                                 <span class="text-muted">-</span>
                             @endif
