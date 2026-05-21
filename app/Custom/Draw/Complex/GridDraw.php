@@ -310,6 +310,16 @@ class GridDraw
         $this->drawItems[] = $scrollbarStrip;
         $this->scrollUids[] = $scrollbarStrip->getUid();
 
+        // Scrollbar strip left border
+        $stripLeftBorder = new Rectangle($uid . '_scrollbar_strip_left_border');
+        $stripLeftBorder->setOrigin($scrollX, $scrollY);
+        $stripLeftBorder->setSize(2, $height);
+        $stripLeftBorder->setColor(0x000000);
+        $stripLeftBorder->setRenderable($this->renderable);
+        $stripLeftBorder->addAttributes('z_index', $this->baseZIndex + 11);
+        $this->drawItems[] = $stripLeftBorder;
+        $this->scrollUids[] = $stripLeftBorder->getUid();
+
         // Up button
         $upButton = new Rectangle($uid . '_scroll_up');
         $upButton->setOrigin($scrollX, $scrollY);
@@ -320,6 +330,16 @@ class GridDraw
         $upButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_up_" . $uid . "']();");
         $this->drawItems[] = $upButton;
         $this->scrollUids[] = $upButton->getUid();
+
+        // Up button left border
+        $upLeftBorder = new Rectangle($uid . '_scroll_up_left_border');
+        $upLeftBorder->setOrigin($scrollX, $scrollY);
+        $upLeftBorder->setSize(2, $scrollbarWidth);
+        $upLeftBorder->setColor(0x000000);
+        $upLeftBorder->setRenderable($this->renderable);
+        $upLeftBorder->addAttributes('z_index', $this->baseZIndex + 21);
+        $this->drawItems[] = $upLeftBorder;
+        $this->scrollUids[] = $upLeftBorder->getUid();
 
         // Up text
         $upText = new Text($uid . '_scroll_up_text');
@@ -343,6 +363,16 @@ class GridDraw
         $downButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_down_" . $uid . "']();");
         $this->drawItems[] = $downButton;
         $this->scrollUids[] = $downButton->getUid();
+
+        // Down button left border
+        $downLeftBorder = new Rectangle($uid . '_scroll_down_left_border');
+        $downLeftBorder->setOrigin($scrollX, $scrollY + $height - $scrollbarWidth);
+        $downLeftBorder->setSize(2, $scrollbarWidth);
+        $downLeftBorder->setColor(0x000000);
+        $downLeftBorder->setRenderable($this->renderable);
+        $downLeftBorder->addAttributes('z_index', $this->baseZIndex + 21);
+        $this->drawItems[] = $downLeftBorder;
+        $this->scrollUids[] = $downLeftBorder->getUid();
 
         // Down text
         $downText = new Text($uid . '_scroll_down_text');
