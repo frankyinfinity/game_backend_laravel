@@ -337,14 +337,14 @@ class EntityAssemblerDraw
                 $data = $item->toArray();
                 $pixels = [];
 
-                // Build zone pixel lookup set for this entity body
+                // Build zone pixel lookup: maps "x,y" => zone_id
                 // Zone pixels are saved at 64x64 (editor grid), image is resized to 32x32
-                $zoneSet = [];
+                $zonePixelToZoneId = [];
                 foreach ($item->zones as $zone) {
                     foreach ($zone->pixels as $pixel) {
                         $gx = (int) floor($pixel->x / 2);
                         $gy = (int) floor($pixel->y / 2);
-                        $zoneSet[$gx . ',' . $gy] = true;
+                        $zonePixelToZoneId[$gx . ',' . $gy] = $zone->id;
                     }
                 }
                 
@@ -369,10 +369,18 @@ class EntityAssemblerDraw
                                     $g = ($rgb >> 8) & 0xFF;
                                     $b = $rgb & 0xFF;
                                     if ($r < 50 && $g < 50 && $b < 50) {
+                                        $key = $x . ',' . $y;
+                                        $myZoneId = $zonePixelToZoneId[$key] ?? null;
+                                        $hasZone = isset($zonePixelToZoneId[$x . ',' . $y]);
+
                                         $pixels[] = [
                                             'x' => $x,
                                             'y' => $y,
-                                            'has_zone' => isset($zoneSet[$x . ',' . $y]),
+                                            'has_zone' => $hasZone,
+                                            'zone_border_top' => $hasZone && (($zonePixelToZoneId[$x . ',' . ($y - 1)] ?? null) !== $myZoneId),
+                                            'zone_border_bottom' => $hasZone && (($zonePixelToZoneId[$x . ',' . ($y + 1)] ?? null) !== $myZoneId),
+                                            'zone_border_left' => $hasZone && (($zonePixelToZoneId[($x - 1) . ',' . $y] ?? null) !== $myZoneId),
+                                            'zone_border_right' => $hasZone && (($zonePixelToZoneId[($x + 1) . ',' . $y] ?? null) !== $myZoneId),
                                         ];
                                     }
                                 }

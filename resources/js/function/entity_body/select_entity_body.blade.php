@@ -52,9 +52,10 @@
             selectedBodyUid = elementUid;
         }
         
-        // Draw black pixels on grid + gray border for zone pixels
+        // Draw black pixels on grid + gray border for zone pixels + red border where zone edge
         var pixels = data.pixels_json ? JSON.parse(data.pixels_json) : [];
-        var borderColor = 0x808080;
+        var grayBorderColor = 0x808080;
+        var zoneBorderColor = 0xFF0000;
         var borderThickness = 2;
 
         pixels.forEach(function(pixel) {
@@ -64,16 +65,16 @@
 
             cellShape.tint = 0x000000;
 
-            // If this black pixel is also part of a zone, draw gray border
+            // Draw gray border for zone pixels + red borders where zone edge
             if (pixel.has_zone) {
                 var cx = cellShape.x;
                 var cy = cellShape.y;
                 var cw = cellShape.width;
                 var ch = cellShape.height;
 
-                function addBorderRect(rx, ry, rw, rh) {
+                function addBorderRect(rx, ry, rw, rh, color) {
                     var g = new PIXI.Graphics();
-                    g.beginFill(borderColor);
+                    g.beginFill(color);
                     g.drawRect(0, 0, rw, rh);
                     g.endFill();
                     g.x = rx;
@@ -83,10 +84,17 @@
                     zoneBorderShapes.push(g);
                 }
 
-                addBorderRect(cx, cy, cw, borderThickness);                       // top
-                addBorderRect(cx, cy + ch - borderThickness, cw, borderThickness); // bottom
-                addBorderRect(cx, cy, borderThickness, ch);                       // left
-                addBorderRect(cx + cw - borderThickness, cy, borderThickness, ch); // right
+                // Gray base border for all zone pixels
+                addBorderRect(cx, cy, cw, borderThickness, grayBorderColor);
+                addBorderRect(cx, cy + ch - borderThickness, cw, borderThickness, grayBorderColor);
+                addBorderRect(cx, cy, borderThickness, ch, grayBorderColor);
+                addBorderRect(cx + cw - borderThickness, cy, borderThickness, ch, grayBorderColor);
+
+                // Red borders only on sides where neighbor is NOT same zone
+                if (pixel.zone_border_top)    addBorderRect(cx, cy, cw, borderThickness, zoneBorderColor);
+                if (pixel.zone_border_bottom) addBorderRect(cx, cy + ch - borderThickness, cw, borderThickness, zoneBorderColor);
+                if (pixel.zone_border_left)   addBorderRect(cx, cy, borderThickness, ch, zoneBorderColor);
+                if (pixel.zone_border_right)  addBorderRect(cx + cw - borderThickness, cy, borderThickness, ch, zoneBorderColor);
             }
         });
     };
