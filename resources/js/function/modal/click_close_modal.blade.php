@@ -36,6 +36,12 @@ window['__name__'] = function() {
     window['__modal_scroll_drag_' + modalUid] = null;
     window.__disableGlobalPan = false;
 
+    // Reset entity body grid and clear zone borders if the modal has them
+    var resetGridFn = window['resetEntityBodyGrid_' + modalUid];
+    if (typeof resetGridFn === 'function') {
+        resetGridFn();
+    }
+
     if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
         let resolvedPlayerId = null;
         if (typeof playerId !== 'undefined') {

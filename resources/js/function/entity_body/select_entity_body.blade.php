@@ -14,6 +14,26 @@
         zoneBorderShapes = [];
     }
 
+    window['clearZoneBorders_' + '__MODAL_UID__'] = clearZoneBorders;
+
+    window['resetEntityBodyGrid_' + '__MODAL_UID__'] = function() {
+        if (selectedRect) {
+            selectedRect.tint = 0xFFFFFF;
+            selectedRect = null;
+        }
+        selectedBodyUid = null;
+        for (var row = 0; row < 32; row++) {
+            for (var col = 0; col < 32; col++) {
+                var cellUid = '__MODAL_UID___grid_cell_' + row + '_' + col;
+                var cellShape = shapes[cellUid];
+                if (cellShape) {
+                    cellShape.tint = 0xFFFFFF;
+                }
+            }
+        }
+        clearZoneBorders();
+    };
+
     window['__name__'] = function(elementUid) {
         var obj = objects[elementUid];
         if (!obj || !obj['attributes']) return;
@@ -56,7 +76,8 @@
         var pixels = data.pixels_json ? JSON.parse(data.pixels_json) : [];
         var grayBorderColor = 0x808080;
         var zoneBorderColor = 0xFF0000;
-        var borderThickness = 2;
+        var grayThickness = 1;
+        var zoneThickness = 3;
 
         pixels.forEach(function(pixel) {
             var cellUid = '__MODAL_UID___grid_cell_' + pixel.y + '_' + pixel.x;
@@ -85,16 +106,16 @@
                 }
 
                 // Gray base border for all zone pixels
-                addBorderRect(cx, cy, cw, borderThickness, grayBorderColor);
-                addBorderRect(cx, cy + ch - borderThickness, cw, borderThickness, grayBorderColor);
-                addBorderRect(cx, cy, borderThickness, ch, grayBorderColor);
-                addBorderRect(cx + cw - borderThickness, cy, borderThickness, ch, grayBorderColor);
+                addBorderRect(cx, cy, cw, grayThickness, grayBorderColor);
+                addBorderRect(cx, cy + ch - grayThickness, cw, grayThickness, grayBorderColor);
+                addBorderRect(cx, cy, grayThickness, ch, grayBorderColor);
+                addBorderRect(cx + cw - grayThickness, cy, grayThickness, ch, grayBorderColor);
 
                 // Red borders only on sides where neighbor is NOT same zone
-                if (pixel.zone_border_top)    addBorderRect(cx, cy, cw, borderThickness, zoneBorderColor);
-                if (pixel.zone_border_bottom) addBorderRect(cx, cy + ch - borderThickness, cw, borderThickness, zoneBorderColor);
-                if (pixel.zone_border_left)   addBorderRect(cx, cy, borderThickness, ch, zoneBorderColor);
-                if (pixel.zone_border_right)  addBorderRect(cx + cw - borderThickness, cy, borderThickness, ch, zoneBorderColor);
+                if (pixel.zone_border_top)    addBorderRect(cx, cy, cw, zoneThickness, zoneBorderColor);
+                if (pixel.zone_border_bottom) addBorderRect(cx, cy + ch - zoneThickness, cw, zoneThickness, zoneBorderColor);
+                if (pixel.zone_border_left)   addBorderRect(cx, cy, zoneThickness, ch, zoneBorderColor);
+                if (pixel.zone_border_right)  addBorderRect(cx + cw - zoneThickness, cy, zoneThickness, ch, zoneBorderColor);
             }
         });
     };
