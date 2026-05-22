@@ -238,93 +238,79 @@ class EntityAssemblerDraw
         $gridAreaWidth = $leftWidth - ($gridPadding * 2);
         $gridAreaHeight = $contentHeight - ($gridPadding * 2);
         
-        // Calculate cell size (square cells)
-        $cellSize = min($gridAreaWidth / $gridSize, $gridAreaHeight / $gridSize);
+        // Calculate cell size as integer for uniform cells
+        $cellSize = (int) floor(min($gridAreaWidth / $gridSize, $gridAreaHeight / $gridSize));
         
         // Center the grid in the left area
         $gridTotalWidth = $cellSize * $gridSize;
         $gridTotalHeight = $cellSize * $gridSize;
-        $gridX = $contentX + ($leftWidth - $gridTotalWidth) / 2;
-        $gridY = $contentY + ($contentHeight - $gridTotalHeight) / 2;
+        $gridX = (int) ($contentX + ($leftWidth - $gridTotalWidth) / 2);
+        $gridY = (int) ($contentY + ($contentHeight - $gridTotalHeight) / 2);
 
-        // Create 32x32 grid cells
-        $gridCellUids = [];
-        
-        // White background for the entire grid
+        // Dark gray background (acts as grid lines)
         $gridBg = new Rectangle($modalUid . '_grid_bg');
-        $gridBg->setOrigin((int)$gridX, (int)$gridY);
-        $gridBg->setSize((int)$gridTotalWidth, (int)$gridTotalHeight);
-        $gridBg->setColor(0xFFFFFF);
+        $gridBg->setOrigin($gridX, $gridY);
+        $gridBg->setSize($gridTotalWidth, $gridTotalHeight);
+        $gridBg->setColor(0x404040);
         $gridBg->setRenderable(false);
         $gridBg->addAttributes('z_index', 20040);
         $this->drawItems[] = $gridBg;
+
+        // 32x32 white cells with 1px gap (shows dark gray background as lines)
+        $gridCellUids = [];
         $gridCellUids[] = $gridBg->getUid();
+        $cellInnerSize = $cellSize - 1; // 1px gap for grid lines
         
-        $lineColor = 0x404040;
-        $lineThickness = 1;
-        
-        // Horizontal lines
-        for ($row = 0; $row <= $gridSize; $row++) {
-            $lineY = $gridY + ($row * $cellSize);
-            $line = new Rectangle($modalUid . '_grid_hline_' . $row);
-            $line->setOrigin((int)$gridX, (int)$lineY);
-            $line->setSize((int)$gridTotalWidth, $lineThickness);
-            $line->setColor($lineColor);
-            $line->setRenderable(false);
-            $line->addAttributes('z_index', 20041);
-            $this->drawItems[] = $line;
-            $gridCellUids[] = $line->getUid();
-        }
-        
-        // Vertical lines
-        for ($col = 0; $col <= $gridSize; $col++) {
-            $lineX = $gridX + ($col * $cellSize);
-            $line = new Rectangle($modalUid . '_grid_vline_' . $col);
-            $line->setOrigin((int)$lineX, (int)$gridY);
-            $line->setSize($lineThickness, (int)$gridTotalHeight);
-            $line->setColor($lineColor);
-            $line->setRenderable(false);
-            $line->addAttributes('z_index', 20041);
-            $this->drawItems[] = $line;
-            $gridCellUids[] = $line->getUid();
+        for ($row = 0; $row < $gridSize; $row++) {
+            for ($col = 0; $col < $gridSize; $col++) {
+                $cellX = $gridX + ($col * $cellSize) + 1;
+                $cellY = $gridY + ($row * $cellSize) + 1;
+                
+                $cell = new Rectangle($modalUid . '_grid_cell_' . $row . '_' . $col);
+                $cell->setOrigin($cellX, $cellY);
+                $cell->setSize($cellInnerSize, $cellInnerSize);
+                $cell->setColor(0xFFFFFF);
+                $cell->setRenderable(false);
+                $cell->addAttributes('z_index', 20041);
+                $cell->addAttributes('grid_row', $row);
+                $cell->addAttributes('grid_col', $col);
+                $this->drawItems[] = $cell;
+                $gridCellUids[] = $cell->getUid();
+            }
         }
         
         // Black border around the entire grid
         $borderThick = 2;
-        // Top border
         $gridBorderTop = new Rectangle($modalUid . '_grid_border_top');
-        $gridBorderTop->setOrigin((int)$gridX, (int)$gridY);
-        $gridBorderTop->setSize((int)$gridTotalWidth, $borderThick);
+        $gridBorderTop->setOrigin($gridX, $gridY);
+        $gridBorderTop->setSize($gridTotalWidth, $borderThick);
         $gridBorderTop->setColor(0x000000);
         $gridBorderTop->setRenderable(false);
         $gridBorderTop->addAttributes('z_index', 20042);
         $this->drawItems[] = $gridBorderTop;
         $gridCellUids[] = $gridBorderTop->getUid();
         
-        // Bottom border
         $gridBorderBottom = new Rectangle($modalUid . '_grid_border_bottom');
-        $gridBorderBottom->setOrigin((int)$gridX, (int)($gridY + $gridTotalHeight - $borderThick));
-        $gridBorderBottom->setSize((int)$gridTotalWidth, $borderThick);
+        $gridBorderBottom->setOrigin($gridX, $gridY + $gridTotalHeight - $borderThick);
+        $gridBorderBottom->setSize($gridTotalWidth, $borderThick);
         $gridBorderBottom->setColor(0x000000);
         $gridBorderBottom->setRenderable(false);
         $gridBorderBottom->addAttributes('z_index', 20042);
         $this->drawItems[] = $gridBorderBottom;
         $gridCellUids[] = $gridBorderBottom->getUid();
         
-        // Left border
         $gridBorderLeft = new Rectangle($modalUid . '_grid_border_left');
-        $gridBorderLeft->setOrigin((int)$gridX, (int)$gridY);
-        $gridBorderLeft->setSize($borderThick, (int)$gridTotalHeight);
+        $gridBorderLeft->setOrigin($gridX, $gridY);
+        $gridBorderLeft->setSize($borderThick, $gridTotalHeight);
         $gridBorderLeft->setColor(0x000000);
         $gridBorderLeft->setRenderable(false);
         $gridBorderLeft->addAttributes('z_index', 20042);
         $this->drawItems[] = $gridBorderLeft;
         $gridCellUids[] = $gridBorderLeft->getUid();
         
-        // Right border
         $gridBorderRight = new Rectangle($modalUid . '_grid_border_right');
-        $gridBorderRight->setOrigin((int)($gridX + $gridTotalWidth - $borderThick), (int)$gridY);
-        $gridBorderRight->setSize($borderThick, (int)$gridTotalHeight);
+        $gridBorderRight->setOrigin($gridX + $gridTotalWidth - $borderThick, $gridY);
+        $gridBorderRight->setSize($borderThick, $gridTotalHeight);
         $gridBorderRight->setColor(0x000000);
         $gridBorderRight->setRenderable(false);
         $gridBorderRight->addAttributes('z_index', 20042);
@@ -344,14 +330,60 @@ class EntityAssemblerDraw
         $gridDrawBody->setElementsPerRow(3);
         $gridDrawBody->setElementSpacing(2);
 
-        $elementDataBody = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)->get()->toArray();
+        $elementDataBody = \App\Models\EntityBody::where('state', \App\Models\EntityBody::STATE_COMPLETED)
+            ->get()
+            ->map(function ($item) {
+                $data = $item->toArray();
+                $pixels = [];
+                
+                // Read black pixels from the entity body image
+                if (!empty($item->image)) {
+                    $imagePath = \Storage::disk('entity_bodies')->path($item->image);
+                    if (file_exists($imagePath)) {
+                        $img = imagecreatefromstring(file_get_contents($imagePath));
+                        if ($img) {
+                            $origW = imagesx($img);
+                            $origH = imagesy($img);
+                            // Resize to 32x32 with white background
+                            $resized = imagecreatetruecolor(32, 32);
+                            $white = imagecolorallocate($resized, 255, 255, 255);
+                            imagefill($resized, 0, 0, $white);
+                            imagecopyresampled($resized, $img, 0, 0, 0, 0, 32, 32, $origW, $origH);
+                            
+                            for ($y = 0; $y < 32; $y++) {
+                                for ($x = 0; $x < 32; $x++) {
+                                    $rgb = imagecolorat($resized, $x, $y);
+                                    $r = ($rgb >> 16) & 0xFF;
+                                    $g = ($rgb >> 8) & 0xFF;
+                                    $b = $rgb & 0xFF;
+                                    if ($r < 50 && $g < 50 && $b < 50) {
+                                        $pixels[] = ['x' => $x, 'y' => $y];
+                                    }
+                                }
+                            }
+                            imagedestroy($img);
+                            imagedestroy($resized);
+                        }
+                    }
+                }
+                
+                $data['pixels_json'] = json_encode($pixels);
+                return $data;
+            })->toArray();
         $gridDrawBody->setElementData($elementDataBody);
+        $gridDrawBody->setOnClickJs('selectEntityBody_' . $modalUid);
 
         $this->buildGridTemplate($gridDrawBody, $modalUid, false);
         $gridDrawBody->build();
         $gridElementUidsBody = $gridDrawBody->getElementUids();
         $gridScrollUidsBody = $gridDrawBody->getScrollUids();
         $this->gridScrollInitJs = $gridDrawBody->getScrollInitJs();
+        
+        // Generate JS for entity body selection on grid
+        $gridJs = file_get_contents(resource_path('js/function/entity_body/select_entity_body.blade.php'));
+        $gridJs = str_replace('__MODAL_UID__', $modalUid, $gridJs);
+        $gridJs = str_replace('__name__', 'selectEntityBody_' . $modalUid, $gridJs);
+        $this->gridScrollInitJs .= $gridJs;
 
         // Create GridDraw for tab_component
         $gridDrawComponent = new GridDraw($modalUid . '_grid_component');

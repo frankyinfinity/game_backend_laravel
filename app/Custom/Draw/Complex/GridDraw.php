@@ -31,6 +31,7 @@ class GridDraw
     private array $elementData = [];
     private array $placeholderMappings = [];
     private string $imageDisk = 'entity_bodies';
+    private ?string $onClickJs = null;
 
     public function __construct(string $uid)
     {
@@ -93,6 +94,11 @@ class GridDraw
     public function setBaseZIndex(int $zIndex): void
     {
         $this->baseZIndex = $zIndex;
+    }
+
+    public function setOnClickJs(?string $js): void
+    {
+        $this->onClickJs = $js;
     }
 
     public function build(): void
@@ -174,6 +180,11 @@ class GridDraw
             $rect->setRenderable($this->renderable);
             $rect->addAttributes('z_index', $this->baseZIndex + 1);
             $rect->addAttributes('grid_uid', $uid);
+            $rect->addAttributes('cell_data', json_encode($cellData));
+            if ($this->onClickJs !== null) {
+                $rect->addAttributes('onclick', $this->onClickJs);
+                $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['" . $this->onClickJs . "']('" . $rect->getUid() . "');");
+            }
             $this->drawItems[] = $rect;
             $elementUids[] = $rect->getUid();
             $this->allElementUids[] = $rect->getUid();
