@@ -232,6 +232,105 @@ class EntityAssemblerDraw
         $leftWidth = (int) ($contentWidth * 0.6);
         $separatorX = $contentX + $leftWidth - 1;
 
+        // Left side (60%) - 32x32 grid
+        $gridSize = 32;
+        $gridPadding = 20;
+        $gridAreaWidth = $leftWidth - ($gridPadding * 2);
+        $gridAreaHeight = $contentHeight - ($gridPadding * 2);
+        
+        // Calculate cell size (square cells)
+        $cellSize = min($gridAreaWidth / $gridSize, $gridAreaHeight / $gridSize);
+        
+        // Center the grid in the left area
+        $gridTotalWidth = $cellSize * $gridSize;
+        $gridTotalHeight = $cellSize * $gridSize;
+        $gridX = $contentX + ($leftWidth - $gridTotalWidth) / 2;
+        $gridY = $contentY + ($contentHeight - $gridTotalHeight) / 2;
+
+        // Create 32x32 grid cells
+        $gridCellUids = [];
+        
+        // White background for the entire grid
+        $gridBg = new Rectangle($modalUid . '_grid_bg');
+        $gridBg->setOrigin((int)$gridX, (int)$gridY);
+        $gridBg->setSize((int)$gridTotalWidth, (int)$gridTotalHeight);
+        $gridBg->setColor(0xFFFFFF);
+        $gridBg->setRenderable(false);
+        $gridBg->addAttributes('z_index', 20040);
+        $this->drawItems[] = $gridBg;
+        $gridCellUids[] = $gridBg->getUid();
+        
+        $lineColor = 0x404040;
+        $lineThickness = 1;
+        
+        // Horizontal lines
+        for ($row = 0; $row <= $gridSize; $row++) {
+            $lineY = $gridY + ($row * $cellSize);
+            $line = new Rectangle($modalUid . '_grid_hline_' . $row);
+            $line->setOrigin((int)$gridX, (int)$lineY);
+            $line->setSize((int)$gridTotalWidth, $lineThickness);
+            $line->setColor($lineColor);
+            $line->setRenderable(false);
+            $line->addAttributes('z_index', 20041);
+            $this->drawItems[] = $line;
+            $gridCellUids[] = $line->getUid();
+        }
+        
+        // Vertical lines
+        for ($col = 0; $col <= $gridSize; $col++) {
+            $lineX = $gridX + ($col * $cellSize);
+            $line = new Rectangle($modalUid . '_grid_vline_' . $col);
+            $line->setOrigin((int)$lineX, (int)$gridY);
+            $line->setSize($lineThickness, (int)$gridTotalHeight);
+            $line->setColor($lineColor);
+            $line->setRenderable(false);
+            $line->addAttributes('z_index', 20041);
+            $this->drawItems[] = $line;
+            $gridCellUids[] = $line->getUid();
+        }
+        
+        // Black border around the entire grid
+        $borderThick = 2;
+        // Top border
+        $gridBorderTop = new Rectangle($modalUid . '_grid_border_top');
+        $gridBorderTop->setOrigin((int)$gridX, (int)$gridY);
+        $gridBorderTop->setSize((int)$gridTotalWidth, $borderThick);
+        $gridBorderTop->setColor(0x000000);
+        $gridBorderTop->setRenderable(false);
+        $gridBorderTop->addAttributes('z_index', 20042);
+        $this->drawItems[] = $gridBorderTop;
+        $gridCellUids[] = $gridBorderTop->getUid();
+        
+        // Bottom border
+        $gridBorderBottom = new Rectangle($modalUid . '_grid_border_bottom');
+        $gridBorderBottom->setOrigin((int)$gridX, (int)($gridY + $gridTotalHeight - $borderThick));
+        $gridBorderBottom->setSize((int)$gridTotalWidth, $borderThick);
+        $gridBorderBottom->setColor(0x000000);
+        $gridBorderBottom->setRenderable(false);
+        $gridBorderBottom->addAttributes('z_index', 20042);
+        $this->drawItems[] = $gridBorderBottom;
+        $gridCellUids[] = $gridBorderBottom->getUid();
+        
+        // Left border
+        $gridBorderLeft = new Rectangle($modalUid . '_grid_border_left');
+        $gridBorderLeft->setOrigin((int)$gridX, (int)$gridY);
+        $gridBorderLeft->setSize($borderThick, (int)$gridTotalHeight);
+        $gridBorderLeft->setColor(0x000000);
+        $gridBorderLeft->setRenderable(false);
+        $gridBorderLeft->addAttributes('z_index', 20042);
+        $this->drawItems[] = $gridBorderLeft;
+        $gridCellUids[] = $gridBorderLeft->getUid();
+        
+        // Right border
+        $gridBorderRight = new Rectangle($modalUid . '_grid_border_right');
+        $gridBorderRight->setOrigin((int)($gridX + $gridTotalWidth - $borderThick), (int)$gridY);
+        $gridBorderRight->setSize($borderThick, (int)$gridTotalHeight);
+        $gridBorderRight->setColor(0x000000);
+        $gridBorderRight->setRenderable(false);
+        $gridBorderRight->addAttributes('z_index', 20042);
+        $this->drawItems[] = $gridBorderRight;
+        $gridCellUids[] = $gridBorderRight->getUid();
+
         // Right side (40%) - TabDraw with 'Body' (primary) and 'Components' tabs
         $rightWidth = $contentWidth - $leftWidth;
         $rightX = $contentX + $leftWidth;
@@ -354,7 +453,7 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_bottom_tab_component',
             $modalUid . '_tabs_tab_border_left_tab_component',
             $modalUid . '_tabs_tab_border_right_tab_component'
-        ], $gridElementUidsBody, $gridScrollUidsBody, $gridElementUidsComponent, $gridScrollUidsComponent));
+        ], $gridCellUids, $gridElementUidsBody, $gridScrollUidsBody, $gridElementUidsComponent, $gridScrollUidsComponent));
         $contentViewport->addAttributes('scroll_initial_renderables', array_merge([
             $modalUid . '_separator_1' => true,
             $modalUid . '_border_top' => true,
@@ -378,7 +477,7 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_bottom_tab_component' => false,
             $modalUid . '_tabs_tab_border_left_tab_component' => false,
             $modalUid . '_tabs_tab_border_right_tab_component' => false
-        ], array_fill_keys($gridElementUidsBody, true), array_fill_keys($gridScrollUidsBody, true), array_fill_keys($gridElementUidsComponent, false), array_fill_keys($gridScrollUidsComponent, false)));
+        ], array_fill_keys($gridCellUids, true), array_fill_keys($gridElementUidsBody, true), array_fill_keys($gridScrollUidsBody, true), array_fill_keys($gridElementUidsComponent, false), array_fill_keys($gridScrollUidsComponent, false)));
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
 

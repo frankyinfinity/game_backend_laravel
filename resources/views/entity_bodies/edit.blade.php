@@ -618,8 +618,15 @@
                     );
                 });
                 promises.push(
-                    $.post('/entity-bodies/' + entityBodyId + '/zones/' + zone.id + '/save-pixels',
-                        { pixels: blackPixels, _token: getCsrf() })
+                    $.ajax({
+                        url: '/entity-bodies/' + entityBodyId + '/zones/' + zone.id + '/save-pixels',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        headers: {
+                            'X-CSRF-TOKEN': getCsrf()
+                        },
+                        data: JSON.stringify({ pixels: blackPixels })
+                    })
                 );
                 $.when.apply($, promises).done(function () {
                     zoneName = '';
@@ -665,9 +672,15 @@
                             allZonePixels[selectedZoneId] = $.grep(allZonePixels[selectedZoneId], function (px) {
                                 return !(px.x === pt.x && px.y === pt.y);
                             });
-                            $.post('/entity-bodies/' + entityBodyId + '/zones/' + selectedZoneId + '/save-pixels',
-                                { pixels: allZonePixels[selectedZoneId], _token: getCsrf() },
-                                function () {
+                            $.ajax({
+                                url: '/entity-bodies/' + entityBodyId + '/zones/' + selectedZoneId + '/save-pixels',
+                                type: 'POST',
+                                contentType: 'application/json',
+                                headers: {
+                                    'X-CSRF-TOKEN': getCsrf()
+                                },
+                                data: JSON.stringify({ pixels: allZonePixels[selectedZoneId] }),
+                                success: function () {
                                     clearCanvas();
                                     redrawZoneDots();
                                     var dots = allZoneDots[selectedZoneId];
@@ -675,7 +688,7 @@
                                         drawZonePolygon(selectedZoneId, dots, zoneColorFor(selectedZoneId), 3, SCALE * 0.45);
                                     }
                                 }
-                            );
+                            });
                         }
                     } else {
                         var tr = $('#zones-tbody tr[data-zone-id="' + foundZoneId + '"]');
@@ -697,9 +710,15 @@
                     if (isBlack) {
                         if (!allZonePixels[selectedZoneId]) allZonePixels[selectedZoneId] = [];
                         allZonePixels[selectedZoneId].push({ x: pt.x, y: pt.y });
-                        $.post('/entity-bodies/' + entityBodyId + '/zones/' + selectedZoneId + '/save-pixels',
-                            { pixels: allZonePixels[selectedZoneId], _token: getCsrf() },
-                            function () {
+                        $.ajax({
+                            url: '/entity-bodies/' + entityBodyId + '/zones/' + selectedZoneId + '/save-pixels',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            headers: {
+                                'X-CSRF-TOKEN': getCsrf()
+                            },
+                            data: JSON.stringify({ pixels: allZonePixels[selectedZoneId] }),
+                            success: function () {
                                 clearCanvas();
                                 redrawZoneDots();
                                 var dots = allZoneDots[selectedZoneId];
@@ -707,7 +726,7 @@
                                     drawZonePolygon(selectedZoneId, dots, zoneColorFor(selectedZoneId), 3, SCALE * 0.45);
                                 }
                             }
-                        );
+                        });
                     }
                 }
                 return;
