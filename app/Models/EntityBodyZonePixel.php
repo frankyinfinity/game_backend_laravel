@@ -23,6 +23,6 @@ class EntityBodyZonePixel extends Model
      */
     public function zone()
     {
-        return $this->belongsTo(EntityBodyZone::class);
+        return $this->belongsTo(EntityBodyZone::class, 'entity_body_zone_id');
     }
 }
