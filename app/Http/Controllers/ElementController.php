@@ -366,11 +366,11 @@ class ElementController extends Controller
             $informations = [];
             if ($request->has('information_genes')) {
                 foreach ($request->information_genes as $g) {
-                    if (! empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['value'])) {
+                    if (! empty($g['gene_id']) && isset($g['min_value']) && isset($g['max_from']) && isset($g['max_to']) && isset($g['max_value']) && isset($g['value'])) {
                         $informations[] = [
                             'gene_id' => $g['gene_id'],
-                            'min_value' => $g['min_value'],
-                            'max_value' => $g['value'], // Set max_value to current value
+                            'min_value' => 1,
+                            'max_value' => $g['max_value'],
                             'max_from' => $g['max_from'],
                             'max_to' => $g['max_to'],
                             'value' => $g['value'],

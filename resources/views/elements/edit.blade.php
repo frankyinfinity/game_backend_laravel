@@ -117,6 +117,21 @@
     $(function () {
         $('[data-toggle="tooltip"]').tooltip();
 
+        const geneOptions = @json($allGenes->map(fn ($gene) => ['id' => $gene->id, 'name' => $gene->name])->values());
+        const rewardScoreOptions = @json($allScores->map(fn ($score) => ['id' => $score->id, 'name' => $score->name])->values());
+
+        function buildOptions(options, placeholder) {
+            let html = `<option value="">${placeholder}</option>`;
+            options.forEach(function (option) {
+                html += `<option value="${option.id}">${$('<div>').text(option.name).html()}</option>`;
+            });
+            return html;
+        }
+
+        function getSafeOptionHtml(options, placeholder) {
+            return buildOptions(options, placeholder);
+        }
+
         // Gene Rows Management
         let geneIndex = {{ $element->genes->count() }};
 
@@ -159,10 +174,7 @@
                     <tr class="gene-row">
                         <td>
                             <select name="consumption_genes[${geneIndex}][gene_id]" class="form-control gene-selector" required>
-                                <option value="">Seleziona Gene</option>
-                                @foreach($allGenes as $g)
-                                    <option value="{{$g->id}}">{{$g->name}}</option>
-                                @endforeach
+                                ${buildOptions(geneOptions, 'Seleziona Gene')}
                             </select>
                         </td>
                         <td>
@@ -188,6 +200,15 @@
 
         // Information Rows Management
         let informationIndex = {{ $element->informations->count() }};
+        const informationMinValue = 1;
+
+        function syncInformationValueFields(row) {
+            const value = row.find('input[name$="[value]"]').val();
+            row.find('input[name$="[min_value]"]').val(informationMinValue);
+            row.find('input[name$="[max_from]"]').val(value);
+            row.find('input[name$="[max_to]"]').val(value);
+            row.find('input[name$="[max_value]"]').val(value);
+        }
 
         function updateInformationOptions() {
             let selectedValues = [];
@@ -217,68 +238,29 @@
 
         $(document).on('change', '.information-selector', function () {
             updateInformationOptions();
-
-            // Get the selected gene id
-            const geneId = $(this).val();
-            if (!geneId) {
-                return;
-            }
-
-            // Find the corresponding gene data
-            const gene = geneMap[geneId];
-            if (!gene) {
-                return;
-            }
-
-            // Update the min, max_from, and max_to fields
-            const row = $(this).closest('tr');
-            const minInput = row.find('input[name$="[min_value]"]');
-            const maxFromInput = row.find('input[name$="[max_from]"]');
-            const maxToInput = row.find('input[name$="[max_to]"]');
-            const valueInput = row.find('input[name$="[value]"]');
-
-            // Set values
-            minInput.val(gene.min || 0);
-            if (gene.max !== null) {
-                maxFromInput.val(gene.max);
-                maxToInput.val(gene.max);
-            } else {
-                maxFromInput.val(gene.max_from || 0);
-                maxToInput.val(gene.max_to || 0);
-            }
-
-            // Set value field constraints
-            valueInput.attr('min', gene.max_from || 0);
-            valueInput.attr('max', gene.max_to || 999999);
-
-            // Set default value if empty
-            if (!valueInput.val() || valueInput.val() === '') {
-                valueInput.val(gene.max_from || 0);
-            }
+            syncInformationValueFields($(this).closest('tr'));
         });
 
-        $('#add-information-row').click(function () {
+        $(document).on('input change', '.information-value', function () {
+            syncInformationValueFields($(this).closest('tr'));
+        });
+
+        $(document).on('click', '#add-information-row', function () {
             let html = `
                     <tr class="information-row">
                         <td>
                             <select name="information_genes[${informationIndex}][gene_id]" class="form-control information-selector" required>
-                                <option value="">Seleziona Gene</option>
-                                @foreach($allGenes as $g)
-                                    <option value="{{$g->id}}">{{$g->name}}</option>
-                                @endforeach
+                                ${buildOptions(geneOptions, 'Seleziona Gene')}
                             </select>
                         </td>
                         <td>
-                            <input type="number" name="information_genes[${informationIndex}][min_value]" class="form-control" required placeholder="Valore Minimo" readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
+                            <input type="number" name="information_genes[${informationIndex}][min_value]" value="1" class="form-control" required readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
                         </td>
                         <td>
-                            <input type="number" name="information_genes[${informationIndex}][max_from]" class="form-control" required placeholder="Valore Massimo Da" readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
-                        </td>
-                        <td>
-                            <input type="number" name="information_genes[${informationIndex}][max_to]" class="form-control" required placeholder="Valore Massimo A" readonly style="background-color: #f4f6f9; color: #6c757d; border-style: dashed;">
-                        </td>
-                        <td>
-                            <input type="number" name="information_genes[${informationIndex}][value]" class="form-control" required placeholder="Valore Attuale">
+                            <input type="number" name="information_genes[${informationIndex}][value]" class="form-control information-value" required min="1" placeholder="Valore">
+                            <input type="hidden" name="information_genes[${informationIndex}][max_from]" class="information-max-from">
+                            <input type="hidden" name="information_genes[${informationIndex}][max_to]" class="information-max-to">
+                            <input type="hidden" name="information_genes[${informationIndex}][max_value]" class="information-max-value">
                         </td>
                         <td>
                             <button type="button" class="btn btn-danger btn-sm remove-information-row"><i class="fa fa-trash"></i></button>
@@ -296,6 +278,9 @@
         });
 
         updateInformationOptions();
+        $('.information-row').each(function () {
+            syncInformationValueFields($(this));
+        });
 
         // Reward Rows Management
         let rewardIndex = {{ $element->scores->count() }};
@@ -326,15 +311,16 @@
             });
         }
 
-        $('#add-reward-row').click(function () {
+        $(document).on('change', '.reward-selector', function () {
+            updateRewardOptions();
+        });
+
+        $(document).on('click', '#add-reward-row', function () {
             let html = `
                     <tr class="reward-row">
                         <td>
                             <select name="reward_scores[${rewardIndex}][score_id]" class="form-control reward-selector" required>
-                                <option value="">Seleziona Punteggio</option>
-                                @foreach($allScores as $s)
-                                    <option value="{{ $s->id }}">{{ $s->name }}</option>
-                                @endforeach
+                                ${buildOptions(rewardScoreOptions, 'Seleziona Punteggio')}
                             </select>
                         </td>
                         <td>
