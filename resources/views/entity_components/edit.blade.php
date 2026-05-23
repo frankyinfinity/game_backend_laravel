@@ -150,6 +150,7 @@
                                         <th>ID</th>
                                         <th>Nome Gene</th>
                                         <th>Key</th>
+                                        <th>Valore</th>
                                         <th>Azioni</th>
                                     </tr>
                                 </thead>
@@ -226,6 +227,10 @@
                                 <option value="">Seleziona un Gene...</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="gene-value" class="font-weight-bold">Valore</label>
+                            <input type="number" class="form-control" id="gene-value" name="value" placeholder="Inserisci un valore intero">
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
@@ -301,6 +306,7 @@
                     { data: 'id', name: 'id' },
                     { data: 'gene_name', name: 'gene_name', orderable: false, searchable: false },
                     { data: 'gene_key', name: 'gene_key', orderable: false, searchable: false },
+                    { data: 'value', name: 'value', orderable: false, searchable: false },
                     {
                         data: null,
                         orderable: false,

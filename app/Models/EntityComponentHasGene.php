@@ -11,11 +11,13 @@ class EntityComponentHasGene extends Model
     protected $fillable = [
         'entity_component_id',
         'gene_id',
+        'value',
     ];
 
     protected $casts = [
         'entity_component_id' => 'integer',
         'gene_id' => 'integer',
+        'value' => 'integer',
     ];
 
     public function entityComponent()

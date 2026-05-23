@@ -434,7 +434,7 @@ class EntityAssemblerDraw
                     $tooltipParts[] = 'GENI:';
                     foreach ($item->genes as $geneRel) {
                         if ($geneRel->gene) {
-                            $tooltipParts[] = "  - {$geneRel->gene->name}";
+                            $tooltipParts[] = "  - {$geneRel->gene->name} ({$geneRel->value})";
                         }
                     }
                 }

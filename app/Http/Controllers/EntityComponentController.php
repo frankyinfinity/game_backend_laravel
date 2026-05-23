@@ -214,6 +214,9 @@ class EntityComponentController extends Controller
             ->addColumn('gene_key', function ($row) {
                 return $row->gene ? $row->gene->key : '';
             })
+            ->addColumn('value', function ($row) {
+                return $row->value;
+            })
             ->rawColumns([])
             ->toJson();
     }
@@ -245,6 +248,7 @@ class EntityComponentController extends Controller
 
         $request->validate([
             'gene_id' => 'required|exists:genes,id',
+            'value' => 'nullable|integer',
         ]);
 
         $exists = EntityComponentHasGene::where('entity_component_id', $entityComponent->id)
@@ -258,6 +262,7 @@ class EntityComponentController extends Controller
         EntityComponentHasGene::create([
             'entity_component_id' => $entityComponent->id,
             'gene_id' => $request->gene_id,
+            'value' => $request->value,
         ]);
 
         return response()->json(['success' => true]);

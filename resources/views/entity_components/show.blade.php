@@ -94,6 +94,7 @@
                                 <tr>
                                     <th>Nome Gene</th>
                                     <th>Key</th>
+                                    <th>Valore</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -101,10 +102,11 @@
                                     <tr>
                                         <td>{{ $assoc->gene->name ?? 'N/A' }}</td>
                                         <td><code>{{ $assoc->gene->key ?? 'N/A' }}</code></td>
+                                        <td>{{ $assoc->value ?? '-' }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="3" class="text-muted text-center py-3">Nessun gene associato.</td>
+                                        <td colspan="4" class="text-muted text-center py-3">Nessun gene associato.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
