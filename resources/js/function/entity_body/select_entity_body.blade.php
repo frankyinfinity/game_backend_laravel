@@ -76,6 +76,14 @@
         var pixels = data.pixels_json ? JSON.parse(data.pixels_json) : [];
         var grayBorderColor = 0x808080;
         var zoneBorderColor = 0xFF0000;
+
+        // Helper to convert hex string to PIXI color number
+        function hexToPixiColor(hex) {
+            if (!hex) return 0xFF0000;
+            if (typeof hex === 'number') return hex;
+            hex = hex.replace('#', '');
+            return parseInt(hex, 16);
+        }
         var grayThickness = 1;
         var zoneThickness = 3;
 
@@ -86,12 +94,13 @@
 
             cellShape.tint = 0x000000;
 
-            // Draw gray border for zone pixels + red borders where zone edge
+            // Draw gray border for zone pixels + zone color borders where zone edge
             if (pixel.has_zone) {
                 var cx = cellShape.x;
                 var cy = cellShape.y;
                 var cw = cellShape.width;
                 var ch = cellShape.height;
+                var zoneBorderColor = hexToPixiColor(pixel.zone_color);
 
                 function addBorderRect(rx, ry, rw, rh, color) {
                     var g = new PIXI.Graphics();

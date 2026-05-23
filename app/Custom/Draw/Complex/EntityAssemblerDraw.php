@@ -337,10 +337,12 @@ class EntityAssemblerDraw
                 $data = $item->toArray();
                 $pixels = [];
 
-                // Build zone pixel lookup: maps "x,y" => zone_id
+                // Build zone pixel lookup: maps "x,y" => zone_id and zone_id => color
                 // Zone pixels are saved at 64x64 (editor grid), image is resized to 32x32
                 $zonePixelToZoneId = [];
+                $zoneIdToColor = [];
                 foreach ($item->zones as $zone) {
+                    $zoneIdToColor[$zone->id] = $zone->color ?? '#000000';
                     foreach ($zone->pixels as $pixel) {
                         $gx = (int) floor($pixel->x / 2);
                         $gy = (int) floor($pixel->y / 2);
@@ -381,6 +383,7 @@ class EntityAssemblerDraw
                                             'zone_border_bottom' => $hasZone && (($zonePixelToZoneId[$x . ',' . ($y + 1)] ?? null) !== $myZoneId),
                                             'zone_border_left' => $hasZone && (($zonePixelToZoneId[($x - 1) . ',' . $y] ?? null) !== $myZoneId),
                                             'zone_border_right' => $hasZone && (($zonePixelToZoneId[($x + 1) . ',' . $y] ?? null) !== $myZoneId),
+                                            'zone_color' => $hasZone ? ($zoneIdToColor[$myZoneId] ?? '#000000') : null,
                                         ];
                                     }
                                 }
