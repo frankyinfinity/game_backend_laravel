@@ -21,7 +21,7 @@ class SliderDraw
     private $y = 0;
     private $width = 300;
     private $height = 60;
-    private $onChange = "console.log(value);";
+    private $onChange = '';
 
     public function __construct($uid)
     {
@@ -164,7 +164,7 @@ class SliderDraw
             "        if (trackFill) { trackFill.width = Math.max(0, newX - trackX); }" .
             "        var ratio = (newX - trackX) / trackWidth;" .
             "        var value = " . $this->min . " + Math.round(ratio * " . ($this->max - $this->min) . ");" .
-            "        " . $this->onChange . ";" .
+            ($this->onChange !== '' ? "        " . $this->onChange . ";" : "") .
             "    }" .
             "    function onUp() {" .
             "        app.stage.off('pointermove', onMove);" .
