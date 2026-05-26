@@ -568,6 +568,7 @@ class EntityAssemblerDraw
         $tabDraw->addTab('Corpo', 'tab_body', $gridDrawBody->getDrawItems());
         $tabDraw->addTab('Componenti', 'tab_component', $gridDrawComponent->getDrawItems());
         $tabDraw->setPrimaryTab('tab_body');
+        $tabDraw->disableTab('tab_component');
         $tabDraw->build();
 
         // Restore grid element positions overridden by TabDraw

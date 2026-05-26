@@ -13,6 +13,7 @@ class TabDraw
     private string $uid;
     private array $drawItems = [];
     private array $tabs = [];
+    private array $disabledTabs = [];
     private ?string $primaryTab = null;
     private ?string $activeTab = null;
 
@@ -77,6 +78,21 @@ class TabDraw
         $this->activeTab = $tabName;
     }
 
+    public function disableTab(string $tabUid): void
+    {
+        $this->disabledTabs[$tabUid] = true;
+    }
+
+    public function enableTab(string $tabUid): void
+    {
+        unset($this->disabledTabs[$tabUid]);
+    }
+
+    public function isTabDisabled(string $tabUid): bool
+    {
+        return isset($this->disabledTabs[$tabUid]);
+    }
+
     public function getDrawItems(): array
     {
         return $this->drawItems;
@@ -105,6 +121,7 @@ class TabDraw
 
             $isActive = ($tabUid === $this->activeTab);
             $isPrimary = ($tabUid === $this->primaryTab);
+            $isDisabled = $this->isTabDisabled($tabUid);
 
             $tabBg = $this->tabInactiveColor;
 
@@ -160,17 +177,30 @@ class TabDraw
             $text->setCenterAnchor(true);
             $text->setOrigin($tabX + ($tabWidth / 2), $tabY + ($tabHeight / 2));
             $text->setText($tabName);
-            $text->setColor($this->tabTextColor);
+            $text->setColor($isDisabled ? 0x808080 : $this->tabTextColor);
             $text->setFontSize(14);
             $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
             $text->setRenderable($this->renderable);
             $text->addAttributes('z_index', $this->baseZIndex + $index + 150);
             $this->drawItems[] = $text;
 
-            // Click handler for tab
-            $jsClick = $this->generateTabClickScript($tabUid);
-            $tab->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsClick);
-            $text->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsClick);
+            // Strikethrough line for disabled tabs
+            if ($isDisabled) {
+                $strikeLine = new Rectangle($uid . '_tab_strike_' . $tabUid);
+                $strikeLine->setOrigin($tabX + 10, $tabY + ($tabHeight / 2));
+                $strikeLine->setSize($tabWidth - 20, 2);
+                $strikeLine->setColor(0x808080);
+                $strikeLine->setRenderable($this->renderable);
+                $strikeLine->addAttributes('z_index', $this->baseZIndex + $index + 151);
+                $this->drawItems[] = $strikeLine;
+            }
+
+            // Click handler for tab (only if not disabled)
+            if (!$isDisabled) {
+                $jsClick = $this->generateTabClickScript($tabUid);
+                $tab->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsClick);
+                $text->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsClick);
+            }
         }
 
         // Container area
