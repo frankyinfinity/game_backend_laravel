@@ -801,6 +801,8 @@
         });
         document.getElementById('display_container').appendChild(app.view);
         app.stage.sortableChildren = true;
+        app.stage.eventMode = 'static';
+        app.stage.hitArea = app.screen;
 
         worldLayer = new PIXI.Container();
         worldLayer.sortableChildren = true;
