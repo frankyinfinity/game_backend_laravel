@@ -345,11 +345,32 @@
             shape.tint = 0x00FF00;
             selectedRect = shape;
             selectedBodyUid = elementUid;
+
+            // Show direction buttons when EntityBody is selected
+            var dirButtons = ['dir_up', 'dir_down', 'dir_left', 'dir_right'];
+            dirButtons.forEach(function(dir) {
+                var buttonUid = '__MODAL_UID___' + dir;
+                var textUid = '__MODAL_UID___' + dir + '_text';
+                if (shapes[buttonUid]) shapes[buttonUid].renderable = true;
+                if (shapes[textUid]) shapes[textUid].renderable = true;
+            });
+
+            // Show direction title and container
+            var dirTitle = shapes['__MODAL_UID___dir_title'];
+            if (dirTitle) dirTitle.renderable = true;
+            var dirContainer = shapes['__MODAL_UID___dir_container'];
+            if (dirContainer) dirContainer.renderable = true;
         }
 
         // Draw black pixels on grid + gray border for zone pixels + zone color border where zone edge
         var pixels = data.pixels_json ? JSON.parse(data.pixels_json) : [];
         currentPixels = pixels; // Store for grid cell clicks
+
+        // Set pixels context for move function
+        var setPixelsFn = window['setPixelsContext_' + '__MODAL_UID__'];
+        if (typeof setPixelsFn === 'function') {
+            setPixelsFn(pixels);
+        }
         var grayBorderColor = 0x808080;
         var zoneBorderColor = 0xFF0000;
 

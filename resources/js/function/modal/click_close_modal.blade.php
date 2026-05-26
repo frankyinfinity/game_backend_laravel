@@ -72,6 +72,21 @@ window['__name__'] = function() {
         });
     });
 
+    // Hide direction buttons if the modal has them
+    var dirButtons = ['dir_up', 'dir_down', 'dir_left', 'dir_right'];
+    dirButtons.forEach(function(dir) {
+        var buttonUid = modalUid + '_' + dir;
+        var textUid = modalUid + '_' + dir + '_text';
+        if (shapes[buttonUid]) shapes[buttonUid].renderable = false;
+        if (shapes[textUid]) shapes[textUid].renderable = false;
+    });
+
+    // Hide direction title and container
+    var dirTitle = shapes[modalUid + '_dir_title'];
+    if (dirTitle) dirTitle.renderable = false;
+    var dirContainer = shapes[modalUid + '_dir_container'];
+    if (dirContainer) dirContainer.renderable = false;
+
     if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
         let resolvedPlayerId = null;
         if (typeof playerId !== 'undefined') {

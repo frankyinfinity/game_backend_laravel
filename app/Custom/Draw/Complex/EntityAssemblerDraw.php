@@ -242,10 +242,10 @@ class EntityAssemblerDraw
         // Calculate cell size as integer for uniform cells
         $cellSize = (int) floor(min($gridAreaWidth / $gridSize, $gridAreaHeight / $gridSize));
         
-        // Center the grid in the left area
+        // Center the grid vertically, align to left horizontally
         $gridTotalWidth = $cellSize * $gridSize;
         $gridTotalHeight = $cellSize * $gridSize;
-        $gridX = (int) ($contentX + ($leftWidth - $gridTotalWidth) / 2);
+        $gridX = (int) ($contentX + $gridPadding);
         $gridY = (int) ($contentY + ($contentHeight - $gridTotalHeight) / 2);
 
         // Dark gray background (acts as grid lines)
@@ -322,6 +322,152 @@ class EntityAssemblerDraw
         $gridBorderRight->addAttributes('z_index', 20042);
         $this->drawItems[] = $gridBorderRight;
         $gridCellUids[] = $gridBorderRight->getUid();
+
+        // Direction buttons for moving EntityBody pixels (positioned like GenerateMapJob pattern)
+        $dirButtonSize = 34;
+        $dirButtonGap = 6;
+        $dirButtonPadding = 10;
+        $containerPadding = 8;
+        $dirButtonsX = $gridX + $gridTotalWidth + $dirButtonPadding;
+        $dirButtonsY = $gridY + $dirButtonPadding; // Back to top position
+
+        // Light gray container with black border (simulating transparency)
+        $containerWidth = ($dirButtonSize * 3) + ($dirButtonGap * 2) + ($containerPadding * 2);
+        $containerHeight = ($dirButtonSize * 2) + $dirButtonGap + 20 + ($containerPadding * 2) + 10; // Extra space for title + 10px margin below
+        $containerX = $dirButtonsX - $containerPadding;
+        $containerY = $dirButtonsY - $containerPadding;
+
+        $dirContainer = new Rectangle($modalUid . '_dir_container');
+        $dirContainer->setOrigin($containerX, $containerY);
+        $dirContainer->setSize($containerWidth, $containerHeight);
+        $dirContainer->setColor(0xE0E0E0); // Light gray
+        $dirContainer->setBorderRadius(8);
+        $dirContainer->setBorderColor(0x000000);
+        $dirContainer->setThickness(1);
+        $dirContainer->setRenderable(false);
+        $dirContainer->addAttributes('z_index', 20042);
+        $this->drawItems[] = $dirContainer;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        // Title above direction buttons (inside container)
+        $dirTitle = new Text($modalUid . '_dir_title');
+        $dirTitle->setCenterAnchor(false);
+        $dirTitle->setOrigin($dirButtonsX, $dirButtonsY + 5);
+        $dirTitle->setText('Movimento');
+        $dirTitle->setColor(0x000000);
+        $dirTitle->setFontSize(14);
+        $dirTitle->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $dirTitle->setRenderable(false);
+        $dirTitle->addAttributes('z_index', 20043);
+        $this->drawItems[] = $dirTitle;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        // Up button (centered horizontally at top, below title)
+        $upButton = new Rectangle($modalUid . '_dir_up');
+        $upButton->setOrigin($dirButtonsX + $dirButtonSize + $dirButtonGap, $dirButtonsY + 30);
+        $upButton->setSize($dirButtonSize, $dirButtonSize);
+        $upButton->setColor(0x404040);
+        $upButton->setBorderRadius(5);
+        $upButton->setRenderable(false);
+        $upButton->addAttributes('z_index', 20043);
+        $this->drawItems[] = $upButton;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        $upText = new Text($modalUid . '_dir_up_text');
+        $upText->setCenterAnchor(true);
+        $upText->setOrigin($dirButtonsX + $dirButtonSize + $dirButtonGap + (int) floor($dirButtonSize / 2), $dirButtonsY + 30 + (int) floor($dirButtonSize / 2));
+        $upText->setText('↑');
+        $upText->setColor(0xFFFFFF);
+        $upText->setFontSize(24);
+        $upText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $upText->setRenderable(false);
+        $upText->addAttributes('z_index', 20044);
+        $this->drawItems[] = $upText;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        // Left button (left side, bottom row)
+        $leftButton = new Rectangle($modalUid . '_dir_left');
+        $leftButton->setOrigin($dirButtonsX, $dirButtonsY + 30 + $dirButtonSize + $dirButtonGap);
+        $leftButton->setSize($dirButtonSize, $dirButtonSize);
+        $leftButton->setColor(0x404040);
+        $leftButton->setBorderRadius(5);
+        $leftButton->setRenderable(false);
+        $leftButton->addAttributes('z_index', 20043);
+        $this->drawItems[] = $leftButton;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        $leftText = new Text($modalUid . '_dir_left_text');
+        $leftText->setCenterAnchor(true);
+        $leftText->setOrigin($dirButtonsX + (int) floor($dirButtonSize / 2), $dirButtonsY + 30 + $dirButtonSize + $dirButtonGap + (int) floor($dirButtonSize / 2));
+        $leftText->setText('←');
+        $leftText->setColor(0xFFFFFF);
+        $leftText->setFontSize(24);
+        $leftText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $leftText->setRenderable(false);
+        $leftText->addAttributes('z_index', 20044);
+        $this->drawItems[] = $leftText;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        // Down button (centered horizontally at bottom)
+        $downButton = new Rectangle($modalUid . '_dir_down');
+        $downButton->setOrigin($dirButtonsX + $dirButtonSize + $dirButtonGap, $dirButtonsY + 30 + $dirButtonSize + $dirButtonGap);
+        $downButton->setSize($dirButtonSize, $dirButtonSize);
+        $downButton->setColor(0x404040);
+        $downButton->setBorderRadius(5);
+        $downButton->setRenderable(false);
+        $downButton->addAttributes('z_index', 20043);
+        $this->drawItems[] = $downButton;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        $downText = new Text($modalUid . '_dir_down_text');
+        $downText->setCenterAnchor(true);
+        $downText->setOrigin($dirButtonsX + $dirButtonSize + $dirButtonGap + (int) floor($dirButtonSize / 2), $dirButtonsY + 30 + $dirButtonSize + $dirButtonGap + (int) floor($dirButtonSize / 2));
+        $downText->setText('↓');
+        $downText->setColor(0xFFFFFF);
+        $downText->setFontSize(24);
+        $downText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $downText->setRenderable(false);
+        $downText->addAttributes('z_index', 20044);
+        $this->drawItems[] = $downText;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        // Right button (right side, bottom row)
+        $rightButton = new Rectangle($modalUid . '_dir_right');
+        $rightButton->setOrigin($dirButtonsX + (($dirButtonSize + $dirButtonGap) * 2), $dirButtonsY + 30 + $dirButtonSize + $dirButtonGap);
+        $rightButton->setSize($dirButtonSize, $dirButtonSize);
+        $rightButton->setColor(0x404040);
+        $rightButton->setBorderRadius(5);
+        $rightButton->setRenderable(false);
+        $rightButton->addAttributes('z_index', 20043);
+        $this->drawItems[] = $rightButton;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        $rightText = new Text($modalUid . '_dir_right_text');
+        $rightText->setCenterAnchor(true);
+        $rightText->setOrigin($dirButtonsX + (($dirButtonSize + $dirButtonGap) * 2) + (int) floor($dirButtonSize / 2), $dirButtonsY + 30 + $dirButtonSize + $dirButtonGap + (int) floor($dirButtonSize / 2));
+        $rightText->setText('→');
+        $rightText->setColor(0xFFFFFF);
+        $rightText->setFontSize(24);
+        $rightText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $rightText->setRenderable(false);
+        $rightText->addAttributes('z_index', 20044);
+        $this->drawItems[] = $rightText;
+        // Don't add to gridCellUids to prevent auto-renderable=true
+
+        // Direction button click handlers
+        $jsMoveUp = "window['movePixels_" . $modalUid . "']('up');";
+        $jsMoveDown = "window['movePixels_" . $modalUid . "']('down');";
+        $jsMoveLeft = "window['movePixels_" . $modalUid . "']('left');";
+        $jsMoveRight = "window['movePixels_" . $modalUid . "']('right');";
+
+        $upButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveUp);
+        $upText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveUp);
+        $downButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveDown);
+        $downText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveDown);
+        $leftButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveLeft);
+        $leftText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveLeft);
+        $rightButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveRight);
+        $rightText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsMoveRight);
 
         // Right side (40%) - TabDraw with 'Body' (primary) and 'Components' tabs
         $rightWidth = $contentWidth - $leftWidth;
@@ -757,6 +903,11 @@ class EntityAssemblerDraw
         $updateColorJs = file_get_contents(resource_path('js/function/entity_body/update_zone_color.blade.php'));
         $updateColorJs = str_replace('__MODAL_UID__', $modalUid, $updateColorJs);
         $this->gridScrollInitJs .= $updateColorJs;
+
+        // Generate JS for moving pixels
+        $movePixelsJs = file_get_contents(resource_path('js/function/entity_body/move_pixels.blade.php'));
+        $movePixelsJs = str_replace('__MODAL_UID__', $modalUid, $movePixelsJs);
+        $this->gridScrollInitJs .= $movePixelsJs;
     }
 
     private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false): void
