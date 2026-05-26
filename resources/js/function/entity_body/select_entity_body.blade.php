@@ -4,16 +4,18 @@
     var selectedBodyUid = null;
     var selectedRect = null;
     var lastDrawnCells = [];
-    var zoneBorderShapes = [];
     var currentPixels = [];
     var zonePanelOriginalPositions = null;
 
+    // Use window variable to share zoneBorderShapes with update_zone_color
+    window['__zoneBorderShapes_' + '__MODAL_UID__'] = window['__zoneBorderShapes_' + '__MODAL_UID__'] || [];
+
     function clearZoneBorders() {
-        zoneBorderShapes.forEach(function(s) {
+        window['__zoneBorderShapes_' + '__MODAL_UID__'].forEach(function(s) {
             if (s.parent) s.parent.removeChild(s);
             if (typeof s.destroy === 'function') s.destroy();
         });
-        zoneBorderShapes = [];
+        window['__zoneBorderShapes_' + '__MODAL_UID__'] = [];
     }
 
     window['clearZoneBorders_' + '__MODAL_UID__'] = clearZoneBorders;
@@ -134,7 +136,7 @@
 
         // Add panel and its elements to stage, ensuring they are on top
         app.stage.sortableChildren = true;
-        
+
         // Remove from current parent if any, then add to stage to ensure they render last (on top)
         if (panel.parent) panel.parent.removeChild(panel);
         if (colorSquare.parent) colorSquare.parent.removeChild(colorSquare);
@@ -145,7 +147,7 @@
         if (borderBottom && borderBottom.parent) borderBottom.parent.removeChild(borderBottom);
         if (borderLeft && borderLeft.parent) borderLeft.parent.removeChild(borderLeft);
         if (borderRight && borderRight.parent) borderRight.parent.removeChild(borderRight);
-        
+
         // Add borders first (lower in display list), then panel (on top)
         if (borderTop) app.stage.addChild(borderTop);
         if (borderBottom) app.stage.addChild(borderBottom);
@@ -199,10 +201,29 @@
             if (s) s.renderable = true;
         });
 
-        // Update slider values from zone color
-        updateSlider('__MODAL_UID___slider_red', r || 0);
-        updateSlider('__MODAL_UID___slider_green', g || 0);
-        updateSlider('__MODAL_UID___slider_blue', b || 0);
+        // Get current color from the first pixel of the zone (or use provided r,g,b)
+        var currentR = r || 0;
+        var currentG = g || 0;
+        var currentB = b || 0;
+
+        // Try to get the actual current color from the first zone pixel
+        var zonePixels = currentPixels.filter(function(p) { return p.has_zone && p.zone_name === zoneName; });
+        if (zonePixels.length > 0) {
+            var firstPixel = zonePixels[0];
+            var cellUid = '__MODAL_UID___grid_cell_' + firstPixel.y + '_' + firstPixel.x;
+            var cellShape = shapes[cellUid];
+            if (cellShape && cellShape.tint !== 0x000000) {
+                // Extract RGB from current tint
+                currentR = (cellShape.tint >> 16) & 255;
+                currentG = (cellShape.tint >> 8) & 255;
+                currentB = cellShape.tint & 255;
+            }
+        }
+
+        // Update slider values from current zone color
+        updateSlider('__MODAL_UID___slider_red', currentR);
+        updateSlider('__MODAL_UID___slider_green', currentG);
+        updateSlider('__MODAL_UID___slider_blue', currentB);
     }
 
     function updateSlider(sliderPrefix, value) {
@@ -255,6 +276,11 @@
             if (clickedPixel.has_zone) {
                 var rgb = hexToRgb(clickedPixel.zone_color);
                 showZonePanel(clickedPixel.zone_color, clickedPixel.zone_name, cellShape.x, cellShape.y, r, g, b);
+                // Set zone context for color updates
+                var setContextFn = window['setZoneContext_' + '__MODAL_UID__'];
+                if (typeof setContextFn === 'function') {
+                    setContextFn(clickedPixel.zone_name, currentPixels.filter(function(p) { return p.has_zone && p.zone_name === clickedPixel.zone_name; }));
+                }
             } else {
                 showZonePanel('#000000', 'Pixel', cellShape.x, cellShape.y, r, g, b);
             }
@@ -362,7 +388,7 @@
                     g.zIndex = 20045;
                     app.stage.sortableChildren = true;
                     app.stage.addChild(g);
-                    zoneBorderShapes.push(g);
+                    window['__zoneBorderShapes_' + '__MODAL_UID__'].push(g);
                 }
 
                 // Gray base border for all zone pixels

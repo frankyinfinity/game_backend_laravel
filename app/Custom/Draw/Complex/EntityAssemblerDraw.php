@@ -701,7 +701,7 @@ class EntityAssemblerDraw
             $slider->setValue(0);
             $slider->setColor($config['color']);
             $slider->setTitle($config['title']);
-            $slider->setOnChange("console.log('" . $config['title'] . "'); console.log(value);");
+            $slider->setOnChange("window['updateZoneColor_" . $modalUid . "']();");
             $slider->build();
             foreach ($slider->getDrawItems() as $item) {
                 $item->addAttributes('z_index', 50050 + $index);
@@ -752,6 +752,11 @@ class EntityAssemblerDraw
         $gridJs = str_replace('__name__', 'selectEntityBody_' . $modalUid, $gridJs);
         $gridJs = str_replace('__SLIDER_UIDS__', $sliderUidsJson, $gridJs);
         $this->gridScrollInitJs .= $gridJs;
+
+        // Generate JS for zone color update
+        $updateColorJs = file_get_contents(resource_path('js/function/entity_body/update_zone_color.blade.php'));
+        $updateColorJs = str_replace('__MODAL_UID__', $modalUid, $updateColorJs);
+        $this->gridScrollInitJs .= $updateColorJs;
     }
 
     private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false): void
