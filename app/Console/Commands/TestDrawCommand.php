@@ -56,6 +56,7 @@ class TestDrawCommand extends Command
         $entityAssembler->build();
         $drawItems = array_merge($drawItems, $entityAssembler->getDrawItemsWithObjectDraw($sessionId));
 
+        /*
         // Slider below assembler button
         $slider = new SliderDraw('test_slider');
         $slider->setOrigin(20, 85);
@@ -68,6 +69,7 @@ class TestDrawCommand extends Command
         $slider->setOnChange("console.log(value)");
         $slider->build();
         $drawItems = array_merge($drawItems, $slider->getDrawItemsWithObjectDraw($sessionId));
+        */
 
         ObjectCache::flush($sessionId);
 

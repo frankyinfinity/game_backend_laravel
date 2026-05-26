@@ -167,14 +167,14 @@ class SliderDraw
             ($this->onChange !== '' ? "        " . $this->onChange . ";" : "") .
             "    }" .
             "    function onUp() {" .
-            "        app.stage.off('pointermove', onMove);" .
-            "        app.stage.off('pointerup', onUp);" .
-            "        app.stage.off('pointerupoutside', onUp);" .
+            "        app.renderer.events.off('pointermove', onMove);" .
+            "        app.renderer.events.off('pointerup', onUp);" .
+            "        app.renderer.events.off('pointerupoutside', onUp);" .
             "        window.__disableGlobalPan = false;" .
             "    }" .
-            "    app.stage.on('pointermove', onMove);" .
-            "    app.stage.on('pointerup', onUp);" .
-            "    app.stage.on('pointerupoutside', onUp);" .
+            "    app.renderer.events.on('pointermove', onMove);" .
+            "    app.renderer.events.on('pointerup', onUp);" .
+            "    app.renderer.events.on('pointerupoutside', onUp);" .
             "} else {" .
             "    window.__disableGlobalPan = false;" .
             "}";
