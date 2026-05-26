@@ -42,6 +42,26 @@ window['__name__'] = function() {
         resetGridFn();
     }
 
+    // Hide zone panel if the modal has it
+    var panel = shapes[modalUid + '_zone_panel'];
+    var colorSquare = shapes[modalUid + '_zone_color_square'];
+    var nameText = shapes[modalUid + '_zone_name_text'];
+    var closeButton = shapes[modalUid + '_zone_close_button'];
+    var closeText = shapes[modalUid + '_zone_close_text'];
+    var borderTop = shapes[modalUid + '_zone_border_top'];
+    var borderBottom = shapes[modalUid + '_zone_border_bottom'];
+    var borderLeft = shapes[modalUid + '_zone_border_left'];
+    var borderRight = shapes[modalUid + '_zone_border_right'];
+    if (panel) panel.renderable = false;
+    if (colorSquare) colorSquare.renderable = false;
+    if (nameText) nameText.renderable = false;
+    if (closeButton) closeButton.renderable = false;
+    if (closeText) closeText.renderable = false;
+    if (borderTop) borderTop.renderable = false;
+    if (borderBottom) borderBottom.renderable = false;
+    if (borderLeft) borderLeft.renderable = false;
+    if (borderRight) borderRight.renderable = false;
+
     if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
         let resolvedPlayerId = null;
         if (typeof playerId !== 'undefined') {

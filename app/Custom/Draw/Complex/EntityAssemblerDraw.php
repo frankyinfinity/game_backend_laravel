@@ -274,6 +274,11 @@ class EntityAssemblerDraw
                 $cell->addAttributes('z_index', 20041);
                 $cell->addAttributes('grid_row', $row);
                 $cell->addAttributes('grid_col', $col);
+
+                // Add click handler for zone info panel
+                $jsGridCellClick = "window['clickGridCell_{$modalUid}']('{$cell->getUid()}');";
+                $cell->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsGridCellClick);
+
                 $this->drawItems[] = $cell;
                 $gridCellUids[] = $cell->getUid();
             }
@@ -337,12 +342,14 @@ class EntityAssemblerDraw
                 $data = $item->toArray();
                 $pixels = [];
 
-                // Build zone pixel lookup: maps "x,y" => zone_id and zone_id => color
+                // Build zone pixel lookup: maps "x,y" => zone_id and zone_id => color/name
                 // Zone pixels are saved at 64x64 (editor grid), image is resized to 32x32
                 $zonePixelToZoneId = [];
                 $zoneIdToColor = [];
+                $zoneIdToName = [];
                 foreach ($item->zones as $zone) {
                     $zoneIdToColor[$zone->id] = $zone->color ?? '#000000';
+                    $zoneIdToName[$zone->id] = $zone->name ?? 'Unknown';
                     foreach ($zone->pixels as $pixel) {
                         $gx = (int) floor($pixel->x / 2);
                         $gy = (int) floor($pixel->y / 2);
@@ -384,6 +391,7 @@ class EntityAssemblerDraw
                                             'zone_border_left' => $hasZone && (($zonePixelToZoneId[($x - 1) . ',' . $y] ?? null) !== $myZoneId),
                                             'zone_border_right' => $hasZone && (($zonePixelToZoneId[($x + 1) . ',' . $y] ?? null) !== $myZoneId),
                                             'zone_color' => $hasZone ? ($zoneIdToColor[$myZoneId] ?? '#000000') : null,
+                                            'zone_name' => $hasZone ? ($zoneIdToName[$myZoneId] ?? 'Unknown') : null,
                                         ];
                                     }
                                 }
@@ -582,6 +590,130 @@ class EntityAssemblerDraw
         foreach ($tabDraw->getDrawItems() as $item) {
             $this->drawItems[] = $item;
         }
+
+        // Zone info panel (hidden by default) - created LAST to render above everything
+        $zonePanelWidth = 280;
+        $zonePanelHeight = 50;
+        $zonePanelX = $modalX + ($modalWidth / 2) - ($zonePanelWidth / 2);
+        $zonePanelY = $modalY + $headerHeight + 20;
+
+        $zonePanel = new Rectangle($modalUid . '_zone_panel');
+        $zonePanel->setOrigin($zonePanelX + 2, $zonePanelY + 2);
+        $zonePanel->setSize($zonePanelWidth - 4, $zonePanelHeight - 4);
+        $zonePanel->setColor(0xFFFFFF);
+        $zonePanel->setRenderable(false);
+        $zonePanel->addAttributes('z_index', 50000);
+        // NOT a child of body - top level to render above everything
+        $this->drawItems[] = $zonePanel;
+
+        // Zone panel border (4 separate rectangles)
+        $zoneBorderThickness = 2;
+        $zoneBorderTop = new Rectangle($modalUid . '_zone_border_top');
+        $zoneBorderTop->setOrigin($zonePanelX, $zonePanelY);
+        $zoneBorderTop->setSize($zonePanelWidth, $zoneBorderThickness);
+        $zoneBorderTop->setColor(0x000000);
+        $zoneBorderTop->setRenderable(false);
+        $zoneBorderTop->addAttributes('z_index', 49999);
+        $this->drawItems[] = $zoneBorderTop;
+
+        $zoneBorderBottom = new Rectangle($modalUid . '_zone_border_bottom');
+        $zoneBorderBottom->setOrigin($zonePanelX, $zonePanelY + $zonePanelHeight - $zoneBorderThickness);
+        $zoneBorderBottom->setSize($zonePanelWidth, $zoneBorderThickness);
+        $zoneBorderBottom->setColor(0x000000);
+        $zoneBorderBottom->setRenderable(false);
+        $zoneBorderBottom->addAttributes('z_index', 49999);
+        $this->drawItems[] = $zoneBorderBottom;
+
+        $zoneBorderLeft = new Rectangle($modalUid . '_zone_border_left');
+        $zoneBorderLeft->setOrigin($zonePanelX, $zonePanelY);
+        $zoneBorderLeft->setSize($zoneBorderThickness, $zonePanelHeight);
+        $zoneBorderLeft->setColor(0x000000);
+        $zoneBorderLeft->setRenderable(false);
+        $zoneBorderLeft->addAttributes('z_index', 49999);
+        $this->drawItems[] = $zoneBorderLeft;
+
+        $zoneBorderRight = new Rectangle($modalUid . '_zone_border_right');
+        $zoneBorderRight->setOrigin($zonePanelX + $zonePanelWidth - $zoneBorderThickness, $zonePanelY);
+        $zoneBorderRight->setSize($zoneBorderThickness, $zonePanelHeight);
+        $zoneBorderRight->setColor(0x000000);
+        $zoneBorderRight->setRenderable(false);
+        $zoneBorderRight->addAttributes('z_index', 49999);
+        $this->drawItems[] = $zoneBorderRight;
+
+        // Zone color square
+        $zoneColorSize = 24;
+        $zoneColorX = $zonePanelX + 15;
+        $zoneColorY = $zonePanelY + 13;
+
+        $zoneColorSquare = new Rectangle($modalUid . '_zone_color_square');
+        $zoneColorSquare->setOrigin($zoneColorX, $zoneColorY);
+        $zoneColorSquare->setSize($zoneColorSize, $zoneColorSize);
+        $zoneColorSquare->setColor(0xFFFFFF);
+        $zoneColorSquare->setRenderable(false);
+        $zoneColorSquare->addAttributes('z_index', 50010);
+        $this->drawItems[] = $zoneColorSquare;
+
+        // Zone name text
+        $zoneNameText = new Text($modalUid . '_zone_name_text');
+        $zoneNameText->setCenterAnchor(false);
+        $zoneNameText->setOrigin($zoneColorX + $zoneColorSize + 12, $zonePanelY + 16);
+        $zoneNameText->setText('Zone Name');
+        $zoneNameText->setColor(0x000000);
+        $zoneNameText->setFontSize(16);
+        $zoneNameText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $zoneNameText->setRenderable(false);
+        $zoneNameText->addAttributes('z_index', 50020);
+        $this->drawItems[] = $zoneNameText;
+
+        // Zone panel close button (X)
+        $zoneCloseSize = 20;
+        $zoneCloseX = $zonePanelX + $zonePanelWidth - $zoneCloseSize - 8;
+        $zoneCloseY = $zonePanelY + 8;
+
+        $zoneCloseButton = new Rectangle($modalUid . '_zone_close_button');
+        $zoneCloseButton->setOrigin($zoneCloseX, $zoneCloseY);
+        $zoneCloseButton->setSize($zoneCloseSize, $zoneCloseSize);
+        $zoneCloseButton->setColor(0x666666);
+        $zoneCloseButton->setBorderRadius(3);
+        $zoneCloseButton->setRenderable(false);
+        $zoneCloseButton->addAttributes('z_index', 50030);
+
+        $zoneCloseText = new Text($modalUid . '_zone_close_text');
+        $zoneCloseText->setCenterAnchor(true);
+        $zoneCloseText->setOrigin($zoneCloseX + (int) floor($zoneCloseSize / 2), $zoneCloseY + (int) floor($zoneCloseSize / 2));
+        $zoneCloseText->setText('X');
+        $zoneCloseText->setFontSize(14);
+        $zoneCloseText->setColor(0xFFFFFF);
+        $zoneCloseText->setRenderable(false);
+        $zoneCloseText->addAttributes('z_index', 50040);
+
+        // Zone panel close button click handler
+        $jsZoneClose = "(function() {
+            var panel = shapes['{$modalUid}_zone_panel'];
+            var colorSquare = shapes['{$modalUid}_zone_color_square'];
+            var nameText = shapes['{$modalUid}_zone_name_text'];
+            var closeButton = shapes['{$modalUid}_zone_close_button'];
+            var closeText = shapes['{$modalUid}_zone_close_text'];
+            var borderTop = shapes['{$modalUid}_zone_border_top'];
+            var borderBottom = shapes['{$modalUid}_zone_border_bottom'];
+            var borderLeft = shapes['{$modalUid}_zone_border_left'];
+            var borderRight = shapes['{$modalUid}_zone_border_right'];
+            if (panel) panel.renderable = false;
+            if (colorSquare) colorSquare.renderable = false;
+            if (nameText) nameText.renderable = false;
+            if (closeButton) closeButton.renderable = false;
+            if (closeText) closeText.renderable = false;
+            if (borderTop) borderTop.renderable = false;
+            if (borderBottom) borderBottom.renderable = false;
+            if (borderLeft) borderLeft.renderable = false;
+            if (borderRight) borderRight.renderable = false;
+        })();";
+        $jsZoneClose = Helper::setCommonJsCode($jsZoneClose, Str::random(20));
+        $zoneCloseButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsZoneClose);
+        $zoneCloseText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsZoneClose);
+
+        $this->drawItems[] = $zoneCloseButton;
+        $this->drawItems[] = $zoneCloseText;
     }
 
     private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false): void
