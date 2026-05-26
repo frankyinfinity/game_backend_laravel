@@ -189,7 +189,7 @@
     // Grid cell click handler - shows zone info panel
     window['clickGridCell_' + '__MODAL_UID__'] = function(cellUid) {
         var cellShape = shapes[cellUid];
-        if (!cellShape || cellShape.tint !== 0x000000) return;
+        if (!cellShape) return;
 
         var parts = cellUid.replace('__MODAL_UID___grid_cell_', '').split('_');
         var cellY = parseInt(parts[0]);
