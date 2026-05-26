@@ -62,6 +62,16 @@ window['__name__'] = function() {
     if (borderLeft) borderLeft.renderable = false;
     if (borderRight) borderRight.renderable = false;
 
+    // Hide sliders if the modal has them
+    var sliderSuffixes = ['slider_red', 'slider_green', 'slider_blue'];
+    var sliderParts = ['knob', 'track_bg', 'track_fill', 'title', 'min', 'max'];
+    sliderSuffixes.forEach(function(suffix) {
+        sliderParts.forEach(function(part) {
+            var uid = modalUid + '_' + suffix + '_' + part;
+            if (shapes[uid]) shapes[uid].renderable = false;
+        });
+    });
+
     if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
         let resolvedPlayerId = null;
         if (typeof playerId !== 'undefined') {
