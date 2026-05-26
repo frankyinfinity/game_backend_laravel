@@ -18,6 +18,8 @@
 
     window['clearZoneBorders_' + '__MODAL_UID__'] = clearZoneBorders;
 
+    var sliderUids = __SLIDER_UIDS__;
+
     function hideZonePanel() {
         var panel = shapes['__MODAL_UID___zone_panel'];
         var colorSquare = shapes['__MODAL_UID___zone_color_square'];
@@ -37,6 +39,10 @@
         if (borderBottom) borderBottom.renderable = false;
         if (borderLeft) borderLeft.renderable = false;
         if (borderRight) borderRight.renderable = false;
+        sliderUids.forEach(function(uid) {
+            var s = shapes[uid];
+            if (s) s.renderable = false;
+        });
     }
 
     function positionZonePanel(nearX, nearY) {
@@ -64,6 +70,12 @@
                 borderLeft: borderLeft ? { x: borderLeft.x, y: borderLeft.y } : null,
                 borderRight: borderRight ? { x: borderRight.x, y: borderRight.y } : null
             };
+            sliderUids.forEach(function(uid) {
+                var s = shapes[uid];
+                if (s) {
+                    zonePanelOriginalPositions[uid] = { x: s.x, y: s.y };
+                }
+            });
         }
 
         var newPanelX = nearX + 15;
@@ -97,9 +109,17 @@
             borderRight.x = zonePanelOriginalPositions.borderRight.x + deltaX;
             borderRight.y = zonePanelOriginalPositions.borderRight.y + deltaY;
         }
+        sliderUids.forEach(function(uid) {
+            var s = shapes[uid];
+            var orig = zonePanelOriginalPositions[uid];
+            if (s && orig) {
+                s.x = orig.x + deltaX;
+                s.y = orig.y + deltaY;
+            }
+        });
     }
 
-    function showZonePanel(zoneColor, zoneName, nearX, nearY) {
+    function showZonePanel(zoneColor, zoneName, nearX, nearY, r, g, b) {
         var panel = shapes['__MODAL_UID___zone_panel'];
         var colorSquare = shapes['__MODAL_UID___zone_color_square'];
         var nameText = shapes['__MODAL_UID___zone_name_text'];
@@ -137,6 +157,14 @@
         app.stage.addChild(closeButton);
         app.stage.addChild(closeText);
 
+        sliderUids.forEach(function(uid) {
+            var s = shapes[uid];
+            if (s) {
+                if (s.parent) s.parent.removeChild(s);
+                app.stage.addChild(s);
+            }
+        });
+
         // Position panel near clicked cell if coordinates provided
         if (typeof nearX === 'number' && typeof nearY === 'number') {
             positionZonePanel(nearX, nearY);
@@ -166,6 +194,31 @@
         if (borderBottom) borderBottom.renderable = true;
         if (borderLeft) borderLeft.renderable = true;
         if (borderRight) borderRight.renderable = true;
+        sliderUids.forEach(function(uid) {
+            var s = shapes[uid];
+            if (s) s.renderable = true;
+        });
+
+        // Update slider values from zone color
+        updateSlider('__MODAL_UID___slider_red', r || 0);
+        updateSlider('__MODAL_UID___slider_green', g || 0);
+        updateSlider('__MODAL_UID___slider_blue', b || 0);
+    }
+
+    function updateSlider(sliderPrefix, value) {
+        var knob = shapes[sliderPrefix + '_knob'];
+        var trackBg = shapes[sliderPrefix + '_track_bg'];
+        var trackFill = shapes[sliderPrefix + '_track_fill'];
+        if (trackBg) {
+            var ratio = value / 255;
+            var trackWidth = trackBg.width;
+            var newX = trackBg.x + ratio * trackWidth;
+            if (knob) knob.x = newX;
+            if (trackFill) {
+                var newWidth = Math.max(1, newX - trackBg.x);
+                trackFill.width = newWidth;
+            }
+        }
     }
 
     window['resetEntityBodyGrid_' + '__MODAL_UID__'] = function() {
@@ -196,10 +249,36 @@
         var cellX = parseInt(parts[1]);
 
         var clickedPixel = currentPixels.find(function(p) { return p.x === cellX && p.y === cellY; });
-        if (clickedPixel && clickedPixel.has_zone) {
-            showZonePanel(clickedPixel.zone_color, clickedPixel.zone_name, cellShape.x, cellShape.y);
+        if (clickedPixel) {
+            // Use pixel color (black = 0,0,0) instead of zone color
+            var r = 0, g = 0, b = 0;
+            if (clickedPixel.has_zone) {
+                var rgb = hexToRgb(clickedPixel.zone_color);
+                showZonePanel(clickedPixel.zone_color, clickedPixel.zone_name, cellShape.x, cellShape.y, r, g, b);
+            } else {
+                showZonePanel('#000000', 'Pixel', cellShape.x, cellShape.y, r, g, b);
+            }
         }
-    };
+    }
+
+    function hexToRgb(hex) {
+        if (!hex) return { r: 0, g: 0, b: 0 };
+        if (typeof hex === 'number') {
+            return {
+                r: (hex >> 16) & 255,
+                g: (hex >> 8) & 255,
+                b: hex & 255
+            };
+        }
+        hex = hex.replace('#', '');
+        var bigint = parseInt(hex, 16);
+        if (isNaN(bigint)) return { r: 0, g: 0, b: 0 };
+        return {
+            r: (bigint >> 16) & 255,
+            g: (bigint >> 8) & 255,
+            b: bigint & 255
+        };
+    }
 
     window['__name__'] = function(elementUid) {
         var obj = objects[elementUid];

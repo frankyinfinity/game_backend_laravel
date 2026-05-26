@@ -129,16 +129,14 @@ class SliderDraw
         $this->drawItems[] = $trackBg;
 
         // Track filled part
-        $fillWidth = (int) floor($ratio * $trackWidth);
-        if ($fillWidth > 0) {
-            $trackFill = new Rectangle($this->uid . '_track_fill');
-            $trackFill->setOrigin($trackX, $trackY);
-            $trackFill->setSize($fillWidth, $trackHeight);
-            $trackFill->setColor($this->color);
-            $trackFill->setBorderRadius(4);
-            $trackFill->setRenderable(true);
-            $this->drawItems[] = $trackFill;
-        }
+        $fillWidth = max(1, (int) floor($ratio * $trackWidth));
+        $trackFill = new Rectangle($this->uid . '_track_fill');
+        $trackFill->setOrigin($trackX, $trackY);
+        $trackFill->setSize($fillWidth, $trackHeight);
+        $trackFill->setColor($this->color);
+        $trackFill->setBorderRadius(4);
+        $trackFill->setRenderable(true);
+        $this->drawItems[] = $trackFill;
 
         // Knob (circle)
         $knob = new Circle($this->uid . '_knob');
@@ -147,35 +145,58 @@ class SliderDraw
         $knob->setColor($this->color);
         $knob->setRenderable(true);
 
-        $jsDrag = "window.__disableGlobalPan = true;" .
+        $jsDrag = "console.log('Slider drag start: " . $this->title . "');" .
+            "window.__disableGlobalPan = true;" .
             "var knob = shape;" .
             "var trackBg = shapes['" . $this->uid . "_track_bg'];" .
             "var trackFill = shapes['" . $this->uid . "_track_fill'];" .
+            "console.log('Looking for trackBg: " . $this->uid . "_track_bg');" .
+            "console.log('shapes keys:', Object.keys(shapes));" .
+            "function getPointerPosition(e) {" .
+            "    if (e && typeof e.clientX === 'number' && typeof e.clientY === 'number') {" .
+            "        return { x: e.clientX, y: e.clientY };" .
+            "    }" .
+            "    if (e && e.data && e.data.originalEvent && typeof e.data.originalEvent.clientX === 'number' && typeof e.data.originalEvent.clientY === 'number') {" .
+            "        return { x: e.data.originalEvent.clientX, y: e.data.originalEvent.clientY };" .
+            "    }" .
+            "    if (e && e.data && e.data.global && typeof e.data.global.x === 'number') {" .
+            "        return { x: e.data.global.x, y: e.data.global.y };" .
+            "    }" .
+            "    return { x: 0, y: 0 };" .
+            "}" .
             "if (trackBg) {" .
+            "    console.log('trackBg found', trackBg.x, trackBg.width);" .
             "    var trackX = trackBg.x;" .
             "    var trackWidth = trackBg.width;" .
-            "    var startGlobalX = event.global.x;" .
+            "    var startPointer = getPointerPosition(typeof event !== 'undefined' ? event : null);" .
+            "    var startGlobalX = startPointer.x;" .
             "    var knobStartX = knob.x;" .
             "    function onMove(ev) {" .
-            "        var newX = knobStartX + (ev.global.x - startGlobalX);" .
+            "        var pointer = getPointerPosition(ev);" .
+            "        var newX = knobStartX + (pointer.x - startGlobalX);" .
             "        if (newX < trackX) newX = trackX;" .
             "        if (newX > trackX + trackWidth) newX = trackX + trackWidth;" .
             "        knob.x = newX;" .
-            "        if (trackFill) { trackFill.width = Math.max(0, newX - trackX); }" .
+            "        if (trackFill) { trackFill.width = Math.max(1, newX - trackX); }" .
             "        var ratio = (newX - trackX) / trackWidth;" .
             "        var value = " . $this->min . " + Math.round(ratio * " . ($this->max - $this->min) . ");" .
             ($this->onChange !== '' ? "        " . $this->onChange . ";" : "") .
             "    }" .
             "    function onUp() {" .
-            "        app.renderer.events.off('pointermove', onMove);" .
-            "        app.renderer.events.off('pointerup', onUp);" .
-            "        app.renderer.events.off('pointerupoutside', onUp);" .
+            "        window.removeEventListener('pointermove', onMove);" .
+            "        window.removeEventListener('pointerup', onUp);" .
+            "        window.removeEventListener('pointercancel', onUp);" .
+            "        window.removeEventListener('mouseup', onUp);" .
+            "        window.removeEventListener('blur', onUp);" .
             "        window.__disableGlobalPan = false;" .
             "    }" .
-            "    app.renderer.events.on('pointermove', onMove);" .
-            "    app.renderer.events.on('pointerup', onUp);" .
-            "    app.renderer.events.on('pointerupoutside', onUp);" .
+            "    window.addEventListener('pointermove', onMove);" .
+            "    window.addEventListener('pointerup', onUp);" .
+            "    window.addEventListener('pointercancel', onUp);" .
+            "    window.addEventListener('mouseup', onUp);" .
+            "    window.addEventListener('blur', onUp);" .
             "} else {" .
+            "    console.error('trackBg NOT found for " . $this->uid . "');" .
             "    window.__disableGlobalPan = false;" .
             "}";
 

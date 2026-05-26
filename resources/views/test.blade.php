@@ -519,7 +519,7 @@
             const object = objects[this.object['uid']];
             if (!object['attributes'] || !object['attributes']['tooltip_text']) return;
 
-            this.shape.interactive = true;
+            this.shape.eventMode = 'static';
             this.shape.cursor = 'help';
 
             const tooltipText = object['attributes']['tooltip_text'];
@@ -574,7 +574,7 @@
                 'interactives'
             ]['count'] === 0) return;
 
-            this.shape.interactive = true;
+            this.shape.eventMode = 'static';
             this.shape.cursor = 'pointer';
             const items = object['attributes']['interactives']['items'];
 

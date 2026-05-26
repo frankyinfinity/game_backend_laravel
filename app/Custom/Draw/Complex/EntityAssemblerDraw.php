@@ -9,6 +9,7 @@ use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Complex\SliderDraw;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
 
@@ -414,12 +415,6 @@ class EntityAssemblerDraw
         $gridElementUidsBody = $gridDrawBody->getElementUids();
         $gridScrollUidsBody = $gridDrawBody->getScrollUids();
         $this->gridScrollInitJs = $gridDrawBody->getScrollInitJs();
-        
-        // Generate JS for entity body selection on grid
-        $gridJs = file_get_contents(resource_path('js/function/entity_body/select_entity_body.blade.php'));
-        $gridJs = str_replace('__MODAL_UID__', $modalUid, $gridJs);
-        $gridJs = str_replace('__name__', 'selectEntityBody_' . $modalUid, $gridJs);
-        $this->gridScrollInitJs .= $gridJs;
 
         // Create GridDraw for tab_component
         $gridDrawComponent = new GridDraw($modalUid . '_grid_component');
@@ -593,7 +588,7 @@ class EntityAssemblerDraw
 
         // Zone info panel (hidden by default) - created LAST to render above everything
         $zonePanelWidth = 280;
-        $zonePanelHeight = 50;
+        $zonePanelHeight = 210;
         $zonePanelX = $modalX + ($modalWidth / 2) - ($zonePanelWidth / 2);
         $zonePanelY = $modalY + $headerHeight + 20;
 
@@ -687,7 +682,37 @@ class EntityAssemblerDraw
         $zoneCloseText->setRenderable(false);
         $zoneCloseText->addAttributes('z_index', 50040);
 
+        // RGB Sliders in zone panel
+        $sliderYStart = $zonePanelY + 45;
+        $sliderX = $zonePanelX + 10;
+        $sliderWidth = $zonePanelWidth - 20;
+        $sliderConfigs = [
+            ['uid_suffix' => 'slider_red', 'color' => 0xFF0000, 'title' => 'Rosso'],
+            ['uid_suffix' => 'slider_green', 'color' => 0x00FF00, 'title' => 'Verde'],
+            ['uid_suffix' => 'slider_blue', 'color' => 0x0000FF, 'title' => 'Blu'],
+        ];
+        $sliderUids = [];
+        foreach ($sliderConfigs as $index => $config) {
+            $slider = new SliderDraw($modalUid . '_' . $config['uid_suffix']);
+            $slider->setOrigin($sliderX, $sliderYStart + ($index * 55));
+            $slider->setWidth($sliderWidth);
+            $slider->setMin(0);
+            $slider->setMax(255);
+            $slider->setValue(0);
+            $slider->setColor($config['color']);
+            $slider->setTitle($config['title']);
+            $slider->setOnChange("console.log('" . $config['title'] . "'); console.log(value);");
+            $slider->build();
+            foreach ($slider->getDrawItems() as $item) {
+                $item->addAttributes('z_index', 50050 + $index);
+                $item->setRenderable(false);
+                $this->drawItems[] = $item;
+                $sliderUids[] = $item->getUid();
+            }
+        }
+
         // Zone panel close button click handler
+        $sliderUidsJson = json_encode($sliderUids);
         $jsZoneClose = "(function() {
             var panel = shapes['{$modalUid}_zone_panel'];
             var colorSquare = shapes['{$modalUid}_zone_color_square'];
@@ -698,6 +723,7 @@ class EntityAssemblerDraw
             var borderBottom = shapes['{$modalUid}_zone_border_bottom'];
             var borderLeft = shapes['{$modalUid}_zone_border_left'];
             var borderRight = shapes['{$modalUid}_zone_border_right'];
+            var sliderUids = " . $sliderUidsJson . ";
             if (panel) panel.renderable = false;
             if (colorSquare) colorSquare.renderable = false;
             if (nameText) nameText.renderable = false;
@@ -707,13 +733,25 @@ class EntityAssemblerDraw
             if (borderBottom) borderBottom.renderable = false;
             if (borderLeft) borderLeft.renderable = false;
             if (borderRight) borderRight.renderable = false;
+            sliderUids.forEach(function(uid) {
+                var s = shapes[uid];
+                if (s) s.renderable = false;
+            });
         })();";
+
         $jsZoneClose = Helper::setCommonJsCode($jsZoneClose, Str::random(20));
         $zoneCloseButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsZoneClose);
         $zoneCloseText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsZoneClose);
 
         $this->drawItems[] = $zoneCloseButton;
         $this->drawItems[] = $zoneCloseText;
+
+        // Generate JS for entity body selection on grid
+        $gridJs = file_get_contents(resource_path('js/function/entity_body/select_entity_body.blade.php'));
+        $gridJs = str_replace('__MODAL_UID__', $modalUid, $gridJs);
+        $gridJs = str_replace('__name__', 'selectEntityBody_' . $modalUid, $gridJs);
+        $gridJs = str_replace('__SLIDER_UIDS__', $sliderUidsJson, $gridJs);
+        $this->gridScrollInitJs .= $gridJs;
     }
 
     private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false): void
