@@ -482,7 +482,7 @@ class EntityAssemblerDraw
         $gridDrawBody->setElementsPerRow(3);
         $gridDrawBody->setElementSpacing(2);
 
-        $elementDataBody = \App\Models\EntityBody::with('zones.pixels')
+        $elementDataBody = \App\Models\EntityBody::with('zones.pixels', 'anchors')
             ->where('state', \App\Models\EntityBody::STATE_COMPLETED)
             ->get()
             ->map(function ($item) {
@@ -550,6 +550,16 @@ class EntityAssemblerDraw
                 }
                 
                 $data['pixels_json'] = json_encode($pixels);
+
+                // Add anchor information using morphTo relationship
+                $anchors = $item->anchors;
+                $data['anchors'] = $anchors->map(function ($anchor) {
+                    return [
+                        'id' => $anchor->id,
+                        'x' => $anchor->x,
+                        'y' => $anchor->y,
+                    ];
+                })->toArray();
 
                 return $data;
             })->toArray();

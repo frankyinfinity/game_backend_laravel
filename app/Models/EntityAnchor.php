@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class EntityAnchor extends Model
 {
+    protected $table = 'entity_anchors';
+
     protected $fillable = [
         'x',
         'y',

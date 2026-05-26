@@ -3,10 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\EntityAnchor;
+use App\Models\EntityBody;
+use App\Models\EntityComponent;
 use Illuminate\Http\Request;
 
 class EntityAnchorController extends Controller
 {
+    /**
+     * Get the model instance based on type and id.
+     */
+    private function getModel(string $type, int $id)
+    {
+        return match($type) {
+            'entity_body', 'App\Models\EntityBody', 'AppModelsEntityBody' => EntityBody::findOrFail($id),
+            'entity_component', 'App\Models\EntityComponent', 'AppModelsEntityComponent' => EntityComponent::findOrFail($id),
+            default => throw new \InvalidArgumentException("Invalid type: {$type}"),
+        };
+    }
+
     /**
      * Display a listing of the resource for the specified polymorphic entity.
      */
@@ -17,9 +31,8 @@ class EntityAnchorController extends Controller
             'id' => 'required|integer',
         ]);
 
-        $anchors = EntityAnchor::where('anchorable_type', $request->type)
-            ->where('anchorable_id', $request->id)
-            ->get();
+        $model = $this->getModel($request->type, $request->id);
+        $anchors = $model->anchors;
 
         return response()->json($anchors);
     }
@@ -36,9 +49,10 @@ class EntityAnchorController extends Controller
             'y' => 'required|integer|min:0|max:31',
         ]);
 
+        $model = $this->getModel($request->type, $request->id);
+
         // Prevent duplicates at the same coordinate
-        $exists = EntityAnchor::where('anchorable_type', $request->type)
-            ->where('anchorable_id', $request->id)
+        $exists = $model->anchors()
             ->where('x', $request->x)
             ->where('y', $request->y)
             ->exists();
@@ -47,9 +61,7 @@ class EntityAnchorController extends Controller
             return response()->json(['success' => false, 'message' => 'Un\'ancora esiste già in questa posizione.'], 422);
         }
 
-        $anchor = EntityAnchor::create([
-            'anchorable_type' => $request->type,
-            'anchorable_id' => $request->id,
+        $anchor = $model->anchors()->create([
             'x' => $request->x,
             'y' => $request->y,
         ]);

@@ -2,9 +2,14 @@
 
 (function() {
     var currentPixels = [];
+    var currentAnchors = [];
 
     window['setPixelsContext_' + '__MODAL_UID__'] = function(pixels) {
         currentPixels = pixels;
+    };
+
+    window['setAnchorsContext_' + '__MODAL_UID__'] = function(anchors) {
+        currentAnchors = anchors;
     };
 
     window['movePixels_' + '__MODAL_UID__'] = function(direction) {
@@ -18,6 +23,7 @@
 
         // Calculate new positions for all pixels
         var movedPixels = [];
+        var movedAnchors = [];
         var gridSize = 32;
 
         currentPixels.forEach(function(pixel) {
@@ -57,8 +63,48 @@
             }
         });
 
+        // Calculate new positions for anchors
+        currentAnchors.forEach(function(anchor) {
+            var newX = anchor.x;
+            var newY = anchor.y;
+
+            switch(direction) {
+                case 'up':
+                    newY = Math.max(0, anchor.y - 1);
+                    break;
+                case 'down':
+                    newY = Math.min(gridSize - 1, anchor.y + 1);
+                    break;
+                case 'left':
+                    newX = Math.max(0, anchor.x - 1);
+                    break;
+                case 'right':
+                    newX = Math.min(gridSize - 1, anchor.x + 1);
+                    break;
+            }
+
+            // Only add if position changed
+            if (newX !== anchor.x || newY !== anchor.y) {
+                movedAnchors.push({
+                    oldX: anchor.x,
+                    oldY: anchor.y,
+                    newX: newX,
+                    newY: newY
+                });
+            }
+        });
+
         // Clear old positions
         movedPixels.forEach(function(moved) {
+            var oldCellUid = '__MODAL_UID___grid_cell_' + moved.oldY + '_' + moved.oldX;
+            var oldCellShape = shapes[oldCellUid];
+            if (oldCellShape) {
+                oldCellShape.tint = 0xFFFFFF;
+            }
+        });
+
+        // Clear old anchor positions
+        movedAnchors.forEach(function(moved) {
             var oldCellUid = '__MODAL_UID___grid_cell_' + moved.oldY + '_' + moved.oldX;
             var oldCellShape = shapes[oldCellUid];
             if (oldCellShape) {
@@ -75,12 +121,55 @@
             }
         });
 
+        // Set new anchor positions (blue)
+        movedAnchors.forEach(function(moved) {
+            var newCellUid = '__MODAL_UID___grid_cell_' + moved.newY + '_' + moved.newX;
+            var newCellShape = shapes[newCellUid];
+            if (newCellShape) {
+                newCellShape.tint = 0x0000FF; // Blue for anchors
+
+                // Re-attach hover events to new cell
+                newCellShape.eventMode = 'static';
+                newCellShape.cursor = 'pointer';
+
+                // Find the anchor data for this position
+                var anchorData = currentAnchors.find(function(a) {
+                    return a.x === moved.newX && a.y === moved.newY;
+                });
+
+                if (anchorData) {
+                    newCellShape.on('pointerover', function() {
+                        var showTooltipFn = window['showAnchorTooltip_' + '__MODAL_UID__'];
+                        if (typeof showTooltipFn === 'function') {
+                            showTooltipFn(anchorData, newCellShape);
+                        }
+                    });
+
+                    newCellShape.on('pointerout', function() {
+                        var hideTooltipFn = window['hideAnchorTooltip_' + '__MODAL_UID__'];
+                        if (typeof hideTooltipFn === 'function') {
+                            hideTooltipFn();
+                        }
+                    });
+                }
+            }
+        });
+
         // Update currentPixels array with new positions
         currentPixels.forEach(function(pixel) {
             var moved = movedPixels.find(function(m) { return m.oldX === pixel.x && m.oldY === pixel.y; });
             if (moved) {
                 pixel.x = moved.newX;
                 pixel.y = moved.newY;
+            }
+        });
+
+        // Update currentAnchors array with new positions
+        currentAnchors.forEach(function(anchor) {
+            var moved = movedAnchors.find(function(m) { return m.oldX === anchor.x && m.oldY === anchor.y; });
+            if (moved) {
+                anchor.x = moved.newX;
+                anchor.y = moved.newY;
             }
         });
 

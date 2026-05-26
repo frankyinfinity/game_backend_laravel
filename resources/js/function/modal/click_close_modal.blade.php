@@ -87,6 +87,12 @@ window['__name__'] = function() {
     var dirContainer = shapes[modalUid + '_dir_container'];
     if (dirContainer) dirContainer.renderable = false;
 
+    // Hide anchor tooltip if visible
+    var hideTooltipFn = window['hideAnchorTooltip_' + modalUid];
+    if (typeof hideTooltipFn === 'function') {
+        hideTooltipFn();
+    }
+
     if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
         let resolvedPlayerId = null;
         if (typeof playerId !== 'undefined') {

@@ -306,6 +306,43 @@
         };
     }
 
+    // Tooltip functions for anchor cells (HTML tooltip)
+    var anchorTooltipElement = null;
+
+    function showAnchorTooltip(anchor, cellShape) {
+        if (!anchorTooltipElement) {
+            anchorTooltipElement = document.createElement('div');
+            anchorTooltipElement.style.position = 'absolute';
+            anchorTooltipElement.style.backgroundColor = 'white';
+            anchorTooltipElement.style.border = '1px solid black';
+            anchorTooltipElement.style.padding = '4px 8px';
+            anchorTooltipElement.style.fontSize = '12px';
+            anchorTooltipElement.style.fontFamily = 'Arial';
+            anchorTooltipElement.style.zIndex = '9999';
+            anchorTooltipElement.style.pointerEvents = 'none';
+            document.body.appendChild(anchorTooltipElement);
+        }
+
+        anchorTooltipElement.textContent = '#' + anchor.id + ' (X: ' + anchor.x + ' - Y: ' + anchor.y + ')';
+        anchorTooltipElement.style.display = 'block';
+
+        // Position tooltip near the cell
+        var canvas = app.renderer.view;
+        var rect = canvas.getBoundingClientRect();
+        anchorTooltipElement.style.left = (rect.left + cellShape.x) + 'px';
+        anchorTooltipElement.style.top = (rect.top + cellShape.y - 25) + 'px';
+    }
+
+    function hideAnchorTooltip() {
+        if (anchorTooltipElement) {
+            anchorTooltipElement.style.display = 'none';
+        }
+    }
+
+    // Expose functions globally
+    window['hideAnchorTooltip_' + '__MODAL_UID__'] = hideAnchorTooltip;
+    window['showAnchorTooltip_' + '__MODAL_UID__'] = showAnchorTooltip;
+
     window['__name__'] = function(elementUid) {
         var obj = objects[elementUid];
         if (!obj || !obj['attributes']) return;
@@ -371,6 +408,36 @@
         if (typeof setPixelsFn === 'function') {
             setPixelsFn(pixels);
         }
+
+        // Draw EntityAnchor cell in blue (without borders) - AFTER drawing black pixels
+        var anchors = data.anchors ? data.anchors : [];
+        window['__anchorData_' + '__MODAL_UID__'] = anchors; // Store anchor data for hover tooltips
+        anchors.forEach(function(anchor) {
+            var anchorCellUid = '__MODAL_UID___grid_cell_' + anchor.y + '_' + anchor.x;
+            var anchorCellShape = shapes[anchorCellUid];
+            if (anchorCellShape) {
+                anchorCellShape.tint = 0x0000FF; // Blue
+
+                // Add hover events for tooltip
+                anchorCellShape.eventMode = 'static';
+                anchorCellShape.cursor = 'pointer';
+
+                anchorCellShape.on('pointerover', function() {
+                    showAnchorTooltip(anchor, anchorCellShape);
+                });
+
+                anchorCellShape.on('pointerout', function() {
+                    hideAnchorTooltip();
+                });
+            }
+        });
+
+        // Set anchors context for move function
+        var setAnchorsFn = window['setAnchorsContext_' + '__MODAL_UID__'];
+        if (typeof setAnchorsFn === 'function') {
+            setAnchorsFn(anchors);
+        }
+
         var grayBorderColor = 0x808080;
         var zoneBorderColor = 0xFF0000;
 
