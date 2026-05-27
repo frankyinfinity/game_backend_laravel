@@ -6,6 +6,12 @@
     var lastDrawnCells = [];
     var currentPixels = [];
     var zonePanelOriginalPositions = null;
+    var activeAssemblerTab = 'tab_body';
+    var tabEnabledState = {
+        tab_body: true,
+        tab_component: false
+    };
+    var activeAnchorTooltipId = null;
 
     // Use window variable to share zoneBorderShapes with update_zone_color
     window['__zoneBorderShapes_' + '__MODAL_UID__'] = window['__zoneBorderShapes_' + '__MODAL_UID__'] || [];
@@ -46,6 +52,19 @@
             if (s) s.renderable = false;
         });
     }
+
+    window['hideZonePanel_' + '__MODAL_UID__'] = hideZonePanel;
+
+    window['setAssemblerActiveTab_' + '__MODAL_UID__'] = function(tabUid) {
+        activeAssemblerTab = tabUid;
+    };
+
+    window['setAssemblerTabEnabled_' + '__MODAL_UID__'] = function(tabUid, enabled) {
+        tabEnabledState[tabUid] = !!enabled;
+    };
+
+    window['__assemblerTabBodyDisabled_' + '__MODAL_UID__'] = false;
+    window['__assemblerTabComponentDisabled_' + '__MODAL_UID__'] = true;
 
     function positionZonePanel(nearX, nearY) {
         var panel = shapes['__MODAL_UID___zone_panel'];
@@ -262,6 +281,10 @@
 
     // Grid cell click handler - shows zone info panel
     window['clickGridCell_' + '__MODAL_UID__'] = function(cellUid) {
+        if (activeAssemblerTab !== 'tab_body' || !tabEnabledState.tab_body) {
+            return;
+        }
+
         var cellShape = shapes[cellUid];
         if (!cellShape) return;
 
@@ -323,6 +346,7 @@
             document.body.appendChild(anchorTooltipElement);
         }
 
+        activeAnchorTooltipId = anchor.id;
         anchorTooltipElement.textContent = '#' + anchor.id + ' (X: ' + anchor.x + ' - Y: ' + anchor.y + ')';
         anchorTooltipElement.style.display = 'block';
 
@@ -334,10 +358,34 @@
     }
 
     function hideAnchorTooltip() {
+        activeAnchorTooltipId = null;
         if (anchorTooltipElement) {
             anchorTooltipElement.style.display = 'none';
         }
     }
+
+    window['refreshAnchorTooltip_' + '__MODAL_UID__'] = function(anchors) {
+        if (activeAnchorTooltipId === null || !anchorTooltipElement || anchorTooltipElement.style.display === 'none') {
+            return;
+        }
+
+        var anchor = (anchors || []).find(function(item) {
+            return item.id === activeAnchorTooltipId;
+        });
+        if (!anchor) {
+            hideAnchorTooltip();
+            return;
+        }
+
+        var cellUid = '__MODAL_UID___grid_cell_' + anchor.y + '_' + anchor.x;
+        var cellShape = shapes[cellUid];
+        if (!cellShape) {
+            hideAnchorTooltip();
+            return;
+        }
+
+        showAnchorTooltip(anchor, cellShape);
+    };
 
     // Expose functions globally
     window['hideAnchorTooltip_' + '__MODAL_UID__'] = hideAnchorTooltip;

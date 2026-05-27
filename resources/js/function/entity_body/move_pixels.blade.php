@@ -29,6 +29,9 @@
         currentPixels.forEach(function(pixel) {
             var newX = pixel.x;
             var newY = pixel.y;
+            var oldCellUid = '__MODAL_UID___grid_cell_' + pixel.y + '_' + pixel.x;
+            var oldCellShape = shapes[oldCellUid];
+            var pixelTint = oldCellShape ? oldCellShape.tint : 0x000000;
 
             switch(direction) {
                 case 'up':
@@ -52,6 +55,7 @@
                     oldY: pixel.y,
                     newX: newX,
                     newY: newY,
+                    tint: pixelTint,
                     has_zone: pixel.has_zone,
                     zone_color: pixel.zone_color,
                     zone_name: pixel.zone_name,
@@ -117,7 +121,7 @@
             var newCellUid = '__MODAL_UID___grid_cell_' + moved.newY + '_' + moved.newX;
             var newCellShape = shapes[newCellUid];
             if (newCellShape) {
-                newCellShape.tint = 0x000000;
+                newCellShape.tint = moved.tint;
             }
         });
 
@@ -131,27 +135,6 @@
                 // Re-attach hover events to new cell
                 newCellShape.eventMode = 'static';
                 newCellShape.cursor = 'pointer';
-
-                // Find the anchor data for this position
-                var anchorData = currentAnchors.find(function(a) {
-                    return a.x === moved.newX && a.y === moved.newY;
-                });
-
-                if (anchorData) {
-                    newCellShape.on('pointerover', function() {
-                        var showTooltipFn = window['showAnchorTooltip_' + '__MODAL_UID__'];
-                        if (typeof showTooltipFn === 'function') {
-                            showTooltipFn(anchorData, newCellShape);
-                        }
-                    });
-
-                    newCellShape.on('pointerout', function() {
-                        var hideTooltipFn = window['hideAnchorTooltip_' + '__MODAL_UID__'];
-                        if (typeof hideTooltipFn === 'function') {
-                            hideTooltipFn();
-                        }
-                    });
-                }
             }
         });
 
@@ -172,6 +155,38 @@
                 anchor.y = moved.newY;
             }
         });
+
+        movedAnchors.forEach(function(moved) {
+            var newCellUid = '__MODAL_UID___grid_cell_' + moved.newY + '_' + moved.newX;
+            var newCellShape = shapes[newCellUid];
+            var anchorData = currentAnchors.find(function(anchor) {
+                return anchor.x === moved.newX && anchor.y === moved.newY;
+            });
+
+            if (!newCellShape || !anchorData) return;
+
+            newCellShape.removeAllListeners('pointerover');
+            newCellShape.removeAllListeners('pointerout');
+
+            newCellShape.on('pointerover', function() {
+                var showTooltipFn = window['showAnchorTooltip_' + '__MODAL_UID__'];
+                if (typeof showTooltipFn === 'function') {
+                    showTooltipFn(anchorData, newCellShape);
+                }
+            });
+
+            newCellShape.on('pointerout', function() {
+                var hideTooltipFn = window['hideAnchorTooltip_' + '__MODAL_UID__'];
+                if (typeof hideTooltipFn === 'function') {
+                    hideTooltipFn();
+                }
+            });
+        });
+
+        var refreshAnchorTooltipFn = window['refreshAnchorTooltip_' + '__MODAL_UID__'];
+        if (typeof refreshAnchorTooltipFn === 'function') {
+            refreshAnchorTooltipFn(currentAnchors);
+        }
 
         // Re-draw zone borders if there are zones
         if (currentPixels.some(function(p) { return p.has_zone; })) {

@@ -800,8 +800,32 @@ class EntityAssemblerDraw
         $backButtonText->setRenderable(false);
         $backButtonText->addAttributes('z_index', 20096);
 
+        $jsSetBodyActive = "
+    var setActiveTabFn = window['setAssemblerActiveTab_{$modalUid}'];
+    if (typeof setActiveTabFn === 'function') setActiveTabFn('tab_body');
+    var setTabEnabledFn = window['setAssemblerTabEnabled_{$modalUid}'];
+    if (typeof setTabEnabledFn === 'function') {
+        setTabEnabledFn('tab_body', true);
+        setTabEnabledFn('tab_component', false);
+    }
+    window['__assemblerTabBodyDisabled_{$modalUid}'] = false;
+    window['__assemblerTabComponentDisabled_{$modalUid}'] = true;";
+
+        $jsSetComponentActive = "
+    var setActiveTabFn = window['setAssemblerActiveTab_{$modalUid}'];
+    if (typeof setActiveTabFn === 'function') setActiveTabFn('tab_component');
+    var setTabEnabledFn = window['setAssemblerTabEnabled_{$modalUid}'];
+    if (typeof setTabEnabledFn === 'function') {
+        setTabEnabledFn('tab_body', false);
+        setTabEnabledFn('tab_component', true);
+    }
+    window['__assemblerTabBodyDisabled_{$modalUid}'] = true;
+    window['__assemblerTabComponentDisabled_{$modalUid}'] = false;";
+
         // JS click handler for back button: enable tab_body, go to tab_body, disable tab_component
         $jsBackButton = "(function() {
+    {$jsSetBodyActive}
+
     // Show body content
     var bodyUids = {$bodyContentUidsJson};
     bodyUids.forEach(function(uid) {
@@ -898,6 +922,13 @@ class EntityAssemblerDraw
 
         // JS click handler for proceed button: enable tab_component, go to tab_component, disable tab_body
         $jsProceedButton = "(function() {
+    {$jsSetComponentActive}
+
+    var hideZonePanelFn = window['hideZonePanel_{$modalUid}'];
+    if (typeof hideZonePanelFn === 'function') {
+        hideZonePanelFn();
+    }
+
     var bodyUids = {$bodyContentUidsJson};
     bodyUids.forEach(function(uid) {
         if (shapes[uid]) shapes[uid].renderable = false;
@@ -963,6 +994,11 @@ class EntityAssemblerDraw
 
         // JS click handler for tab_component tab: switch to component content, show back button
         $jsTabComponentClick = "(function() {
+    if (window['__assemblerTabComponentDisabled_{$modalUid}'] === true) {
+        return;
+    }
+    {$jsSetComponentActive}
+
     // Hide body content
     var bodyUids = {$bodyContentUidsJson};
     bodyUids.forEach(function(uid) {
@@ -1028,12 +1064,80 @@ class EntityAssemblerDraw
 })();";
         $jsTabComponentClick = Helper::setCommonJsCode($jsTabComponentClick, Str::random(20));
 
-        // Set click handler on tab_component tab and text (even though tab is disabled)
+        $jsTabBodyClick = "(function() {
+    if (window['__assemblerTabBodyDisabled_{$modalUid}'] === true) {
+        return;
+    }
+    {$jsSetBodyActive}
+
+    // Show body content
+    var bodyUids = {$bodyContentUidsJson};
+    bodyUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = true;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = true;
+    });
+
+    // Hide component content
+    var componentUids = {$componentContentUidsJson};
+    componentUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = false;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+    });
+
+    ['top','bottom','left','right'].forEach(function(side) {
+        var bodyBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_body'];
+        if (bodyBorder) bodyBorder.renderable = true;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes.renderable = true;
+        var compBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_component'];
+        if (compBorder) compBorder.renderable = false;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes.renderable = false;
+    });
+
+    var strike = shapes['{$modalUid}_tabs_tab_strike_tab_component'];
+    if (strike) strike.renderable = true;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_component'] && objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes.renderable = true;
+
+    var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
+    if (compText) compText.style.fill = 0x808080;
+
+    var bodyStrike = shapes['{$modalUid}_tabs_tab_strike_tab_body'];
+    if (bodyStrike) bodyStrike.renderable = false;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_body'] && objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes.renderable = false;
+
+    var bodyText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
+    if (bodyText) bodyText.style.fill = 0x000000;
+
+    ['{$modalUid}_dir_container','{$modalUid}_dir_title','{$modalUid}_dir_up','{$modalUid}_dir_up_text','{$modalUid}_dir_left','{$modalUid}_dir_left_text','{$modalUid}_dir_down','{$modalUid}_dir_down_text','{$modalUid}_dir_right','{$modalUid}_dir_right_text'].forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = true;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = true;
+    });
+
+    var backRect = shapes['{$modalUid}_back_button_rect'];
+    var backText = shapes['{$modalUid}_back_button_text'];
+    if (backRect) backRect.renderable = false;
+    if (backText) backText.renderable = false;
+    if (objects['{$modalUid}_back_button_rect'] && objects['{$modalUid}_back_button_rect'].attributes) objects['{$modalUid}_back_button_rect'].attributes.renderable = false;
+    if (objects['{$modalUid}_back_button_text'] && objects['{$modalUid}_back_button_text'].attributes) objects['{$modalUid}_back_button_text'].attributes.renderable = false;
+
+    var procRect = shapes['{$modalUid}_proceed_button_rect'];
+    var procText = shapes['{$modalUid}_proceed_button_text'];
+    if (procRect) procRect.renderable = true;
+    if (procText) procText.renderable = true;
+    if (objects['{$modalUid}_proceed_button_rect'] && objects['{$modalUid}_proceed_button_rect'].attributes) objects['{$modalUid}_proceed_button_rect'].attributes.renderable = true;
+    if (objects['{$modalUid}_proceed_button_text'] && objects['{$modalUid}_proceed_button_text'].attributes) objects['{$modalUid}_proceed_button_text'].attributes.renderable = true;
+})();";
+        $jsTabBodyClick = Helper::setCommonJsCode($jsTabBodyClick, Str::random(20));
+        $jsTabComponentClick = Helper::setCommonJsCode($jsTabComponentClick, Str::random(20));
+
+        // Set guarded click handlers on tabs so disabled tabs are never clickable
         foreach ($tabDraw->getDrawItems() as $item) {
             $itemUid = $item->getUid();
             if ($itemUid === $modalUid . '_tabs_tab_tab_component' ||
                 $itemUid === $modalUid . '_tabs_tab_text_tab_component') {
                 $item->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsTabComponentClick);
+            } elseif ($itemUid === $modalUid . '_tabs_tab_tab_body' ||
+                $itemUid === $modalUid . '_tabs_tab_text_tab_body') {
+                $item->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsTabBodyClick);
             }
         }
 
