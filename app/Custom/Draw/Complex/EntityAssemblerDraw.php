@@ -109,7 +109,7 @@ class EntityAssemblerDraw
 
     private function buildModal($modalUid): void
     {
-        $modalWidth = 1200;
+        $modalWidth = 1100;
         $modalHeight = 600;
         $screenWidth = 1280;
         $screenHeight = 720;
@@ -674,7 +674,9 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_right_tab_component',
             $modalUid . '_tabs_tab_strike_tab_component',
             $modalUid . '_back_button_rect',
-            $modalUid . '_back_button_text'
+            $modalUid . '_back_button_text',
+            $modalUid . '_proceed_button_rect',
+            $modalUid . '_proceed_button_text'
         ], $gridCellUids, $gridElementUidsBody, $gridScrollUidsBody, $gridElementUidsComponent, $gridScrollUidsComponent));
         $contentViewport->addAttributes('scroll_initial_renderables', array_merge([
             $modalUid . '_separator_1' => true,
@@ -701,7 +703,9 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_right_tab_component' => false,
             $modalUid . '_tabs_tab_strike_tab_component' => true,
             $modalUid . '_back_button_rect' => false,
-            $modalUid . '_back_button_text' => false
+            $modalUid . '_back_button_text' => false,
+            $modalUid . '_proceed_button_rect' => false,
+            $modalUid . '_proceed_button_text' => false
         ], array_fill_keys($gridCellUids, true), array_fill_keys($gridElementUidsBody, true), array_fill_keys($gridScrollUidsBody, true), array_fill_keys($gridElementUidsComponent, false), array_fill_keys($gridScrollUidsComponent, false)));
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
@@ -826,6 +830,14 @@ class EntityAssemblerDraw
     if (backText) backText.renderable = false;
     if (objects['{$modalUid}_back_button_rect'] && objects['{$modalUid}_back_button_rect'].attributes) objects['{$modalUid}_back_button_rect'].attributes.renderable = false;
     if (objects['{$modalUid}_back_button_text'] && objects['{$modalUid}_back_button_text'].attributes) objects['{$modalUid}_back_button_text'].attributes.renderable = false;
+
+    // Show proceed button
+    var procRect = shapes['{$modalUid}_proceed_button_rect'];
+    var procText = shapes['{$modalUid}_proceed_button_text'];
+    if (procRect) procRect.renderable = true;
+    if (procText) procText.renderable = true;
+    if (objects['{$modalUid}_proceed_button_rect'] && objects['{$modalUid}_proceed_button_rect'].attributes) objects['{$modalUid}_proceed_button_rect'].attributes.renderable = true;
+    if (objects['{$modalUid}_proceed_button_text'] && objects['{$modalUid}_proceed_button_text'].attributes) objects['{$modalUid}_proceed_button_text'].attributes.renderable = true;
 })();";
         $jsBackButton = Helper::setCommonJsCode($jsBackButton, Str::random(20));
         $backButtonRect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsBackButton);
@@ -833,6 +845,81 @@ class EntityAssemblerDraw
 
         $this->drawItems[] = $backButtonRect;
         $this->drawItems[] = $backButtonText;
+
+        // Green "Prosegui" (proceed) button - hidden by default, shown after EntityBody selection
+        $proceedButtonWidth = 120;
+        $proceedButtonHeight = 35;
+        $proceedButtonX = $rightX + 10;
+        $proceedButtonY = $contentY + 45;
+
+        $proceedButtonRect = new Rectangle($modalUid . '_proceed_button_rect');
+        $proceedButtonRect->setOrigin($proceedButtonX, $proceedButtonY);
+        $proceedButtonRect->setSize($proceedButtonWidth, $proceedButtonHeight);
+        $proceedButtonRect->setColor(0x00AA00);
+        $proceedButtonRect->setBorderRadius(5);
+        $proceedButtonRect->setRenderable(false);
+        $proceedButtonRect->addAttributes('z_index', 20095);
+
+        $proceedButtonText = new Text($modalUid . '_proceed_button_text');
+        $proceedButtonText->setCenterAnchor(true);
+        $proceedButtonText->setOrigin($proceedButtonX + (int) floor($proceedButtonWidth / 2), $proceedButtonY + (int) floor($proceedButtonHeight / 2));
+        $proceedButtonText->setText('Prosegui');
+        $proceedButtonText->setColor(0xFFFFFF);
+        $proceedButtonText->setFontSize(14);
+        $proceedButtonText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $proceedButtonText->setRenderable(false);
+        $proceedButtonText->addAttributes('z_index', 20096);
+
+        // JS click handler for proceed button: enable tab_component, go to tab_component, disable tab_body
+        $jsProceedButton = "(function() {
+    var bodyUids = {$bodyContentUidsJson};
+    bodyUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = false;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+    });
+
+    var componentUids = {$componentContentUidsJson};
+    componentUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = true;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = true;
+    });
+
+    ['top','bottom','left','right'].forEach(function(side) {
+        var compBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_component'];
+        if (compBorder) compBorder.renderable = true;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes.renderable = true;
+        var bodyBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_body'];
+        if (bodyBorder) bodyBorder.renderable = false;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes.renderable = false;
+    });
+
+    var strike = shapes['{$modalUid}_tabs_tab_strike_tab_component'];
+    if (strike) strike.renderable = false;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_component'] && objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes.renderable = false;
+
+    var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
+    if (compText) compText.style.fill = 0x000000;
+
+    var backRect = shapes['{$modalUid}_back_button_rect'];
+    var backText = shapes['{$modalUid}_back_button_text'];
+    if (backRect) backRect.renderable = true;
+    if (backText) backText.renderable = true;
+    if (objects['{$modalUid}_back_button_rect'] && objects['{$modalUid}_back_button_rect'].attributes) objects['{$modalUid}_back_button_rect'].attributes.renderable = true;
+    if (objects['{$modalUid}_back_button_text'] && objects['{$modalUid}_back_button_text'].attributes) objects['{$modalUid}_back_button_text'].attributes.renderable = true;
+
+    var procRect = shapes['{$modalUid}_proceed_button_rect'];
+    var procText = shapes['{$modalUid}_proceed_button_text'];
+    if (procRect) procRect.renderable = false;
+    if (procText) procText.renderable = false;
+    if (objects['{$modalUid}_proceed_button_rect'] && objects['{$modalUid}_proceed_button_rect'].attributes) objects['{$modalUid}_proceed_button_rect'].attributes.renderable = false;
+    if (objects['{$modalUid}_proceed_button_text'] && objects['{$modalUid}_proceed_button_text'].attributes) objects['{$modalUid}_proceed_button_text'].attributes.renderable = false;
+})();";
+        $jsProceedButton = Helper::setCommonJsCode($jsProceedButton, Str::random(20));
+        $proceedButtonRect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsProceedButton);
+        $proceedButtonText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsProceedButton);
+
+        $this->drawItems[] = $proceedButtonRect;
+        $this->drawItems[] = $proceedButtonText;
 
         // JS click handler for tab_component tab: switch to component content, show back button
         $jsTabComponentClick = "(function() {
@@ -876,6 +963,14 @@ class EntityAssemblerDraw
     if (backText) backText.renderable = true;
     if (objects['{$modalUid}_back_button_rect'] && objects['{$modalUid}_back_button_rect'].attributes) objects['{$modalUid}_back_button_rect'].attributes.renderable = true;
     if (objects['{$modalUid}_back_button_text'] && objects['{$modalUid}_back_button_text'].attributes) objects['{$modalUid}_back_button_text'].attributes.renderable = true;
+
+    // Hide proceed button
+    var procRect = shapes['{$modalUid}_proceed_button_rect'];
+    var procText = shapes['{$modalUid}_proceed_button_text'];
+    if (procRect) procRect.renderable = false;
+    if (procText) procText.renderable = false;
+    if (objects['{$modalUid}_proceed_button_rect'] && objects['{$modalUid}_proceed_button_rect'].attributes) objects['{$modalUid}_proceed_button_rect'].attributes.renderable = false;
+    if (objects['{$modalUid}_proceed_button_text'] && objects['{$modalUid}_proceed_button_text'].attributes) objects['{$modalUid}_proceed_button_text'].attributes.renderable = false;
 })();";
         $jsTabComponentClick = Helper::setCommonJsCode($jsTabComponentClick, Str::random(20));
 
