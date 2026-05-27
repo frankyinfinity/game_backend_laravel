@@ -671,7 +671,10 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_top_tab_component',
             $modalUid . '_tabs_tab_border_bottom_tab_component',
             $modalUid . '_tabs_tab_border_left_tab_component',
-            $modalUid . '_tabs_tab_border_right_tab_component'
+            $modalUid . '_tabs_tab_border_right_tab_component',
+            $modalUid . '_tabs_tab_strike_tab_component',
+            $modalUid . '_back_button_rect',
+            $modalUid . '_back_button_text'
         ], $gridCellUids, $gridElementUidsBody, $gridScrollUidsBody, $gridElementUidsComponent, $gridScrollUidsComponent));
         $contentViewport->addAttributes('scroll_initial_renderables', array_merge([
             $modalUid . '_separator_1' => true,
@@ -695,7 +698,10 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_top_tab_component' => false,
             $modalUid . '_tabs_tab_border_bottom_tab_component' => false,
             $modalUid . '_tabs_tab_border_left_tab_component' => false,
-            $modalUid . '_tabs_tab_border_right_tab_component' => false
+            $modalUid . '_tabs_tab_border_right_tab_component' => false,
+            $modalUid . '_tabs_tab_strike_tab_component' => true,
+            $modalUid . '_back_button_rect' => false,
+            $modalUid . '_back_button_text' => false
         ], array_fill_keys($gridCellUids, true), array_fill_keys($gridElementUidsBody, true), array_fill_keys($gridScrollUidsBody, true), array_fill_keys($gridElementUidsComponent, false), array_fill_keys($gridScrollUidsComponent, false)));
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
@@ -740,6 +746,146 @@ class EntityAssemblerDraw
         // Add tab draw items
         foreach ($tabDraw->getDrawItems() as $item) {
             $this->drawItems[] = $item;
+        }
+
+        // Collect element UIDs for tab content switching JS
+        $bodyContentUids = [];
+        foreach ($gridDrawBody->getDrawItems() as $item) {
+            $bodyContentUids[] = $item->getUid();
+        }
+        $componentContentUids = [];
+        foreach ($gridDrawComponent->getDrawItems() as $item) {
+            $componentContentUids[] = $item->getUid();
+        }
+        $bodyContentUidsJson = json_encode($bodyContentUids);
+        $componentContentUidsJson = json_encode($componentContentUids);
+
+        // Red "Indietro" (back) button - shown when tab_component is active
+        $backButtonWidth = 120;
+        $backButtonHeight = 35;
+        $backButtonX = $rightX + 10;
+        $backButtonY = $contentY + 45;
+
+        $backButtonRect = new Rectangle($modalUid . '_back_button_rect');
+        $backButtonRect->setOrigin($backButtonX, $backButtonY);
+        $backButtonRect->setSize($backButtonWidth, $backButtonHeight);
+        $backButtonRect->setColor(0xFF0000);
+        $backButtonRect->setBorderRadius(5);
+        $backButtonRect->setRenderable(false);
+        $backButtonRect->addAttributes('z_index', 20095);
+
+        $backButtonText = new Text($modalUid . '_back_button_text');
+        $backButtonText->setCenterAnchor(true);
+        $backButtonText->setOrigin($backButtonX + (int) floor($backButtonWidth / 2), $backButtonY + (int) floor($backButtonHeight / 2));
+        $backButtonText->setText('Indietro');
+        $backButtonText->setColor(0xFFFFFF);
+        $backButtonText->setFontSize(14);
+        $backButtonText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $backButtonText->setRenderable(false);
+        $backButtonText->addAttributes('z_index', 20096);
+
+        // JS click handler for back button: enable tab_body, go to tab_body, disable tab_component
+        $jsBackButton = "(function() {
+    // Show body content
+    var bodyUids = {$bodyContentUidsJson};
+    bodyUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = true;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = true;
+    });
+
+    // Hide component content
+    var componentUids = {$componentContentUidsJson};
+    componentUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = false;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+    });
+
+    // Update tab borders - show body borders, hide component borders
+    ['top','bottom','left','right'].forEach(function(side) {
+        var bodyBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_body'];
+        if (bodyBorder) bodyBorder.renderable = true;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes.renderable = true;
+        var compBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_component'];
+        if (compBorder) compBorder.renderable = false;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes.renderable = false;
+    });
+
+    // Show strikethrough on tab_component (disable it)
+    var strike = shapes['{$modalUid}_tabs_tab_strike_tab_component'];
+    if (strike) strike.renderable = true;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_component'] && objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes.renderable = true;
+
+    // Gray out tab_component text
+    var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
+    if (compText) compText.style.fill = 0x808080;
+
+    // Hide back button
+    var backRect = shapes['{$modalUid}_back_button_rect'];
+    var backText = shapes['{$modalUid}_back_button_text'];
+    if (backRect) backRect.renderable = false;
+    if (backText) backText.renderable = false;
+    if (objects['{$modalUid}_back_button_rect'] && objects['{$modalUid}_back_button_rect'].attributes) objects['{$modalUid}_back_button_rect'].attributes.renderable = false;
+    if (objects['{$modalUid}_back_button_text'] && objects['{$modalUid}_back_button_text'].attributes) objects['{$modalUid}_back_button_text'].attributes.renderable = false;
+})();";
+        $jsBackButton = Helper::setCommonJsCode($jsBackButton, Str::random(20));
+        $backButtonRect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsBackButton);
+        $backButtonText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsBackButton);
+
+        $this->drawItems[] = $backButtonRect;
+        $this->drawItems[] = $backButtonText;
+
+        // JS click handler for tab_component tab: switch to component content, show back button
+        $jsTabComponentClick = "(function() {
+    // Hide body content
+    var bodyUids = {$bodyContentUidsJson};
+    bodyUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = false;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+    });
+
+    // Show component content
+    var componentUids = {$componentContentUidsJson};
+    componentUids.forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = true;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = true;
+    });
+
+    // Update tab borders - show component borders, hide body borders
+    ['top','bottom','left','right'].forEach(function(side) {
+        var compBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_component'];
+        if (compBorder) compBorder.renderable = true;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_component'].attributes.renderable = true;
+        var bodyBorder = shapes['{$modalUid}_tabs_tab_border_' + side + '_tab_body'];
+        if (bodyBorder) bodyBorder.renderable = false;
+        if (objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'] && objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes) objects['{$modalUid}_tabs_tab_border_' + side + '_tab_body'].attributes.renderable = false;
+    });
+
+    // Hide strikethrough on tab_component (enable it visually)
+    var strike = shapes['{$modalUid}_tabs_tab_strike_tab_component'];
+    if (strike) strike.renderable = false;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_component'] && objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_component'].attributes.renderable = false;
+
+    // Restore tab_component text color
+    var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
+    if (compText) compText.style.fill = 0x000000;
+
+    // Show back button
+    var backRect = shapes['{$modalUid}_back_button_rect'];
+    var backText = shapes['{$modalUid}_back_button_text'];
+    if (backRect) backRect.renderable = true;
+    if (backText) backText.renderable = true;
+    if (objects['{$modalUid}_back_button_rect'] && objects['{$modalUid}_back_button_rect'].attributes) objects['{$modalUid}_back_button_rect'].attributes.renderable = true;
+    if (objects['{$modalUid}_back_button_text'] && objects['{$modalUid}_back_button_text'].attributes) objects['{$modalUid}_back_button_text'].attributes.renderable = true;
+})();";
+        $jsTabComponentClick = Helper::setCommonJsCode($jsTabComponentClick, Str::random(20));
+
+        // Set click handler on tab_component tab and text (even though tab is disabled)
+        foreach ($tabDraw->getDrawItems() as $item) {
+            $itemUid = $item->getUid();
+            if ($itemUid === $modalUid . '_tabs_tab_tab_component' ||
+                $itemUid === $modalUid . '_tabs_tab_text_tab_component') {
+                $item->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsTabComponentClick);
+            }
         }
 
         // Zone info panel (hidden by default) - created LAST to render above everything
