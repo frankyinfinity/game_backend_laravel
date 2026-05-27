@@ -323,13 +323,13 @@ class EntityAssemblerDraw
         $this->drawItems[] = $gridBorderRight;
         $gridCellUids[] = $gridBorderRight->getUid();
 
-        // Direction buttons for moving EntityBody pixels (positioned below the grid)
+        // Direction buttons for moving EntityBody pixels (positioned to the right of the grid)
         $dirButtonSize = 34;
         $dirButtonGap = 6;
         $dirButtonPadding = 10;
         $containerPadding = 8;
-        $dirButtonsX = $gridX + $dirButtonPadding;
-        $dirButtonsY = $gridY + $gridTotalHeight + $dirButtonPadding;
+        $dirButtonsX = $gridX + $gridTotalWidth + $dirButtonPadding;
+        $dirButtonsY = $gridY + $dirButtonPadding;
 
         // Light gray container with black border (simulating transparency)
         $containerWidth = ($dirButtonSize * 3) + ($dirButtonGap * 2) + ($containerPadding * 2);
@@ -779,8 +779,8 @@ class EntityAssemblerDraw
         // Red "Indietro" (back) button - shown when tab_component is active
         $backButtonWidth = 120;
         $backButtonHeight = 35;
-        $backButtonX = $containerX + $containerWidth + 15;
-        $backButtonY = $containerY + (int) floor(($containerHeight - $backButtonHeight) / 2);
+        $backButtonX = $gridX;
+        $backButtonY = $gridY + $gridTotalHeight + 10;
 
         $backButtonRect = new Rectangle($modalUid . '_back_button_rect');
         $backButtonRect->setOrigin($backButtonX, $backButtonY);
@@ -843,6 +843,12 @@ class EntityAssemblerDraw
     var bodyText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
     if (bodyText) bodyText.style.fill = 0x000000;
 
+    // Show direction buttons
+    ['{$modalUid}_dir_container','{$modalUid}_dir_title','{$modalUid}_dir_up','{$modalUid}_dir_up_text','{$modalUid}_dir_left','{$modalUid}_dir_left_text','{$modalUid}_dir_down','{$modalUid}_dir_down_text','{$modalUid}_dir_right','{$modalUid}_dir_right_text'].forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = true;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = true;
+    });
+
     // Hide back button
     var backRect = shapes['{$modalUid}_back_button_rect'];
     var backText = shapes['{$modalUid}_back_button_text'];
@@ -869,8 +875,8 @@ class EntityAssemblerDraw
         // Green "Prosegui" (proceed) button - below grid, next to direction buttons
         $proceedButtonWidth = 120;
         $proceedButtonHeight = 35;
-        $proceedButtonX = $containerX + $containerWidth + 15;
-        $proceedButtonY = $containerY + (int) floor(($containerHeight - $proceedButtonHeight) / 2);
+        $proceedButtonX = $gridX;
+        $proceedButtonY = $gridY + $gridTotalHeight + 10;
 
         $proceedButtonRect = new Rectangle($modalUid . '_proceed_button_rect');
         $proceedButtonRect->setOrigin($proceedButtonX, $proceedButtonY);
@@ -927,6 +933,12 @@ class EntityAssemblerDraw
 
     var bodyText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
     if (bodyText) bodyText.style.fill = 0x808080;
+
+    // Hide direction buttons
+    ['{$modalUid}_dir_container','{$modalUid}_dir_title','{$modalUid}_dir_up','{$modalUid}_dir_up_text','{$modalUid}_dir_left','{$modalUid}_dir_left_text','{$modalUid}_dir_down','{$modalUid}_dir_down_text','{$modalUid}_dir_right','{$modalUid}_dir_right_text'].forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = false;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+    });
 
     var backRect = shapes['{$modalUid}_back_button_rect'];
     var backText = shapes['{$modalUid}_back_button_text'];
@@ -991,6 +1003,12 @@ class EntityAssemblerDraw
 
     var bodyTabText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
     if (bodyTabText) bodyTabText.style.fill = 0x808080;
+
+    // Hide direction buttons
+    ['{$modalUid}_dir_container','{$modalUid}_dir_title','{$modalUid}_dir_up','{$modalUid}_dir_up_text','{$modalUid}_dir_left','{$modalUid}_dir_left_text','{$modalUid}_dir_down','{$modalUid}_dir_down_text','{$modalUid}_dir_right','{$modalUid}_dir_right_text'].forEach(function(uid) {
+        if (shapes[uid]) shapes[uid].renderable = false;
+        if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+    });
 
     // Show back button
     var backRect = shapes['{$modalUid}_back_button_rect'];
