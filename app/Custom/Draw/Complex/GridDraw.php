@@ -116,7 +116,11 @@ class GridDraw
         $gridWidth = $width - $scrollbarWidth;
         $totalSpacingX = ($elementsPerRow - 1) * $elementSpacing;
         $elementWidth = ($gridWidth - $totalSpacingX) / $elementsPerRow;
-        $elementHeight = $elementWidth; // Square elements
+        $hasInfoButtonTemplate = !empty(array_filter(
+            $this->templates,
+            fn($template) => (($template->buildJson()['attributes']['template_role'] ?? null) === 'info_button_rect')
+        ));
+        $elementHeight = $hasInfoButtonTemplate ? ($elementWidth + 18) : $elementWidth;
 
         // Calculate total rows and content height
         $totalElements = count($this->elementData);
@@ -201,9 +205,12 @@ class GridDraw
                 foreach ($this->templates as $templateIndex => $template) {
                     $clonedElement = clone $template;
                     $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
+                    $templateAttributes = $template->buildJson()['attributes'] ?? [];
                     
                     $innerPadding = 4;
-                    $textAreaHeight = 22;
+                    $hasInfoLayout = $hasInfoButtonTemplate;
+                    $textAreaHeight = $hasInfoLayout ? 34 : 22;
+                    $componentOffsetY = (($templateAttributes['template_role'] ?? null) === 'component_frame' || ($templateAttributes['template_role'] ?? null) === 'component_image') ? 24 : 0;
 
                     if ($clonedElement instanceof Rectangle && $rectCount === 0) {
                         $rectCount++;
@@ -215,6 +222,16 @@ class GridDraw
                             (int)($cellY + $margin + $containerH - 19)
                         );
                         $clonedElement->setCenterAnchor(false);
+                    } elseif ($clonedElement instanceof Text && (($templateAttributes['template_role'] ?? null) === 'info_button_text')) {
+                        $infoButtonWidth = (int)($containerW - (2 * $innerPadding));
+                        $infoButtonHeight = 18;
+                        $infoButtonX = (int)($cellX + $margin + $innerPadding);
+                        $infoButtonY = (int)($cellY + $margin + $innerPadding - 2);
+                        $clonedElement->setOrigin(
+                            (int)($infoButtonX + floor($infoButtonWidth / 2)),
+                            (int)($infoButtonY + floor($infoButtonHeight / 2))
+                        );
+                        $clonedElement->setCenterAnchor(true);
                     } elseif ($clonedElement instanceof Text) {
                         $textX = $hasSymbol ? 24 : 6;
                         $clonedElement->setOrigin(
@@ -223,21 +240,43 @@ class GridDraw
                         );
                         $clonedElement->setCenterAnchor(false);
                     } elseif ($clonedElement instanceof Rectangle) {
-                        $rectCount++;
-                        $wsX = (int)($cellX + $margin + $innerPadding);
-                        $wsY = (int)($cellY + $margin + $innerPadding);
-                        $wsW = (int)($containerW - 2 * $innerPadding);
-                        $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding);
-                        $clonedElement->setOrigin($wsX, $wsY);
-                        $clonedElement->setSize($wsW, $wsH);
+                        if (($templateAttributes['template_role'] ?? null) === 'info_button_rect') {
+                            $infoButtonWidth = (int)($containerW - (2 * $innerPadding));
+                            $infoButtonHeight = 18;
+                            $infoButtonX = (int)($cellX + $margin + $innerPadding);
+                            $infoButtonY = (int)($cellY + $margin + $innerPadding - 2);
+                            $clonedElement->setOrigin($infoButtonX, $infoButtonY);
+                            $clonedElement->setSize($infoButtonWidth, $infoButtonHeight);
+                        } else {
+                            $rectCount++;
+                            $wsX = (int)($cellX + $margin + $innerPadding);
+                            $wsY = (int)($cellY + $margin + $innerPadding + $componentOffsetY);
+                            $wsW = (int)($containerW - 2 * $innerPadding);
+                            $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding - $componentOffsetY);
+                            if (($templateAttributes['template_role'] ?? null) === 'component_frame') {
+                                $squareSize = (int)max(16, min($wsW, $wsH) + 6);
+                                $squareSize = (int)min($squareSize, $wsW + 6);
+                                $squareX = (int)($wsX + floor(($wsW - $squareSize) / 2));
+                                $clonedElement->setOrigin($squareX, $wsY);
+                                $clonedElement->setSize($squareSize, $squareSize);
+                            } else {
+                                $clonedElement->setOrigin($wsX, $wsY);
+                                $clonedElement->setSize($wsW, $wsH);
+                            }
+                        }
                     } elseif ($clonedElement instanceof Image) {
-                        $imgPadding = 4;
+                        $imgPadding = (($templateAttributes['template_role'] ?? null) === 'component_image') ? 4 : 4;
                         $wsW = (int)($containerW - 2 * $innerPadding);
-                        $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding);
-                        $imgX = (int)($cellX + $margin + $innerPadding + $imgPadding);
-                        $imgY = (int)($cellY + $margin + $innerPadding + $imgPadding);
-                        $imgW = (int)($wsW - 2 * $imgPadding);
-                        $imgH = (int)($wsH - 2 * $imgPadding);
+                        $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding - $componentOffsetY);
+                        $frameSize = (($templateAttributes['template_role'] ?? null) === 'component_image') ? (int)max(16, min($wsW, $wsH) + 6) : $wsW;
+                        if (($templateAttributes['template_role'] ?? null) === 'component_image') {
+                            $frameSize = (int)min($frameSize, $wsW + 6);
+                        }
+                        $frameX = (int)($cellX + $margin + $innerPadding + floor(($wsW - $frameSize) / 2));
+                        $imgX = (int)($frameX + $imgPadding);
+                        $imgY = (int)($cellY + $margin + $innerPadding + $imgPadding + $componentOffsetY);
+                        $imgW = (int)(($templateAttributes['template_role'] ?? null) === 'component_image' ? max(12, $frameSize - 2 * $imgPadding) : $wsW - 2 * $imgPadding);
+                        $imgH = (int)(($templateAttributes['template_role'] ?? null) === 'component_image' ? max(12, $frameSize - 2 * $imgPadding) : max(12, $wsH - (2 * $imgPadding)));
                         $clonedElement->setOrigin($imgX, $imgY);
                         $clonedElement->setSize($imgW, $imgH);
                     } else {
@@ -253,7 +292,14 @@ class GridDraw
                     $clonedElement->addAttributes('cell_value', (string)($index + 1));
                     
                     // Add tooltip if available in data
-                    if (isset($cellData['tooltip']) && !empty($cellData['tooltip'])) {
+                    if (
+                        isset($cellData['tooltip']) &&
+                        !empty($cellData['tooltip']) &&
+                        (
+                            ($templateAttributes['use_cell_tooltip'] ?? false) === true ||
+                            !array_key_exists('use_cell_tooltip', $templateAttributes)
+                        )
+                    ) {
                         $clonedElement->addAttributes('tooltip_text', $cellData['tooltip']);
                     }
                     

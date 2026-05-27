@@ -566,7 +566,7 @@ class EntityAssemblerDraw
         $gridDrawBody->setElementData($elementDataBody);
         $gridDrawBody->setOnClickJs('selectEntityBody_' . $modalUid);
 
-        $this->buildGridTemplate($gridDrawBody, $modalUid, false);
+        $this->buildGridTemplate($gridDrawBody, $modalUid, false, false);
         $gridDrawBody->build();
         $gridElementUidsBody = $gridDrawBody->getElementUids();
         $gridScrollUidsBody = $gridDrawBody->getScrollUids();
@@ -634,7 +634,7 @@ class EntityAssemblerDraw
         $gridDrawComponent->setElementData($elementDataComponent);
         $gridDrawComponent->setImageDisk('entity_components');
 
-        $this->buildGridTemplate($gridDrawComponent, $modalUid, true);
+        $this->buildGridTemplate($gridDrawComponent, $modalUid, true, true);
         $gridDrawComponent->build();
         $gridElementUidsComponent = $gridDrawComponent->getElementUids();
         $gridScrollUidsComponent = $gridDrawComponent->getScrollUids();
@@ -1319,27 +1319,31 @@ class EntityAssemblerDraw
         $this->gridScrollInitJs .= $movePixelsJs;
     }
 
-    private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false): void
+    private function buildGridTemplate($gridDraw, $modalUid, bool $withSymbol = false, bool $withInfoButton = false): void
     {
         $templateContainer = new Rectangle('template_container');
         $templateContainer->setColor(0x87CEEB);
         $templateContainer->setBorderColor(0x000000);
         $templateContainer->setBorderRadius(5);
+        $templateContainer->addAttributes('use_cell_tooltip', false);
 
         $templateText = new Text('template_text');
         $templateText->setText('{label}');
         $templateText->setColor(0x000000);
         $templateText->setFontSize(14);
         $templateText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $templateText->addAttributes('use_cell_tooltip', false);
 
         $templateWhiteSquare = new Rectangle('template_white_square');
         $templateWhiteSquare->setColor(0xFFFFFF);
         $templateWhiteSquare->setBorderColor(0x000000);
         $templateWhiteSquare->setThickness(2);
         $templateWhiteSquare->setBorderRadius(2);
+        $templateWhiteSquare->addAttributes('use_cell_tooltip', false);
 
         $templateImage = new Image('template_image');
         $templateImage->setSrc('{image}');
+        $templateImage->addAttributes('use_cell_tooltip', false);
 
         $templateGrid = new TemplateGridDraw($modalUid . '_template');
         $templateGrid->addTemplate($templateContainer);
@@ -1349,7 +1353,28 @@ class EntityAssemblerDraw
             $templateSymbol->setColor(0x000000);
             $templateSymbol->setFontSize(14);
             $templateSymbol->setFontFamily(\App\Helper\FontAwesome::fontFamily());
+            $templateSymbol->addAttributes('use_cell_tooltip', false);
             $templateGrid->addTemplate($templateSymbol);
+        }
+        if ($withInfoButton) {
+            $templateInfoButton = new Rectangle('template_info_button');
+            $templateInfoButton->setColor(0x000000);
+            $templateInfoButton->setBorderRadius(3);
+            $templateInfoButton->addAttributes('template_role', 'info_button_rect');
+            $templateInfoButton->addAttributes('use_cell_tooltip', true);
+
+            $templateInfoText = new Text('template_info_text');
+            $templateInfoText->setText('Info');
+            $templateInfoText->setColor(0xFFFFFF);
+            $templateInfoText->setFontSize(10);
+            $templateInfoText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+            $templateInfoText->addAttributes('template_role', 'info_button_text');
+            $templateInfoText->addAttributes('use_cell_tooltip', true);
+
+            $templateWhiteSquare->addAttributes('template_role', 'component_frame');
+            $templateImage->addAttributes('template_role', 'component_image');
+            $templateGrid->addTemplate($templateInfoButton);
+            $templateGrid->addTemplate($templateInfoText);
         }
         $templateGrid->addTemplate($templateText);
         $templateGrid->addTemplate($templateWhiteSquare);
