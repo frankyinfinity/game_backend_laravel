@@ -397,6 +397,14 @@
             if (dirTitle) dirTitle.renderable = true;
             var dirContainer = shapes['__MODAL_UID___dir_container'];
             if (dirContainer) dirContainer.renderable = true;
+
+            // Show proceed button
+            var procRect = shapes['__MODAL_UID___proceed_button_rect'];
+            var procText = shapes['__MODAL_UID___proceed_button_text'];
+            if (procRect) procRect.renderable = true;
+            if (procText) procText.renderable = true;
+            if (objects['__MODAL_UID___proceed_button_rect'] && objects['__MODAL_UID___proceed_button_rect'].attributes) objects['__MODAL_UID___proceed_button_rect'].attributes.renderable = true;
+            if (objects['__MODAL_UID___proceed_button_text'] && objects['__MODAL_UID___proceed_button_text'].attributes) objects['__MODAL_UID___proceed_button_text'].attributes.renderable = true;
         }
 
         // Draw black pixels on grid + gray border for zone pixels + zone color border where zone edge
