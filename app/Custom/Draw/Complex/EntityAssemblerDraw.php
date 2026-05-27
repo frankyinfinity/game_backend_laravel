@@ -673,6 +673,7 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_left_tab_component',
             $modalUid . '_tabs_tab_border_right_tab_component',
             $modalUid . '_tabs_tab_strike_tab_component',
+            $modalUid . '_tabs_tab_strike_tab_body',
             $modalUid . '_back_button_rect',
             $modalUid . '_back_button_text',
             $modalUid . '_proceed_button_rect',
@@ -702,6 +703,7 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_border_left_tab_component' => false,
             $modalUid . '_tabs_tab_border_right_tab_component' => false,
             $modalUid . '_tabs_tab_strike_tab_component' => true,
+            $modalUid . '_tabs_tab_strike_tab_body' => false,
             $modalUid . '_back_button_rect' => false,
             $modalUid . '_back_button_text' => false,
             $modalUid . '_proceed_button_rect' => false,
@@ -751,6 +753,16 @@ class EntityAssemblerDraw
         foreach ($tabDraw->getDrawItems() as $item) {
             $this->drawItems[] = $item;
         }
+
+        // Create strikethrough line for tab_body (hidden by default, shown when Prosegui disables tab_body)
+        $tabBodyTabWidth = $rightWidth / 2;
+        $tabBodyStrike = new Rectangle($modalUid . '_tabs_tab_strike_tab_body');
+        $tabBodyStrike->setOrigin($rightX + 10, $contentY + 20);
+        $tabBodyStrike->setSize((int) ($tabBodyTabWidth - 20), 2);
+        $tabBodyStrike->setColor(0x808080);
+        $tabBodyStrike->setRenderable(false);
+        $tabBodyStrike->addAttributes('z_index', 20221);
+        $this->drawItems[] = $tabBodyStrike;
 
         // Collect element UIDs for tab content switching JS
         $bodyContentUids = [];
@@ -822,6 +834,14 @@ class EntityAssemblerDraw
     // Gray out tab_component text
     var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
     if (compText) compText.style.fill = 0x808080;
+
+    // Re-enable tab_body (hide strikethrough + restore text color)
+    var bodyStrike = shapes['{$modalUid}_tabs_tab_strike_tab_body'];
+    if (bodyStrike) bodyStrike.renderable = false;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_body'] && objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes.renderable = false;
+
+    var bodyText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
+    if (bodyText) bodyText.style.fill = 0x000000;
 
     // Hide back button
     var backRect = shapes['{$modalUid}_back_button_rect'];
@@ -900,6 +920,14 @@ class EntityAssemblerDraw
     var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
     if (compText) compText.style.fill = 0x000000;
 
+    // Disable tab_body (strikethrough + gray text)
+    var bodyStrike = shapes['{$modalUid}_tabs_tab_strike_tab_body'];
+    if (bodyStrike) bodyStrike.renderable = true;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_body'] && objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes.renderable = true;
+
+    var bodyText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
+    if (bodyText) bodyText.style.fill = 0x808080;
+
     var backRect = shapes['{$modalUid}_back_button_rect'];
     var backText = shapes['{$modalUid}_back_button_text'];
     if (backRect) backRect.renderable = true;
@@ -955,6 +983,14 @@ class EntityAssemblerDraw
     // Restore tab_component text color
     var compText = shapes['{$modalUid}_tabs_tab_text_tab_component'];
     if (compText) compText.style.fill = 0x000000;
+
+    // Disable tab_body (strikethrough + gray text)
+    var bodyStrike = shapes['{$modalUid}_tabs_tab_strike_tab_body'];
+    if (bodyStrike) bodyStrike.renderable = true;
+    if (objects['{$modalUid}_tabs_tab_strike_tab_body'] && objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes) objects['{$modalUid}_tabs_tab_strike_tab_body'].attributes.renderable = true;
+
+    var bodyTabText = shapes['{$modalUid}_tabs_tab_text_tab_body'];
+    if (bodyTabText) bodyTabText.style.fill = 0x808080;
 
     // Show back button
     var backRect = shapes['{$modalUid}_back_button_rect'];
