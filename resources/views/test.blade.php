@@ -8,7 +8,7 @@
 
 @section('content')
 <div id="display_container" style="width: 100%; height: 80vh; background: #fff; position: relative;">
-    <div id="map_direction_pad" class="map-direction-pad">
+    {{-- <div id="map_direction_pad" class="map-direction-pad">
         <button type="button" class="map-dir-btn map-dir-up" data-dir="up"><i class="fa fa-chevron-up"></i></button>
         <button type="button" class="map-dir-btn map-dir-left" data-dir="left"><i
                 class="fa fa-chevron-left"></i></button>
@@ -16,7 +16,7 @@
                 class="fa fa-chevron-right"></i></button>
         <button type="button" class="map-dir-btn map-dir-down" data-dir="down"><i
                 class="fa fa-chevron-down"></i></button>
-    </div>
+    </div> --}}
 </div>
 <div class="status-msg"
     style="position: absolute; bottom: 10px; right: 10px; opacity: 0.5; background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 5px; font-size: 0.8rem; color: white;">
