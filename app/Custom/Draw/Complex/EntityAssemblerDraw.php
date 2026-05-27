@@ -109,7 +109,7 @@ class EntityAssemblerDraw
 
     private function buildModal($modalUid): void
     {
-        $modalWidth = 1100;
+        $modalWidth = 1200;
         $modalHeight = 600;
         $screenWidth = 1280;
         $screenHeight = 720;

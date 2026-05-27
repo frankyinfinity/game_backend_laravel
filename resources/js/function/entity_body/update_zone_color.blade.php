@@ -41,12 +41,6 @@
         var hexColor = ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
         var pixiColor = parseInt('0x' + hexColor, 16);
 
-        // Update zone color square in panel
-        var colorSquare = shapes['__MODAL_UID___zone_color_square'];
-        if (colorSquare) {
-            colorSquare.tint = pixiColor;
-        }
-
         // Update ONLY pixels of the clicked zone (background color only, borders remain intact)
         currentZonePixels.forEach(function(pixel) {
             var cellUid = '__MODAL_UID___grid_cell_' + pixel.y + '_' + pixel.x;
