@@ -779,8 +779,8 @@ class EntityAssemblerDraw
         // Red "Indietro" (back) button - shown when tab_component is active
         $backButtonWidth = 120;
         $backButtonHeight = 35;
-        $backButtonX = $rightX + 10;
-        $backButtonY = $contentY + 45;
+        $backButtonX = $containerX + $containerWidth + 15;
+        $backButtonY = $containerY + (int) floor(($containerHeight - $backButtonHeight) / 2);
 
         $backButtonRect = new Rectangle($modalUid . '_back_button_rect');
         $backButtonRect->setOrigin($backButtonX, $backButtonY);
