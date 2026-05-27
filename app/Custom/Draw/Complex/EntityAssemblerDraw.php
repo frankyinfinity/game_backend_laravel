@@ -109,8 +109,8 @@ class EntityAssemblerDraw
 
     private function buildModal($modalUid): void
     {
-        $modalWidth = 1100;
-        $modalHeight = 600;
+        $modalWidth = 1300;
+        $modalHeight = 680;
         $screenWidth = 1280;
         $screenHeight = 720;
 
@@ -239,14 +239,14 @@ class EntityAssemblerDraw
         $gridAreaWidth = $leftWidth - ($gridPadding * 2);
         $gridAreaHeight = $contentHeight - ($gridPadding * 2);
         
-        // Calculate cell size as integer for uniform cells
-        $cellSize = (int) floor(min($gridAreaWidth / $gridSize, $gridAreaHeight / $gridSize));
+        // Fixed cell size to preserve grid dimensions
+        $cellSize = 15;
         
-        // Center the grid vertically, align to left horizontally
+        // Position grid near the top of the left area
         $gridTotalWidth = $cellSize * $gridSize;
         $gridTotalHeight = $cellSize * $gridSize;
         $gridX = (int) ($contentX + $gridPadding);
-        $gridY = (int) ($contentY + ($contentHeight - $gridTotalHeight) / 2);
+        $gridY = (int) ($contentY + $gridPadding);
 
         // Dark gray background (acts as grid lines)
         $gridBg = new Rectangle($modalUid . '_grid_bg');
@@ -323,13 +323,13 @@ class EntityAssemblerDraw
         $this->drawItems[] = $gridBorderRight;
         $gridCellUids[] = $gridBorderRight->getUid();
 
-        // Direction buttons for moving EntityBody pixels (positioned like GenerateMapJob pattern)
+        // Direction buttons for moving EntityBody pixels (positioned below the grid)
         $dirButtonSize = 34;
         $dirButtonGap = 6;
         $dirButtonPadding = 10;
         $containerPadding = 8;
-        $dirButtonsX = $gridX + $gridTotalWidth + $dirButtonPadding;
-        $dirButtonsY = $gridY + $dirButtonPadding; // Back to top position
+        $dirButtonsX = $gridX + $dirButtonPadding;
+        $dirButtonsY = $gridY + $gridTotalHeight + $dirButtonPadding;
 
         // Light gray container with black border (simulating transparency)
         $containerWidth = ($dirButtonSize * 3) + ($dirButtonGap * 2) + ($containerPadding * 2);
@@ -846,11 +846,11 @@ class EntityAssemblerDraw
         $this->drawItems[] = $backButtonRect;
         $this->drawItems[] = $backButtonText;
 
-        // Green "Prosegui" (proceed) button - hidden by default, shown after EntityBody selection
+        // Green "Prosegui" (proceed) button - below grid, next to direction buttons
         $proceedButtonWidth = 120;
         $proceedButtonHeight = 35;
-        $proceedButtonX = $rightX + 10;
-        $proceedButtonY = $contentY + 45;
+        $proceedButtonX = $containerX + $containerWidth + 15;
+        $proceedButtonY = $containerY + (int) floor(($containerHeight - $proceedButtonHeight) / 2);
 
         $proceedButtonRect = new Rectangle($modalUid . '_proceed_button_rect');
         $proceedButtonRect->setOrigin($proceedButtonX, $proceedButtonY);
