@@ -146,6 +146,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::delete('/complex-chimical-elements/{complexChimicalElement}/details/{detail}', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'destroy'])->name('complex-chimical-elements.details.destroy');
     Route::post('/complex-chimical-elements/{complexChimicalElement}/details/delete', [App\Http\Controllers\ComplexChimicalElementDetailController::class, 'delete'])->name('complex-chimical-elements.details.delete');
 
+    //Genes
+    Route::get('/genes', [App\Http\Controllers\GeneController::class, 'index'])->name('genes.index');
+    Route::post('/genes/list/table', [App\Http\Controllers\GeneController::class, 'listDataTable'])->name('genes.datatable');
+    Route::get('/genes/{gene}', [App\Http\Controllers\GeneController::class, 'show'])->name('genes.show')->whereNumber('gene');
+
     //Generator Chimical Elements
     Route::resource('generator-chimical-elements', App\Http\Controllers\GeneratorChimicalElementController::class);
     Route::post('/generator-chimical-elements/list/table', [App\Http\Controllers\GeneratorChimicalElementController::class, 'listDataTable'])->name('generator-chimical-elements.datatable');

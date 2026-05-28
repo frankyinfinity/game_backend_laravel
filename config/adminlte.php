@@ -371,6 +371,18 @@ return [
             'icon_color' => 'orange',
             'submenu' => [
                 [
+                    'text'    => 'Geni',
+                    'icon'    => 'fas fa-dna',
+                    'icon_color' => 'orange',
+                    'submenu' => [
+                        [
+                            'text' => 'Geni',
+                            'url'  => '/genes',
+                            'icon' => 'fas fa-dna',
+                        ],
+                    ]
+                ],
+                [
                     'text'    => 'Elementi Chimici',
                     'icon'    => 'fas fa-flask',
                     'icon_color' => 'orange',
