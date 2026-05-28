@@ -30,105 +30,127 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card card-outline card-secondary">
-            <div class="card-header">
-                <h3 class="card-title">Strumenti</h3>
+        <div class="card card-secondary card-outline card-tabs">
+            <div class="card-header p-0 pt-1 border-bottom-0">
+                <ul class="nav nav-tabs" id="graphics-editor-tabs-{{$modelType}}" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="graphics-tools-tab-{{$modelType}}" data-toggle="pill" href="#graphics-tools-{{$modelType}}" role="tab"
+                            aria-controls="graphics-tools-{{$modelType}}" aria-selected="true">Strumenti</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="graphics-current-image-tab-{{$modelType}}" data-toggle="pill" href="#graphics-current-image-{{$modelType}}" role="tab"
+                            aria-controls="graphics-current-image-{{$modelType}}" aria-selected="false">Immagine Attuale</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="graphics-ai-tab-{{$modelType}}" data-toggle="pill" href="#graphics-ai-{{$modelType}}" role="tab"
+                            aria-controls="graphics-ai-{{$modelType}}" aria-selected="false">AI</a>
+                    </li>
+                </ul>
             </div>
             <div class="card-body">
-                @if(isset($availableColors) && is_array($availableColors) && count($availableColors) > 0)
-                    <div class="form-group" style="display: none;">
-                        <input type="color" id="editor-color-{{$modelType}}" value="{{ $availableColors[0] }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Palette Colori (Vincolata) <i class="fas fa-lock text-warning" title="I colori sono limitati per questo tipo di grafica"></i></label>
-                        <div class="d-flex flex-wrap">
-                            @foreach($availableColors as $color)
-                                <button type="button" class="btn btn-sm m-1" style="background-color: {{ $color }}; width: 30px; height: 30px;" data-color="{{ $color }}"></button>
-                            @endforeach
+                <div class="tab-content" id="graphics-editor-tabs-content-{{$modelType}}">
+                    <div class="tab-pane fade show active" id="graphics-tools-{{$modelType}}" role="tabpanel" aria-labelledby="graphics-tools-tab-{{$modelType}}">
+                        @if(isset($availableColors) && is_array($availableColors) && count($availableColors) > 0)
+                            <div class="form-group" style="display: none;">
+                                <input type="color" id="editor-color-{{$modelType}}" value="{{ $availableColors[0] }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Palette Colori (Vincolata) <i class="fas fa-lock text-warning" title="I colori sono limitati per questo tipo di grafica"></i></label>
+                                <div class="d-flex flex-wrap">
+                                    @foreach($availableColors as $color)
+                                        <button type="button" class="btn btn-sm m-1" style="background-color: {{ $color }}; width: 30px; height: 30px;" data-color="{{ $color }}"></button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @else
+                            <div class="form-group">
+                                <label>Colore</label>
+                                <input type="color" id="editor-color-{{$modelType}}" class="form-control" value="#000000" style="height: 40px;">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Palette Colori</label>
+                                <div class="d-flex flex-wrap">
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #000000; width: 30px; height: 30px;" data-color="#000000"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #FFFFFF; width: 30px; height: 30px;" data-color="#FFFFFF"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #FF0000; width: 30px; height: 30px;" data-color="#FF0000"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #00FF00; width: 30px; height: 30px;" data-color="#00FF00"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #0000FF; width: 30px; height: 30px;" data-color="#0000FF"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #FFFF00; width: 30px; height: 30px;" data-color="#FFFF00"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #FF00FF; width: 30px; height: 30px;" data-color="#FF00FF"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #00FFFF; width: 30px; height: 30px;" data-color="#00FFFF"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #FFA500; width: 30px; height: 30px;" data-color="#FFA500"></button>
+                                    <button type="button" class="btn btn-sm m-1" style="background-color: #800080; width: 30px; height: 30px;" data-color="#800080"></button>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="form-group">
+                            <label>Strumenti</label>
+                            <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
+                                <label class="btn btn-primary active flex-fill">
+                                    <input type="radio" name="editor-tool-{{$modelType}}" id="tool-pencil-{{$modelType}}" autocomplete="off" checked>
+                                    <i class="fas fa-pencil-alt"></i> Matita
+                                </label>
+                                <label class="btn btn-primary flex-fill">
+                                    <input type="radio" name="editor-tool-{{$modelType}}" id="tool-eraser-{{$modelType}}" autocomplete="off">
+                                    <i class="fas fa-eraser"></i> Gomma
+                                </label>
+                                <label class="btn btn-primary flex-fill">
+                                    <input type="radio" name="editor-tool-{{$modelType}}" id="tool-fill-{{$modelType}}" autocomplete="off">
+                                    <i class="fas fa-fill-drip"></i> Riempimento
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="grid-toggle-{{$modelType}}" checked>
+                                <label class="form-check-label" for="grid-toggle-{{$modelType}}">
+                                    Mostra Griglia
+                                </label>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="form-group text-center">
+                            <label>Anteprima 32x32</label><br>
+                            <div class="preview-box">
+                                <canvas id="preview-canvas-{{$modelType}}" width="32" height="32" style="display: block;"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <p class="text-muted small">
+                                <i class="fas fa-info-circle"></i> La grafica verrà salvata cliccando sul pulsante <b>Aggiorna</b> in fondo alla pagina.
+                            </p>
+                            <input type="hidden" name="image_base64" id="image_base64-{{$modelType}}">
                         </div>
                     </div>
-                @else
-                    <div class="form-group">
-                        <label>Colore</label>
-                        <input type="color" id="editor-color-{{$modelType}}" class="form-control" value="#000000" style="height: 40px;">
+
+                    <div class="tab-pane fade text-center" id="graphics-current-image-{{$modelType}}" role="tabpanel" aria-labelledby="graphics-current-image-tab-{{$modelType}}">
+                        @if($fileExists)
+                            <img id="current-image-{{$modelType}}" src="{{ asset($imagePath) }}?v={{ time() }}" style="width: 128px; height: 128px; image-rendering: pixelated; border: 1px solid #ccc;">
+                            <br>
+                            <button type="button" class="btn btn-sm btn-info mt-2" id="btn-load-current-{{$modelType}}">
+                                <i class="fas fa-file-import"></i> Carica in Editor
+                            </button>
+                        @else
+                            <p class="text-muted">Nessuna immagine salvata</p>
+                        @endif
                     </div>
 
-                    <div class="form-group">
-                        <label>Palette Colori</label>
-                        <div class="d-flex flex-wrap">
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #000000; width: 30px; height: 30px;" data-color="#000000"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #FFFFFF; width: 30px; height: 30px;" data-color="#FFFFFF"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #FF0000; width: 30px; height: 30px;" data-color="#FF0000"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #00FF00; width: 30px; height: 30px;" data-color="#00FF00"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #0000FF; width: 30px; height: 30px;" data-color="#0000FF"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #FFFF00; width: 30px; height: 30px;" data-color="#FFFF00"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #FF00FF; width: 30px; height: 30px;" data-color="#FF00FF"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #00FFFF; width: 30px; height: 30px;" data-color="#00FFFF"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #FFA500; width: 30px; height: 30px;" data-color="#FFA500"></button>
-                            <button type="button" class="btn btn-sm m-1" style="background-color: #800080; width: 30px; height: 30px;" data-color="#800080"></button>
+                    <div class="tab-pane fade" id="graphics-ai-{{$modelType}}" role="tabpanel" aria-labelledby="graphics-ai-tab-{{$modelType}}">
+                        <div class="form-group">
+                            <label for="graphics-ai-prompt-{{$modelType}}">Prompt</label>
+                            <textarea class="form-control" id="graphics-ai-prompt-{{$modelType}}" rows="5"></textarea>
                         </div>
-                    </div>
-                @endif
-
-                <div class="form-group">
-                    <label>Strumenti</label>
-                    <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
-                        <label class="btn btn-primary active flex-fill">
-                            <input type="radio" name="editor-tool-{{$modelType}}" id="tool-pencil-{{$modelType}}" autocomplete="off" checked>
-                            <i class="fas fa-pencil-alt"></i> Matita
-                        </label>
-                        <label class="btn btn-primary flex-fill">
-                            <input type="radio" name="editor-tool-{{$modelType}}" id="tool-eraser-{{$modelType}}" autocomplete="off">
-                            <i class="fas fa-eraser"></i> Gomma
-                        </label>
-                        <label class="btn btn-primary flex-fill">
-                            <input type="radio" name="editor-tool-{{$modelType}}" id="tool-fill-{{$modelType}}" autocomplete="off">
-                            <i class="fas fa-fill-drip"></i> Riempimento
-                        </label>
+                        <button type="button" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Invia
+                        </button>
                     </div>
                 </div>
-
-                <div class="form-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="grid-toggle-{{$modelType}}" checked>
-                        <label class="form-check-label" for="grid-toggle-{{$modelType}}">
-                            Mostra Griglia
-                        </label>
-                    </div>
-                </div>
-
-                <hr>
-
-                <div class="form-group text-center">
-                    <label>Anteprima 32x32</label><br>
-                    <div class="preview-box">
-                        <canvas id="preview-canvas-{{$modelType}}" width="32" height="32" style="display: block;"></canvas>
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <p class="text-muted small">
-                        <i class="fas fa-info-circle"></i> La grafica verrà salvata cliccando sul pulsante <b>Aggiorna</b> in fondo alla pagina.
-                    </p>
-                    <input type="hidden" name="image_base64" id="image_base64-{{$modelType}}">
-                </div>
-            </div>
-        </div>
-
-        <div class="card card-outline card-info mt-3">
-             <div class="card-header">
-                <h3 class="card-title">Immagine Attuale</h3>
-            </div>
-            <div class="card-body text-center">
-                @if($fileExists)
-                    <img id="current-image-{{$modelType}}" src="{{ asset($imagePath) }}?v={{ time() }}" style="width: 128px; height: 128px; image-rendering: pixelated; border: 1px solid #ccc;">
-                    <br>
-                    <button type="button" class="btn btn-sm btn-info mt-2" id="btn-load-current-{{$modelType}}">
-                        <i class="fas fa-file-import"></i> Carica in Editor
-                    </button>
-                @else
-                    <p class="text-muted">Nessuna immagine salvata</p>
-                @endif
             </div>
         </div>
     </div>
