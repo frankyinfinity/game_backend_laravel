@@ -58,10 +58,6 @@ class GraphicsAiController extends Controller
 
         $token = config('services.openrouter.token');
         $model = config('services.openrouter.model');
-        $models = array_values(array_unique(array_filter(array_merge(
-            [$model],
-            config('services.openrouter.fallback_models', [])
-        ))));
         $endpoint = config('services.openrouter.endpoint');
         $referer = config('services.openrouter.referer');
         $title = config('services.openrouter.title');
@@ -98,31 +94,20 @@ class GraphicsAiController extends Controller
                 ])
                 ->timeout(90);
 
-            foreach ($models as $currentModel) {
-                $payload['model'] = $currentModel;
-                $response = $client->post($endpoint, $payload);
+            $payload['model'] = $model;
+            $response = $client->post($endpoint, $payload);
 
-                if ($response->status() === 400) {
-                    $fallbackPayload = $payload;
-                    unset($fallbackPayload['response_format']);
-                    $response = $client->post($endpoint, $fallbackPayload);
-                }
-
-                $attempts[] = [
-                    'model' => $currentModel,
-                    'status' => $response->status(),
-                    'message' => data_get($response->json(), 'error.message'),
-                ];
-
-                if ($response->successful()) {
-                    $model = $currentModel;
-                    break;
-                }
-
-                if (! in_array($response->status(), [400, 404, 429], true)) {
-                    break;
-                }
+            if ($response->status() === 400) {
+                $fallbackPayload = $payload;
+                unset($fallbackPayload['response_format']);
+                $response = $client->post($endpoint, $fallbackPayload);
             }
+
+            $attempts[] = [
+                'model' => $model,
+                'status' => $response->status(),
+                'message' => data_get($response->json(), 'error.message'),
+            ];
         } catch (ConnectionException $exception) {
             return response()->json([
                 'message' => 'Impossibile connettersi a OpenRouter. Verifica connessione internet, DNS o proxy/firewall.',
@@ -174,21 +159,6 @@ class GraphicsAiController extends Controller
             $payload = [
                 'pixels' => $this->expandLetterRows($aiPixels),
             ];
-        }
-
-        if ($payload && isset($payload['pixels'])) {
-            if ($this->isLetterRowPixelArray($payload['pixels'])) {
-                $aiPixels = $this->normalizeLetterRows($payload['pixels']);
-            }
-            $payload['pixels'] = $this->normalizePixelsPayload($payload['pixels']);
-        }
-
-        if ($payload && isset($payload['palette'], $payload['rows'])) {
-            $payload['pixels'] = $this->expandCompactPixelPayload($payload['palette'], $payload['rows']);
-        }
-
-        if ($payload && ! isset($payload['pixels'])) {
-            $payload['pixels'] = $this->extractPixelMatrixFromRows($payload);
         }
 
         if (! $payload || ! isset($payload['pixels']) || ! $this->isValidPixelMatrix($payload['pixels'])) {

@@ -35,7 +35,6 @@ return [
         'referer' => env('OPENROUTER_REFERER', env('APP_URL')),
         'title' => env('OPENROUTER_TITLE', env('APP_NAME', 'Game')),
         'max_tokens' => env('OPENROUTER_MAX_TOKENS', 2000),
-        'fallback_models' => array_filter(array_map('trim', explode(',', env('OPENROUTER_FALLBACK_MODELS', 'deepseek/deepseek-chat-v3-0324:free,qwen/qwen3-8b:free,meta-llama/llama-3.2-3b-instruct:free')))),
     ],
 
     'slack' => [
