@@ -706,8 +706,8 @@ class EntityAssemblerDraw
             $modalUid . '_tabs_tab_strike_tab_body' => false,
             $modalUid . '_back_button_rect' => false,
             $modalUid . '_back_button_text' => false,
-            $modalUid . '_proceed_button_rect' => false,
-            $modalUid . '_proceed_button_text' => false
+            $modalUid . '_proceed_button_rect' => true,
+            $modalUid . '_proceed_button_text' => true
         ], array_fill_keys($gridCellUids, true), array_fill_keys($gridElementUidsBody, true), array_fill_keys($gridScrollUidsBody, true), array_fill_keys($gridElementUidsComponent, false), array_fill_keys($gridScrollUidsComponent, false)));
         $body->addChild($contentViewport);
         $this->drawItems[] = $contentViewport;
