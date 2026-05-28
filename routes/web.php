@@ -149,6 +149,8 @@ Route::group(['middleware' => ['auth']], function () {
     //Genes
     Route::get('/genes', [App\Http\Controllers\GeneController::class, 'index'])->name('genes.index');
     Route::post('/genes/list/table', [App\Http\Controllers\GeneController::class, 'listDataTable'])->name('genes.datatable');
+    Route::get('/genes/{gene}/edit', [App\Http\Controllers\GeneController::class, 'edit'])->name('genes.edit')->whereNumber('gene');
+    Route::put('/genes/{gene}', [App\Http\Controllers\GeneController::class, 'update'])->name('genes.update')->whereNumber('gene');
     Route::get('/genes/{gene}', [App\Http\Controllers\GeneController::class, 'show'])->name('genes.show')->whereNumber('gene');
 
     //Generator Chimical Elements

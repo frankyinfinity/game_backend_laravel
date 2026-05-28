@@ -55,9 +55,19 @@ class ComplexChimicalElementController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'symbol' => 'required|string|max:255',
+            'image_base64' => 'nullable|string',
         ]);
 
-        $complexChimicalElement->update($request->all());
+        $complexChimicalElement->update($request->only(['name', 'symbol']));
+
+        // Save Image if provided from canvas editor
+        if ($request->has('image_base64') && ! empty($request->image_base64)) {
+            $imageData = $request->image_base64;
+            $imageData = str_replace('data:image/png;base64,', '', $imageData);
+            $imageData = str_replace(' ', '+', $imageData);
+            $imageName = $complexChimicalElement->id.'.png';
+            \Storage::disk('complex_chimical_elements')->put($imageName, base64_decode($imageData));
+        }
 
         return redirect()->route('complex-chimical-elements.index')
             ->with('success', 'Elemento chimico complesso aggiornato con successo.');

@@ -37,6 +37,7 @@
                                 </div>
                             </th>
                             <th>ID</th>
+                            <th>Immagine</th>
                             <th>Nome</th>
                             <th>Simbolo</th>
                             <th>Azioni</th>
@@ -82,6 +83,7 @@
                         class:          "disableEdit",
                     },
                     {data:"id", name:"id"},
+                    {data:"image_url", name:"image"},
                     {data:"name", name:"name"},
                     {data:"symbol", name:"symbol"},
                     {data:"id", name:"id"},
@@ -105,9 +107,18 @@
                     },
                     {
                         render: function(data, type, row){
+                            if (data) {
+                                return '<img src="'+data+'" alt="Immagine" style="max-height: 40px; max-width: 40px; border-radius: 4px;">';
+                            }
+                            return '<span class="text-muted"><em>Nessuna</em></span>';
+                        },
+                        targets:   2
+                    },
+                    {
+                        render: function(data, type, row){
                             return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
                         },
-                        targets:   4
+                        targets:   5
                     },
                 ],
             });

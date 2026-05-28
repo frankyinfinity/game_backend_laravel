@@ -132,6 +132,30 @@ return [
             'throw' => false,
         ],
 
+        'genes' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/genes'),
+            'url' => env('APP_URL').'/storage/genes',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
+        'chimical_elements' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/chimical_elements'),
+            'url' => env('APP_URL').'/storage/chimical_elements',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
+        'complex_chimical_elements' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/complex_chimical_elements'),
+            'url' => env('APP_URL').'/storage/complex_chimical_elements',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

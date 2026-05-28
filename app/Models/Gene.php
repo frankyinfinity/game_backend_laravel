@@ -8,6 +8,7 @@ class Gene extends Model
 {
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
+    protected $appends = ['image_url'];
 
     const TYPE_STATIC_RANGE = 'static_range';
     const DYNAMIC_MAX = 'dynamic_max';
@@ -20,6 +21,15 @@ class Gene extends Model
 
     public function genomes(){
         return $this->hasMany(Genome::class);
+    }
+
+    public function getImageUrlAttribute()
+    {
+        $imagePath = 'storage/genes/' . $this->id . '.png';
+        if (file_exists(public_path($imagePath))) {
+            return asset($imagePath . '?v=' . filemtime(public_path($imagePath)));
+        }
+        return null;
     }
 
 }

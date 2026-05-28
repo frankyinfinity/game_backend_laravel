@@ -15,7 +15,7 @@ class ChimicalElementController extends Controller
 
     public function listDataTable(Request $request)
     {
-        $query = ChimicalElement::query()->get();
+        $query = ChimicalElement::query()->select('id', 'name', 'symbol', 'image')->get();
         return datatables($query)->toJson();
     }
 
@@ -52,9 +52,19 @@ class ChimicalElementController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'symbol' => 'required|string|max:255',
+            'image_base64' => 'nullable|string',
         ]);
 
-        $chimicalElement->update($request->all());
+        $chimicalElement->update($request->only(['name', 'symbol']));
+
+        // Save Image if provided from canvas editor
+        if ($request->has('image_base64') && ! empty($request->image_base64)) {
+            $imageData = $request->image_base64;
+            $imageData = str_replace('data:image/png;base64,', '', $imageData);
+            $imageData = str_replace(' ', '+', $imageData);
+            $imageName = $chimicalElement->id.'.png';
+            \Storage::disk('chimical_elements')->put($imageName, base64_decode($imageData));
+        }
 
         return redirect()->route('chimical-elements.index')
             ->with('success', 'Elemento chimico aggiornato con successo.');

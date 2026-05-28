@@ -1,13 +1,13 @@
 @extends('adminlte::page')
 
-@section('title', 'Modifica Elemento Chimico Complesso')
+@section('title', 'Modifica Gene')
 
 @section('content_header')
-    <h1>Modifica Elemento Chimico Complesso</h1>
+    <h1>Modifica Gene</h1>
 @stop
 
 @section('content')
-<form action="{{ route('complex-chimical-elements.update', $complexChimicalElement) }}" method="POST">
+<form action="{{ route('genes.update', $gene) }}" method="POST">
     @csrf
     @method('PUT')
 
@@ -37,7 +37,7 @@
                                class="form-control @error('name') is-invalid @enderror"
                                id="name"
                                name="name"
-                               value="{{ old('name', $complexChimicalElement->name) }}"
+                               value="{{ old('name', $gene->name) }}"
                                required>
                         @error('name')
                             <span class="invalid-feedback" role="alert">
@@ -46,14 +46,14 @@
                         @enderror
                     </div>
                     <div class="form-group">
-                        <label for="symbol">Simbolo <span class="text-danger">*</span></label>
+                        <label for="key">Key <span class="text-danger">*</span></label>
                         <input type="text"
-                               class="form-control @error('symbol') is-invalid @enderror"
-                               id="symbol"
-                               name="symbol"
-                               value="{{ old('symbol', $complexChimicalElement->symbol) }}"
+                               class="form-control @error('key') is-invalid @enderror"
+                               id="key"
+                               name="key"
+                               value="{{ old('key', $gene->key) }}"
                                required>
-                        @error('symbol')
+                        @error('key')
                             <span class="invalid-feedback" role="alert">
                                 <strong>{{ $message }}</strong>
                             </span>
@@ -63,7 +63,7 @@
 
                 <!-- TAB IMMAGINE -->
                 <div class="tab-pane fade" id="tab-image" role="tabpanel" aria-labelledby="tab-image-link">
-                    @include('shared.graphics_editor', ['model' => $complexChimicalElement, 'modelType' => 'complex_chimical_element'])
+                    @include('shared.graphics_editor', ['model' => $gene, 'modelType' => 'gene'])
                 </div>
 
             </div>
@@ -73,7 +73,7 @@
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-save"></i> Aggiorna
             </button>
-            <a href="{{ route('complex-chimical-elements.index') }}" class="btn btn-secondary">
+            <a href="{{ route('genes.index') }}" class="btn btn-secondary">
                 <i class="fas fa-times"></i> Annulla
             </a>
         </div>

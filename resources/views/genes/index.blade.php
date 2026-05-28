@@ -17,6 +17,7 @@
                         <thead>
                         <tr>
                             <th>ID</th>
+                            <th>Immagine</th>
                             <th>Nome</th>
                             <th>Key</th>
                             <th>Azioni</th>
@@ -54,6 +55,7 @@
                 },
                 columns: [
                     {data:"id", name:"id"},
+                    {data:"image_url", name:"image"},
                     {data:"name", name:"name"},
                     {data:"key", name:"key"},
                     {data:"id", name:"id"},
@@ -68,9 +70,18 @@
                 columnDefs: [
                     {
                         render: function(data, type, row){
+                            if (data) {
+                                return '<img src="'+data+'" alt="Immagine" style="max-height: 40px; max-width: 40px; border-radius: 4px;">';
+                            }
+                            return '<span class="text-muted"><em>Nessuna</em></span>';
+                        },
+                        targets:   1
+                    },
+                    {
+                        render: function(data, type, row){
                             return '<button type="button" class="btn btn-info btn-block btn-sm btn_show" data-id="'+data+'"><i class="fa fa-eye"></i> Dettaglio</button>';
                         },
-                        targets:   3
+                        targets:   4
                     },
                 ],
             });
