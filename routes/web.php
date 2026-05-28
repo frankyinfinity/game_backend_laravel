@@ -134,6 +134,10 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/chimical-elements/list/table', [App\Http\Controllers\ChimicalElementController::class, 'listDataTable'])->name('chimical-elements.datatable');
     Route::post('/chimical-elements/delete', [App\Http\Controllers\ChimicalElementController::class, 'delete'])->name('chimical-elements.delete');
 
+    //Graphics AI
+    Route::get('/graphics-editor/ai-models', [App\Http\Controllers\GraphicsAiController::class, 'models'])->name('graphics-editor.ai-models');
+    Route::post('/graphics-editor/ai-generate', [App\Http\Controllers\GraphicsAiController::class, 'generate'])->name('graphics-editor.ai-generate');
+
     //Complex Chimical Elements
     Route::resource('complex-chimical-elements', App\Http\Controllers\ComplexChimicalElementController::class);
     Route::post('/complex-chimical-elements/list/table', [App\Http\Controllers\ComplexChimicalElementController::class, 'listDataTable'])->name('complex-chimical-elements.datatable');

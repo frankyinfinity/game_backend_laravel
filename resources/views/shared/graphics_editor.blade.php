@@ -146,7 +146,7 @@
                             <label for="graphics-ai-prompt-{{$modelType}}">Prompt</label>
                             <textarea class="form-control" id="graphics-ai-prompt-{{$modelType}}" rows="5"></textarea>
                         </div>
-                        <button type="button" class="btn btn-primary">
+                        <button type="button" class="btn btn-primary" id="btn-ai-generate-{{$modelType}}">
                             <i class="fas fa-paper-plane"></i> Invia
                         </button>
                     </div>
@@ -221,6 +221,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnUndo = document.getElementById('btn-undo-' + modelType);
     const btnRedo = document.getElementById('btn-redo-' + modelType);
     const gridToggle = document.getElementById('grid-toggle-' + modelType);
+    const aiPrompt = document.getElementById('graphics-ai-prompt-' + modelType);
+    const btnAiGenerate = document.getElementById('btn-ai-generate-' + modelType);
 
     let isDrawing = false;
     let hasGraphicsChanges = false;
@@ -334,6 +336,25 @@ document.addEventListener('DOMContentLoaded', function() {
         previewCtx.drawImage(canvas, 0, 0, canvasSize, canvasSize, 0, 0, pixelSize, pixelSize);
     }
 
+    function drawPixelMatrix(pixels) {
+        ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+        pixels.forEach((row, y) => {
+            row.forEach((color, x) => {
+                if (color) {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                } else {
+                    ctx.clearRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            });
+        });
+
+        hasGraphicsChanges = true;
+        updatePreview();
+        saveState();
+    }
+
     canvas.addEventListener('mousedown', (e) => {
         const coords = getPixelCoords(e);
         const tool = document.querySelector('input[name="editor-tool-' + modelType + '"]:checked').id;
@@ -427,6 +448,82 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveState();
                 toastr.info('Immagine caricata nell\'editor');
             };
+        });
+    }
+
+    if (btnAiGenerate) {
+        function startAiRetryCountdown(seconds, originalHtml) {
+            let remaining = Math.max(1, parseInt(seconds, 10));
+            btnAiGenerate.disabled = true;
+            btnAiGenerate.innerHTML = '<i class="fas fa-clock"></i> Riprova tra ' + remaining + 's';
+
+            const interval = setInterval(() => {
+                remaining--;
+
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    btnAiGenerate.disabled = false;
+                    btnAiGenerate.innerHTML = originalHtml;
+                    return;
+                }
+
+                btnAiGenerate.innerHTML = '<i class="fas fa-clock"></i> Riprova tra ' + remaining + 's';
+            }, 1000);
+        }
+
+        btnAiGenerate.addEventListener('click', async () => {
+            const prompt = aiPrompt.value.trim();
+
+            if (!prompt) {
+                toastr.warning('Inserisci un prompt.');
+                return;
+            }
+
+            const originalHtml = btnAiGenerate.innerHTML;
+            btnAiGenerate.disabled = true;
+            btnAiGenerate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generazione...';
+
+            try {
+                const response = await fetch('{{ route('graphics-editor.ai-generate') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        model_type: modelType,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        const retryAfter = data.details?.error?.metadata?.retry_after_seconds
+                            || data.details?.error?.metadata?.headers?.['Retry-After'];
+
+                        if (retryAfter) {
+                            toastr.warning(data.message);
+                            startAiRetryCountdown(retryAfter, originalHtml);
+                            return;
+                        }
+                    }
+
+                    throw new Error(data.message || 'Errore durante la generazione AI.');
+                }
+
+                drawPixelMatrix(data.pixels);
+                toastr.success('Immagine generata sulla griglia.');
+            } catch (error) {
+                toastr.error(error.message);
+            } finally {
+                if (btnAiGenerate.innerHTML.includes('Generazione')) {
+                    btnAiGenerate.disabled = false;
+                    btnAiGenerate.innerHTML = originalHtml;
+                }
+            }
         });
     }
 
