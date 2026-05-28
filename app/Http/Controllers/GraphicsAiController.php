@@ -70,7 +70,7 @@ class GraphicsAiController extends Controller
             ], 422);
         }
 
-        $systemPrompt = 'Sei un generatore di pixel art 32x32 per un editor canvas. Il prompt utente è scritto in italiano. Devi restituire solo un array JSON valido e minificato, senza oggetti wrapper, senza markdown e senza spiegazioni. La risposta deve essere direttamente un array di esattamente 32 stringhe, non un array di singoli caratteri. Ogni elemento dell array è una riga completa lunga esattamente 32 caratteri. Usa "." per i pixel vuoti trasparenti. Usa solo queste lettere per i colori: r,g,b,y,k,w,o,p. Significato colori: r rosso, g verde, b blu o azzurro, y giallo, k nero, w bianco, o arancione, p viola. Crea una piccola icona pixel art semplice, centrata e riconoscibile, con sfondo trasparente. Esempio formato corretto: ["................................","..............rr................"]. La risposta deve essere completa e JSON valido.';
+        $systemPrompt = 'Sei un generatore di pixel art 32x32 per un editor canvas. Il prompt utente è scritto in italiano. Devi restituire SOLO 32 righe di testo, nient altro, niente markdown, niente spiegazioni. Ogni riga deve contenere ESATTAMENTE 32 caratteri. Usa "." per i pixel vuoti trasparenti. Usa queste lettere per i colori: r=rosso, g=verde, b=blu, c=azzurro/ciano, y=giallo, k=nero, w=bianco, o=arancione, p=viola, m=magenta/fucsia, n=marrone, e=grigio, s=rosa. Crea l oggetto ESATTO richiesto, non una forma generica. Se l utente chiede un cuore, disegna un cuore con due sporgenze sopra e punta sotto. Se chiede una spada, disegna una lama e un manico. Se chiede una pozione, disegna un flacone. Usa PIU colori diversi, non uno solo. Esempio di output per "cuore rosso":\n................................\n................................\n...........rr....rr.............\n..........rrr..rrrr.............\n.........rrrrrrrrrrr............\n.........rrrrrrrrrrr............\n..........rrrrrrrrr.............\n...........rrrrrrr..............\n............rrrrr...............\n.............rrr................\n..............r.................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................';
         $payload = [
             'messages' => [
                 [
@@ -79,7 +79,7 @@ class GraphicsAiController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => 'Genera questa immagine: ' . $data['prompt'] . '. Restituisci solo l array JSON grezzo di 32 stringhe.',
+                    'content' => 'Genera questa immagine: ' . $data['prompt'] . '. Scrivi solo 32 righe da 32 caratteri, nient altro.',
                 ],
             ],
             'temperature' => 0.2,
@@ -96,12 +96,6 @@ class GraphicsAiController extends Controller
 
             $payload['model'] = $model;
             $response = $client->post($endpoint, $payload);
-
-            if ($response->status() === 400) {
-                $fallbackPayload = $payload;
-                unset($fallbackPayload['response_format']);
-                $response = $client->post($endpoint, $fallbackPayload);
-            }
 
             $attempts[] = [
                 'model' => $model,
@@ -124,8 +118,8 @@ class GraphicsAiController extends Controller
 
                 return response()->json([
                     'message' => $retryAfter
-                        ? 'Tutti i modelli OpenRouter disponibili sono temporaneamente in rate limit. Riprova tra ' . $retryAfter . ' secondi.'
-                        : 'Tutti i modelli OpenRouter disponibili sono temporaneamente in rate limit. Riprova tra poco.',
+                        ? 'Il modello OpenRouter è temporaneamente in rate limit. Riprova tra ' . $retryAfter . ' secondi.'
+                        : 'Il modello OpenRouter è temporaneamente in rate limit. Riprova tra poco.',
                     'details' => $details ?: $response->body(),
                     'attempts' => $attempts,
                 ], 429);
@@ -139,40 +133,20 @@ class GraphicsAiController extends Controller
         }
 
         $generatedText = $this->extractGeneratedText($response->json());
-        $payload = $this->extractJsonPayload($generatedText);
-        $aiPixels = null;
+        $aiPixels = $this->extractPlainTextRows($generatedText);
 
-        if (! $payload) {
-            $payload = $this->extractTruncatedCompactPayload($generatedText);
-        }
-
-        if (! $payload) {
-            $payload = $this->extractTruncatedCoordinatePixelsPayload($generatedText);
-        }
-
-        if (! $payload) {
-            $payload = $this->extractTruncatedLetterRowsPayload($generatedText);
-        }
-
-        if ($payload && $this->isLetterRowPixelArray($payload)) {
-            $aiPixels = $this->normalizeLetterRows($payload);
-            $payload = [
-                'pixels' => $this->expandLetterRows($aiPixels),
-            ];
-        }
-
-        if (! $payload || ! isset($payload['pixels']) || ! $this->isValidPixelMatrix($payload['pixels'])) {
+        if ($aiPixels === null || ! $this->isValidPixelMatrix($this->expandLetterRows($aiPixels))) {
             return response()->json([
                 'message' => 'La risposta AI non contiene pixel utilizzabili.',
                 'raw' => $generatedText,
-                'decoded' => $payload,
+                'decoded' => $aiPixels,
                 'attempts' => $attempts,
             ], 422);
         }
 
         return response()->json([
             'ai_pixels' => $aiPixels,
-            'pixels' => $payload['pixels'],
+            'pixels' => $this->expandLetterRows($aiPixels),
             'model' => $model,
             'attempts' => $attempts,
         ]);
@@ -193,6 +167,39 @@ class GraphicsAiController extends Controller
         }
 
         return is_string($response) ? $response : json_encode($response);
+    }
+
+    private function extractPlainTextRows(string $text): ?array
+    {
+        $text = preg_replace('/^```[a-z]*\s*/im', '', $text);
+        $text = preg_replace('/```\s*$/im', '', $text);
+
+        $lines = preg_split('/\r?\n/', $text);
+        $rows = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $line = trim($line, '"\'[] ');
+
+            if (preg_match('/^[\.rgbykwopcmnesRGByKkwWwOoPpCMNES]+$/', $line)) {
+                $rows[] = strtolower(substr(str_pad($line, 32, '.'), 0, 32));
+            }
+        }
+
+        if (count($rows) === 0) {
+            return null;
+        }
+
+        while (count($rows) < 32) {
+            $rows[] = str_repeat('.', 32);
+        }
+
+        return array_slice($rows, 0, 32);
     }
 
     private function extractJsonPayload(string $text): ?array
@@ -441,7 +448,7 @@ class GraphicsAiController extends Controller
         }
 
         foreach ($pixels as $pixel) {
-            if (! is_string($pixel) || strlen($pixel) !== 1 || ! preg_match('/^[\\.rgbykwop]$/i', $pixel)) {
+            if (! is_string($pixel) || strlen($pixel) !== 1 || ! preg_match('/^[\\.rgbykwopcmnes]$/i', $pixel)) {
                 return false;
             }
         }
@@ -455,11 +462,16 @@ class GraphicsAiController extends Controller
             'r' => '#FF0000',
             'g' => '#00AA00',
             'b' => '#0000FF',
+            'c' => '#00DDDD',
             'y' => '#FFFF00',
             'k' => '#111111',
             'w' => '#FFFFFF',
             'o' => '#FF8800',
             'p' => '#AA00FF',
+            'm' => '#FF00CC',
+            'n' => '#884400',
+            'e' => '#888888',
+            's' => '#FF88AA',
         ];
 
         $rows = $this->normalizeLetterRows($rows);
