@@ -310,8 +310,12 @@ return [
             'icon' => 'fas fa-flask',
         ],
         [
+            'header' => 'GESTIONE DATI',
+        ],
+        [
             'text'    => 'Gestione Utenti',
             'icon'    => 'fas fa-users',
+            'icon_color' => 'blue',
             'submenu' => [
                 [
                     'text' => 'Utenti',
@@ -321,40 +325,135 @@ return [
             ]
         ],
         [
-            'text'    => 'Gestione Tile',
-            'icon'    => 'fas fa-th',
+            'text'    => 'Gestione Ambiente',
+            'icon'    => 'fas fa-globe-americas',
+            'icon_color' => 'green',
             'submenu' => [
                 [
-                    'text' => 'Famiglie Tile',
-                    'url'  => '/family-tiles',
-                    'icon' => 'fas fa-th-large',
+                    'text'    => 'Gestione Tile',
+                    'icon'    => 'fas fa-th',
+                    'icon_color' => 'teal',
+                    'submenu' => [
+                        [
+                            'text' => 'Famiglie Tile',
+                            'url'  => '/family-tiles',
+                            'icon' => 'fas fa-th-large',
+                        ],
+                        [
+                            'text' => 'Tile',
+                            'url'  => '/tiles',
+                            'icon' => 'fas fa-th',
+                        ],
+                    ]
                 ],
                 [
-                    'text' => 'Tile',
-                    'url'  => '/tiles',
-                    'icon' => 'fas fa-th',
+                    'text'    => 'Gestione Pianeti',
+                    'icon'    => 'fas fa-globe',
+                    'icon_color' => 'teal',
+                    'submenu' => [
+                        [
+                            'text' => 'Clima',
+                            'url'  => '/climates',
+                            'icon' => 'fas fa-leaf',
+                        ],
+                        [
+                            'text' => 'Pianeti',
+                            'url'  => '/planets',
+                            'icon' => 'fas fa-globe',
+                        ]
+                    ]
                 ],
             ]
         ],
         [
-            'text'    => 'Gestione Pianeti',
-            'icon'    => 'fas fa-globe',
+            'text'    => 'Gestione Composizione',
+            'icon'    => 'fas fa-flask',
+            'icon_color' => 'orange',
             'submenu' => [
                 [
-                    'text' => 'Clima',
-                    'url'  => '/climates',
-                    'icon' => 'fas fa-tree',
+                    'text'    => 'Elementi Chimici',
+                    'icon'    => 'fas fa-flask',
+                    'icon_color' => 'orange',
+                    'submenu' => [
+                        [
+                            'text' => 'Elementi Chimici',
+                            'url'  => '/chimical-elements',
+                            'icon' => 'fas fa-atom',
+                        ],
+                        [
+                            'text' => 'Elementi Chimici Complessi',
+                            'url'  => '/complex-chimical-elements',
+                            'icon' => 'fas fa-atom',
+                        ],
+                        [
+                            'text' => 'Generatori',
+                            'url'  => '/generator-chimical-elements',
+                            'icon' => 'fas fa-cogs',
+                        ],
+                        [
+                            'text' => 'Regole',
+                            'url'  => '/rule-chimical-elements',
+                            'icon' => 'fas fa-balance-scale',
+                        ]
+                    ]
+                ],
+            ]
+        ],
+        [
+            'text'    => 'Gestione Entità',
+            'icon'    => 'fas fa-dice-d6',
+            'icon_color' => 'purple',
+            'submenu' => [
+                [
+                    'text'    => 'Entity',
+                    'icon'    => 'fas fa-dna',
+                    'icon_color' => 'purple',
+                    'submenu' => [
+                        [
+                            'text' => 'Tipologia Componente',
+                            'url'  => '/entity-type-components',
+                            'icon' => 'fas fa-tags',
+                        ],
+                        [
+                            'text' => 'Componente Entity',
+                            'url'  => '/entity-components',
+                            'icon' => 'fas fa-puzzle-piece',
+                        ],
+                        [
+                            'text' => 'Corpo Entity',
+                            'url'  => '/entity-bodies',
+                            'icon' => 'fas fa-child',
+                        ]
+                    ]
                 ],
                 [
-                    'text' => 'Pianeti',
-                    'url'  => '/planets',
-                    'icon' => 'fas fa-globe',
-                ]
+                    'text'    => 'Elementi',
+                    'icon'    => 'fas fa-cubes',
+                    'icon_color' => 'purple',
+                    'submenu' => [
+                        [
+                            'text' => 'Tipologie Elementi',
+                            'url'  => '/element-types',
+                            'icon' => 'fas fa-cube',
+                        ],
+                        [
+                            'text' => 'Elementi',
+                            'url'  => '/elements',
+                            'icon' => 'fas fa-atom',
+                        ],
+                        [
+                            'text' => 'Diffusione Elementi',
+                            'url'  => '/elements/diffusion',
+                            'icon' => 'fas fa-map',
+                        ]
+                    ]
+                ],
             ]
         ],
         [
             'text'    => 'Gestione Giocatori',
             'icon'    => 'fas fa-gamepad',
+            'icon_color' => 'cyan',
             'submenu' => [
                 [
                     'text' => 'Container',
@@ -364,76 +463,12 @@ return [
             ]
         ],
         [
-            'text'    => 'Entity',
-            'icon'    => 'fas fa-dna',
-            'submenu' => [
-                [
-                    'text' => 'Tipologia Componente',
-                    'url'  => '/entity-type-components',
-                    'icon' => 'fas fa-tags',
-                ],
-                [
-                    'text' => 'Componente Entity',
-                    'url'  => '/entity-components',
-                    'icon' => 'fas fa-puzzle-piece',
-                ],
-                [
-                    'text' => 'Corpo Entity',
-                    'url'  => '/entity-bodies',
-                    'icon' => 'fas fa-child',
-                ]
-            ]
-        ],
-        [
-            'text'    => 'Elementi',
-            'icon'    => 'fas fa-cubes',
-            'submenu' => [
-                [
-                    'text' => 'Tipologie Elementi',
-                    'url'  => '/element-types',
-                    'icon' => 'fas fa-cube',
-                ],
-                [
-                    'text' => 'Elementi',
-                    'url'  => '/elements',
-                    'icon' => 'fas fa-atom',
-                ],
-                [
-                    'text' => 'Diffusione Elementi',
-                    'url'  => '/elements/diffusion',
-                    'icon' => 'fas fa-map',
-                ]
-            ]
-        ],
-        [
-            'text'    => 'Elementi Chimici',
-            'icon'    => 'fas fa-flask',
-            'submenu' => [
-                [
-                    'text' => 'Elementi Chimici',
-                    'url'  => '/chimical-elements',
-                    'icon' => 'fas fa-atom',
-                ],
-                [
-                    'text' => 'Elementi Chimici Complessi',
-                    'url'  => '/complex-chimical-elements',
-                    'icon' => 'fas fa-atom',
-                ],
-                [
-                    'text' => 'Generatori',
-                    'url'  => '/generator-chimical-elements',
-                    'icon' => 'fas fa-cogs',
-                ],
-                [
-                    'text' => 'Regole',
-                    'url'  => '/rule-chimical-elements',
-                    'icon' => 'fas fa-balance-scale',
-                ]
-            ]
+            'header' => 'GENERALE',
         ],
         [
             'text'    => 'Obiettivi',
             'icon'    => 'fas fa-trophy',
+            'icon_color' => 'yellow',
             'submenu' => [
                 [
                     'text' => 'Punteggi',

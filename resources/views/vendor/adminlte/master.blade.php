@@ -69,6 +69,44 @@
     {{-- Custom Stylesheets (post AdminLTE) --}}
     @yield('adminlte_css')
 
+    {{-- Sidebar Tree Indentation --}}
+    <style>
+    .nav-sidebar > .nav-item > .nav-link {
+        padding-left: 0.8rem !important;
+    }
+    .nav-sidebar .nav-treeview .nav-link {
+        padding-left: 2rem !important;
+        padding-top: 0.4rem;
+        padding-bottom: 0.4rem;
+    }
+    .nav-sidebar .nav-treeview .nav-treeview .nav-link {
+        padding-left: 3.2rem !important;
+    }
+    .nav-sidebar .nav-treeview {
+        position: relative;
+    }
+    .nav-sidebar .nav-treeview::before {
+        content: '';
+        position: absolute;
+        left: 1rem;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: rgba(255,255,255,0.1);
+    }
+    .nav-sidebar .nav-treeview .nav-treeview::before {
+        left: 2.2rem;
+    }
+    .nav-sidebar .nav-header {
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+        padding-top: 1rem;
+        padding-bottom: 0.3rem;
+        color: rgba(255,255,255,0.5) !important;
+        text-transform: uppercase;
+    }
+    </style>
+
     {{-- Favicon --}}
     @if(config('adminlte.use_ico_only'))
         <link rel="shortcut icon" href="{{ asset('favicons/favicon.ico') }}" />
