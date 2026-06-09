@@ -261,6 +261,9 @@ class EntityDraw
             if($gene->type === 'dynamic_max') {
                
                 $progressBar = new BarGeneDraw($dbEntity->uid.'_progress_bar_'.$gene->key, $gene);
+                if ($gene->image_url) {
+                    $progressBar->setImagePath($gene->image_url);
+                }
                 $progressBar->setName($gene->name);
                 $progressBar->setMin($genome->min);
                 $progressBar->setMax($genome->max);
@@ -283,6 +286,10 @@ class EntityDraw
         
         foreach($chimicalElements as $entityChimicalElement) {
             $barChimicalElement = new BarChimicalElementDraw($entityChimicalElement);
+            $chimicalElementId = $entityChimicalElement->playerRuleChimicalElement->chimical_element_id ?? null;
+            if ($chimicalElementId && file_exists(public_path('storage/chimical_elements/' . $chimicalElementId . '.png'))) {
+                $barChimicalElement->setImagePath('/storage/chimical_elements/' . $chimicalElementId . '.png');
+            }
             $barChimicalElement->setWidth(380);
             $barChimicalElement->setOrigin($panelX, $panelY);
             $barChimicalElement->setRenderable(false);

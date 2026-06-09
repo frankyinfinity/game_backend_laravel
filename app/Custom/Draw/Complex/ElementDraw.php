@@ -303,6 +303,9 @@ class ElementDraw
                 $progressBarUid = $elementHasPosition->uid . '_progress_bar_' . $gene->key;
 
                 $progressBar = new BarGeneDraw($progressBarUid, $gene);
+                if ($gene->image_url) {
+                    $progressBar->setImagePath($gene->image_url);
+                }
                 $progressBar->setName($gene->name);
                 $progressBar->setValue($elementHasPositionInformation->value);
                 $progressBar->setMin($elementHasPositionInformation->min);
@@ -351,6 +354,10 @@ class ElementDraw
 
             foreach ($elementHasPositionChimicalElements as $chimicalElement) {
                 $barDraw = new BarChimicalElementDraw($chimicalElement);
+                $chimicalElementId = $chimicalElement->elementHasPositionRuleChimicalElement->chimical_element_id ?? null;
+                if ($chimicalElementId && file_exists(public_path('storage/chimical_elements/' . $chimicalElementId . '.png'))) {
+                    $barDraw->setImagePath('/storage/chimical_elements/' . $chimicalElementId . '.png');
+                }
                 $barDraw->setWidth(380);
                 $barDraw->setOrigin($panelX + 10, $barY + 20); // Add offset for title
                 $barDraw->setRenderable(false);

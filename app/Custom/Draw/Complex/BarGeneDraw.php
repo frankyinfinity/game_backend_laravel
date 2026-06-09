@@ -5,6 +5,7 @@ namespace App\Custom\Draw\Complex;
 use App\Custom\Draw\Primitive;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Text;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Colors;
 use App\Helper\Helper;
 use App\Models\Gene;
@@ -25,6 +26,7 @@ class BarGeneDraw {
     private $x = 0;
     private $y = 0;
     private $renderable = true;
+    private $imagePath = null;
 
     private array $drawItems = [];
 
@@ -48,6 +50,10 @@ class BarGeneDraw {
         $this->modifier = $modifier;
     }
 
+    public function setImagePath($imagePath): void {
+        $this->imagePath = $imagePath;
+    }
+
     public function updateValue($newValue, $sessionId): array {
         $this->value = $newValue;
         
@@ -68,10 +74,13 @@ class BarGeneDraw {
             $this->barColor = $cachedBar['color'];
         }
         
+        // Calculate image offset from cached border attributes
+        $cachedAttributes = is_array($cachedBorder['attributes'] ?? null) ? $cachedBorder['attributes'] : [];
+        $imageOffset = (int) ($cachedAttributes['image_offset'] ?? 0);
+        
         $operations = [];
         
         // 1. Update the label text (name + value)
-        $cachedAttributes = is_array($cachedBorder['attributes'] ?? null) ? $cachedBorder['attributes'] : [];
         $cachedName = $cachedAttributes['progress_name'] ?? null;
         if (is_string($cachedName) && trim($cachedName) !== '') {
             $this->name = trim($cachedName);
@@ -117,7 +126,7 @@ class BarGeneDraw {
         $range = $this->max - $this->min;
         $percent = $range > 0 ? ($this->value - $this->min) / $range : 0;
         $percent = max(0, min(1, $percent));
-        $barWidth = ($this->width - 4) * $percent;
+        $barWidth = ($this->width - 4 - $imageOffset) * $percent;
         $barHeight = $this->height - 4;
         
         // Update the existing bar's width instead of clearing and redrawing.
@@ -173,11 +182,28 @@ class BarGeneDraw {
     public function build(): void {
         $this->drawItems = [];
 
+        // Image on the left (if present)
+        $imageSize = 24;
+        $imageGap = 4;
+        $imageOffset = 0;
+
+        if ($this->imagePath) {
+            $imageOffset = $imageSize + $imageGap;
+            $this->width -= $imageOffset;
+
+            $image = new Image($this->uid . '_image');
+            $image->setSrc($this->imagePath);
+            $image->setOrigin($this->x, $this->y + ($this->height - $imageSize) / 2);
+            $image->setSize($imageSize, $imageSize);
+            $image->setRenderable($this->renderable);
+            $this->drawItems[] = $image;
+        }
+
         // 1. Background / Border Rectangle
         // We'll use a main rectangle as the container/border
         $border = new Primitive\Rectangle($this->uid . '_border');
         $border->setSize($this->width, $this->height);
-        $border->setOrigin($this->x, $this->y);
+        $border->setOrigin($this->x + $imageOffset, $this->y);
         $border->setColor($this->borderColor);
         $border->setThickness(2); // Giving it some thickness to look like a border
         $border->setBorderRadius(0);
@@ -185,6 +211,7 @@ class BarGeneDraw {
         $border->addAttributes('progress_name', $this->name);
         $border->addAttributes('progress_min', $this->min);
         $border->addAttributes('progress_max', $this->max);
+        $border->addAttributes('image_offset', $imageOffset);
         $this->drawItems[] = $border;
 
         // 2. The Progress Bar (Filled part)
@@ -212,7 +239,7 @@ class BarGeneDraw {
 
         $bar = new Primitive\Rectangle($this->uid . '_bar');
         $bar->setSize(max(0, $barWidth), $barHeight);
-        $bar->setOrigin($this->x + 2, $this->y + 2);
+        $bar->setOrigin($this->x + $imageOffset + 2, $this->y + 2);
         $bar->setColor($this->barColor);
         $bar->setBorderRadius(0);
         $bar->setRenderable($this->renderable);
@@ -230,7 +257,7 @@ class BarGeneDraw {
             
             $modifierBarWidth = max(2, ($this->width - 4) * $percent); // min width 2 for visibility
             $modifierBarHeight = $this->height - 6;
-            $modifierBarX = $this->x + 2 + ($this->width - 4) - $modifierBarWidth;
+            $modifierBarX = $this->x + $imageOffset + 2 + ($this->width - 4) - $modifierBarWidth;
             $modifierBarY = $this->y + 3;
             
             $modifierBorder = new Primitive\Rectangle($this->uid . '_modifier_bar');
@@ -256,7 +283,7 @@ class BarGeneDraw {
         if (!empty($this->name)) {
             $text = new Text($this->uid . '_text');
             $text->setText($this->name . " (" . $this->value . ")");
-            $text->setOrigin($this->x, $this->y - 15); // Place it slightly above the bar
+            $text->setOrigin($this->x + $imageOffset, $this->y - 15); // Place it slightly above the bar
             $text->setFontSize(14);
             $text->setColor(Colors::BLACK);
             $text->setRenderable($this->renderable);
@@ -273,7 +300,7 @@ class BarGeneDraw {
         
         $rangeText = new Text($this->uid . '_range');
         $rangeText->setText($rangeTextStr);
-        $rangeText->setOrigin($this->x + ($this->width / 2), $this->y + $this->height + 12);
+        $rangeText->setOrigin($this->x + $imageOffset + ($this->width / 2), $this->y + $this->height + 12);
         $rangeText->setFontSize(14);
         $rangeText->setColor(Colors::BLACK);
         $rangeText->setCenterAnchor(true);

@@ -7,6 +7,7 @@ use App\Models\ElementHasPositionChimicalElement;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\Line;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Colors;
 
 class BarChimicalElementDraw
@@ -19,6 +20,8 @@ class BarChimicalElementDraw
     private float $y = 0;
     private int $width = self::BAR_WIDTH;
     private bool $renderable = true;
+    private ?string $imagePath = null;
+    private string $uid = '';
 
     private array $drawItems = [];
 
@@ -42,6 +45,16 @@ class BarChimicalElementDraw
     public function setWidth(int $width): void
     {
         $this->width = $width;
+    }
+
+    public function setImagePath(string $imagePath): void
+    {
+        $this->imagePath = $imagePath;
+    }
+
+    public function setUid(string $uid): void
+    {
+        $this->uid = $uid;
     }
 
     public function getDrawItems(): array
@@ -75,11 +88,28 @@ class BarChimicalElementDraw
             $range = 1;
         }
 
-        $uid = 'bar_chimical_element_' . $this->model->id;
+        $uid = !empty($this->uid) ? $this->uid : 'bar_chimical_element_' . $this->model->id;
+
+        // Image on the left (if present)
+        $imageSize = 24;
+        $imageGap = 4;
+        $imageOffset = 0;
+
+        if ($this->imagePath) {
+            $imageOffset = $imageSize + $imageGap;
+            $this->width -= $imageOffset;
+
+            $image = new Image($uid . '_image');
+            $image->setSrc($this->imagePath);
+            $image->setOrigin($this->x, $this->y + (self::BAR_HEIGHT - $imageSize) / 2);
+            $image->setSize($imageSize, $imageSize);
+            $image->setRenderable($this->renderable);
+            $this->drawItems[] = $image;
+        }
 
         $titleText = new Text($uid . '_title');
         $titleText->setText($title);
-        $titleText->setOrigin($this->x, $this->y - 18);
+        $titleText->setOrigin($this->x + $imageOffset, $this->y - 18);
         $titleText->setFontSize(16);
         $titleText->setColor(Colors::BLACK);
         $titleText->setRenderable($this->renderable);
@@ -88,7 +118,7 @@ class BarChimicalElementDraw
         if ($rule->degradable) {
             $degradationText = new Text($uid . '_degradation_icon');
             $degradationText->setText('⚠');
-            $degradationText->setOrigin($this->x + strlen($title) * 9 + 5, $this->y - 18);
+            $degradationText->setOrigin($this->x + $imageOffset + strlen($title) * 9 + 5, $this->y - 18);
             $degradationText->setFontSize(14);
             $degradationText->setColor(Colors::ORANGE);
             $degradationText->setRenderable($this->renderable);
@@ -102,14 +132,14 @@ class BarChimicalElementDraw
         }
 
         $glassBorder = new Rectangle($uid . '_glass_border');
-        $glassBorder->setOrigin($this->x - 1, $this->y - 1);
+        $glassBorder->setOrigin($this->x + $imageOffset - 1, $this->y - 1);
         $glassBorder->setSize($this->width + 2, self::BAR_HEIGHT + 2);
         $glassBorder->setColor(Colors::BLACK);
         $glassBorder->setRenderable($this->renderable);
         $this->drawItems[] = $glassBorder;
 
         $glassInner = new Rectangle($uid . '_glass_inner');
-        $glassInner->setOrigin($this->x, $this->y);
+        $glassInner->setOrigin($this->x + $imageOffset, $this->y);
         $glassInner->setSize($this->width, self::BAR_HEIGHT);
         $glassInner->setColor(Colors::SILVER);
         $glassInner->setRenderable($this->renderable);
@@ -118,7 +148,7 @@ class BarChimicalElementDraw
         $details = $rule->details()->with('effects.gene')->orderBy('min')->get();
         $innerWidth = $this->width;
         $innerHeight = self::BAR_HEIGHT;
-        $innerX = $this->x;
+        $innerX = $this->x + $imageOffset;
         $innerY = $this->y;
 
         foreach ($details as $index => $detail) {
@@ -176,7 +206,7 @@ class BarChimicalElementDraw
 
         $minText = new Text($uid . '_min');
         $minText->setText((string) $min);
-        $minText->setOrigin($this->x + 4, $this->y + self::BAR_HEIGHT + 14);
+        $minText->setOrigin($this->x + $imageOffset + 4, $this->y + self::BAR_HEIGHT + 14);
         $minText->setFontSize(14);
         $minText->setColor(Colors::DARK_GRAY);
         $minText->setCenterAnchor(true);
@@ -185,7 +215,7 @@ class BarChimicalElementDraw
 
         $maxText = new Text($uid . '_max');
         $maxText->setText((string) $max);
-        $maxText->setOrigin($this->x + $this->width - 4, $this->y + self::BAR_HEIGHT + 14);
+        $maxText->setOrigin($this->x + $imageOffset + $this->width - 4, $this->y + self::BAR_HEIGHT + 14);
         $maxText->setFontSize(14);
         $maxText->setColor(Colors::DARK_GRAY);
         $maxText->setCenterAnchor(true);
