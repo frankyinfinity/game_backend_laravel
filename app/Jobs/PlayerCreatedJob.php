@@ -16,6 +16,7 @@ use App\Models\BirthRegionLimitDetail;
 use App\Models\ChimicalElement;
 use App\Models\ComplexChimicalElement;
 use App\Models\Entity;
+use App\Models\EntityChimicalElement;
 use App\Models\EntityInformation;
 use App\Models\FamilyTile;
 use App\Models\FamilyTileDiffusion;
@@ -90,11 +91,14 @@ class PlayerCreatedJob implements ShouldQueue
         $this->populateBirthRegionDiffusions($player, $birthRegionIds);
         $this->populateBirthRegionDetailData($player, $birthRegionIds);
 
-        // Clone the objective structure for the player
-        $this->cloneObjectiveStructure($player);
-
         // Clone RuleChimicalElements for the player
         $this->cloneRuleChimicalElements($player);
+
+        // Populate EntityChimicalElement for the player's entities
+        $this->populateEntityChimicalElements($player);
+
+        // Clone the objective structure for the player
+        $this->cloneObjectiveStructure($player);
     }
 
     /**
@@ -619,5 +623,44 @@ class PlayerCreatedJob implements ShouldQueue
 
             }
         }
+    }
+
+    /**
+     * Populate EntityChimicalElement for all entities of the player.
+     */
+    protected function populateEntityChimicalElements(Player $player): void
+    {
+        Log::info('populateEntityChimicalElements called', ['player_id' => $player->id]);
+
+        $playerRules = PlayerRuleChimicalElement::where('player_id', $player->id)->get();
+        if ($playerRules->isEmpty()) {
+            Log::info('No PlayerRuleChimicalElement found for player', ['player_id' => $player->id]);
+            return;
+        }
+
+        $entities = Entity::whereHas('specie', function ($q) use ($player) {
+            $q->where('player_id', $player->id);
+        })->get();
+
+        Log::info('Found entities for player', ['player_id' => $player->id, 'count' => $entities->count()]);
+
+        foreach ($entities as $entity) {
+            foreach ($playerRules as $playerRule) {
+                $existing = EntityChimicalElement::where('entity_id', $entity->id)
+                    ->where('player_rule_chimical_element_id', $playerRule->id)
+                    ->first();
+
+                if (!$existing) {
+                    $value = $playerRule->default_value ?? $playerRule->max;
+                    EntityChimicalElement::create([
+                        'entity_id' => $entity->id,
+                        'player_rule_chimical_element_id' => $playerRule->id,
+                        'value' => $value,
+                    ]);
+                }
+            }
+        }
+
+        Log::info('EntityChimicalElement population completed', ['player_id' => $player->id]);
     }
 }
