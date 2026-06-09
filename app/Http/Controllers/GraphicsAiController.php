@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
 
 class GraphicsAiController extends Controller
 {
@@ -12,112 +10,63 @@ class GraphicsAiController extends Controller
     {
         return response()->json([
             'models' => [
-                ['id' => 'black-forest-labs/flux-dev', 'name' => 'Flux Dev (economico)'],
+                ['id' => 'local-stable-diffusion', 'name' => 'Stable Diffusion (locale, gratuito)'],
             ],
         ]);
     }
 
     public function generate(Request $request)
     {
-        set_time_limit(120);
+        set_time_limit(600);
 
         $data = $request->validate([
             'prompt' => 'required|string|max:500',
-            'model_type' => 'nullable|string|max:100',
         ]);
 
-        $token = config('services.openrouter.token');
-        $endpoint = config('services.openrouter.endpoint', 'https://openrouter.ai/api/v1/images/generations');
-        $model = config('services.openrouter.model', 'black-forest-labs/flux-dev');
+        return $this->generateLocal($data['prompt']);
+    }
 
-        if (empty($token)) {
-            return response()->json(['message' => 'API key non configurata.'], 422);
+    private function generateLocal(string $prompt)
+    {
+        $scriptPath = base_path('scripts/local_pixel_gen.py');
+
+        if (!file_exists($scriptPath)) {
+            return response()->json(['message' => 'Script locale non trovato.'], 500);
         }
 
-        $payload = [
-            'model' => $model,
-            'prompt' => "pixel art 32x32, " . $data['prompt'] . ", flat colors, no shading, transparent background",
-            'n' => 1,
-            'size' => '256x256',
-        ];
+        $escapedPrompt = escapeshellarg($prompt);
+        $cmd = "python {$scriptPath} {$escapedPrompt} 2>nul";
 
-        try {
-            $response = Http::withToken($token)
-                ->timeout(60)
-                ->post($endpoint, $payload);
-        } catch (ConnectionException $e) {
-            return response()->json(['message' => 'Impossibile connettersi a OpenRouter.'], 503);
-        }
+        exec($cmd, $output, $returnCode);
 
-        if (!$response->successful()) {
-            $details = $response->json() ?: $response->body();
+        $jsonOutput = implode("\n", $output);
+
+        if ($returnCode !== 0) {
             return response()->json([
-                'message' => 'Errore generazione immagine.',
-                'details' => $details,
-            ], $response->status());
+                'message' => 'Errore generazione locale.',
+                'details' => $jsonOutput,
+            ], 500);
         }
 
-        $body = $response->json();
-        $imageUrl = data_get($body, 'data.0.url');
+        $result = json_decode($jsonOutput, true);
 
-        if (!$imageUrl) {
+        if (json_last_error() !== JSON_ERROR_NONE) {
             return response()->json([
-                'message' => 'Nessuna immagine generata.',
-                'details' => $body,
-            ], 422);
+                'message' => 'Output non valido dallo script locale.',
+                'details' => $jsonOutput,
+            ], 500);
         }
 
-        // Scarica immagine
-        try {
-            $imgData = Http::timeout(30)->get($imageUrl)->body();
-        } catch (ConnectionException $e) {
-            return response()->json(['message' => 'Impossibile scaricare l\'immagine generata.'], 502);
+        if (isset($result['error'])) {
+            return response()->json([
+                'message' => 'Errore generazione locale.',
+                'details' => $result['error'],
+            ], 500);
         }
-
-        if (empty($imgData)) {
-            return response()->json(['message' => 'Immagine vuota.'], 502);
-        }
-
-        // Carica con GD e ridimensiona a 32x32
-        $srcImg = @imagecreatefromstring($imgData);
-        if (!$srcImg) {
-            return response()->json(['message' => 'Impossibile processare l\'immagine.'], 422);
-        }
-
-        $srcW = imagesx($srcImg);
-        $srcH = imagesy($srcImg);
-
-        $pixelImg = imagecreatetruecolor(32, 32);
-        imagealphablending($pixelImg, false);
-        imagesavealpha($pixelImg, true);
-        $transparent = imagecolorallocatealpha($pixelImg, 0, 0, 0, 127);
-        imagefill($pixelImg, 0, 0, $transparent);
-        imagecopyresampled($pixelImg, $srcImg, 0, 0, 0, 0, 32, 32, $srcW, $srcH);
-        imagedestroy($srcImg);
-
-        // Estrai pixel
-        $pixels = [];
-        for ($y = 0; $y < 32; $y++) {
-            $row = [];
-            for ($x = 0; $x < 32; $x++) {
-                $rgb = imagecolorat($pixelImg, $x, $y);
-                $alpha = ($rgb >> 24) & 0x7F;
-                if ($alpha >= 100) {
-                    $row[] = null;
-                } else {
-                    $r = ($rgb >> 16) & 0xFF;
-                    $g = ($rgb >> 8) & 0xFF;
-                    $b = $rgb & 0xFF;
-                    $row[] = sprintf('#%02X%02X%02X', $r, $g, $b);
-                }
-            }
-            $pixels[] = $row;
-        }
-        imagedestroy($pixelImg);
 
         return response()->json([
-            'pixels' => $pixels,
-            'model' => 'black-forest-labs/flux-dev',
+            'pixels' => $result['pixels'],
+            'model' => $result['model'] ?? 'local-stable-diffusion',
         ]);
     }
 }

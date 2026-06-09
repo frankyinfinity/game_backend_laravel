@@ -41,10 +41,10 @@
                         <a class="nav-link" id="graphics-current-image-tab-{{$modelType}}" data-toggle="pill" href="#graphics-current-image-{{$modelType}}" role="tab"
                             aria-controls="graphics-current-image-{{$modelType}}" aria-selected="false">Immagine Attuale</a>
                     </li>
-                    <li class="nav-item">
+                    {{--<li class="nav-item">
                         <a class="nav-link" id="graphics-ai-tab-{{$modelType}}" data-toggle="pill" href="#graphics-ai-{{$modelType}}" role="tab"
                             aria-controls="graphics-ai-{{$modelType}}" aria-selected="false">AI</a>
-                    </li>
+                    </li> --}}
                 </ul>
             </div>
             <div class="card-body">
@@ -109,6 +109,21 @@
                                 <label class="form-check-label" for="grid-toggle-{{$modelType}}">
                                     Mostra Griglia
                                 </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Sposta Pixel</label>
+                            <div class="direction-pad" id="direction-pad-{{$modelType}}">
+                                <button type="button" class="btn-dir btn-dir-diag" data-dir="up-left" title="Su-Sinistra"><i class="fas fa-arrow-up"></i><i class="fas fa-arrow-left"></i></button>
+                                <button type="button" class="btn-dir btn-dir-vert" data-dir="up" title="Su"><i class="fas fa-arrow-up"></i></button>
+                                <button type="button" class="btn-dir btn-dir-diag" data-dir="up-right" title="Su-Destra"><i class="fas fa-arrow-up"></i><i class="fas fa-arrow-right"></i></button>
+                                <button type="button" class="btn-dir btn-dir-horiz" data-dir="left" title="Sinistra"><i class="fas fa-arrow-left"></i></button>
+                                <button type="button" class="btn-dir btn-dir-center" data-dir="center" title="Centro" disabled><i class="fas fa-arrows-alt"></i></button>
+                                <button type="button" class="btn-dir btn-dir-horiz" data-dir="right" title="Destra"><i class="fas fa-arrow-right"></i></button>
+                                <button type="button" class="btn-dir btn-dir-diag" data-dir="down-left" title="Giù-Sinistra"><i class="fas fa-arrow-down"></i><i class="fas fa-arrow-left"></i></button>
+                                <button type="button" class="btn-dir btn-dir-vert" data-dir="down" title="Giù"><i class="fas fa-arrow-down"></i></button>
+                                <button type="button" class="btn-dir btn-dir-diag" data-dir="down-right" title="Giù-Destra"><i class="fas fa-arrow-down"></i><i class="fas fa-arrow-right"></i></button>
                             </div>
                         </div>
 
@@ -196,6 +211,55 @@
     .card {
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .direction-pad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        max-width: 180px;
+        margin: 0 auto;
+    }
+
+    .btn-dir {
+        width: 50px;
+        height: 50px;
+        border: 1px solid #6c757d;
+        background-color: #e9ecef;
+        color: #495057;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        font-size: 14px;
+        padding: 0;
+    }
+
+    .btn-dir:hover:not(:disabled) {
+        background-color: #6c757d;
+        color: #fff;
+        border-color: #6c757d;
+    }
+
+    .btn-dir:active:not(:disabled) {
+        background-color: #495057;
+        color: #fff;
+        transform: scale(0.93);
+    }
+
+    .btn-dir:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .btn-dir i {
+        font-size: 12px;
+    }
+
+    .btn-dir-diag i {
+        font-size: 9px;
     }
 </style>
 
@@ -524,6 +588,73 @@ document.addEventListener('DOMContentLoaded', function() {
                     btnAiGenerate.innerHTML = originalHtml;
                 }
             }
+        });
+    }
+
+    // Direction pad: shift all pixels
+    const directionPad = document.getElementById('direction-pad-' + modelType);
+    if (directionPad) {
+        directionPad.querySelectorAll('.btn-dir[data-dir]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const dir = btn.dataset.dir;
+                if (dir === 'center') return;
+
+                // Read current pixel data from the 32x32 grid
+                const imageData = ctx.getImageData(0, 0, canvasSize, canvasSize);
+                const data = imageData.data;
+
+                // Build a 32x32 array of pixel colors by sampling the center of each cell (null = transparent)
+                const pixels = [];
+                for (let y = 0; y < pixelSize; y++) {
+                    pixels[y] = [];
+                    for (let x = 0; x < pixelSize; x++) {
+                        // Sample from the center of each cell
+                        const cx = x * cellSize + Math.floor(cellSize / 2);
+                        const cy = y * cellSize + Math.floor(cellSize / 2);
+                        const i = (cy * canvasSize + cx) * 4;
+                        const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+                        pixels[y][x] = (a > 0) ? { r, g, b, a } : null;
+                    }
+                }
+
+                // Compute direction offsets
+                let dx = 0, dy = 0;
+                if (dir.includes('left'))  dx = -1;
+                if (dir.includes('right')) dx = 1;
+                if (dir.includes('up'))    dy = -1;
+                if (dir.includes('down'))  dy = 1;
+
+                // Create new shifted pixel array
+                const newPixels = [];
+                for (let y = 0; y < pixelSize; y++) {
+                    newPixels[y] = [];
+                    for (let x = 0; x < pixelSize; x++) {
+                        const srcX = x - dx;
+                        const srcY = y - dy;
+                        if (srcX >= 0 && srcX < pixelSize && srcY >= 0 && srcY < pixelSize) {
+                            newPixels[y][x] = pixels[srcY][srcX];
+                        } else {
+                            newPixels[y][x] = null;
+                        }
+                    }
+                }
+
+                // Redraw canvas with shifted pixels
+                ctx.clearRect(0, 0, canvasSize, canvasSize);
+                for (let y = 0; y < pixelSize; y++) {
+                    for (let x = 0; x < pixelSize; x++) {
+                        const px = newPixels[y][x];
+                        if (px) {
+                            ctx.fillStyle = `rgba(${px.r},${px.g},${px.b},${px.a / 255})`;
+                            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                        }
+                    }
+                }
+
+                hasGraphicsChanges = true;
+                updatePreview();
+                saveState();
+            });
         });
     }
 
