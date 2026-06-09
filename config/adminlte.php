@@ -471,7 +471,12 @@ return [
                     'text' => 'Container',
                     'url'  => '/containers',
                     'icon' => 'fas fa-boxes',
-                ]
+                ],
+                [
+                    'text' => 'WebSocket',
+                    'url'  => '/websocket',
+                    'icon' => 'fas fa-bolt',
+                ],
             ]
         ],
         [

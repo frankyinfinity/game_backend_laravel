@@ -31,6 +31,11 @@ Route::group(['middleware' => ['auth']], function () {
     //Broadcasting
     Route::post('/broadcasting/auth', [App\Http\Controllers\BroadcastingController::class, 'auth']);
 
+    //WebSocket
+    Route::get('/websocket', [App\Http\Controllers\WebSocketController::class, 'index'])->name('websocket.index');
+    Route::post('/websocket/list/table', [App\Http\Controllers\WebSocketController::class, 'listPlayersDataTable'])->name('websocket.players.datatable');
+    Route::get('/websocket/{player}', [App\Http\Controllers\WebSocketController::class, 'show'])->name('websocket.show')->whereNumber('player');
+
     //Container
     Route::get('/containers', [App\Http\Controllers\ContainerController::class, 'index'])->name('containers.index');
     Route::post('/containers/list/table', [App\Http\Controllers\ContainerController::class, 'listPlayersDataTable'])->name('containers.players.datatable');
