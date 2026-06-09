@@ -286,9 +286,12 @@ class EntityDraw
         
         foreach($chimicalElements as $entityChimicalElement) {
             $barChimicalElement = new BarChimicalElementDraw($entityChimicalElement);
-            $chimicalElementId = $entityChimicalElement->playerRuleChimicalElement->chimical_element_id ?? null;
-            if ($chimicalElementId && file_exists(public_path('storage/chimical_elements/' . $chimicalElementId . '.png'))) {
-                $barChimicalElement->setImagePath('/storage/chimical_elements/' . $chimicalElementId . '.png');
+            $rule = $entityChimicalElement->playerRuleChimicalElement;
+            $complexId = $rule->complex_chimical_element_id ?? null;
+            if ($complexId && file_exists(public_path('storage/complex_chimical_elements/' . $complexId . '.png'))) {
+                $barChimicalElement->setImagePath('/storage/complex_chimical_elements/' . $complexId . '.png');
+            } elseif (($rule->chimical_element_id ?? null) && file_exists(public_path('storage/chimical_elements/' . $rule->chimical_element_id . '.png'))) {
+                $barChimicalElement->setImagePath('/storage/chimical_elements/' . $rule->chimical_element_id . '.png');
             }
             $barChimicalElement->setWidth(380);
             $barChimicalElement->setOrigin($panelX, $panelY);

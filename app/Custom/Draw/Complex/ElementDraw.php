@@ -354,9 +354,12 @@ class ElementDraw
 
             foreach ($elementHasPositionChimicalElements as $chimicalElement) {
                 $barDraw = new BarChimicalElementDraw($chimicalElement);
-                $chimicalElementId = $chimicalElement->elementHasPositionRuleChimicalElement->chimical_element_id ?? null;
-                if ($chimicalElementId && file_exists(public_path('storage/chimical_elements/' . $chimicalElementId . '.png'))) {
-                    $barDraw->setImagePath('/storage/chimical_elements/' . $chimicalElementId . '.png');
+                $rule = $chimicalElement->elementHasPositionRuleChimicalElement;
+                $complexId = $rule->complex_chimical_element_id ?? null;
+                if ($complexId && file_exists(public_path('storage/complex_chimical_elements/' . $complexId . '.png'))) {
+                    $barDraw->setImagePath('/storage/complex_chimical_elements/' . $complexId . '.png');
+                } elseif (($rule->chimical_element_id ?? null) && file_exists(public_path('storage/chimical_elements/' . $rule->chimical_element_id . '.png'))) {
+                    $barDraw->setImagePath('/storage/chimical_elements/' . $rule->chimical_element_id . '.png');
                 }
                 $barDraw->setWidth(380);
                 $barDraw->setOrigin($panelX + 10, $barY + 20); // Add offset for title

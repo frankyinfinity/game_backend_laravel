@@ -24,6 +24,7 @@
             <div class="card-body text-center" style="background-color: #f4f6f9;">
                 <div id="pixel-editor-container-{{$modelType}}" style="display: inline-block; position: relative; border: 1px solid #ccc; line-height: 0;">
                     <canvas id="pixel-canvas-{{$modelType}}" width="512" height="512" style="image-rendering: pixelated; cursor: crosshair; display: block;"></canvas>
+                    <canvas id="shape-preview-canvas-{{$modelType}}" width="512" height="512" style="position: absolute; top: 0; left: 0; pointer-events: none; display: block;"></canvas>
                     <canvas id="grid-canvas-{{$modelType}}" width="512" height="512" style="position: absolute; top: 0; left: 0; pointer-events: none; display: block;"></canvas>
                 </div>
             </div>
@@ -41,10 +42,6 @@
                         <a class="nav-link" id="graphics-current-image-tab-{{$modelType}}" data-toggle="pill" href="#graphics-current-image-{{$modelType}}" role="tab"
                             aria-controls="graphics-current-image-{{$modelType}}" aria-selected="false">Immagine Attuale</a>
                     </li>
-                    {{--<li class="nav-item">
-                        <a class="nav-link" id="graphics-ai-tab-{{$modelType}}" data-toggle="pill" href="#graphics-ai-{{$modelType}}" role="tab"
-                            aria-controls="graphics-ai-{{$modelType}}" aria-selected="false">AI</a>
-                    </li> --}}
                 </ul>
             </div>
             <div class="card-body">
@@ -101,6 +98,34 @@
                                     <i class="fas fa-fill-drip"></i> Riempimento
                                 </label>
                             </div>
+                            <div class="btn-group btn-group-toggle d-flex mt-2" data-toggle="buttons">
+                                <label class="btn btn-info flex-fill">
+                                    <input type="radio" name="editor-tool-{{$modelType}}" id="tool-line-{{$modelType}}" autocomplete="off">
+                                    <i class="fas fa-minus"></i> Linea
+                                </label>
+                                <label class="btn btn-info flex-fill">
+                                    <input type="radio" name="editor-tool-{{$modelType}}" id="tool-rect-{{$modelType}}" autocomplete="off">
+                                    <i class="far fa-square"></i> Rettangolo
+                                </label>
+                                <label class="btn btn-info flex-fill">
+                                    <input type="radio" name="editor-tool-{{$modelType}}" id="tool-circle-{{$modelType}}" autocomplete="off">
+                                    <i class="far fa-circle"></i> Cerchio
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="brush-size-group-{{$modelType}}">
+                            <label>Dimensione Pennello: <strong id="brush-size-label-{{$modelType}}">1</strong>px</label>
+                            <input type="range" class="custom-range" id="brush-size-{{$modelType}}" min="1" max="8" value="1">
+                        </div>
+
+                        <div class="form-group" id="shape-option-group-{{$modelType}}" style="display: none;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="shape-filled-{{$modelType}}">
+                                <label class="form-check-label" for="shape-filled-{{$modelType}}">
+                                    Riempito
+                                </label>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -154,16 +179,6 @@
                         @else
                             <p class="text-muted">Nessuna immagine salvata</p>
                         @endif
-                    </div>
-
-                    <div class="tab-pane fade" id="graphics-ai-{{$modelType}}" role="tabpanel" aria-labelledby="graphics-ai-tab-{{$modelType}}">
-                        <div class="form-group">
-                            <label for="graphics-ai-prompt-{{$modelType}}">Prompt</label>
-                            <textarea class="form-control" id="graphics-ai-prompt-{{$modelType}}" rows="5"></textarea>
-                        </div>
-                        <button type="button" class="btn btn-primary" id="btn-ai-generate-{{$modelType}}">
-                            <i class="fas fa-paper-plane"></i> Invia
-                        </button>
                     </div>
                 </div>
             </div>
@@ -276,6 +291,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const gridCanvas = document.getElementById('grid-canvas-' + modelType);
     const gridCtx = gridCanvas.getContext('2d');
 
+    const shapePreviewCanvas = document.getElementById('shape-preview-canvas-' + modelType);
+    const shapePreviewCtx = shapePreviewCanvas.getContext('2d');
+
     const previewCanvas = document.getElementById('preview-canvas-' + modelType);
     const previewCtx = previewCanvas.getContext('2d');
 
@@ -285,14 +303,50 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnUndo = document.getElementById('btn-undo-' + modelType);
     const btnRedo = document.getElementById('btn-redo-' + modelType);
     const gridToggle = document.getElementById('grid-toggle-' + modelType);
-    const aiPrompt = document.getElementById('graphics-ai-prompt-' + modelType);
-    const btnAiGenerate = document.getElementById('btn-ai-generate-' + modelType);
+    const brushSizeInput = document.getElementById('brush-size-' + modelType);
+    const brushSizeLabel = document.getElementById('brush-size-label-' + modelType);
+    const brushSizeGroup = document.getElementById('brush-size-group-' + modelType);
+    const shapeOptionGroup = document.getElementById('shape-option-group-' + modelType);
+    const shapeFilledCheck = document.getElementById('shape-filled-' + modelType);
 
     let isDrawing = false;
     let hasGraphicsChanges = false;
     let history = [];
     let historyIndex = -1;
     let gridVisible = true;
+
+    // Shape drawing state
+    let shapeStartX = 0;
+    let shapeStartY = 0;
+
+    // Current tool helpers
+    function getActiveTool() {
+        const checked = document.querySelector('input[name="editor-tool-' + modelType + '"]:checked');
+        return checked ? checked.id : '';
+    }
+
+    function isShapeTool(tool) {
+        return tool === 'tool-line-' + modelType || tool === 'tool-rect-' + modelType || tool === 'tool-circle-' + modelType;
+    }
+
+    // Show/hide brush size and shape options based on active tool
+    function updateToolOptions() {
+        const tool = getActiveTool();
+        const isBrush = (tool === 'tool-pencil-' + modelType || tool === 'tool-eraser-' + modelType);
+        brushSizeGroup.style.display = isBrush ? '' : 'none';
+        shapeOptionGroup.style.display = isShapeTool(tool) ? '' : 'none';
+    }
+
+    document.querySelectorAll('input[name="editor-tool-' + modelType + '"]').forEach(radio => {
+        radio.addEventListener('change', updateToolOptions);
+    });
+    updateToolOptions();
+
+    if (brushSizeInput) {
+        brushSizeInput.addEventListener('input', () => {
+            brushSizeLabel.textContent = brushSizeInput.value;
+        });
+    }
 
     // Initialize canvases
     function initCanvases() {
@@ -303,12 +357,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function saveState() {
-        // Remove any history after current index
         history = history.slice(0, historyIndex + 1);
-        // Add current state
         history.push(ctx.getImageData(0, 0, canvasSize, canvasSize));
         historyIndex++;
-        // Limit history to 50 states
         if (history.length > 50) {
             history.shift();
             historyIndex--;
@@ -375,13 +426,31 @@ document.addEventListener('DOMContentLoaded', function() {
     function drawPixel(x, y) {
         if (x < 0 || x >= pixelSize || y < 0 || y >= pixelSize) return;
 
-        const tool = document.querySelector('input[name="editor-tool-' + modelType + '"]:checked').id;
+        const tool = getActiveTool();
+        const brushSize = parseInt(brushSizeInput.value) || 1;
+        const half = Math.floor(brushSize / 2);
 
         if (tool === 'tool-pencil-' + modelType) {
             ctx.fillStyle = colorPicker.value;
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            for (let dy = -half; dy < brushSize - half; dy++) {
+                for (let dx = -half; dx < brushSize - half; dx++) {
+                    const px = x + dx;
+                    const py = y + dy;
+                    if (px >= 0 && px < pixelSize && py >= 0 && py < pixelSize) {
+                        ctx.fillRect(px * cellSize, py * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
         } else if (tool === 'tool-eraser-' + modelType) {
-            ctx.clearRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            for (let dy = -half; dy < brushSize - half; dy++) {
+                for (let dx = -half; dx < brushSize - half; dx++) {
+                    const px = x + dx;
+                    const py = y + dy;
+                    if (px >= 0 && px < pixelSize && py >= 0 && py < pixelSize) {
+                        ctx.clearRect(px * cellSize, py * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
         }
 
         hasGraphicsChanges = true;
@@ -419,13 +488,125 @@ document.addEventListener('DOMContentLoaded', function() {
         saveState();
     }
 
+    // --- Shape drawing helpers ---
+    function clamp(val, min, max) {
+        return Math.max(min, Math.min(max, val));
+    }
+
+    function drawLineOnCtx(context, x0, y0, x1, y1, color, filled) {
+        // Bresenham line on pixel grid
+        x0 = clamp(x0, 0, pixelSize - 1);
+        y0 = clamp(y0, 0, pixelSize - 1);
+        x1 = clamp(x1, 0, pixelSize - 1);
+        y1 = clamp(y1, 0, pixelSize - 1);
+
+        context.fillStyle = color;
+        let dx = Math.abs(x1 - x0);
+        let dy = Math.abs(y1 - y0);
+        let sx = x0 < x1 ? 1 : -1;
+        let sy = y0 < y1 ? 1 : -1;
+        let err = dx - dy;
+
+        while (true) {
+            context.fillRect(x0 * cellSize, y0 * cellSize, cellSize, cellSize);
+            if (x0 === x1 && y0 === y1) break;
+            let e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+    }
+
+    function drawRectOnCtx(context, x0, y0, x1, y1, color, filled) {
+        const minX = clamp(Math.min(x0, x1), 0, pixelSize - 1);
+        const maxX = clamp(Math.max(x0, x1), 0, pixelSize - 1);
+        const minY = clamp(Math.min(y0, y1), 0, pixelSize - 1);
+        const maxY = clamp(Math.max(y0, y1), 0, pixelSize - 1);
+
+        context.fillStyle = color;
+        if (filled) {
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    context.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        } else {
+            for (let x = minX; x <= maxX; x++) {
+                context.fillRect(x * cellSize, minY * cellSize, cellSize, cellSize);
+                context.fillRect(x * cellSize, maxY * cellSize, cellSize, cellSize);
+            }
+            for (let y = minY; y <= maxY; y++) {
+                context.fillRect(minX * cellSize, y * cellSize, cellSize, cellSize);
+                context.fillRect(maxX * cellSize, y * cellSize, cellSize, cellSize);
+            }
+        }
+    }
+
+    function drawCircleOnCtx(context, cx, cy, ex, ey, color, filled) {
+        // Midpoint circle algorithm
+        const radX = Math.abs(ex - cx);
+        const radY = Math.abs(ey - cy);
+        const r = Math.max(radX, radY);
+
+        let x = r;
+        let y = 0;
+        let d = 1 - r;
+
+        context.fillStyle = color;
+
+        function plotCirclePoints(cx, cy, x, y) {
+            const points = [
+                [cx + x, cy + y], [cx - x, cy + y],
+                [cx + x, cy - y], [cx - x, cy - y],
+                [cx + y, cy + x], [cx - y, cy + x],
+                [cx + y, cy - x], [cx - y, cy - x]
+            ];
+            points.forEach(([px, py]) => {
+                px = clamp(px, 0, pixelSize - 1);
+                py = clamp(py, 0, pixelSize - 1);
+                context.fillRect(px * cellSize, py * cellSize, cellSize, cellSize);
+            });
+        }
+
+        function fillCircleRow(cx, cy, x, y) {
+            for (let i = cx - x; i <= cx + x; i++) {
+                let px = clamp(i, 0, pixelSize - 1);
+                let py1 = clamp(cy + y, 0, pixelSize - 1);
+                let py2 = clamp(cy - y, 0, pixelSize - 1);
+                context.fillRect(px * cellSize, py1 * cellSize, cellSize, cellSize);
+                if (y !== 0) {
+                    context.fillRect(px * cellSize, py2 * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        while (x >= y) {
+            if (filled) {
+                fillCircleRow(cx, cy, x, y);
+            } else {
+                plotCirclePoints(cx, cy, x, y);
+            }
+            y++;
+            if (d <= 0) {
+                d += 2 * y + 1;
+            } else {
+                x--;
+                d += 2 * (y - x) + 1;
+            }
+        }
+    }
+
+    // --- Mouse events ---
     canvas.addEventListener('mousedown', (e) => {
         const coords = getPixelCoords(e);
-        const tool = document.querySelector('input[name="editor-tool-' + modelType + '"]:checked').id;
+        const tool = getActiveTool();
 
         if (tool === 'tool-fill-' + modelType) {
             fillAll(colorPicker.value);
             saveState();
+        } else if (isShapeTool(tool)) {
+            isDrawing = true;
+            shapeStartX = coords.x;
+            shapeStartY = coords.y;
         } else {
             isDrawing = true;
             drawPixel(coords.x, coords.y);
@@ -434,14 +615,59 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('mouseup', () => {
         if (isDrawing) {
-            saveState();
+            const tool = getActiveTool();
+            if (isShapeTool(tool)) {
+                // Shape already drawn on preview during drag; commit to main canvas
+                // The last preview draw is already on shapePreviewCtx; we need to
+                // get the final coords from the last mousemove or use shapeStartX/Y
+                // We store the last end coords in a variable
+                if (typeof lastShapeEndX !== 'undefined') {
+                    const color = colorPicker.value;
+                    const filled = shapeFilledCheck.checked;
+                    if (tool === 'tool-line-' + modelType) {
+                        drawLineOnCtx(ctx, shapeStartX, shapeStartY, lastShapeEndX, lastShapeEndY, color, filled);
+                    } else if (tool === 'tool-rect-' + modelType) {
+                        drawRectOnCtx(ctx, shapeStartX, shapeStartY, lastShapeEndX, lastShapeEndY, color, filled);
+                    } else if (tool === 'tool-circle-' + modelType) {
+                        drawCircleOnCtx(ctx, shapeStartX, shapeStartY, lastShapeEndX, lastShapeEndY, color, filled);
+                    }
+                }
+                shapePreviewCtx.clearRect(0, 0, canvasSize, canvasSize);
+                hasGraphicsChanges = true;
+                updatePreview();
+                saveState();
+            } else {
+                saveState();
+            }
         }
         isDrawing = false;
     });
 
+    let lastShapeEndX = 0;
+    let lastShapeEndY = 0;
+
     canvas.addEventListener('mousemove', (e) => {
-        if (isDrawing) {
-            const coords = getPixelCoords(e);
+        if (!isDrawing) return;
+        const coords = getPixelCoords(e);
+        const tool = getActiveTool();
+
+        if (isShapeTool(tool)) {
+            lastShapeEndX = coords.x;
+            lastShapeEndY = coords.y;
+
+            // Draw preview on overlay canvas
+            shapePreviewCtx.clearRect(0, 0, canvasSize, canvasSize);
+            const color = colorPicker.value;
+            const filled = shapeFilledCheck.checked;
+
+            if (tool === 'tool-line-' + modelType) {
+                drawLineOnCtx(shapePreviewCtx, shapeStartX, shapeStartY, coords.x, coords.y, color, filled);
+            } else if (tool === 'tool-rect-' + modelType) {
+                drawRectOnCtx(shapePreviewCtx, shapeStartX, shapeStartY, coords.x, coords.y, color, filled);
+            } else if (tool === 'tool-circle-' + modelType) {
+                drawCircleOnCtx(shapePreviewCtx, shapeStartX, shapeStartY, coords.x, coords.y, color, filled);
+            }
+        } else {
             drawPixel(coords.x, coords.y);
         }
     });
@@ -474,25 +700,20 @@ document.addEventListener('DOMContentLoaded', function() {
         btnLoadCurrent.addEventListener('click', () => {
             const currentImg = document.getElementById('current-image-' + modelType);
             const img = new Image();
-            // Use timestamp to avoid cache issues
             img.src = currentImg.src.split('?')[0] + '?t=' + new Date().getTime();
             img.crossOrigin = "Anonymous";
             img.onload = function() {
-                // Clear the main canvas
                 ctx.clearRect(0, 0, canvasSize, canvasSize);
 
-                // Create a temporary 32x32 canvas to get clean pixels
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = 32;
                 tempCanvas.height = 32;
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.drawImage(img, 0, 0, 32, 32);
 
-                // Get the image data
                 const imageData = tempCtx.getImageData(0, 0, 32, 32);
                 const data = imageData.data;
 
-                // Redraw on the big canvas pixel by pixel to ensure sharpness
                 for (let y = 0; y < 32; y++) {
                     for (let x = 0; x < 32; x++) {
                         const i = (y * 32 + x) * 4;
@@ -515,82 +736,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (btnAiGenerate) {
-        function startAiRetryCountdown(seconds, originalHtml) {
-            let remaining = Math.max(1, parseInt(seconds, 10));
-            btnAiGenerate.disabled = true;
-            btnAiGenerate.innerHTML = '<i class="fas fa-clock"></i> Riprova tra ' + remaining + 's';
-
-            const interval = setInterval(() => {
-                remaining--;
-
-                if (remaining <= 0) {
-                    clearInterval(interval);
-                    btnAiGenerate.disabled = false;
-                    btnAiGenerate.innerHTML = originalHtml;
-                    return;
-                }
-
-                btnAiGenerate.innerHTML = '<i class="fas fa-clock"></i> Riprova tra ' + remaining + 's';
-            }, 1000);
-        }
-
-        btnAiGenerate.addEventListener('click', async () => {
-            const prompt = aiPrompt.value.trim();
-
-            if (!prompt) {
-                toastr.warning('Inserisci un prompt.');
-                return;
-            }
-
-            const originalHtml = btnAiGenerate.innerHTML;
-            btnAiGenerate.disabled = true;
-            btnAiGenerate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generazione...';
-
-            try {
-                const response = await fetch('{{ route('graphics-editor.ai-generate') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: JSON.stringify({
-                        prompt: prompt,
-                        model_type: modelType,
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    if (response.status === 429) {
-                        const retryAfter = data.details?.error?.metadata?.retry_after_seconds
-                            || data.details?.error?.metadata?.headers?.['Retry-After'];
-
-                        if (retryAfter) {
-                            toastr.warning(data.message);
-                            startAiRetryCountdown(retryAfter, originalHtml);
-                            return;
-                        }
-                    }
-
-                    throw new Error(data.message || 'Errore durante la generazione AI.');
-                }
-
-                drawPixelMatrix(data.pixels);
-                toastr.success('Immagine generata sulla griglia.');
-            } catch (error) {
-                toastr.error(error.message);
-            } finally {
-                if (btnAiGenerate.innerHTML.includes('Generazione')) {
-                    btnAiGenerate.disabled = false;
-                    btnAiGenerate.innerHTML = originalHtml;
-                }
-            }
-        });
-    }
-
     // Direction pad: shift all pixels
     const directionPad = document.getElementById('direction-pad-' + modelType);
     if (directionPad) {
@@ -599,16 +744,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const dir = btn.dataset.dir;
                 if (dir === 'center') return;
 
-                // Read current pixel data from the 32x32 grid
                 const imageData = ctx.getImageData(0, 0, canvasSize, canvasSize);
                 const data = imageData.data;
 
-                // Build a 32x32 array of pixel colors by sampling the center of each cell (null = transparent)
                 const pixels = [];
                 for (let y = 0; y < pixelSize; y++) {
                     pixels[y] = [];
                     for (let x = 0; x < pixelSize; x++) {
-                        // Sample from the center of each cell
                         const cx = x * cellSize + Math.floor(cellSize / 2);
                         const cy = y * cellSize + Math.floor(cellSize / 2);
                         const i = (cy * canvasSize + cx) * 4;
@@ -617,14 +759,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Compute direction offsets
                 let dx = 0, dy = 0;
                 if (dir.includes('left'))  dx = -1;
                 if (dir.includes('right')) dx = 1;
                 if (dir.includes('up'))    dy = -1;
                 if (dir.includes('down'))  dy = 1;
 
-                // Create new shifted pixel array
                 const newPixels = [];
                 for (let y = 0; y < pixelSize; y++) {
                     newPixels[y] = [];
@@ -639,7 +779,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Redraw canvas with shifted pixels
                 ctx.clearRect(0, 0, canvasSize, canvasSize);
                 for (let y = 0; y < pixelSize; y++) {
                     for (let x = 0; x < pixelSize; x++) {
@@ -667,7 +806,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Avoid overwriting existing graphic when no change was made.
             if (hasGraphicsChanges) {
                 imageInput.value = previewCanvas.toDataURL('image/png');
             } else {
