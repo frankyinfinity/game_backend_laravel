@@ -6,7 +6,7 @@
 
 @section('content')
 <div class="card">
-    <div class="card-header pb-0">
+<div class="card-header pb-0">
         <h4 class="mb-0">WebSocket Players</h4>
     </div>
     <div class="card-body">

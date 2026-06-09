@@ -36,6 +36,12 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/websocket/list/table', [App\Http\Controllers\WebSocketController::class, 'listPlayersDataTable'])->name('websocket.players.datatable');
     Route::get('/websocket/{player}', [App\Http\Controllers\WebSocketController::class, 'show'])->name('websocket.show')->whereNumber('player');
 
+    //WebSocket Container Monitor
+    Route::get('/websocket-containers', [App\Http\Controllers\WebSocketContainerController::class, 'index'])->name('websocket.containers.index');
+    Route::get('/websocket-containers/list', [App\Http\Controllers\WebSocketContainerController::class, 'listContainersJson'])->name('websocket.containers.list');
+    Route::get('/websocket-containers/status', [App\Http\Controllers\WebSocketContainerController::class, 'containerStatusJson'])->name('websocket.containers.status');
+    Route::get('/websocket-containers/players', [App\Http\Controllers\WebSocketContainerController::class, 'listPlayers'])->name('websocket.containers.players');
+
     //Container
     Route::get('/containers', [App\Http\Controllers\ContainerController::class, 'index'])->name('containers.index');
     Route::post('/containers/list/table', [App\Http\Controllers\ContainerController::class, 'listPlayersDataTable'])->name('containers.players.datatable');
