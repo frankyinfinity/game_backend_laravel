@@ -7,8 +7,9 @@ use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Colors;
 use App\Helper\Helper;
+use App\Models\Gene;
 
-class ProgressBarDraw {
+class BarGeneDraw {
 
     private $uid;
     private $min = 0;

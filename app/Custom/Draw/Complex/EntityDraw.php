@@ -8,7 +8,7 @@ use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\Line;
-use App\Custom\Draw\Complex\ProgressBarDraw;
+use App\Custom\Draw\Complex\BarGeneDraw;
 use App\Helper\Helper;
 use App\Custom\Colors;
 use App\Models\Entity;
@@ -260,7 +260,7 @@ class EntityDraw
             $gene = $genome->gene;
             if($gene->type === 'dynamic_max') {
                
-                $progressBar = new ProgressBarDraw($dbEntity->uid.'_progress_bar_'.$gene->key);
+                $progressBar = new BarGeneDraw($dbEntity->uid.'_progress_bar_'.$gene->key, $gene);
                 $progressBar->setName($gene->name);
                 $progressBar->setMin($genome->min);
                 $progressBar->setMax($genome->max);

@@ -53,7 +53,7 @@ use App\Models\ElementModifier;
 use App\Models\ElementHasPositionChimicalElement;
 use App\Models\ElementHasPositionRuleChimicalElement;
 use App\Custom\Draw\Primitive\Square;
-use App\Custom\Draw\Complex\ProgressBarDraw;
+use App\Custom\Draw\Complex\BarGeneDraw;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Draw\Complex\ElementDraw;

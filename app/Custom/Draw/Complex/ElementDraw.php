@@ -14,7 +14,7 @@ use App\Custom\Draw\Primitive\Text;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Complex\Element\BrainPanelDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
-use App\Custom\Draw\Complex\ProgressBarDraw;
+use App\Custom\Draw\Complex\BarGeneDraw;
 use App\Custom\Draw\Complex\BarChimicalElementDraw;
 use App\Custom\Draw\Support\ScrollGroup;
 use App\Custom\Colors;
@@ -302,7 +302,7 @@ class ElementDraw
 
                 $progressBarUid = $elementHasPosition->uid . '_progress_bar_' . $gene->key;
 
-                $progressBar = new ProgressBarDraw($progressBarUid);
+                $progressBar = new BarGeneDraw($progressBarUid, $gene);
                 $progressBar->setName($gene->name);
                 $progressBar->setValue($elementHasPositionInformation->value);
                 $progressBar->setMin($elementHasPositionInformation->min);
