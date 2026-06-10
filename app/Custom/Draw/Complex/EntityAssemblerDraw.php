@@ -1878,7 +1878,7 @@ class EntityAssemblerDraw
 
         // Wider than the main modal to host badges on the right
         $modalWidth = 1560;
-        $modalHeight = 680;
+        $modalHeight = 750;
         $modalX = 20;
         $modalY = 20;
 
@@ -1944,6 +1944,18 @@ class EntityAssemblerDraw
         $body->addChild($title);
         $this->drawItems[] = $title;
 
+        $instructionText = new Text($addModalUid . "_instruction_text");
+        $instructionText->setOrigin($modalX + 20, $modalY + $headerHeight + 12);
+        $instructionText->setText(
+            "Seleziona un'ancora a sinistra e una a destra per creare il collegamento",
+        );
+        $instructionText->setColor(0x333333);
+        $instructionText->setFontSize(14);
+        $instructionText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $instructionText->setRenderable(false);
+        $instructionText->addAttributes("z_index", 100011);
+        $this->drawItems[] = $instructionText;
+
         // Close button
         $closeSize = 28;
         $closeX = $modalX + $modalWidth - $closeSize - 12;
@@ -1988,9 +2000,9 @@ class EntityAssemblerDraw
         // Two halves background
         $contentPadding = 20;
         $contentX = $modalX + $contentPadding;
-        $contentY = $modalY + $headerHeight + $contentPadding;
+        $contentY = $modalY + $headerHeight + 34;
         $contentWidth = $modalWidth - $contentPadding * 2;
-        $contentHeight = $modalHeight - $headerHeight - $contentPadding * 2;
+        $contentHeight = 580;
         $leftPanelWidth = 620;
         $rightPanelWidth = $contentWidth - $leftPanelWidth - 20;
 
@@ -2211,6 +2223,84 @@ class EntityAssemblerDraw
         $rightGridBorderRight->setRenderable(false);
         $rightGridBorderRight->addAttributes("z_index", 100042);
         $this->drawItems[] = $rightGridBorderRight;
+
+        $buttonsY = $modalY + $modalHeight - 58;
+        $buttonHeight = 36;
+        $confirmButtonWidth = 120;
+        $previewButtonWidth = 120;
+        $cancelButtonWidth = 120;
+        $buttonsStartX = $contentX;
+
+        $confirmRect = new Rectangle($addModalUid . "_confirm_button_rect");
+        $confirmRect->setOrigin($buttonsStartX, $buttonsY);
+        $confirmRect->setSize($confirmButtonWidth, $buttonHeight);
+        $confirmRect->setColor(0x0a8f2f);
+        $confirmRect->setBorderRadius(6);
+        $confirmRect->setRenderable(false);
+        $confirmRect->addAttributes("z_index", 100060);
+        $this->drawItems[] = $confirmRect;
+
+        $confirmText = new Text($addModalUid . "_confirm_button_text");
+        $confirmText->setCenterAnchor(true);
+        $confirmText->setOrigin(
+            $buttonsStartX + (int) floor($confirmButtonWidth / 2),
+            $buttonsY + (int) floor($buttonHeight / 2),
+        );
+        $confirmText->setText("Conferma");
+        $confirmText->setColor(0xffffff);
+        $confirmText->setFontSize(14);
+        $confirmText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $confirmText->setRenderable(false);
+        $confirmText->addAttributes("z_index", 100061);
+        $this->drawItems[] = $confirmText;
+
+        $previewX = $buttonsStartX + $confirmButtonWidth + 12;
+        $previewRect = new Rectangle($addModalUid . "_preview_button_rect");
+        $previewRect->setOrigin($previewX, $buttonsY);
+        $previewRect->setSize($previewButtonWidth, $buttonHeight);
+        $previewRect->setColor(0x0b5ed7);
+        $previewRect->setBorderRadius(6);
+        $previewRect->setRenderable(false);
+        $previewRect->addAttributes("z_index", 100060);
+        $this->drawItems[] = $previewRect;
+
+        $previewText = new Text($addModalUid . "_preview_button_text");
+        $previewText->setCenterAnchor(true);
+        $previewText->setOrigin(
+            $previewX + (int) floor($previewButtonWidth / 2),
+            $buttonsY + (int) floor($buttonHeight / 2),
+        );
+        $previewText->setText("Preview");
+        $previewText->setColor(0xffffff);
+        $previewText->setFontSize(14);
+        $previewText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $previewText->setRenderable(false);
+        $previewText->addAttributes("z_index", 100061);
+        $this->drawItems[] = $previewText;
+
+        $cancelX = $previewX + $previewButtonWidth + 12;
+        $cancelRect = new Rectangle($addModalUid . "_cancel_button_rect");
+        $cancelRect->setOrigin($cancelX, $buttonsY);
+        $cancelRect->setSize($cancelButtonWidth, $buttonHeight);
+        $cancelRect->setColor(0x6c757d);
+        $cancelRect->setBorderRadius(6);
+        $cancelRect->setRenderable(false);
+        $cancelRect->addAttributes("z_index", 100060);
+        $this->drawItems[] = $cancelRect;
+
+        $cancelText = new Text($addModalUid . "_cancel_button_text");
+        $cancelText->setCenterAnchor(true);
+        $cancelText->setOrigin(
+            $cancelX + (int) floor($cancelButtonWidth / 2),
+            $buttonsY + (int) floor($buttonHeight / 2),
+        );
+        $cancelText->setText("Annulla");
+        $cancelText->setColor(0xffffff);
+        $cancelText->setFontSize(14);
+        $cancelText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $cancelText->setRenderable(false);
+        $cancelText->addAttributes("z_index", 100061);
+        $this->drawItems[] = $cancelText;
 
         // Generate JS for opening/closing the add component modal and populating its grids
         $addModalJs = file_get_contents(

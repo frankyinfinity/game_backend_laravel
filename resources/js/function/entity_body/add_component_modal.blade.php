@@ -6,6 +6,9 @@
     var disabledMainModalInteractivity = [];
     var componentBadgesContainer = null;
     var badgeTooltipElement = null;
+    var anchorTooltipElement = null;
+    var selectedLinkAnchors = { left: null, right: null };
+    var linkPreviewLine = null;
     var addModalBorderShapes = {
         left: [],
         right: []
@@ -40,6 +43,137 @@
 
             shape.eventMode = 'none';
             shape.cursor = 'default';
+        });
+    }
+
+    function ensureAnchorTooltipElement() {
+        if (anchorTooltipElement) return anchorTooltipElement;
+
+        anchorTooltipElement = document.createElement('div');
+        anchorTooltipElement.style.position = 'absolute';
+        anchorTooltipElement.style.zIndex = '130000';
+        anchorTooltipElement.style.display = 'none';
+        anchorTooltipElement.style.pointerEvents = 'none';
+        anchorTooltipElement.style.whiteSpace = 'pre-line';
+        anchorTooltipElement.style.background = '#ffffff';
+        anchorTooltipElement.style.border = '1px solid #000';
+        anchorTooltipElement.style.borderRadius = '6px';
+        anchorTooltipElement.style.padding = '6px 8px';
+        anchorTooltipElement.style.fontFamily = 'Arial';
+        anchorTooltipElement.style.fontSize = '12px';
+        anchorTooltipElement.style.color = '#000';
+        document.body.appendChild(anchorTooltipElement);
+        return anchorTooltipElement;
+    }
+
+    function hideAnchorTooltip() {
+        if (anchorTooltipElement) {
+            anchorTooltipElement.style.display = 'none';
+            anchorTooltipElement.textContent = '';
+        }
+    }
+
+    function clearLinkPreview() {
+        selectedLinkAnchors = { left: null, right: null };
+        if (linkPreviewLine) {
+            if (linkPreviewLine.parent) linkPreviewLine.parent.removeChild(linkPreviewLine);
+            if (typeof linkPreviewLine.destroy === 'function') linkPreviewLine.destroy();
+            linkPreviewLine = null;
+        }
+        ['confirm_button_rect', 'confirm_button_text', 'preview_button_rect', 'preview_button_text', 'cancel_button_rect', 'cancel_button_text'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + '_' + suffix];
+            if (shape) shape.renderable = false;
+            if (objects[addModalUid + '_' + suffix] && objects[addModalUid + '_' + suffix].attributes) {
+                objects[addModalUid + '_' + suffix].attributes.renderable = false;
+            }
+        });
+    }
+
+    function drawLinkPreviewLine() {
+        if (!selectedLinkAnchors.left || !selectedLinkAnchors.right) return;
+
+        if (linkPreviewLine) {
+            if (linkPreviewLine.parent) linkPreviewLine.parent.removeChild(linkPreviewLine);
+            if (typeof linkPreviewLine.destroy === 'function') linkPreviewLine.destroy();
+        }
+
+        var x1 = selectedLinkAnchors.left.x;
+        var y1 = selectedLinkAnchors.left.y;
+        var x2 = selectedLinkAnchors.right.x;
+        var y2 = selectedLinkAnchors.right.y;
+        var dx = x2 - x1;
+        var dy = y2 - y1;
+        var distance = Math.sqrt((dx * dx) + (dy * dy));
+        var dashLength = 8;
+        var gapLength = 6;
+        var step = dashLength + gapLength;
+
+        var line = new PIXI.Graphics();
+        line.lineStyle(2, 0x333333, 1);
+        for (var traveled = 0; traveled < distance; traveled += step) {
+            var startRatio = traveled / distance;
+            var endRatio = Math.min(traveled + dashLength, distance) / distance;
+            var sx = x1 + (dx * startRatio);
+            var sy = y1 + (dy * startRatio);
+            var ex = x1 + (dx * endRatio);
+            var ey = y1 + (dy * endRatio);
+            line.moveTo(sx, sy);
+            line.lineTo(ex, ey);
+        }
+        line.zIndex = 125000;
+        app.stage.sortableChildren = true;
+        app.stage.addChild(line);
+        linkPreviewLine = line;
+
+        ['confirm_button_rect', 'confirm_button_text', 'preview_button_rect', 'preview_button_text', 'cancel_button_rect', 'cancel_button_text'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + '_' + suffix];
+            if (shape) shape.renderable = true;
+            if (objects[addModalUid + '_' + suffix] && objects[addModalUid + '_' + suffix].attributes) {
+                objects[addModalUid + '_' + suffix].attributes.renderable = true;
+            }
+        });
+    }
+
+    function setupAnchorInteractions(side, anchors) {
+        (anchors || []).forEach(function(anchor) {
+            var cellUid = addModalUid + '_' + side + '_cell_' + anchor.y + '_' + anchor.x;
+            var cellShape = shapes[cellUid];
+            if (!cellShape) return;
+
+            cellShape.eventMode = 'static';
+            cellShape.cursor = 'pointer';
+            if (typeof cellShape.removeAllListeners === 'function') {
+                cellShape.removeAllListeners('pointerover');
+                cellShape.removeAllListeners('pointerout');
+                cellShape.removeAllListeners('pointerdown');
+            }
+
+            cellShape.on('pointerover', function() {
+                var tooltip = ensureAnchorTooltipElement();
+                var rect = app.renderer.view.getBoundingClientRect();
+                tooltip.textContent = '#' + anchor.id + ' (X: ' + anchor.x + ' - Y: ' + anchor.y + ')';
+                tooltip.style.left = (rect.left + cellShape.x) + 'px';
+                tooltip.style.top = (rect.top + cellShape.y - 28) + 'px';
+                tooltip.style.display = 'block';
+            });
+
+            cellShape.on('pointerout', function() {
+                hideAnchorTooltip();
+            });
+
+            cellShape.on('pointerdown', function() {
+                selectedLinkAnchors[side] = {
+                    id: anchor.id,
+                    x: cellShape.x + (cellShape.width / 2),
+                    y: cellShape.y + (cellShape.height / 2),
+                    side: side,
+                    anchor: anchor
+                };
+
+                if (selectedLinkAnchors.left && selectedLinkAnchors.right) {
+                    drawLinkPreviewLine();
+                }
+            });
         });
     }
 
@@ -236,6 +370,8 @@
         if (body) body.renderable = false;
         if (header) header.renderable = false;
         if (title) title.renderable = false;
+        var instructionText = shapes[addModalUid + '_instruction_text'];
+        if (instructionText) instructionText.renderable = false;
         if (closeButton) closeButton.renderable = false;
         if (closeText) closeText.renderable = false;
         if (leftBg) leftBg.renderable = false;
@@ -249,6 +385,8 @@
         clearAddModalZoneBorders('left');
         clearAddModalZoneBorders('right');
         hideComponentBadges();
+        hideAnchorTooltip();
+        clearLinkPreview();
         setMainModalInteractivityDisabled(false);
 
         var redrawMainZoneBorders = window['redrawZoneBorders_' + parentModalUid];
@@ -339,6 +477,8 @@
             hideTooltip();
         }
 
+        hideAnchorTooltip();
+        clearLinkPreview();
         setMainModalInteractivityDisabled(true);
 
         // Show modal elements
@@ -358,6 +498,8 @@
         if (body) body.renderable = true;
         if (header) header.renderable = true;
         if (title) title.renderable = true;
+        var instructionText = shapes[addModalUid + '_instruction_text'];
+        if (instructionText) instructionText.renderable = true;
         if (closeButton) closeButton.renderable = true;
         if (closeText) closeText.renderable = true;
         if (leftBg) leftBg.renderable = true;
@@ -380,6 +522,37 @@
                 var border = shapes[addModalUid + '_' + prefix + '_grid_border_' + side];
                 if (border) border.renderable = true;
             });
+        });
+
+        var confirmAction = function() { console.log('conferma link anchor', selectedLinkAnchors); };
+        var previewAction = function() { console.log('preview link anchor', selectedLinkAnchors); };
+        var cancelAction = function() { clearLinkPreview(); };
+        ['_confirm_button_rect', '_confirm_button_text'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + suffix];
+            if (shape) {
+                shape.eventMode = 'static';
+                shape.cursor = 'pointer';
+                if (typeof shape.removeAllListeners === 'function') shape.removeAllListeners('pointerdown');
+                shape.on('pointerdown', confirmAction);
+            }
+        });
+        ['_preview_button_rect', '_preview_button_text'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + suffix];
+            if (shape) {
+                shape.eventMode = 'static';
+                shape.cursor = 'pointer';
+                if (typeof shape.removeAllListeners === 'function') shape.removeAllListeners('pointerdown');
+                shape.on('pointerdown', previewAction);
+            }
+        });
+        ['_cancel_button_rect', '_cancel_button_text'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + suffix];
+            if (shape) {
+                shape.eventMode = 'static';
+                shape.cursor = 'pointer';
+                if (typeof shape.removeAllListeners === 'function') shape.removeAllListeners('pointerdown');
+                shape.on('pointerdown', cancelAction);
+            }
         });
 
         // Populate left grid with the CURRENT assembler grid state
@@ -409,6 +582,7 @@
         }
 
         drawZoneBordersForGrid('left', bodyPixels, 100045);
+        setupAnchorInteractions('left', bodyAnchors);
 
         // Populate right grid (EntityComponent)
         var componentPixels = selectedComponentData.pixels_json ? JSON.parse(selectedComponentData.pixels_json) : [];
@@ -439,6 +613,7 @@
         }
 
         drawZoneBordersForGrid('right', componentPixels, 100045);
+        setupAnchorInteractions('right', componentAnchors);
         showComponentBadges(selectedComponentData);
     };
 })();
