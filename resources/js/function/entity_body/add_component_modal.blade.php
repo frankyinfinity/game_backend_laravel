@@ -3,6 +3,10 @@
     var addModalUid = '__ADD_MODAL_UID__';
     var parentModalUid = '__MODAL_UID__';
     var selectedComponentData = null;
+    var baseMainGridPixels = [];
+    var baseMainGridPixelsInitialized = false;
+    var addedComponents = [];
+    var componentListContainer = null;
     var disabledMainModalInteractivity = [];
     var disabledAddModalInteractivity = [];
     var componentBadgesContainer = null;
@@ -10,6 +14,7 @@
     var anchorTooltipElement = null;
     var selectedLinkAnchors = { left: null, right: null };
     var linkPreviewLine = null;
+    var highlightedComponentIndex = null;
     var addModalBorderShapes = {
         left: [],
         right: []
@@ -122,6 +127,7 @@
     function openPreviewModal() {
         if (!selectedLinkAnchors.left || !selectedLinkAnchors.right) return;
 
+        if (componentListContainer) componentListContainer.style.display = 'none';
         hideAnchorTooltip();
         hideBadgeTooltip();
 
@@ -267,6 +273,124 @@
 
                 if (selectedLinkAnchors.left && selectedLinkAnchors.right) {
                     drawLinkPreviewLine();
+                }
+            });
+        });
+    }
+
+    function getBaseMainGridSnapshot() {
+        return baseMainGridPixels.slice();
+    }
+
+    function setComponentHighlight(index) {
+        highlightedComponentIndex = typeof index === 'number' ? index : null;
+        redrawAddedComponentsOnMainGrid();
+    }
+
+    function ensureComponentListContainer() {
+        if (componentListContainer) return componentListContainer;
+
+        componentListContainer = document.createElement('div');
+        componentListContainer.style.position = 'absolute';
+        componentListContainer.style.zIndex = '1000';
+        componentListContainer.style.display = 'none';
+        componentListContainer.style.background = 'transparent';
+        componentListContainer.style.border = 'none';
+        componentListContainer.style.borderRadius = '0';
+        componentListContainer.style.padding = '0';
+        componentListContainer.style.boxSizing = 'border-box';
+        componentListContainer.style.minWidth = '260px';
+        document.body.appendChild(componentListContainer);
+        return componentListContainer;
+    }
+
+    function renderAddedComponentsList() {
+        var container = ensureComponentListContainer();
+        var gridBg = shapes[parentModalUid + '_grid_bg'];
+        var canvasRect = app.renderer.view.getBoundingClientRect();
+        if (!gridBg || !addedComponents.length) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        container.style.left = (canvasRect.left + gridBg.x + gridBg.width + 8) + 'px';
+        container.style.top = (canvasRect.top + gridBg.y + 20) + 'px';
+        var rows = addedComponents.map(function(item, index) {
+            return '<tr data-component-row-index="' + index + '">' +
+                '<td style="padding:6px 8px;border-bottom:1px solid #ddd;">' + item.name + '</td>' +
+                '<td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;">' +
+                '<button type="button" data-remove-component-index="' + index + '" style="background:#c82333;color:#fff;border:1px solid #000;border-radius:4px;padding:2px 8px;cursor:pointer;">X</button>' +
+                '</td>' +
+                '</tr>';
+        }).join('');
+        container.innerHTML = '<div style="font-family:Arial;font-size:14px;font-weight:bold;margin-bottom:8px;">Componenti aggiunti</div>' +
+            '<table style="border-collapse:collapse;width:100%;font-family:Arial;font-size:12px;"><tbody>' + rows + '</tbody></table>';
+        container.style.display = 'block';
+
+        Array.prototype.forEach.call(container.querySelectorAll('[data-component-row-index]'), function(row) {
+            row.onmouseenter = function() {
+                var index = parseInt(row.getAttribute('data-component-row-index'), 10);
+                if (!isNaN(index)) {
+                    setComponentHighlight(index);
+                }
+            };
+            row.onmouseleave = function() {
+                setComponentHighlight(null);
+            };
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('[data-remove-component-index]'), function(btn) {
+            btn.onclick = function(event) {
+                event.stopPropagation();
+                var index = parseInt(btn.getAttribute('data-remove-component-index'), 10);
+                if (!isNaN(index)) {
+                    if (highlightedComponentIndex === index) {
+                        highlightedComponentIndex = null;
+                    }
+                    addedComponents.splice(index, 1);
+                    redrawAddedComponentsOnMainGrid();
+                    renderAddedComponentsList();
+                }
+            };
+        });
+    }
+
+    function redrawAddedComponentsOnMainGrid() {
+        for (var row = 0; row < 32; row++) {
+            for (var col = 0; col < 32; col++) {
+                var resetCell = shapes[parentModalUid + '_grid_cell_' + row + '_' + col];
+                if (resetCell) {
+                    resetCell.tint = 0xFFFFFF;
+                }
+            }
+        }
+
+        baseMainGridPixels.forEach(function(pixel) {
+            var baseCell = shapes[parentModalUid + '_grid_cell_' + pixel.y + '_' + pixel.x];
+            if (baseCell) {
+                baseCell.tint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+            }
+        });
+
+        addedComponents.forEach(function(item, itemIndex) {
+            (item.pixels || []).forEach(function(pixel) {
+                var targetX = pixel.x + item.dx;
+                var targetY = pixel.y + item.dy;
+                if (targetX < 0 || targetX > 31 || targetY < 0 || targetY > 31) return;
+                var cell = shapes[parentModalUid + '_grid_cell_' + targetY + '_' + targetX];
+                if (cell) {
+                    var tint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+                    if (highlightedComponentIndex === itemIndex) {
+                        var r = (tint >> 16) & 255;
+                        var g = (tint >> 8) & 255;
+                        var b = tint & 255;
+                        r = Math.min(255, Math.round((r * 0.65) + (255 * 0.35)));
+                        g = Math.min(255, Math.round((g * 0.65) + (213 * 0.35)));
+                        b = Math.min(255, Math.round((b * 0.65) + (79 * 0.35)));
+                        tint = (r << 16) | (g << 8) | b;
+                    }
+                    cell.tint = tint;
                 }
             });
         });
@@ -483,6 +607,7 @@
         hideAnchorTooltip();
         clearLinkPreview();
         closePreviewModal();
+        renderAddedComponentsList();
         setMainModalInteractivityDisabled(false);
 
         var redrawMainZoneBorders = window['redrawZoneBorders_' + parentModalUid];
@@ -576,6 +701,7 @@
         hideAnchorTooltip();
         clearLinkPreview();
         closePreviewModal();
+        if (componentListContainer) componentListContainer.style.display = 'none';
         setMainModalInteractivityDisabled(true);
 
         // Show modal elements
@@ -621,7 +747,21 @@
             });
         });
 
-        var confirmAction = function() { console.log('conferma link anchor', selectedLinkAnchors); };
+        var confirmAction = function() {
+            console.log('conferma link anchor', selectedLinkAnchors);
+            if (!selectedLinkAnchors.left || !selectedLinkAnchors.right || !selectedComponentData) return;
+            var dx = selectedLinkAnchors.left.anchor.x - selectedLinkAnchors.right.anchor.x;
+            var dy = selectedLinkAnchors.left.anchor.y - selectedLinkAnchors.right.anchor.y;
+            addedComponents.push({
+                name: selectedComponentData.name || 'Componente',
+                pixels: window.__addModalComponentPixels || [],
+                dx: dx,
+                dy: dy
+            });
+            redrawAddedComponentsOnMainGrid();
+            renderAddedComponentsList();
+            window['closeAddComponentModal_' + parentModalUid]();
+        };
         var previewAction = function() {
             console.log('preview link anchor', selectedLinkAnchors);
             openPreviewModal();
@@ -655,9 +795,46 @@
             }
         });
 
-        // Populate left grid with the CURRENT assembler grid state
-        var bodyPixels = assemblerGridSnapshot.pixels || [];
+        // Populate left grid with a real copy of the CURRENT main assembler grid state
+        if (!baseMainGridPixelsInitialized) {
+            baseMainGridPixels = [];
+        }
+        var bodyPixels = [];
         var bodyAnchors = assemblerGridSnapshot.anchors || [];
+        var snapshotPixels = assemblerGridSnapshot.pixels || [];
+
+        for (var sourceRow = 0; sourceRow < 32; sourceRow++) {
+            for (var sourceCol = 0; sourceCol < 32; sourceCol++) {
+                var mainCellUid = parentModalUid + '_grid_cell_' + sourceRow + '_' + sourceCol;
+                var mainCellShape = shapes[mainCellUid];
+                if (!mainCellShape) continue;
+                if (mainCellShape.tint === 0xFFFFFF) continue;
+
+                var existingPixel = snapshotPixels.find(function(p) {
+                    return p.x === sourceCol && p.y === sourceRow;
+                });
+
+                var copiedPixel = {
+                    x: sourceCol,
+                    y: sourceRow,
+                    tint: mainCellShape.tint,
+                    has_zone: existingPixel ? !!existingPixel.has_zone : false,
+                    zone_border_top: existingPixel ? !!existingPixel.zone_border_top : false,
+                    zone_border_bottom: existingPixel ? !!existingPixel.zone_border_bottom : false,
+                    zone_border_left: existingPixel ? !!existingPixel.zone_border_left : false,
+                    zone_border_right: existingPixel ? !!existingPixel.zone_border_right : false,
+                    zone_color: existingPixel ? existingPixel.zone_color : null,
+                    zone_name: existingPixel ? existingPixel.zone_name : null
+                };
+
+                bodyPixels.push(copiedPixel);
+                if (!baseMainGridPixelsInitialized) {
+                    baseMainGridPixels.push({ x: copiedPixel.x, y: copiedPixel.y, tint: copiedPixel.tint });
+                }
+
+
+            }
+        }
 
         for (var row = 0; row < 32; row++) {
             for (var col = 0; col < 32; col++) {
@@ -681,6 +858,7 @@
             }
         }
 
+        baseMainGridPixelsInitialized = true;
         window.__addModalBodyPixels = bodyPixels;
         drawZoneBordersForGrid('left', bodyPixels, 100045);
         setupAnchorInteractions('left', bodyAnchors);
