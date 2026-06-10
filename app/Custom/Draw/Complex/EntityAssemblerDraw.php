@@ -1371,10 +1371,26 @@ class EntityAssemblerDraw
             $templateInfoText->addAttributes('template_role', 'info_button_text');
             $templateInfoText->addAttributes('use_cell_tooltip', true);
 
+            $templateAddButton = new Rectangle('template_add_button');
+            $templateAddButton->setColor(0xE07B00);
+            $templateAddButton->setBorderRadius(3);
+            $templateAddButton->addAttributes('template_role', 'add_button_rect');
+            $templateAddButton->addAttributes('use_cell_tooltip', false);
+
+            $templateAddText = new Text('template_add_text');
+            $templateAddText->setText('Aggiungi');
+            $templateAddText->setColor(0x000000);
+            $templateAddText->setFontSize(10);
+            $templateAddText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+            $templateAddText->addAttributes('template_role', 'add_button_text');
+            $templateAddText->addAttributes('use_cell_tooltip', false);
+
             $templateWhiteSquare->addAttributes('template_role', 'component_frame');
             $templateImage->addAttributes('template_role', 'component_image');
             $templateGrid->addTemplate($templateInfoButton);
             $templateGrid->addTemplate($templateInfoText);
+            $templateGrid->addTemplate($templateAddButton);
+            $templateGrid->addTemplate($templateAddText);
         }
         $templateGrid->addTemplate($templateText);
         $templateGrid->addTemplate($templateWhiteSquare);

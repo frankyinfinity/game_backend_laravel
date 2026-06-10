@@ -120,7 +120,13 @@ class GridDraw
             $this->templates,
             fn($template) => (($template->buildJson()['attributes']['template_role'] ?? null) === 'info_button_rect')
         ));
-        $elementHeight = $hasInfoButtonTemplate ? ($elementWidth + 18) : $elementWidth;
+        $hasAddButtonTemplate = !empty(array_filter(
+            $this->templates,
+            fn($template) => (($template->buildJson()['attributes']['template_role'] ?? null) === 'add_button_rect')
+        ));
+        // Add extra height for the Aggiungi button below the Info button
+        $extraAddHeight = $hasAddButtonTemplate ? 22 : 0;
+        $elementHeight = $hasInfoButtonTemplate ? ($elementWidth + 18 + $extraAddHeight) : $elementWidth;
 
         // Calculate total rows and content height
         $totalElements = count($this->elementData);
@@ -209,8 +215,14 @@ class GridDraw
                     
                     $innerPadding = 4;
                     $hasInfoLayout = $hasInfoButtonTemplate;
-                    $textAreaHeight = $hasInfoLayout ? 34 : 22;
-                    $componentOffsetY = (($templateAttributes['template_role'] ?? null) === 'component_frame' || ($templateAttributes['template_role'] ?? null) === 'component_image') ? 24 : 0;
+                    $hasAddButtonTemplate = !empty(array_filter(
+                        $this->templates,
+                        fn($t) => (($t->buildJson()['attributes']['template_role'] ?? null) === 'add_button_rect')
+                    ));
+                    $textAreaHeight = ($hasInfoLayout || $hasAddButtonTemplate) ? 52 : 22;
+                    // Shift the image/frame further down when both the info and add buttons are present
+                    $extraOffsetForAddButton = ($hasInfoLayout && $hasAddButtonTemplate) ? 22 : 0;
+                    $componentOffsetY = (($templateAttributes['template_role'] ?? null) === 'component_frame' || ($templateAttributes['template_role'] ?? null) === 'component_image') ? (24 + $extraOffsetForAddButton) : 0;
 
                     if ($clonedElement instanceof Rectangle && $rectCount === 0) {
                         $rectCount++;
@@ -232,6 +244,16 @@ class GridDraw
                             (int)($infoButtonY + floor($infoButtonHeight / 2))
                         );
                         $clonedElement->setCenterAnchor(true);
+                    } elseif ($clonedElement instanceof Text && (($templateAttributes['template_role'] ?? null) === 'add_button_text')) {
+                        $addButtonWidth = (int)($containerW - (2 * $innerPadding));
+                        $addButtonHeight = 18;
+                        $addButtonX = (int)($cellX + $margin + $innerPadding);
+                        $addButtonY = (int)($cellY + $margin + $innerPadding - 2 + 20);
+                        $clonedElement->setOrigin(
+                            (int)($addButtonX + floor($addButtonWidth / 2)),
+                            (int)($addButtonY + floor($addButtonHeight / 2))
+                        );
+                        $clonedElement->setCenterAnchor(true);
                     } elseif ($clonedElement instanceof Text) {
                         $textX = $hasSymbol ? 24 : 6;
                         $clonedElement->setOrigin(
@@ -247,6 +269,15 @@ class GridDraw
                             $infoButtonY = (int)($cellY + $margin + $innerPadding - 2);
                             $clonedElement->setOrigin($infoButtonX, $infoButtonY);
                             $clonedElement->setSize($infoButtonWidth, $infoButtonHeight);
+                        } elseif (($templateAttributes['template_role'] ?? null) === 'add_button_rect') {
+                            $addButtonWidth = (int)($containerW - (2 * $innerPadding));
+                            $addButtonHeight = 18;
+                            $addButtonX = (int)($cellX + $margin + $innerPadding);
+                            $addButtonY = (int)($cellY + $margin + $innerPadding - 2 + 20);
+                            $clonedElement->setOrigin($addButtonX, $addButtonY);
+                            $clonedElement->setSize($addButtonWidth, $addButtonHeight);
+                            $componentId = isset($cellData['id']) ? (is_numeric($cellData['id']) ? (int) $cellData['id'] : "'" . addslashes((string) $cellData['id']) . "'") : 'null';
+                            $clonedElement->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "console.log('ciao', " . $componentId . ");");
                         } else {
                             $rectCount++;
                             $wsX = (int)($cellX + $margin + $innerPadding);
