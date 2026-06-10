@@ -4,6 +4,7 @@
     var parentModalUid = '__MODAL_UID__';
     var selectedComponentData = null;
     var disabledMainModalInteractivity = [];
+    var disabledAddModalInteractivity = [];
     var componentBadgesContainer = null;
     var badgeTooltipElement = null;
     var anchorTooltipElement = null;
@@ -46,6 +47,34 @@
         });
     }
 
+    function setAddModalInteractivityDisabled(disabled) {
+        if (!disabled) {
+            disabledAddModalInteractivity.forEach(function(entry) {
+                if (!entry.shape) return;
+                entry.shape.eventMode = entry.eventMode;
+                entry.shape.cursor = entry.cursor;
+            });
+            disabledAddModalInteractivity = [];
+            return;
+        }
+
+        disabledAddModalInteractivity = [];
+        Object.keys(shapes).forEach(function(uid) {
+            if (uid.indexOf(addModalUid) !== 0) return;
+            if (uid.indexOf(addModalUid + '_preview_') === 0) return;
+
+            var shape = shapes[uid];
+            if (!shape) return;
+            disabledAddModalInteractivity.push({
+                shape: shape,
+                eventMode: shape.eventMode,
+                cursor: shape.cursor
+            });
+            shape.eventMode = 'none';
+            shape.cursor = 'default';
+        });
+    }
+
     function ensureAnchorTooltipElement() {
         if (anchorTooltipElement) return anchorTooltipElement;
 
@@ -71,6 +100,72 @@
             anchorTooltipElement.style.display = 'none';
             anchorTooltipElement.textContent = '';
         }
+    }
+
+    function closePreviewModal() {
+        ['body','title','close_rect','close_text','grid_bg','grid_border_top','grid_border_bottom','grid_border_left','grid_border_right','border_top','border_bottom','border_left','border_right'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + '_preview_' + suffix];
+            if (shape) shape.renderable = false;
+        });
+        setAddModalInteractivityDisabled(false);
+        if (linkPreviewLine) {
+            linkPreviewLine.renderable = true;
+        }
+        for (var row = 0; row < 32; row++) {
+            for (var col = 0; col < 32; col++) {
+                var cell = shapes[addModalUid + '_preview_cell_' + row + '_' + col];
+                if (cell) cell.renderable = false;
+            }
+        }
+    }
+
+    function openPreviewModal() {
+        if (!selectedLinkAnchors.left || !selectedLinkAnchors.right) return;
+
+        hideAnchorTooltip();
+        hideBadgeTooltip();
+
+        if (typeof hideTooltip === 'function') {
+            hideTooltip();
+        }
+
+        setAddModalInteractivityDisabled(true);
+
+        if (linkPreviewLine) {
+            linkPreviewLine.renderable = false;
+        }
+
+        ['body','title','close_rect','close_text','grid_bg','grid_border_top','grid_border_bottom','grid_border_left','grid_border_right','border_top','border_bottom','border_left','border_right'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + '_preview_' + suffix];
+            if (shape) shape.renderable = true;
+        });
+
+        var bodyPixels = window.__addModalBodyPixels || [];
+        var componentPixels = window.__addModalComponentPixels || [];
+        var dx = selectedLinkAnchors.left.anchor.x - selectedLinkAnchors.right.anchor.x;
+        var dy = selectedLinkAnchors.left.anchor.y - selectedLinkAnchors.right.anchor.y;
+
+        for (var row = 0; row < 32; row++) {
+            for (var col = 0; col < 32; col++) {
+                var cell = shapes[addModalUid + '_preview_cell_' + row + '_' + col];
+                if (!cell) continue;
+                cell.tint = 0xFFFFFF;
+                cell.renderable = true;
+            }
+        }
+
+        bodyPixels.forEach(function(pixel) {
+            var cell = shapes[addModalUid + '_preview_cell_' + pixel.y + '_' + pixel.x];
+            if (cell) cell.tint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+        });
+
+        componentPixels.forEach(function(pixel) {
+            var targetX = pixel.x + dx;
+            var targetY = pixel.y + dy;
+            if (targetX < 0 || targetX > 31 || targetY < 0 || targetY > 31) return;
+            var cell = shapes[addModalUid + '_preview_cell_' + targetY + '_' + targetX];
+            if (cell) cell.tint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+        });
     }
 
     function clearLinkPreview() {
@@ -387,6 +482,7 @@
         hideComponentBadges();
         hideAnchorTooltip();
         clearLinkPreview();
+        closePreviewModal();
         setMainModalInteractivityDisabled(false);
 
         var redrawMainZoneBorders = window['redrawZoneBorders_' + parentModalUid];
@@ -479,6 +575,7 @@
 
         hideAnchorTooltip();
         clearLinkPreview();
+        closePreviewModal();
         setMainModalInteractivityDisabled(true);
 
         // Show modal elements
@@ -525,7 +622,10 @@
         });
 
         var confirmAction = function() { console.log('conferma link anchor', selectedLinkAnchors); };
-        var previewAction = function() { console.log('preview link anchor', selectedLinkAnchors); };
+        var previewAction = function() {
+            console.log('preview link anchor', selectedLinkAnchors);
+            openPreviewModal();
+        };
         var cancelAction = function() { clearLinkPreview(); };
         ['_confirm_button_rect', '_confirm_button_text'].forEach(function(suffix) {
             var shape = shapes[addModalUid + suffix];
@@ -581,6 +681,7 @@
             }
         }
 
+        window.__addModalBodyPixels = bodyPixels;
         drawZoneBordersForGrid('left', bodyPixels, 100045);
         setupAnchorInteractions('left', bodyAnchors);
 
@@ -612,9 +713,20 @@
             }
         }
 
+        window.__addModalComponentPixels = componentPixels;
         drawZoneBordersForGrid('right', componentPixels, 100045);
         setupAnchorInteractions('right', componentAnchors);
         showComponentBadges(selectedComponentData);
+
+        ['_preview_close_rect', '_preview_close_text'].forEach(function(suffix) {
+            var shape = shapes[addModalUid + suffix];
+            if (shape) {
+                shape.eventMode = 'static';
+                shape.cursor = 'pointer';
+                if (typeof shape.removeAllListeners === 'function') shape.removeAllListeners('pointerdown');
+                shape.on('pointerdown', closePreviewModal);
+            }
+        });
     };
 })();
 </script>

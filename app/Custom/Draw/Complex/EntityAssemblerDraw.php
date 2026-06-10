@@ -2302,6 +2302,140 @@ class EntityAssemblerDraw
         $cancelText->addAttributes("z_index", 100061);
         $this->drawItems[] = $cancelText;
 
+        $previewModalWidth = 620;
+        $previewModalHeight = 620;
+        $previewModalX = 470;
+        $previewModalY = 70;
+
+        $previewBody = new Rectangle($addModalUid . "_preview_body");
+        $previewBody->setOrigin($previewModalX, $previewModalY);
+        $previewBody->setSize($previewModalWidth, $previewModalHeight);
+        $previewBody->setColor(0xffffff);
+        $previewBody->setBorderRadius(10);
+        $previewBody->setRenderable(false);
+        $previewBody->addAttributes("z_index", 300000);
+        $this->drawItems[] = $previewBody;
+
+        foreach (["top", "bottom", "left", "right"] as $side) {
+            $border = new Rectangle($addModalUid . "_preview_border_" . $side);
+            if ($side === "top") {
+                $border->setOrigin($previewModalX, $previewModalY);
+                $border->setSize($previewModalWidth, 2);
+            } elseif ($side === "bottom") {
+                $border->setOrigin(
+                    $previewModalX,
+                    $previewModalY + $previewModalHeight - 2,
+                );
+                $border->setSize($previewModalWidth, 2);
+            } elseif ($side === "left") {
+                $border->setOrigin($previewModalX, $previewModalY);
+                $border->setSize(2, $previewModalHeight);
+            } else {
+                $border->setOrigin(
+                    $previewModalX + $previewModalWidth - 2,
+                    $previewModalY,
+                );
+                $border->setSize(2, $previewModalHeight);
+            }
+            $border->setColor(0x000000);
+            $border->setRenderable(false);
+            $border->addAttributes("z_index", 300001);
+            $this->drawItems[] = $border;
+        }
+
+        $previewTitle = new Text($addModalUid . "_preview_title");
+        $previewTitle->setOrigin($previewModalX + 16, $previewModalY + 16);
+        $previewTitle->setText("Preview collegamento");
+        $previewTitle->setColor(0x000000);
+        $previewTitle->setFontSize(22);
+        $previewTitle->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $previewTitle->setRenderable(false);
+        $previewTitle->addAttributes("z_index", 300002);
+        $this->drawItems[] = $previewTitle;
+
+        $previewCloseRect = new Rectangle($addModalUid . "_preview_close_rect");
+        $previewCloseRect->setOrigin(
+            $previewModalX + $previewModalWidth - 40,
+            $previewModalY + 12,
+        );
+        $previewCloseRect->setSize(28, 28);
+        $previewCloseRect->setColor(0x666666);
+        $previewCloseRect->setBorderRadius(4);
+        $previewCloseRect->setRenderable(false);
+        $previewCloseRect->addAttributes("z_index", 300003);
+        $this->drawItems[] = $previewCloseRect;
+
+        $previewCloseText = new Text($addModalUid . "_preview_close_text");
+        $previewCloseText->setCenterAnchor(true);
+        $previewCloseText->setOrigin(
+            $previewModalX + $previewModalWidth - 26,
+            $previewModalY + 26,
+        );
+        $previewCloseText->setText("X");
+        $previewCloseText->setFontSize(16);
+        $previewCloseText->setColor(0xffffff);
+        $previewCloseText->setRenderable(false);
+        $previewCloseText->addAttributes("z_index", 300004);
+        $this->drawItems[] = $previewCloseText;
+
+        $previewGridX = $previewModalX + 70;
+        $previewGridY = $previewModalY + 90;
+        $previewGridSize = 15 * 32;
+
+        $previewGridBg = new Rectangle($addModalUid . "_preview_grid_bg");
+        $previewGridBg->setOrigin($previewGridX, $previewGridY);
+        $previewGridBg->setSize($previewGridSize, $previewGridSize);
+        $previewGridBg->setColor(0x404040);
+        $previewGridBg->setRenderable(false);
+        $previewGridBg->addAttributes("z_index", 300010);
+        $this->drawItems[] = $previewGridBg;
+
+        for ($row = 0; $row < 32; $row++) {
+            for ($col = 0; $col < 32; $col++) {
+                $cell = new Rectangle(
+                    $addModalUid . "_preview_cell_" . $row . "_" . $col,
+                );
+                $cell->setOrigin(
+                    $previewGridX + $col * 15 + 1,
+                    $previewGridY + $row * 15 + 1,
+                );
+                $cell->setSize(14, 14);
+                $cell->setColor(0xffffff);
+                $cell->setRenderable(false);
+                $cell->addAttributes("z_index", 300011);
+                $this->drawItems[] = $cell;
+            }
+        }
+
+        foreach (["top", "bottom", "left", "right"] as $side) {
+            $border = new Rectangle(
+                $addModalUid . "_preview_grid_border_" . $side,
+            );
+            if ($side === "top") {
+                $border->setOrigin($previewGridX, $previewGridY);
+                $border->setSize($previewGridSize, 2);
+            } elseif ($side === "bottom") {
+                $border->setOrigin(
+                    $previewGridX,
+                    $previewGridY + $previewGridSize - 2,
+                );
+                $border->setSize($previewGridSize, 2);
+            } elseif ($side === "left") {
+                $border->setOrigin($previewGridX, $previewGridY);
+                $border->setSize(2, $previewGridSize);
+            } else {
+                $border->setOrigin(
+                    $previewGridX + $previewGridSize - 2,
+                    $previewGridY,
+                );
+                $border->setSize(2, $previewGridSize);
+            }
+            $border->setColor(0x000000);
+            $border->setRenderable(false);
+            $border->addAttributes("z_index", 300012);
+            $this->drawItems[] = $border;
+        }
+
         // Generate JS for opening/closing the add component modal and populating its grids
         $addModalJs = file_get_contents(
             resource_path(
