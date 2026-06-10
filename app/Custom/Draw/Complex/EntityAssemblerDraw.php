@@ -753,6 +753,8 @@ class EntityAssemblerDraw
             "entityTypeComponent",
             "genes.gene",
             "ruleChimicalElements.ruleChimicalElement.details.effects.gene",
+            "ruleChimicalElements.ruleChimicalElement.chimicalElement",
+            "ruleChimicalElements.ruleChimicalElement.complexChimicalElement",
             "anchors",
         ])
             ->where("state", \App\Models\EntityComponent::STATE_COMPLETED)
@@ -765,31 +767,33 @@ class EntityAssemblerDraw
                     )
                     : "";
 
-                // Build tooltip with genes and chemical elements details
-                $tooltipParts = [];
+                // Build split tooltips with genes and chemical elements details
+                $genesTooltipParts = [];
+                $chimicalTooltipParts = [];
 
-                // Add genes
                 if ($item->genes->isNotEmpty()) {
-                    $tooltipParts[] = "GENI:";
+                    $genesTooltipParts[] = "GENI:";
                     foreach ($item->genes as $geneRel) {
                         if ($geneRel->gene) {
-                            $tooltipParts[] = "  - {$geneRel->gene->name} ({$geneRel->value})";
+                            $genesTooltipParts[] = "  - {$geneRel->gene->name} ({$geneRel->value})";
                         }
                     }
                 }
 
-                // Add chemical elements with ranges and effects
                 if ($item->ruleChimicalElements->isNotEmpty()) {
-                    $tooltipParts[] = "ELEMENTI CHIMICI:";
+                    $chimicalTooltipParts[] = "ELEMENTI CHIMICI:";
                     foreach ($item->ruleChimicalElements as $elemRel) {
                         if ($elemRel->ruleChimicalElement) {
                             $rule = $elemRel->ruleChimicalElement;
-                            $tooltipParts[] = "  - {$rule->name} ({$rule->title})";
+                            $chimicalName =
+                                $rule->chimicalElement->name ??
+                                ($rule->complexChimicalElement->name ??
+                                    $rule->name);
+                            $chimicalTooltipParts[] = "  - {$chimicalName} ({$rule->title})";
                             if ($rule->details->isNotEmpty()) {
                                 foreach ($rule->details as $detail) {
-                                    // Only show bands that have effects
                                     if ($detail->effects->isNotEmpty()) {
-                                        $tooltipParts[] = "    Fascia: [{$detail->min} / {$detail->max}]";
+                                        $chimicalTooltipParts[] = "    Fascia: [{$detail->min} / {$detail->max}]";
                                         foreach ($detail->effects as $effect) {
                                             $geneName = $effect->gene
                                                 ? $effect->gene->name
@@ -809,7 +813,7 @@ class EntityAssemblerDraw
                                                         $effect->duration .
                                                             " min"
                                                     : "-";
-                                            $tooltipParts[] = "      Effetto: {$geneName} (valore: {$effect->value}, tipo: {$typeLabel}, durata: {$durationLabel})";
+                                            $chimicalTooltipParts[] = "      Effetto: {$geneName} (valore: {$effect->value}, tipo: {$typeLabel}, durata: {$durationLabel})";
                                         }
                                     }
                                 }
@@ -891,7 +895,120 @@ class EntityAssemblerDraw
                     })
                     ->toArray();
 
-                $data["tooltip"] = implode("\n", $tooltipParts);
+                $data["genes_badges"] = $item->genes
+                    ->map(function ($geneRel) {
+                        if (!$geneRel->gene) {
+                            return null;
+                        }
+
+                        return [
+                            "name" => $geneRel->gene->name,
+                            "image_url" => $geneRel->gene->image_url,
+                            "tooltip" => "GENE: {$geneRel->gene->name}\nValore: {$geneRel->value}",
+                        ];
+                    })
+                    ->filter()
+                    ->values()
+                    ->toArray();
+
+                $data["chimical_badges"] = $item->ruleChimicalElements
+                    ->map(function ($elemRel) {
+                        if (!$elemRel->ruleChimicalElement) {
+                            return null;
+                        }
+
+                        $rule = $elemRel->ruleChimicalElement;
+                        $imageUrl = null;
+                        $badgeName =
+                            $rule->chimicalElement->name ??
+                            ($rule->complexChimicalElement->name ??
+                                $rule->name);
+                        if ($rule->complex_chimical_element_id) {
+                            $imagePath = public_path(
+                                "storage/complex_chimical_elements/" .
+                                    $rule->complex_chimical_element_id .
+                                    ".png",
+                            );
+                            if (file_exists($imagePath)) {
+                                $imageUrl = asset(
+                                    "storage/complex_chimical_elements/" .
+                                        $rule->complex_chimical_element_id .
+                                        ".png?v=" .
+                                        filemtime($imagePath),
+                                );
+                            }
+                        } elseif ($rule->chimical_element_id) {
+                            $imagePath = public_path(
+                                "storage/chimical_elements/" .
+                                    $rule->chimical_element_id .
+                                    ".png",
+                            );
+                            if (file_exists($imagePath)) {
+                                $imageUrl = asset(
+                                    "storage/chimical_elements/" .
+                                        $rule->chimical_element_id .
+                                        ".png?v=" .
+                                        filemtime($imagePath),
+                                );
+                            }
+                        }
+
+                        $tooltipLines = [
+                            "ELEMENTO CHIMICO: {$badgeName}",
+                            "Regola: {$rule->title}",
+                        ];
+                        if ($rule->details->isNotEmpty()) {
+                            foreach ($rule->details as $detail) {
+                                if ($detail->effects->isNotEmpty()) {
+                                    $tooltipLines[] = "Fascia: [{$detail->min} / {$detail->max}]";
+                                    foreach ($detail->effects as $effect) {
+                                        $geneName = $effect->gene
+                                            ? $effect->gene->name
+                                            : "N/A";
+                                        $typeLabel =
+                                            $effect->type ===
+                                            \App\Models\RuleChimicalElementDetailEffect::TYPE_FIXED
+                                                ? "Fisso"
+                                                : "A Tempo";
+                                        $durationLabel =
+                                            $effect->type ===
+                                            \App\Models\RuleChimicalElementDetailEffect::TYPE_TIMED
+                                                ? \App\Models\RuleChimicalElementDetailEffect
+                                                        ::DURATION_OPTIONS[
+                                                        $effect->duration
+                                                    ] ??
+                                                    $effect->duration . " min"
+                                                : "-";
+                                        $tooltipLines[] = "Effetto: {$geneName} (valore: {$effect->value}, tipo: {$typeLabel}, durata: {$durationLabel})";
+                                    }
+                                }
+                            }
+                        }
+
+                        return [
+                            "name" => $badgeName,
+                            "image_url" => $imageUrl,
+                            "tooltip" => implode("\n", $tooltipLines),
+                        ];
+                    })
+                    ->filter()
+                    ->values()
+                    ->toArray();
+
+                $data["tooltip_genes"] = implode("\n", $genesTooltipParts);
+                $data["tooltip_chimical"] = implode(
+                    "\n",
+                    $chimicalTooltipParts,
+                );
+                $data["tooltip"] = trim(
+                    implode(
+                        "\n\n",
+                        array_filter([
+                            $data["tooltip_genes"],
+                            $data["tooltip_chimical"],
+                        ]),
+                    ),
+                );
                 return $data;
             })
             ->toArray();
@@ -1759,8 +1876,8 @@ class EntityAssemblerDraw
     {
         $addModalUid = $parentModalUid . "_add";
 
-        // Same width/height as the main modal
-        $modalWidth = 1300;
+        // Wider than the main modal to host badges on the right
+        $modalWidth = 1560;
         $modalHeight = 680;
         $modalX = 20;
         $modalY = 20;
@@ -1874,12 +1991,13 @@ class EntityAssemblerDraw
         $contentY = $modalY + $headerHeight + $contentPadding;
         $contentWidth = $modalWidth - $contentPadding * 2;
         $contentHeight = $modalHeight - $headerHeight - $contentPadding * 2;
-        $halfWidth = (int) ($contentWidth / 2) - 10;
+        $leftPanelWidth = 620;
+        $rightPanelWidth = $contentWidth - $leftPanelWidth - 20;
 
         // Left half background
         $leftBg = new Rectangle($addModalUid . "_left_bg");
         $leftBg->setOrigin($contentX, $contentY);
-        $leftBg->setSize($halfWidth, $contentHeight);
+        $leftBg->setSize($leftPanelWidth, $contentHeight);
         $leftBg->setColor(0xf5f5f5);
         $leftBg->setBorderRadius(8);
         $leftBg->setBorderColor(0x000000);
@@ -1899,10 +2017,10 @@ class EntityAssemblerDraw
         $this->drawItems[] = $leftTitle;
 
         // Right half background
-        $rightBgX = $contentX + $halfWidth + 20;
+        $rightBgX = $contentX + $leftPanelWidth + 20;
         $rightBg = new Rectangle($addModalUid . "_right_bg");
         $rightBg->setOrigin($rightBgX, $contentY);
-        $rightBg->setSize($halfWidth, $contentHeight);
+        $rightBg->setSize($rightPanelWidth, $contentHeight);
         $rightBg->setColor(0xf5f5f5);
         $rightBg->setBorderRadius(8);
         $rightBg->setBorderColor(0x000000);
@@ -1923,7 +2041,7 @@ class EntityAssemblerDraw
 
         // Vertical separator
         $separator = new Rectangle($addModalUid . "_separator");
-        $separator->setOrigin($contentX + $halfWidth + 9, $contentY);
+        $separator->setOrigin($contentX + $leftPanelWidth + 9, $contentY);
         $separator->setSize(2, $contentHeight);
         $separator->setColor(0x000000);
         $separator->setRenderable(false);
@@ -1937,7 +2055,7 @@ class EntityAssemblerDraw
         $gridTotalWidth = $cellSize * $gridSize;
         $gridTotalHeight = $cellSize * $gridSize;
         $leftGridX =
-            $contentX + (int) floor(($halfWidth - $gridTotalWidth) / 2);
+            $contentX + (int) floor(($leftPanelWidth - $gridTotalWidth) / 2);
         $leftGridY = $contentY + 58;
 
         // Left grid background
@@ -2017,8 +2135,7 @@ class EntityAssemblerDraw
         $this->drawItems[] = $leftGridBorderRight;
 
         // Right grid (EntityComponent) - 32x32
-        $rightGridX =
-            $rightBgX + (int) floor(($halfWidth - $gridTotalWidth) / 2);
+        $rightGridX = $rightBgX + 20;
         $rightGridY = $contentY + 58;
 
         // Right grid background

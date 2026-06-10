@@ -4,6 +4,8 @@
     var parentModalUid = '__MODAL_UID__';
     var selectedComponentData = null;
     var disabledMainModalInteractivity = [];
+    var componentBadgesContainer = null;
+    var badgeTooltipElement = null;
     var addModalBorderShapes = {
         left: [],
         right: []
@@ -38,6 +40,115 @@
 
             shape.eventMode = 'none';
             shape.cursor = 'default';
+        });
+    }
+
+    function ensureBadgeTooltipElement() {
+        if (badgeTooltipElement) return badgeTooltipElement;
+
+        badgeTooltipElement = document.createElement('div');
+        badgeTooltipElement.style.position = 'absolute';
+        badgeTooltipElement.style.zIndex = '130000';
+        badgeTooltipElement.style.display = 'none';
+        badgeTooltipElement.style.pointerEvents = 'none';
+        badgeTooltipElement.style.whiteSpace = 'pre-line';
+        badgeTooltipElement.style.background = '#ffffff';
+        badgeTooltipElement.style.border = '1px solid #000';
+        badgeTooltipElement.style.borderRadius = '6px';
+        badgeTooltipElement.style.padding = '8px 10px';
+        badgeTooltipElement.style.fontFamily = 'Arial';
+        badgeTooltipElement.style.fontSize = '12px';
+        badgeTooltipElement.style.color = '#000';
+        badgeTooltipElement.style.maxWidth = '320px';
+        badgeTooltipElement.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
+        document.body.appendChild(badgeTooltipElement);
+        return badgeTooltipElement;
+    }
+
+    function hideBadgeTooltip() {
+        if (badgeTooltipElement) {
+            badgeTooltipElement.style.display = 'none';
+            badgeTooltipElement.textContent = '';
+        }
+    }
+
+    function ensureComponentBadgesContainer() {
+        if (componentBadgesContainer) return componentBadgesContainer;
+
+        componentBadgesContainer = document.createElement('div');
+        componentBadgesContainer.style.position = 'absolute';
+        componentBadgesContainer.style.zIndex = '120000';
+        componentBadgesContainer.style.display = 'none';
+        componentBadgesContainer.style.pointerEvents = 'none';
+        componentBadgesContainer.style.maxWidth = '320px';
+        componentBadgesContainer.style.background = '#f5f5f5';
+        componentBadgesContainer.style.border = '1px solid #000';
+        componentBadgesContainer.style.borderRadius = '8px';
+        componentBadgesContainer.style.padding = '14px';
+        componentBadgesContainer.style.boxSizing = 'border-box';
+        componentBadgesContainer.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
+        document.body.appendChild(componentBadgesContainer);
+        return componentBadgesContainer;
+    }
+
+    function hideComponentBadges() {
+        if (componentBadgesContainer) {
+            componentBadgesContainer.style.display = 'none';
+            componentBadgesContainer.innerHTML = '';
+        }
+        hideBadgeTooltip();
+    }
+
+    function renderBadgeSection(title, items) {
+        if (!items || !items.length) return '';
+
+        var badgesHtml = items.map(function(item) {
+            var tooltipAttr = item.tooltip
+                ? ' data-badge-tooltip="' + item.tooltip.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"'
+                : '';
+            var imageHtml = item.image_url
+                ? '<img src="' + item.image_url + '" style="width:20px;height:20px;image-rendering:pixelated;border-radius:4px;flex:0 0 auto;">'
+                : '<div style="width:20px;height:20px;border:1px solid #999;border-radius:4px;background:#fff;flex:0 0 auto;"></div>';
+
+            return '<div' + tooltipAttr + ' style="display:inline-flex;align-items:center;gap:6px;background:#ffffff;border:1px solid #000;border-radius:999px;padding:6px 10px;margin:0 8px 8px 0;font-family:Arial;font-size:12px;color:#000;pointer-events:auto;">' + imageHtml + '<span>' + item.name + '</span></div>';
+        }).join('');
+
+        return '<div style="margin-top:12px;"><div style="font-family:Arial;font-size:13px;font-weight:bold;color:#000;margin-bottom:8px;">' + title + '</div><div>' + badgesHtml + '</div></div>';
+    }
+
+    function showComponentBadges(componentData) {
+        var container = ensureComponentBadgesContainer();
+        var canvas = app.renderer.view;
+        var rect = canvas.getBoundingClientRect();
+        var rightGridBg = shapes[addModalUid + '_right_grid_bg'];
+
+        var left = rect.left + 700;
+        var top = rect.top + 140;
+
+        if (rightGridBg) {
+            left = rect.left + rightGridBg.x + rightGridBg.width + 24;
+            top = rect.top + rightGridBg.y;
+        }
+
+        container.style.left = left + 'px';
+        container.style.top = top + 'px';
+        container.innerHTML =
+            '<div style="font-family:Arial;font-size:16px;font-weight:bold;color:#000;margin-bottom:6px;">Dettagli componente</div>' +
+            renderBadgeSection('Geni', componentData.genes_badges || []) +
+            renderBadgeSection('Elementi chimici', componentData.chimical_badges || []);
+        container.style.display = container.innerHTML ? 'block' : 'none';
+
+        Array.prototype.forEach.call(container.querySelectorAll('[data-badge-tooltip]'), function(el) {
+            el.addEventListener('mouseenter', function() {
+                var tooltip = ensureBadgeTooltipElement();
+                tooltip.textContent = el.getAttribute('data-badge-tooltip') || '';
+                tooltip.style.left = (el.getBoundingClientRect().left) + 'px';
+                tooltip.style.top = (el.getBoundingClientRect().bottom + 6) + 'px';
+                tooltip.style.display = tooltip.textContent ? 'block' : 'none';
+            });
+            el.addEventListener('mouseleave', function() {
+                hideBadgeTooltip();
+            });
         });
     }
 
@@ -137,6 +248,7 @@
 
         clearAddModalZoneBorders('left');
         clearAddModalZoneBorders('right');
+        hideComponentBadges();
         setMainModalInteractivityDisabled(false);
 
         var redrawMainZoneBorders = window['redrawZoneBorders_' + parentModalUid];
@@ -327,6 +439,7 @@
         }
 
         drawZoneBordersForGrid('right', componentPixels, 100045);
+        showComponentBadges(selectedComponentData);
     };
 })();
 </script>
