@@ -12,6 +12,85 @@
         currentAnchors = anchors;
     };
 
+    window['getAssemblerGridSnapshot_' + '__MODAL_UID__'] = function() {
+        var pixels = currentPixels.map(function(pixel) {
+            var cellUid = '__MODAL_UID___grid_cell_' + pixel.y + '_' + pixel.x;
+            var cellShape = shapes[cellUid];
+            return Object.assign({}, pixel, {
+                tint: cellShape ? cellShape.tint : 0x000000
+            });
+        });
+
+        var anchors = currentAnchors.map(function(anchor) {
+            return Object.assign({}, anchor);
+        });
+
+        return {
+            pixels: pixels,
+            anchors: anchors
+        };
+    };
+
+    window['redrawZoneBorders_' + '__MODAL_UID__'] = function() {
+        var clearFn = window['clearZoneBorders_' + '__MODAL_UID__'];
+        if (typeof clearFn === 'function') {
+            clearFn();
+        }
+
+        if (!currentPixels.some(function(p) { return p.has_zone; })) {
+            return;
+        }
+
+        var grayBorderColor = 0x808080;
+        var zoneThickness = 3;
+        var grayThickness = 1;
+
+        currentPixels.forEach(function(pixel) {
+            if (pixel.has_zone) {
+                var cellUid = '__MODAL_UID___grid_cell_' + pixel.y + '_' + pixel.x;
+                var cellShape = shapes[cellUid];
+                if (!cellShape) return;
+
+                var cx = cellShape.x;
+                var cy = cellShape.y;
+                var cw = cellShape.width;
+                var ch = cellShape.height;
+
+                function hexToPixiColor(hex) {
+                    if (!hex) return 0xFF0000;
+                    if (typeof hex === 'number') return hex;
+                    hex = hex.replace('#', '');
+                    return parseInt(hex, 16);
+                }
+
+                var zoneBorderColor = hexToPixiColor(pixel.zone_color);
+
+                function addBorderRect(rx, ry, rw, rh, color) {
+                    var g = new PIXI.Graphics();
+                    g.beginFill(color);
+                    g.drawRect(0, 0, rw, rh);
+                    g.endFill();
+                    g.x = rx;
+                    g.y = ry;
+                    g.zIndex = 20045;
+                    app.stage.sortableChildren = true;
+                    app.stage.addChild(g);
+                    window['__zoneBorderShapes_' + '__MODAL_UID__'].push(g);
+                }
+
+                addBorderRect(cx, cy, cw, grayThickness, grayBorderColor);
+                addBorderRect(cx, cy + ch - grayThickness, cw, grayThickness, grayBorderColor);
+                addBorderRect(cx, cy, grayThickness, ch, grayBorderColor);
+                addBorderRect(cx + cw - grayThickness, cy, grayThickness, ch, grayBorderColor);
+
+                if (pixel.zone_border_top)    addBorderRect(cx, cy, cw, zoneThickness, zoneBorderColor);
+                if (pixel.zone_border_bottom) addBorderRect(cx, cy + ch - zoneThickness, cw, zoneThickness, zoneBorderColor);
+                if (pixel.zone_border_left)   addBorderRect(cx, cy, zoneThickness, ch, zoneBorderColor);
+                if (pixel.zone_border_right)  addBorderRect(cx + cw - zoneThickness, cy, zoneThickness, ch, zoneBorderColor);
+            }
+        });
+    };
+
     window['movePixels_' + '__MODAL_UID__'] = function(direction) {
         if (currentPixels.length === 0) return;
 
@@ -188,59 +267,9 @@
             refreshAnchorTooltipFn(currentAnchors);
         }
 
-        // Re-draw zone borders if there are zones
-        if (currentPixels.some(function(p) { return p.has_zone; })) {
-            var grayBorderColor = 0x808080;
-            var zoneThickness = 3;
-            var grayThickness = 1;
-
-            currentPixels.forEach(function(pixel) {
-                if (pixel.has_zone) {
-                    var cellUid = '__MODAL_UID___grid_cell_' + pixel.y + '_' + pixel.x;
-                    var cellShape = shapes[cellUid];
-                    if (!cellShape) return;
-
-                    var cx = cellShape.x;
-                    var cy = cellShape.y;
-                    var cw = cellShape.width;
-                    var ch = cellShape.height;
-
-                    // Helper to convert hex string to PIXI color number
-                    function hexToPixiColor(hex) {
-                        if (!hex) return 0xFF0000;
-                        if (typeof hex === 'number') return hex;
-                        hex = hex.replace('#', '');
-                        return parseInt(hex, 16);
-                    }
-
-                    var zoneBorderColor = hexToPixiColor(pixel.zone_color);
-
-                    function addBorderRect(rx, ry, rw, rh, color) {
-                        var g = new PIXI.Graphics();
-                        g.beginFill(color);
-                        g.drawRect(0, 0, rw, rh);
-                        g.endFill();
-                        g.x = rx;
-                        g.y = ry;
-                        g.zIndex = 20045;
-                        app.stage.sortableChildren = true;
-                        app.stage.addChild(g);
-                        window['__zoneBorderShapes_' + '__MODAL_UID__'].push(g);
-                    }
-
-                    // Gray base border for all zone pixels
-                    addBorderRect(cx, cy, cw, grayThickness, grayBorderColor);
-                    addBorderRect(cx, cy + ch - grayThickness, cw, grayThickness, grayBorderColor);
-                    addBorderRect(cx, cy, grayThickness, ch, grayBorderColor);
-                    addBorderRect(cx + cw - grayThickness, cy, grayThickness, ch, grayBorderColor);
-
-                    // Zone color borders only on sides where neighbor is NOT same zone
-                    if (pixel.zone_border_top)    addBorderRect(cx, cy, cw, zoneThickness, zoneBorderColor);
-                    if (pixel.zone_border_bottom) addBorderRect(cx, cy + ch - zoneThickness, cw, zoneThickness, zoneBorderColor);
-                    if (pixel.zone_border_left)   addBorderRect(cx, cy, zoneThickness, ch, zoneBorderColor);
-                    if (pixel.zone_border_right)  addBorderRect(cx + cw - zoneThickness, cy, zoneThickness, ch, zoneBorderColor);
-                }
-            });
+        var redrawFn = window['redrawZoneBorders_' + '__MODAL_UID__'];
+        if (typeof redrawFn === 'function') {
+            redrawFn();
         }
     };
 })();

@@ -13,6 +13,9 @@
     };
     var activeAnchorTooltipId = null;
 
+    // Track selected EntityBody UID globally
+    window['__selectedBodyUid_' + '__MODAL_UID__'] = null;
+
     // Use window variable to share zoneBorderShapes with update_zone_color
     window['__zoneBorderShapes_' + '__MODAL_UID__'] = window['__zoneBorderShapes_' + '__MODAL_UID__'] || [];
 
@@ -430,6 +433,7 @@
             shape.tint = 0x00FF00;
             selectedRect = shape;
             selectedBodyUid = elementUid;
+            window['__selectedBodyUid_' + '__MODAL_UID__'] = elementUid;
 
             // Show direction buttons when EntityBody is selected
             var dirButtons = ['dir_up', 'dir_down', 'dir_left', 'dir_right'];

@@ -7,6 +7,7 @@ use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
 use App\Helper\Helper;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class GridDraw
@@ -25,12 +26,12 @@ class GridDraw
     private int $scrollbarWidth = 30;
     private int $currentScrollRow = 0;
     private array $scrollUids = [];
-    private string $scrollInitJs = '';
+    private string $scrollInitJs = "";
     private array $allElementUids = [];
     private array $templates = [];
     private array $elementData = [];
     private array $placeholderMappings = [];
-    private string $imageDisk = 'entity_bodies';
+    private string $imageDisk = "entity_bodies";
     private ?string $onClickJs = null;
 
     public function __construct(string $uid)
@@ -116,28 +117,44 @@ class GridDraw
         $gridWidth = $width - $scrollbarWidth;
         $totalSpacingX = ($elementsPerRow - 1) * $elementSpacing;
         $elementWidth = ($gridWidth - $totalSpacingX) / $elementsPerRow;
-        $hasInfoButtonTemplate = !empty(array_filter(
-            $this->templates,
-            fn($template) => (($template->buildJson()['attributes']['template_role'] ?? null) === 'info_button_rect')
-        ));
-        $hasAddButtonTemplate = !empty(array_filter(
-            $this->templates,
-            fn($template) => (($template->buildJson()['attributes']['template_role'] ?? null) === 'add_button_rect')
-        ));
+        $hasInfoButtonTemplate = !empty(
+            array_filter(
+                $this->templates,
+                fn($template) => ($template->buildJson()["attributes"][
+                    "template_role"
+                ] ??
+                    null) ===
+                    "info_button_rect",
+            )
+        );
+        $hasAddButtonTemplate = !empty(
+            array_filter(
+                $this->templates,
+                fn($template) => ($template->buildJson()["attributes"][
+                    "template_role"
+                ] ??
+                    null) ===
+                    "add_button_rect",
+            )
+        );
         // Add extra height for the Aggiungi button below the Info button
         $extraAddHeight = $hasAddButtonTemplate ? 22 : 0;
-        $elementHeight = $hasInfoButtonTemplate ? ($elementWidth + 18 + $extraAddHeight) : $elementWidth;
+        $elementHeight = $hasInfoButtonTemplate
+            ? $elementWidth + 18 + $extraAddHeight
+            : $elementWidth;
 
         // Calculate total rows and content height
         $totalElements = count($this->elementData);
         $rows = (int) ceil($totalElements / $elementsPerRow);
-        $totalContentHeight = ($rows * $elementHeight) + (($rows - 1) * $elementSpacing);
+        $totalContentHeight =
+            $rows * $elementHeight + ($rows - 1) * $elementSpacing;
 
         // Calculate how many rows fit in viewport
         $visibleRows = 0;
         $accumulatedHeight = 0;
         for ($r = 0; $r < $rows; $r++) {
-            $rowHeight = $elementHeight + ($r < $rows - 1 ? $elementSpacing : 0);
+            $rowHeight =
+                $elementHeight + ($r < $rows - 1 ? $elementSpacing : 0);
             if ($accumulatedHeight + $rowHeight <= $height) {
                 $visibleRows++;
                 $accumulatedHeight += $rowHeight;
@@ -145,55 +162,64 @@ class GridDraw
                 break;
             }
         }
-        if ($visibleRows === 0) $visibleRows = 1;
+        if ($visibleRows === 0) {
+            $visibleRows = 1;
+        }
 
         // Create viewport (visible area)
-        $viewport = new Rectangle($uid . '_viewport');
+        $viewport = new Rectangle($uid . "_viewport");
         $viewport->setOrigin($x, $y);
         $viewport->setSize($width, $height);
-        $viewport->setColor(0xD0D0D0);
+        $viewport->setColor(0xd0d0d0);
         $viewport->setRenderable($this->renderable); // Controlled by parent
-        $viewport->addAttributes('z_index', $this->baseZIndex);
-        $viewport->addAttributes('currentScrollRow', 0);
-        $viewport->addAttributes('totalRows', $rows);
-        $viewport->addAttributes('visibleRows', $visibleRows);
-        $viewport->addAttributes('rowHeight', $elementHeight + $elementSpacing);
+        $viewport->addAttributes("z_index", $this->baseZIndex);
+        $viewport->addAttributes("currentScrollRow", 0);
+        $viewport->addAttributes("totalRows", $rows);
+        $viewport->addAttributes("visibleRows", $visibleRows);
+        $viewport->addAttributes("rowHeight", $elementHeight + $elementSpacing);
         $this->drawItems[] = $viewport;
 
         // Create content panel (scrollable area)
-        $panel = new Rectangle($uid . '_panel');
+        $panel = new Rectangle($uid . "_panel");
         $panel->setOrigin($x, $y);
         $panel->setSize($gridWidth, max($totalContentHeight, $height));
-        $panel->setColor(0xD0D0D0);
+        $panel->setColor(0xd0d0d0);
         $panel->setRenderable($this->renderable); // Controlled by parent
-        $panel->addAttributes('z_index', $this->baseZIndex - 1);
+        $panel->addAttributes("z_index", $this->baseZIndex - 1);
         $this->drawItems[] = $panel;
 
         // Position elements in grid
         $elementUids = [];
         $this->allElementUids = [];
-        
+
         foreach ($this->elementData as $index => $cellData) {
             $row = (int) floor($index / $elementsPerRow);
             $col = $index % $elementsPerRow;
 
-            $cellX = $x + ($col * ($elementWidth + $elementSpacing));
-            $cellY = $y + ($row * ($elementHeight + $elementSpacing));
+            $cellX = $x + $col * ($elementWidth + $elementSpacing);
+            $cellY = $y + $row * ($elementHeight + $elementSpacing);
 
             // Create base rectangle (always)
-            $rect = new Rectangle($uid . '_element_' . $index);
+            $rect = new Rectangle($uid . "_element_" . $index);
             $rect->setOrigin($cellX, $cellY);
             $rect->setSize($elementWidth, $elementHeight);
-            $rect->setColor(0xD0D0D0);
+            $rect->setColor(0xd0d0d0);
             $rect->setBorderColor(0x000000);
             $rect->setThickness(2);
             $rect->setRenderable($this->renderable);
-            $rect->addAttributes('z_index', $this->baseZIndex + 1);
-            $rect->addAttributes('grid_uid', $uid);
-            $rect->addAttributes('cell_data', json_encode($cellData));
+            $rect->addAttributes("z_index", $this->baseZIndex + 1);
+            $rect->addAttributes("grid_uid", $uid);
+            $rect->addAttributes("cell_data", json_encode($cellData));
             if ($this->onClickJs !== null) {
-                $rect->addAttributes('onclick', $this->onClickJs);
-                $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['" . $this->onClickJs . "']('" . $rect->getUid() . "');");
+                $rect->addAttributes("onclick", $this->onClickJs);
+                $rect->setInteractive(
+                    BasicDraw::INTERACTIVE_POINTER_DOWN,
+                    "window['" .
+                        $this->onClickJs .
+                        "']('" .
+                        $rect->getUid() .
+                        "');",
+                );
             }
             $this->drawItems[] = $rect;
             $elementUids[] = $rect->getUid();
@@ -201,155 +227,301 @@ class GridDraw
 
             // Clone template elements on top
             if (!empty($this->templates)) {
-                $cellData = isset($this->elementData[$index]) ? $this->elementData[$index] : [];
+                $cellData = isset($this->elementData[$index])
+                    ? $this->elementData[$index]
+                    : [];
                 $margin = 4;
-                $containerW = $elementWidth - ($margin * 2);
-                $containerH = $elementHeight - ($margin * 2);
-                
+                $containerW = $elementWidth - $margin * 2;
+                $containerH = $elementHeight - $margin * 2;
+
                 $rectCount = 0;
-                $hasSymbol = !empty(array_filter($this->templates, fn($t) => $t instanceof Text && $t->getText() === '{symbol}'));
+                $hasSymbol = !empty(
+                    array_filter(
+                        $this->templates,
+                        fn($t) => $t instanceof Text &&
+                            $t->getText() === "{symbol}",
+                    )
+                );
                 foreach ($this->templates as $templateIndex => $template) {
                     $clonedElement = clone $template;
-                    $clonedElement->setUid($uid . '_cell_' . $index . '_template_' . $templateIndex);
-                    $templateAttributes = $template->buildJson()['attributes'] ?? [];
-                    
+                    $clonedElement->setUid(
+                        $uid .
+                            "_cell_" .
+                            $index .
+                            "_template_" .
+                            $templateIndex,
+                    );
+                    $templateAttributes =
+                        $template->buildJson()["attributes"] ?? [];
+
                     $innerPadding = 4;
                     $hasInfoLayout = $hasInfoButtonTemplate;
-                    $hasAddButtonTemplate = !empty(array_filter(
-                        $this->templates,
-                        fn($t) => (($t->buildJson()['attributes']['template_role'] ?? null) === 'add_button_rect')
-                    ));
-                    $textAreaHeight = ($hasInfoLayout || $hasAddButtonTemplate) ? 52 : 22;
+                    $hasAddButtonTemplate = !empty(
+                        array_filter(
+                            $this->templates,
+                            fn($t) => ($t->buildJson()["attributes"][
+                                "template_role"
+                            ] ??
+                                null) ===
+                                "add_button_rect",
+                        )
+                    );
+                    $textAreaHeight =
+                        $hasInfoLayout || $hasAddButtonTemplate ? 52 : 22;
                     // Shift the image/frame further down when both the info and add buttons are present
-                    $extraOffsetForAddButton = ($hasInfoLayout && $hasAddButtonTemplate) ? 22 : 0;
-                    $componentOffsetY = (($templateAttributes['template_role'] ?? null) === 'component_frame' || ($templateAttributes['template_role'] ?? null) === 'component_image') ? (24 + $extraOffsetForAddButton) : 0;
+                    $extraOffsetForAddButton =
+                        $hasInfoLayout && $hasAddButtonTemplate ? 22 : 0;
+                    $componentOffsetY =
+                        ($templateAttributes["template_role"] ?? null) ===
+                            "component_frame" ||
+                        ($templateAttributes["template_role"] ?? null) ===
+                            "component_image"
+                            ? 24 + $extraOffsetForAddButton
+                            : 0;
 
-                    if ($clonedElement instanceof Rectangle && $rectCount === 0) {
+                    if (
+                        $clonedElement instanceof Rectangle &&
+                        $rectCount === 0
+                    ) {
                         $rectCount++;
-                        $clonedElement->setOrigin((int)($cellX + $margin), (int)($cellY + $margin));
-                        $clonedElement->setSize((int)$containerW, (int)$containerH);
-                    } elseif ($clonedElement instanceof Text && $clonedElement->getText() === '{symbol}') {
                         $clonedElement->setOrigin(
-                            (int)($cellX + $margin + 6),
-                            (int)($cellY + $margin + $containerH - 19)
+                            (int) ($cellX + $margin),
+                            (int) ($cellY + $margin),
+                        );
+                        $clonedElement->setSize(
+                            (int) $containerW,
+                            (int) $containerH,
+                        );
+                    } elseif (
+                        $clonedElement instanceof Text &&
+                        $clonedElement->getText() === "{symbol}"
+                    ) {
+                        $clonedElement->setOrigin(
+                            (int) ($cellX + $margin + 6),
+                            (int) ($cellY + $margin + $containerH - 19),
                         );
                         $clonedElement->setCenterAnchor(false);
-                    } elseif ($clonedElement instanceof Text && (($templateAttributes['template_role'] ?? null) === 'info_button_text')) {
-                        $infoButtonWidth = (int)($containerW - (2 * $innerPadding));
+                    } elseif (
+                        $clonedElement instanceof Text &&
+                        ($templateAttributes["template_role"] ?? null) ===
+                            "info_button_text"
+                    ) {
+                        $infoButtonWidth =
+                            (int) ($containerW - 2 * $innerPadding);
                         $infoButtonHeight = 18;
-                        $infoButtonX = (int)($cellX + $margin + $innerPadding);
-                        $infoButtonY = (int)($cellY + $margin + $innerPadding - 2);
+                        $infoButtonX = (int) ($cellX + $margin + $innerPadding);
+                        $infoButtonY =
+                            (int) ($cellY + $margin + $innerPadding - 2);
                         $clonedElement->setOrigin(
-                            (int)($infoButtonX + floor($infoButtonWidth / 2)),
-                            (int)($infoButtonY + floor($infoButtonHeight / 2))
+                            (int) ($infoButtonX + floor($infoButtonWidth / 2)),
+                            (int) ($infoButtonY + floor($infoButtonHeight / 2)),
                         );
                         $clonedElement->setCenterAnchor(true);
-                    } elseif ($clonedElement instanceof Text && (($templateAttributes['template_role'] ?? null) === 'add_button_text')) {
-                        $addButtonWidth = (int)($containerW - (2 * $innerPadding));
+                    } elseif (
+                        $clonedElement instanceof Text &&
+                        ($templateAttributes["template_role"] ?? null) ===
+                            "add_button_text"
+                    ) {
+                        $addButtonWidth =
+                            (int) ($containerW - 2 * $innerPadding);
                         $addButtonHeight = 18;
-                        $addButtonX = (int)($cellX + $margin + $innerPadding);
-                        $addButtonY = (int)($cellY + $margin + $innerPadding - 2 + 20);
+                        $addButtonX = (int) ($cellX + $margin + $innerPadding);
+                        $addButtonY =
+                            (int) ($cellY + $margin + $innerPadding - 2 + 20);
                         $clonedElement->setOrigin(
-                            (int)($addButtonX + floor($addButtonWidth / 2)),
-                            (int)($addButtonY + floor($addButtonHeight / 2))
+                            (int) ($addButtonX + floor($addButtonWidth / 2)),
+                            (int) ($addButtonY + floor($addButtonHeight / 2)),
                         );
                         $clonedElement->setCenterAnchor(true);
                     } elseif ($clonedElement instanceof Text) {
                         $textX = $hasSymbol ? 24 : 6;
                         $clonedElement->setOrigin(
-                            (int)($cellX + $margin + $textX),
-                            (int)($cellY + $margin + $containerH - 19)
+                            (int) ($cellX + $margin + $textX),
+                            (int) ($cellY + $margin + $containerH - 19),
                         );
                         $clonedElement->setCenterAnchor(false);
                     } elseif ($clonedElement instanceof Rectangle) {
-                        if (($templateAttributes['template_role'] ?? null) === 'info_button_rect') {
-                            $infoButtonWidth = (int)($containerW - (2 * $innerPadding));
+                        if (
+                            ($templateAttributes["template_role"] ?? null) ===
+                            "info_button_rect"
+                        ) {
+                            $infoButtonWidth =
+                                (int) ($containerW - 2 * $innerPadding);
                             $infoButtonHeight = 18;
-                            $infoButtonX = (int)($cellX + $margin + $innerPadding);
-                            $infoButtonY = (int)($cellY + $margin + $innerPadding - 2);
-                            $clonedElement->setOrigin($infoButtonX, $infoButtonY);
-                            $clonedElement->setSize($infoButtonWidth, $infoButtonHeight);
-                        } elseif (($templateAttributes['template_role'] ?? null) === 'add_button_rect') {
-                            $addButtonWidth = (int)($containerW - (2 * $innerPadding));
+                            $infoButtonX =
+                                (int) ($cellX + $margin + $innerPadding);
+                            $infoButtonY =
+                                (int) ($cellY + $margin + $innerPadding - 2);
+                            $clonedElement->setOrigin(
+                                $infoButtonX,
+                                $infoButtonY,
+                            );
+                            $clonedElement->setSize(
+                                $infoButtonWidth,
+                                $infoButtonHeight,
+                            );
+                        } elseif (
+                            ($templateAttributes["template_role"] ?? null) ===
+                            "add_button_rect"
+                        ) {
+                            $addButtonWidth =
+                                (int) ($containerW - 2 * $innerPadding);
                             $addButtonHeight = 18;
-                            $addButtonX = (int)($cellX + $margin + $innerPadding);
-                            $addButtonY = (int)($cellY + $margin + $innerPadding - 2 + 20);
+                            $addButtonX =
+                                (int) ($cellX + $margin + $innerPadding);
+                            $addButtonY =
+                                (int) ($cellY +
+                                    $margin +
+                                    $innerPadding -
+                                    2 +
+                                    20);
                             $clonedElement->setOrigin($addButtonX, $addButtonY);
-                            $clonedElement->setSize($addButtonWidth, $addButtonHeight);
-                            $componentId = isset($cellData['id']) ? (is_numeric($cellData['id']) ? (int) $cellData['id'] : "'" . addslashes((string) $cellData['id']) . "'") : 'null';
-                            $clonedElement->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "console.log('ciao', " . $componentId . ");");
+                            $clonedElement->setSize(
+                                $addButtonWidth,
+                                $addButtonHeight,
+                            );
                         } else {
                             $rectCount++;
-                            $wsX = (int)($cellX + $margin + $innerPadding);
-                            $wsY = (int)($cellY + $margin + $innerPadding + $componentOffsetY);
-                            $wsW = (int)($containerW - 2 * $innerPadding);
-                            $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding - $componentOffsetY);
-                            if (($templateAttributes['template_role'] ?? null) === 'component_frame') {
-                                $squareSize = (int)max(16, min($wsW, $wsH) + 6);
-                                $squareSize = (int)min($squareSize, $wsW + 6);
-                                $squareX = (int)($wsX + floor(($wsW - $squareSize) / 2));
+                            $wsX = (int) ($cellX + $margin + $innerPadding);
+                            $wsY =
+                                (int) ($cellY +
+                                    $margin +
+                                    $innerPadding +
+                                    $componentOffsetY);
+                            $wsW = (int) ($containerW - 2 * $innerPadding);
+                            $wsH =
+                                (int) ($containerH -
+                                    $textAreaHeight -
+                                    2 * $innerPadding -
+                                    $componentOffsetY);
+                            if (
+                                ($templateAttributes["template_role"] ??
+                                    null) ===
+                                "component_frame"
+                            ) {
+                                $squareSize = (int) max(
+                                    16,
+                                    min($wsW, $wsH) + 6,
+                                );
+                                $squareSize = (int) min($squareSize, $wsW + 6);
+                                $squareX =
+                                    (int) ($wsX +
+                                        floor(($wsW - $squareSize) / 2));
                                 $clonedElement->setOrigin($squareX, $wsY);
-                                $clonedElement->setSize($squareSize, $squareSize);
+                                $clonedElement->setSize(
+                                    $squareSize,
+                                    $squareSize,
+                                );
                             } else {
                                 $clonedElement->setOrigin($wsX, $wsY);
                                 $clonedElement->setSize($wsW, $wsH);
                             }
                         }
                     } elseif ($clonedElement instanceof Image) {
-                        $imgPadding = (($templateAttributes['template_role'] ?? null) === 'component_image') ? 4 : 4;
-                        $wsW = (int)($containerW - 2 * $innerPadding);
-                        $wsH = (int)($containerH - $textAreaHeight - 2 * $innerPadding - $componentOffsetY);
-                        $frameSize = (($templateAttributes['template_role'] ?? null) === 'component_image') ? (int)max(16, min($wsW, $wsH) + 6) : $wsW;
-                        if (($templateAttributes['template_role'] ?? null) === 'component_image') {
-                            $frameSize = (int)min($frameSize, $wsW + 6);
+                        $imgPadding =
+                            ($templateAttributes["template_role"] ?? null) ===
+                            "component_image"
+                                ? 4
+                                : 4;
+                        $wsW = (int) ($containerW - 2 * $innerPadding);
+                        $wsH =
+                            (int) ($containerH -
+                                $textAreaHeight -
+                                2 * $innerPadding -
+                                $componentOffsetY);
+                        $frameSize =
+                            ($templateAttributes["template_role"] ?? null) ===
+                            "component_image"
+                                ? (int) max(16, min($wsW, $wsH) + 6)
+                                : $wsW;
+                        if (
+                            ($templateAttributes["template_role"] ?? null) ===
+                            "component_image"
+                        ) {
+                            $frameSize = (int) min($frameSize, $wsW + 6);
                         }
-                        $frameX = (int)($cellX + $margin + $innerPadding + floor(($wsW - $frameSize) / 2));
-                        $imgX = (int)($frameX + $imgPadding);
-                        $imgY = (int)($cellY + $margin + $innerPadding + $imgPadding + $componentOffsetY);
-                        $imgW = (int)(($templateAttributes['template_role'] ?? null) === 'component_image' ? max(12, $frameSize - 2 * $imgPadding) : $wsW - 2 * $imgPadding);
-                        $imgH = (int)(($templateAttributes['template_role'] ?? null) === 'component_image' ? max(12, $frameSize - 2 * $imgPadding) : max(12, $wsH - (2 * $imgPadding)));
+                        $frameX =
+                            (int) ($cellX +
+                                $margin +
+                                $innerPadding +
+                                floor(($wsW - $frameSize) / 2));
+                        $imgX = (int) ($frameX + $imgPadding);
+                        $imgY =
+                            (int) ($cellY +
+                                $margin +
+                                $innerPadding +
+                                $imgPadding +
+                                $componentOffsetY);
+                        $imgW =
+                            (int) (($templateAttributes["template_role"] ??
+                                null) ===
+                            "component_image"
+                                ? max(12, $frameSize - 2 * $imgPadding)
+                                : $wsW - 2 * $imgPadding);
+                        $imgH =
+                            (int) (($templateAttributes["template_role"] ??
+                                null) ===
+                            "component_image"
+                                ? max(12, $frameSize - 2 * $imgPadding)
+                                : max(12, $wsH - 2 * $imgPadding));
                         $clonedElement->setOrigin($imgX, $imgY);
                         $clonedElement->setSize($imgW, $imgH);
                     } else {
                         $clonedElement->setOrigin(
-                            (int)($cellX + $clonedElement->getOriginX()),
-                            (int)($cellY + $clonedElement->getOriginY())
+                            (int) ($cellX + $clonedElement->getOriginX()),
+                            (int) ($cellY + $clonedElement->getOriginY()),
                         );
                     }
                     $clonedElement->setRenderable($this->renderable);
-                    $clonedElement->addAttributes('z_index', $this->baseZIndex + 2 + $templateIndex);
-                    $clonedElement->addAttributes('grid_uid', $uid);
-                    $clonedElement->addAttributes('cell_index', $index);
-                    $clonedElement->addAttributes('cell_value', (string)($index + 1));
-                    
+                    $clonedElement->addAttributes(
+                        "z_index",
+                        $this->baseZIndex + 2 + $templateIndex,
+                    );
+                    $clonedElement->addAttributes("grid_uid", $uid);
+                    $clonedElement->addAttributes("cell_index", $index);
+                    $clonedElement->addAttributes(
+                        "cell_value",
+                        (string) ($index + 1),
+                    );
+
                     // Add tooltip if available in data
                     if (
-                        isset($cellData['tooltip']) &&
-                        !empty($cellData['tooltip']) &&
-                        (
-                            ($templateAttributes['use_cell_tooltip'] ?? false) === true ||
-                            !array_key_exists('use_cell_tooltip', $templateAttributes)
-                        )
+                        isset($cellData["tooltip"]) &&
+                        !empty($cellData["tooltip"]) &&
+                        (($templateAttributes["use_cell_tooltip"] ?? false) ===
+                            true ||
+                            !array_key_exists(
+                                "use_cell_tooltip",
+                                $templateAttributes,
+                            ))
                     ) {
-                        $clonedElement->addAttributes('tooltip_text', $cellData['tooltip']);
+                        $clonedElement->addAttributes(
+                            "tooltip_text",
+                            $cellData["tooltip"],
+                        );
                     }
-                    
+
                     // Replace placeholders in Text elements
                     if ($clonedElement instanceof Text) {
                         $originalText = $clonedElement->getText();
                         foreach ($this->placeholderMappings as $mapping) {
-                            if (isset($mapping['placeholder']) && isset($mapping['dataKey'])) {
+                            if (
+                                isset($mapping["placeholder"]) &&
+                                isset($mapping["dataKey"])
+                            ) {
                                 $originalText = TemplateGridDraw::replacePlaceholdersWithMapping(
-                                    $originalText, 
-                                    $cellData, 
-                                    $mapping['placeholder'], 
-                                    $mapping['dataKey']
+                                    $originalText,
+                                    $cellData,
+                                    $mapping["placeholder"],
+                                    $mapping["dataKey"],
                                 );
                             }
                         }
-                        $maxChars = max(1, (int)(($containerW - 8) / 7));
+                        $maxChars = max(1, (int) (($containerW - 8) / 7));
                         if (mb_strlen($originalText) > $maxChars) {
-                            $originalText = mb_substr($originalText, 0, $maxChars - 1) . '...';
+                            $originalText =
+                                mb_substr($originalText, 0, $maxChars - 1) .
+                                "...";
                         }
                         $clonedElement->setText($originalText);
                     }
@@ -358,19 +530,38 @@ class GridDraw
                     if ($clonedElement instanceof Image) {
                         $src = $clonedElement->getSrc();
                         foreach ($this->placeholderMappings as $mapping) {
-                            if (isset($mapping['placeholder'], $mapping['dataKey'], $cellData[$mapping['dataKey']])) {
-                                if (str_contains($src, $mapping['placeholder'])) {
-                                    $imageFile = $cellData[$mapping['dataKey']];
-                                    if ($imageFile && \Storage::disk($this->imageDisk)->exists($imageFile)) {
-                                        $imageUrl = \Storage::disk($this->imageDisk)->url($imageFile);
-                                        $src = str_replace($mapping['placeholder'], $imageUrl, $src);
+                            if (
+                                isset(
+                                    $mapping["placeholder"],
+                                    $mapping["dataKey"],
+                                    $cellData[$mapping["dataKey"]],
+                                )
+                            ) {
+                                if (
+                                    str_contains($src, $mapping["placeholder"])
+                                ) {
+                                    $imageFile = $cellData[$mapping["dataKey"]];
+                                    if (
+                                        $imageFile &&
+                                        Storage::disk($this->imageDisk)->exists(
+                                            $imageFile,
+                                        )
+                                    ) {
+                                        $imageUrl = Storage::url(
+                                            $this->imageDisk . "/" . $imageFile,
+                                        );
+                                        $src = str_replace(
+                                            $mapping["placeholder"],
+                                            $imageUrl,
+                                            $src,
+                                        );
                                     }
                                 }
                             }
                         }
                         $clonedElement->setSrc($src);
                     }
-                    
+
                     $rect->addChild($clonedElement);
                     $this->drawItems[] = $clonedElement;
                     $elementUids[] = $clonedElement->getUid();
@@ -378,19 +569,19 @@ class GridDraw
                 }
             } else {
                 // Default: text centered
-                $text = new Text($uid . '_text_' . $index);
+                $text = new Text($uid . "_text_" . $index);
                 $text->setCenterAnchor(true);
                 $text->setOrigin(
-                    (int)($cellX + $elementWidth / 2),
-                    (int)($cellY + $elementHeight / 2)
+                    (int) ($cellX + $elementWidth / 2),
+                    (int) ($cellY + $elementHeight / 2),
                 );
-                $text->setText((string)($index + 1));
+                $text->setText((string) ($index + 1));
                 $text->setColor(0x000000);
-                $text->setFontSize(max(10, (int)($elementWidth / 4)));
+                $text->setFontSize(max(10, (int) ($elementWidth / 4)));
                 $text->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
                 $text->setRenderable($this->renderable);
-                $text->addAttributes('z_index', $this->baseZIndex + 2);
-                $text->addAttributes('grid_uid', $uid);
+                $text->addAttributes("z_index", $this->baseZIndex + 2);
+                $text->addAttributes("grid_uid", $uid);
                 $this->drawItems[] = $text;
                 $elementUids[] = $text->getUid();
                 $this->allElementUids[] = $text->getUid();
@@ -398,114 +589,176 @@ class GridDraw
         }
 
         // Build scrollbar
-        $this->buildScrollbar($uid, $x, $y, $width, $height, $gridWidth, $elementHeight, $elementSpacing, $rows, $visibleRows, $elementUids);
+        $this->buildScrollbar(
+            $uid,
+            $x,
+            $y,
+            $width,
+            $height,
+            $gridWidth,
+            $elementHeight,
+            $elementSpacing,
+            $rows,
+            $visibleRows,
+            $elementUids,
+        );
     }
 
-    private function buildScrollbar(string $uid, int $x, int $y, int $width, int $height, int $gridWidth, int $elementHeight, int $elementSpacing, int $totalRows, int $visibleRows, array $elementUids): void
-    {
+    private function buildScrollbar(
+        string $uid,
+        int $x,
+        int $y,
+        int $width,
+        int $height,
+        int $gridWidth,
+        int $elementHeight,
+        int $elementSpacing,
+        int $totalRows,
+        int $visibleRows,
+        array $elementUids,
+    ): void {
         $scrollbarWidth = $this->scrollbarWidth;
         $scrollX = $x + $gridWidth;
         $scrollY = $y;
         $rowStep = $elementHeight + $elementSpacing;
 
         // Scrollbar strip background
-        $scrollbarStrip = new Rectangle($uid . '_scrollbar_strip');
+        $scrollbarStrip = new Rectangle($uid . "_scrollbar_strip");
         $scrollbarStrip->setOrigin($scrollX, $scrollY);
         $scrollbarStrip->setSize($scrollbarWidth, $height);
-        $scrollbarStrip->setColor(0xD0D0D0);
+        $scrollbarStrip->setColor(0xd0d0d0);
         $scrollbarStrip->setRenderable($this->renderable);
-        $scrollbarStrip->addAttributes('z_index', $this->baseZIndex + 10);
+        $scrollbarStrip->addAttributes("z_index", $this->baseZIndex + 10);
         $this->drawItems[] = $scrollbarStrip;
         $this->scrollUids[] = $scrollbarStrip->getUid();
 
         // Scrollbar strip left border
-        $stripLeftBorder = new Rectangle($uid . '_scrollbar_strip_left_border');
+        $stripLeftBorder = new Rectangle($uid . "_scrollbar_strip_left_border");
         $stripLeftBorder->setOrigin($scrollX, $scrollY);
         $stripLeftBorder->setSize(2, $height);
         $stripLeftBorder->setColor(0x000000);
         $stripLeftBorder->setRenderable($this->renderable);
-        $stripLeftBorder->addAttributes('z_index', $this->baseZIndex + 11);
+        $stripLeftBorder->addAttributes("z_index", $this->baseZIndex + 11);
         $this->drawItems[] = $stripLeftBorder;
         $this->scrollUids[] = $stripLeftBorder->getUid();
 
         // Up button
-        $upButton = new Rectangle($uid . '_scroll_up');
+        $upButton = new Rectangle($uid . "_scroll_up");
         $upButton->setOrigin($scrollX, $scrollY);
         $upButton->setSize($scrollbarWidth, $scrollbarWidth);
-        $upButton->setColor(0xBBBBBB);
+        $upButton->setColor(0xbbbbbb);
         $upButton->setRenderable($this->renderable);
-        $upButton->addAttributes('z_index', $this->baseZIndex + 20);
-        $upButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_up_" . $uid . "']();");
+        $upButton->addAttributes("z_index", $this->baseZIndex + 20);
+        $upButton->setInteractive(
+            BasicDraw::INTERACTIVE_POINTER_DOWN,
+            "window['scroll_up_" . $uid . "']();",
+        );
         $this->drawItems[] = $upButton;
         $this->scrollUids[] = $upButton->getUid();
 
         // Up button left border
-        $upLeftBorder = new Rectangle($uid . '_scroll_up_left_border');
+        $upLeftBorder = new Rectangle($uid . "_scroll_up_left_border");
         $upLeftBorder->setOrigin($scrollX, $scrollY);
         $upLeftBorder->setSize(2, $scrollbarWidth);
         $upLeftBorder->setColor(0x000000);
         $upLeftBorder->setRenderable($this->renderable);
-        $upLeftBorder->addAttributes('z_index', $this->baseZIndex + 21);
+        $upLeftBorder->addAttributes("z_index", $this->baseZIndex + 21);
         $this->drawItems[] = $upLeftBorder;
         $this->scrollUids[] = $upLeftBorder->getUid();
 
         // Up text
-        $upText = new Text($uid . '_scroll_up_text');
+        $upText = new Text($uid . "_scroll_up_text");
         $upText->setCenterAnchor(true);
         $upText->setFontSize(18);
-        $upText->setOrigin($scrollX + (int)($scrollbarWidth / 2), $scrollY + (int)($scrollbarWidth / 2));
+        $upText->setOrigin(
+            $scrollX + (int) ($scrollbarWidth / 2),
+            $scrollY + (int) ($scrollbarWidth / 2),
+        );
         $upText->setColor(0x333333);
-        $upText->setText('^');
+        $upText->setText("^");
         $upText->setRenderable($this->renderable);
-        $upText->addAttributes('z_index', $this->baseZIndex + 21);
+        $upText->addAttributes("z_index", $this->baseZIndex + 21);
         $this->drawItems[] = $upText;
         $this->scrollUids[] = $upText->getUid();
 
         // Down button
-        $downButton = new Rectangle($uid . '_scroll_down');
+        $downButton = new Rectangle($uid . "_scroll_down");
         $downButton->setOrigin($scrollX, $scrollY + $height - $scrollbarWidth);
         $downButton->setSize($scrollbarWidth, $scrollbarWidth);
-        $downButton->setColor(0xBBBBBB);
+        $downButton->setColor(0xbbbbbb);
         $downButton->setRenderable($this->renderable);
-        $downButton->addAttributes('z_index', $this->baseZIndex + 20);
-        $downButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, "window['scroll_down_" . $uid . "']();");
+        $downButton->addAttributes("z_index", $this->baseZIndex + 20);
+        $downButton->setInteractive(
+            BasicDraw::INTERACTIVE_POINTER_DOWN,
+            "window['scroll_down_" . $uid . "']();",
+        );
         $this->drawItems[] = $downButton;
         $this->scrollUids[] = $downButton->getUid();
 
         // Down button left border
-        $downLeftBorder = new Rectangle($uid . '_scroll_down_left_border');
-        $downLeftBorder->setOrigin($scrollX, $scrollY + $height - $scrollbarWidth);
+        $downLeftBorder = new Rectangle($uid . "_scroll_down_left_border");
+        $downLeftBorder->setOrigin(
+            $scrollX,
+            $scrollY + $height - $scrollbarWidth,
+        );
         $downLeftBorder->setSize(2, $scrollbarWidth);
         $downLeftBorder->setColor(0x000000);
         $downLeftBorder->setRenderable($this->renderable);
-        $downLeftBorder->addAttributes('z_index', $this->baseZIndex + 21);
+        $downLeftBorder->addAttributes("z_index", $this->baseZIndex + 21);
         $this->drawItems[] = $downLeftBorder;
         $this->scrollUids[] = $downLeftBorder->getUid();
 
         // Down text
-        $downText = new Text($uid . '_scroll_down_text');
+        $downText = new Text($uid . "_scroll_down_text");
         $downText->setCenterAnchor(true);
         $downText->setFontSize(18);
-        $downText->setOrigin($scrollX + (int)($scrollbarWidth / 2), $scrollY + $height - (int)($scrollbarWidth / 2));
+        $downText->setOrigin(
+            $scrollX + (int) ($scrollbarWidth / 2),
+            $scrollY + $height - (int) ($scrollbarWidth / 2),
+        );
         $downText->setColor(0x333333);
-        $downText->setText('V');
+        $downText->setText("V");
         $downText->setRenderable($this->renderable);
-        $downText->addAttributes('z_index', $this->baseZIndex + 21);
+        $downText->addAttributes("z_index", $this->baseZIndex + 21);
         $this->drawItems[] = $downText;
         $this->scrollUids[] = $downText->getUid();
 
         // Generate scroll JS
-        $this->generateScrollJs($uid, $elementUids, $rowStep, $totalRows, $visibleRows);
+        $this->generateScrollJs(
+            $uid,
+            $elementUids,
+            $rowStep,
+            $totalRows,
+            $visibleRows,
+        );
     }
 
-    private function generateScrollJs(string $uid, array $elementUids, int $rowStep, int $totalRows, int $visibleRows): void
-    {
-        $elementUidsJs = '[' . implode(', ', array_map(function($u) { return "'" . $u . "'"; }, $elementUids)) . ']';
-        $panelUid = $uid . '_panel';
+    private function generateScrollJs(
+        string $uid,
+        array $elementUids,
+        int $rowStep,
+        int $totalRows,
+        int $visibleRows,
+    ): void {
+        $elementUidsJs =
+            "[" .
+            implode(
+                ", ",
+                array_map(function ($u) {
+                    return "'" . $u . "'";
+                }, $elementUids),
+            ) .
+            "]";
+        $panelUid = $uid . "_panel";
 
-        $this->scrollInitJs = "(function() {
-    window['moveGridShapes_" . $uid . "'] = function(deltaY, elementUids) {
-        var panel = shapes['" . $panelUid . "'];
+        $this->scrollInitJs =
+            "(function() {
+    window['moveGridShapes_" .
+            $uid .
+            "'] = function(deltaY, elementUids) {
+        var panel = shapes['" .
+            $panelUid .
+            "'];
         if (panel) panel.y += deltaY;
         elementUids.forEach(function(uid) {
             var shape = shapes[uid];
@@ -513,27 +766,51 @@ class GridDraw
         });
     };
 
-    window['scroll_up_" . $uid . "'] = function() {
-        var viewport = shapes['" . $uid . "_viewport'];
+    window['scroll_up_" .
+            $uid .
+            "'] = function() {
+        var viewport = shapes['" .
+            $uid .
+            "_viewport'];
         if (!viewport) return;
         var currentRow = viewport.currentScrollRow || 0;
         if (currentRow > 0) {
             currentRow--;
             viewport.currentScrollRow = currentRow;
-            window['moveGridShapes_" . $uid . "'](" . $rowStep . ", " . $elementUidsJs . ");
+            window['moveGridShapes_" .
+            $uid .
+            "'](" .
+            $rowStep .
+            ", " .
+            $elementUidsJs .
+            ");
         }
     };
 
-    window['scroll_down_" . $uid . "'] = function() {
-        var viewport = shapes['" . $uid . "_viewport'];
+    window['scroll_down_" .
+            $uid .
+            "'] = function() {
+        var viewport = shapes['" .
+            $uid .
+            "_viewport'];
         if (!viewport) return;
         var currentRow = viewport.currentScrollRow || 0;
-        var totalRows = " . $totalRows . ";
-        var visibleRows = " . $visibleRows . ";
+        var totalRows = " .
+            $totalRows .
+            ";
+        var visibleRows = " .
+            $visibleRows .
+            ";
         if (currentRow + visibleRows < totalRows) {
             currentRow++;
             viewport.currentScrollRow = currentRow;
-            window['moveGridShapes_" . $uid . "'](-" . $rowStep . ", " . $elementUidsJs . ");
+            window['moveGridShapes_" .
+            $uid .
+            "'](-" .
+            $rowStep .
+            ", " .
+            $elementUidsJs .
+            ");
         }
     };
 })();";
