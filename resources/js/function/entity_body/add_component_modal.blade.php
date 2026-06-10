@@ -287,6 +287,37 @@
         redrawAddedComponentsOnMainGrid();
     }
 
+    function clearAddedComponents() {
+        addedComponents = [];
+        highlightedComponentIndex = null;
+        redrawAddedComponentsOnMainGrid();
+        renderAddedComponentsList();
+    }
+
+    window['resetAddComponentState_' + parentModalUid] = function() {
+        addedComponents = [];
+        highlightedComponentIndex = null;
+        hideComponentBadges();
+        hideAnchorTooltip();
+        hideBadgeTooltip();
+        clearLinkPreview();
+        closePreviewModal();
+        if (componentListContainer) {
+            componentListContainer.style.display = 'none';
+            componentListContainer.innerHTML = '';
+        }
+        for (var row = 0; row < 32; row++) {
+            for (var col = 0; col < 32; col++) {
+                var cell = shapes[parentModalUid + '_grid_cell_' + row + '_' + col];
+                if (cell) {
+                    cell.tint = 0xFFFFFF;
+                }
+            }
+        }
+        baseMainGridPixels = [];
+        baseMainGridPixelsInitialized = false;
+    };
+
     function ensureComponentListContainer() {
         if (componentListContainer) return componentListContainer;
 
@@ -325,7 +356,7 @@
                 '</tr>';
         }).join('');
         container.innerHTML = '<div style="font-family:Arial;font-size:14px;font-weight:bold;margin-bottom:8px;">Componenti aggiunti</div>' +
-            '<table style="border-collapse:collapse;width:100%;font-family:Arial;font-size:12px;"><tbody>' + rows + '</tbody></table>';
+            '<table style="border-collapse:collapse;width:100%;font-family:Arial;font-size:12px;border:1px solid #000;background:#fff;"><tbody>' + rows + '</tbody></table>';
         container.style.display = 'block';
 
         Array.prototype.forEach.call(container.querySelectorAll('[data-component-row-index]'), function(row) {
@@ -366,6 +397,10 @@
             }
         }
 
+        if (!baseMainGridPixelsInitialized) {
+            return;
+        }
+
         baseMainGridPixels.forEach(function(pixel) {
             var baseCell = shapes[parentModalUid + '_grid_cell_' + pixel.y + '_' + pixel.x];
             if (baseCell) {
@@ -380,7 +415,9 @@
                 if (targetX < 0 || targetX > 31 || targetY < 0 || targetY > 31) return;
                 var cell = shapes[parentModalUid + '_grid_cell_' + targetY + '_' + targetX];
                 if (cell) {
-                    var tint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+                    var componentTint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+                    var baseTint = typeof cell.tint === 'number' ? cell.tint : 0xFFFFFF;
+                    var tint = baseTint === 0xFFFFFF ? componentTint : baseTint;
                     if (highlightedComponentIndex === itemIndex) {
                         var r = (tint >> 16) & 255;
                         var g = (tint >> 8) & 255;
@@ -903,6 +940,30 @@
                 shape.cursor = 'pointer';
                 if (typeof shape.removeAllListeners === 'function') shape.removeAllListeners('pointerdown');
                 shape.on('pointerdown', closePreviewModal);
+            }
+        });
+
+        ['_back_button_rect', '_back_button_text'].forEach(function(suffix) {
+            var backShape = shapes[parentModalUid + suffix];
+            if (backShape) {
+                if (typeof backShape.removeAllListeners === 'function') {
+                    backShape.removeAllListeners('pointerdown');
+                }
+                backShape.eventMode = 'static';
+                backShape.cursor = 'pointer';
+                backShape.on('pointerdown', function() {
+                    clearAddedComponents();
+                    var backHandler = objects[parentModalUid + suffix] && objects[parentModalUid + suffix].attributes && objects[parentModalUid + suffix].attributes.interactives && objects[parentModalUid + suffix].attributes.interactives.items
+                        ? objects[parentModalUid + suffix].attributes.interactives.items.pointerdown
+                        : null;
+                    if (typeof backHandler === 'string') {
+                        try {
+                            eval(backHandler);
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                });
             }
         });
     };

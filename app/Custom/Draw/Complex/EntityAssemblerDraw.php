@@ -108,6 +108,7 @@ class EntityAssemblerDraw
         if ($this->gridScrollInitJs) {
             $jsOpen .= $this->gridScrollInitJs;
         }
+        $jsOpen .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
         $jsOpen = Helper::setCommonJsCode($jsOpen, Str::random(20));
         $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
         $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
@@ -236,6 +237,7 @@ class EntityAssemblerDraw
             resource_path("js/function/modal/click_close_modal.blade.php"),
         );
         $jsClose = str_replace("__MODAL_UID__", $modalUid, $jsClose);
+        $jsClose .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
         $jsClose = Helper::setCommonJsCode($jsClose, Str::random(20));
         $closeButton->setInteractive(
             BasicDraw::INTERACTIVE_POINTER_DOWN,
