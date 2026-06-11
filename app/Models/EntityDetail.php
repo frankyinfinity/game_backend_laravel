@@ -28,4 +28,9 @@ class EntityDetail extends Model
     {
         return $this->morphTo();
     }
+
+    public function entityDetailData()
+    {
+        return $this->hasMany(EntityDetailData::class);
+    }
 }

@@ -21,7 +21,6 @@ use App\Observers\ElementHasPositionNeuronObserver;
 use App\Observers\ElementHasPositionObserver;
 use App\Observers\ElementModifierObserver;
 use App\Observers\EntityChimicalElementObserver;
-use App\Observers\EntityObserver;
 use App\Observers\NeuronObserver;
 use App\Observers\PlayerModifierObserver;
 use App\Observers\RegionObserver;
@@ -50,7 +49,6 @@ class AppServiceProvider extends ServiceProvider
         DrawRequest::observe(DrawRequestObserver::class);
         ElementHasPositionNeuron::observe(ElementHasPositionNeuronObserver::class);
         RuleChimicalElement::observe(RuleChimicalElementObserver::class);
-        Entity::observe(EntityObserver::class);
         EntityChimicalElement::observe(EntityChimicalElementObserver::class);
         PlayerModifier::observe(PlayerModifierObserver::class);
         ElementHasPositionChimicalElement::observe(ElementHasPositionChimicalElementObserver::class);

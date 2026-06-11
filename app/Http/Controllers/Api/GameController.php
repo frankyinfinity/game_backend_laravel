@@ -2247,6 +2247,14 @@ class GameController extends Controller
             ];
 
             // 2) Crea nuova entity in una cella adiacente con lifepoint configurato
+            // Copia immagine della entity sorgente sul nuovo id
+            $newEntityImage = null;
+            if ($entity->image && \Illuminate\Support\Facades\Storage::disk('entity_images')->exists($entity->image)) {
+                $imageContent = \Illuminate\Support\Facades\Storage::disk('entity_images')->get($entity->image);
+                // Il nome definitivo verrà impostato dopo la creazione (usiamo l'id della nuova entity)
+                $newEntityImage = '__pending__';
+            }
+
             $newEntity = Entity::query()->create([
                 'specie_id' => $entity->specie_id,
                 'uid' => uniqid('', true),
@@ -2254,6 +2262,13 @@ class GameController extends Controller
                 'tile_j' => $spawnCell['j'],
                 'state' => Entity::STATE_LIFE,
             ]);
+
+            // Salva l'immagine con il nuovo entity id e aggiorna il record
+            if ($newEntityImage === '__pending__' && isset($imageContent)) {
+                $newImageFilename = $newEntity->id . '.png';
+                \Illuminate\Support\Facades\Storage::disk('entity_images')->put($newImageFilename, $imageContent);
+                $newEntity->update(['image' => $newImageFilename]);
+            }
 
             $sourceGenomes = Genome::query()
                 ->where('entity_id', $entity->id)
@@ -2282,9 +2297,44 @@ class GameController extends Controller
                 ]);
             }
 
-            // 3) Crea e avvia container per la nuova entity
+            // 3) Clona EntityChimicalElement dalla entity sorgente
+            $sourceChimicalElements = EntityChimicalElement::query()
+                ->where('entity_id', $entity->id)
+                ->get();
+
+            foreach ($sourceChimicalElements as $sourceChimical) {
+                EntityChimicalElement::query()->create([
+                    'entity_id'                       => $newEntity->id,
+                    'player_rule_chimical_element_id' => $sourceChimical->player_rule_chimical_element_id,
+                    'value'                           => $sourceChimical->value,
+                ]);
+            }
+
+            // 4) Clona EntityDetail e EntityDetailData dalla entity sorgente
+            $sourceDetails = \App\Models\EntityDetail::query()
+                ->where('entity_id', $entity->id)
+                ->with('entityDetailData')
+                ->get();
+
+            foreach ($sourceDetails as $sourceDetail) {
+                $newDetail = \App\Models\EntityDetail::query()->create([
+                    'entity_id'       => $newEntity->id,
+                    'detailable_type' => $sourceDetail->detailable_type,
+                    'detailable_id'   => $sourceDetail->detailable_id,
+                ]);
+
+                foreach ($sourceDetail->entityDetailData as $sourceData) {
+                    \App\Models\EntityDetailData::query()->create([
+                        'entity_detail_id' => $newDetail->id,
+                        'key'              => $sourceData->key,
+                        'value'            => $sourceData->value,
+                    ]);
+                }
+            }
+
+            // 5) Crea e avvia container per la nuova entity
             /** @var DockerContainerService $containerService */
-            $containerService = app(DockerContainerService::class);
+            $containerService = app(DockerContainerService::class);            
             $container = $containerService->createEntityContainer($newEntity, $player->id, true);
 
             DB::commit();
