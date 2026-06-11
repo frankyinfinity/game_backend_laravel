@@ -287,11 +287,23 @@
         redrawAddedComponentsOnMainGrid();
     }
 
+    function updateSaveButtonVisibility() {
+        var visible = addedComponents.length > 0;
+        ['_save_button_rect', '_save_button_text'].forEach(function(suffix) {
+            var shape = shapes[parentModalUid + suffix];
+            if (shape) shape.renderable = visible;
+            if (objects[parentModalUid + suffix] && objects[parentModalUid + suffix].attributes) {
+                objects[parentModalUid + suffix].attributes.renderable = visible;
+            }
+        });
+    }
+
     function clearAddedComponents() {
         addedComponents = [];
         highlightedComponentIndex = null;
         redrawAddedComponentsOnMainGrid();
         renderAddedComponentsList();
+        updateSaveButtonVisibility();
     }
 
     window['resetAddComponentState_' + parentModalUid] = function() {
@@ -382,6 +394,7 @@
                     addedComponents.splice(index, 1);
                     redrawAddedComponentsOnMainGrid();
                     renderAddedComponentsList();
+                    updateSaveButtonVisibility();
                 }
             };
         });
@@ -790,13 +803,17 @@
             var dx = selectedLinkAnchors.left.anchor.x - selectedLinkAnchors.right.anchor.x;
             var dy = selectedLinkAnchors.left.anchor.y - selectedLinkAnchors.right.anchor.y;
             addedComponents.push({
+                id: selectedComponentData.id || null,
                 name: selectedComponentData.name || 'Componente',
                 pixels: window.__addModalComponentPixels || [],
                 dx: dx,
-                dy: dy
+                dy: dy,
+                body_anchor: selectedLinkAnchors.left.anchor,
+                component_anchor: selectedLinkAnchors.right.anchor
             });
             redrawAddedComponentsOnMainGrid();
             renderAddedComponentsList();
+            updateSaveButtonVisibility();
             window['closeAddComponentModal_' + parentModalUid]();
         };
         var previewAction = function() {
@@ -861,12 +878,20 @@
                     zone_border_left: existingPixel ? !!existingPixel.zone_border_left : false,
                     zone_border_right: existingPixel ? !!existingPixel.zone_border_right : false,
                     zone_color: existingPixel ? existingPixel.zone_color : null,
-                    zone_name: existingPixel ? existingPixel.zone_name : null
+                    zone_name: existingPixel ? existingPixel.zone_name : null,
+                    zone_id: existingPixel && typeof existingPixel.zone_id !== 'undefined' ? existingPixel.zone_id : null
                 };
 
                 bodyPixels.push(copiedPixel);
                 if (!baseMainGridPixelsInitialized) {
-                    baseMainGridPixels.push({ x: copiedPixel.x, y: copiedPixel.y, tint: copiedPixel.tint });
+                    baseMainGridPixels.push({
+                        x: copiedPixel.x,
+                        y: copiedPixel.y,
+                        tint: copiedPixel.tint,
+                        zone_name: copiedPixel.zone_name,
+                        zone_color: copiedPixel.zone_color,
+                        zone_id: copiedPixel.zone_id
+                    });
                 }
 
 
@@ -942,6 +967,54 @@
                 shape.on('pointerdown', closePreviewModal);
             }
         });
+
+        var saveAction = function() {
+            var selectedBodyUid = window['__selectedBodyUid_' + parentModalUid];
+            var bodyObj = selectedBodyUid ? objects[selectedBodyUid] : null;
+            var bodyData = bodyObj && bodyObj.attributes && bodyObj.attributes.cell_data ? JSON.parse(bodyObj.attributes.cell_data) : null;
+            var zoneRgbMap = {};
+            (baseMainGridPixels || []).forEach(function(pixel) {
+                if (!pixel.zone_name && !pixel.zone_color) return;
+                var r = (pixel.tint >> 16) & 255;
+                var g = (pixel.tint >> 8) & 255;
+                var b = pixel.tint & 255;
+                var key = (typeof pixel.zone_id !== 'undefined' ? pixel.zone_id : '') + '|' + (pixel.zone_name || pixel.zone_color || '');
+                if (!zoneRgbMap[key]) {
+                    zoneRgbMap[key] = {
+                        zone_id: typeof pixel.zone_id !== 'undefined' ? pixel.zone_id : null,
+                        zone: pixel.zone_name || null,
+                        rgb: r + ',' + g + ',' + b
+                    };
+                }
+            });
+
+            console.log(JSON.stringify({
+                body_selected: bodyData ? { id: bodyData.id || null, name: bodyData.name || null } : null,
+                zones_rgb: Object.values(zoneRgbMap),
+                components: addedComponents.map(function(item) {
+                    return {
+                        id: item.id,
+                        name: item.name,
+                        link_to_body: {
+                            body_anchor: item.body_anchor,
+                            component_anchor: item.component_anchor
+                        }
+                    };
+                })
+            }, null, 2));
+        };
+
+        window['saveAssemblerComponents_' + parentModalUid] = saveAction;
+
+        ['_save_button_rect', '_save_button_text'].forEach(function(suffix) {
+            var saveShape = shapes[parentModalUid + suffix];
+            if (saveShape) {
+                saveShape.eventMode = 'static';
+                saveShape.cursor = 'pointer';
+            }
+        });
+
+        updateSaveButtonVisibility();
 
         ['_back_button_rect', '_back_button_text'].forEach(function(suffix) {
             var backShape = shapes[parentModalUid + suffix];

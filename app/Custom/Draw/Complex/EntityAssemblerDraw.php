@@ -706,6 +706,9 @@ class EntityAssemblerDraw
                                                 ? $zoneIdToName[$myZoneId] ??
                                                     "Unknown"
                                                 : null,
+                                            "zone_id" => $hasZone
+                                                ? $myZoneId
+                                                : null,
                                         ];
                                     }
                                 }
@@ -1236,10 +1239,43 @@ class EntityAssemblerDraw
         $componentContentUidsJson = json_encode($componentContentUids);
 
         // Red "Indietro" (back) button - shown when tab_component is active
+        $saveButtonWidth = 120;
         $backButtonWidth = 120;
         $backButtonHeight = 35;
-        $backButtonX = $gridX;
+        $backButtonX = $gridX + 132;
         $backButtonY = $gridY + $gridTotalHeight + 10;
+        $saveButtonX = $gridX;
+
+        $saveButtonRect = new Rectangle($modalUid . "_save_button_rect");
+        $saveButtonRect->setOrigin($saveButtonX, $backButtonY);
+        $saveButtonRect->setSize($saveButtonWidth, $backButtonHeight);
+        $saveButtonRect->setColor(0x00aa00);
+        $saveButtonRect->setBorderRadius(5);
+        $saveButtonRect->setRenderable(false);
+        $saveButtonRect->addAttributes("z_index", 20095);
+
+        $saveButtonText = new Text($modalUid . "_save_button_text");
+        $saveButtonText->setCenterAnchor(true);
+        $saveButtonText->setOrigin(
+            $saveButtonX + (int) floor($saveButtonWidth / 2),
+            $backButtonY + (int) floor($backButtonHeight / 2),
+        );
+        $saveButtonText->setText("Salva");
+        $saveButtonText->setColor(0xffffff);
+        $saveButtonText->setFontSize(14);
+        $saveButtonText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $saveButtonText->setRenderable(false);
+        $saveButtonText->addAttributes("z_index", 20096);
+
+        $jsSaveButton = "window['saveAssemblerComponents_{$modalUid}']();";
+        $saveButtonRect->setInteractive(
+            BasicDraw::INTERACTIVE_POINTER_DOWN,
+            $jsSaveButton,
+        );
+        $saveButtonText->setInteractive(
+            BasicDraw::INTERACTIVE_POINTER_DOWN,
+            $jsSaveButton,
+        );
 
         $backButtonRect = new Rectangle($modalUid . "_back_button_rect");
         $backButtonRect->setOrigin($backButtonX, $backButtonY);
@@ -1361,6 +1397,8 @@ class EntityAssemblerDraw
             $jsBackButton,
         );
 
+        $this->drawItems[] = $saveButtonRect;
+        $this->drawItems[] = $saveButtonText;
         $this->drawItems[] = $backButtonRect;
         $this->drawItems[] = $backButtonText;
 
