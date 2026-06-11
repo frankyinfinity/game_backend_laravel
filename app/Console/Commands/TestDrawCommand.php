@@ -6,7 +6,6 @@ use App\Custom\Action\ActionForm;
 use App\Custom\Colors;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\EntityAssemblerDraw;
-use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\SliderDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
@@ -63,23 +62,6 @@ class TestDrawCommand extends Command
             $entityAssembler->getDrawItemsWithObjectDraw($sessionId),
         );
 
-        $inputJson = new InputDraw("assembler_form_json", $sessionId);
-        $inputJson->setName("assembler_json");
-        $inputJson->setTitle("Assembler JSON");
-        $inputJson->setOrigin(20, 145);
-        $inputJson->setSize(520, 50);
-        $inputJson->setBorderThickness(2);
-        $inputJson->setBorderColor(Colors::DARK_GRAY);
-        $inputJson->setTitleColor(Colors::BLACK);
-        $inputJson->setBackgroundColor(Colors::WHITE);
-        $inputJson->setBoxIconColor(Colors::LIGHT_GRAY);
-        $inputJson->setBoxIconTextColor(Colors::BLACK);
-        $inputJson->setValue("");
-        $inputJson->build();
-        foreach ($inputJson->getDrawItems() as $item) {
-            $drawItems[] = new ObjectDraw($item, $sessionId)->get();
-        }
-
         $testButton = new ButtonDraw("assembler_form_test_button");
         $testButton->setSize(180, 50);
         $testButton->setOrigin(20, 235);
@@ -89,7 +71,7 @@ class TestDrawCommand extends Command
         $testButton->setTextFontSize(22);
 
         $form = new ActionForm();
-        $form->setInput($inputJson);
+        $form->setInput($entityAssembler->getActionFormInput($sessionId));
         $form->setSubmitFunction(
             resource_path(
                 "js/function/entity/click_button_form_console_log.blade.php",

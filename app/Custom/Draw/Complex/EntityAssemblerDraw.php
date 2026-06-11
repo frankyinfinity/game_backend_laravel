@@ -5,6 +5,8 @@ namespace App\Custom\Draw\Complex;
 use App\Custom\Draw\Complex\GridDraw;
 use App\Custom\Draw\Complex\TabDraw;
 
+use App\Custom\Colors;
+use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
@@ -20,6 +22,7 @@ class EntityAssemblerDraw
     private array $drawItems = [];
     private $borderRadius = 0;
     private $gridScrollInitJs = "";
+    private ?InputDraw $actionFormInput = null;
 
     public function __construct($uid)
     {
@@ -41,7 +44,41 @@ class EntityAssemblerDraw
             );
             $drawItems[] = $objectDraw->get();
         }
+
+        foreach (
+            $this->getActionFormInput($sessionId)->getDrawItems()
+            as $item
+        ) {
+            $item["attributes"]["renderable"] = false;
+            $drawItems[] = new \App\Custom\Manipulation\ObjectDraw(
+                $item,
+                $sessionId,
+            )->get();
+        }
+
         return $drawItems;
+    }
+
+    public function getActionFormInput(string $sessionId): InputDraw
+    {
+        if ($this->actionFormInput === null) {
+            $input = new InputDraw("assembler_form_json", $sessionId);
+            $input->setName("assembler_json");
+            $input->setTitle("Assembler JSON");
+            $input->setOrigin(20, 145);
+            $input->setSize(520, 50);
+            $input->setBorderThickness(2);
+            $input->setBorderColor(Colors::DARK_GRAY);
+            $input->setTitleColor(Colors::BLACK);
+            $input->setBackgroundColor(Colors::WHITE);
+            $input->setBoxIconColor(Colors::LIGHT_GRAY);
+            $input->setBoxIconTextColor(Colors::BLACK);
+            $input->setValue("");
+            $input->build();
+            $this->actionFormInput = $input;
+        }
+
+        return $this->actionFormInput;
     }
 
     public function setBorderRadius($radius): void
