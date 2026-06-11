@@ -13,6 +13,7 @@ class Entity extends Model
         "tile_i",
         "tile_j",
         "state",
+        "image",
     ];
 
     const STATE_LIFE = 0;

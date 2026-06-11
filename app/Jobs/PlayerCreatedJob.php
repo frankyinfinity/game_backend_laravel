@@ -246,25 +246,8 @@ class PlayerCreatedJob implements ShouldQueue
         // Populate Genome and EntityInformation from str_assembler_json genes (summing values per gene)
         $this->populateEntityInformation($player, $entity);
 
-        // Create Genomes and Entity Information
-        /*$gene_ids = explode(',', $data['gene_ids']);
-        foreach ($gene_ids as $gene_id) {
-            $min = $data['gene_min_' . $gene_id];
-            $max = $data['gene_value_' . $gene_id];
-            $value = $data['gene_value_' . $gene_id];
-
-            $genome = Genome::query()->create([
-                'entity_id' => $entity->id,
-                'gene_id' => $gene_id,
-                'min' => $min,
-                'max' => $max,
-            ]);
-
-            EntityInformation::query()->create([
-                'genome_id' => $genome->id,
-                'value' => $value,
-            ]);
-        }*/
+        // Generate and save entity image from assembler pixels
+        $this->populateEntityImage($player, $entity);
 
         // Dispatch container creation job
         CreatePlayerContainerJob::dispatch($player);
@@ -809,6 +792,78 @@ class PlayerCreatedJob implements ShouldQueue
             'player_id'        => $player->id,
             'entity_id'        => $entity->id,
             'components_count' => count($components),
+        ]);
+    }
+
+    /**
+     * Generate a 32x32 PNG from assembler pixels and save it to entity_images disk.
+     * Pixels with rgb "0,0,0" are treated as transparent.
+     */
+    protected function populateEntityImage(Player $player, Entity $entity): void
+    {
+        Log::info('populateEntityImage called', ['player_id' => $player->id, 'entity_id' => $entity->id]);
+
+        $assemblerJson = $player->str_assembler_json;
+        if (empty($assemblerJson)) {
+            Log::info('No str_assembler_json for entity image', ['player_id' => $player->id]);
+            return;
+        }
+
+        $assemblerData = json_decode($assemblerJson, true);
+        $pixels = $assemblerData['pixels'] ?? [];
+
+        if (empty($pixels)) {
+            Log::info('No pixels in assembler json', ['player_id' => $player->id]);
+            return;
+        }
+
+        // Create a 32x32 true-color image with alpha support
+        $img = imagecreatetruecolor(32, 32);
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+
+        // Fill with fully transparent background
+        $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
+        imagefill($img, 0, 0, $transparent);
+
+        foreach ($pixels as $pixel) {
+            $x   = (int) ($pixel['x'] ?? -1);
+            $y   = (int) ($pixel['y'] ?? -1);
+            $rgb = $pixel['rgb'] ?? '0,0,0';
+
+            if ($x < 0 || $x > 31 || $y < 0 || $y > 31) {
+                continue;
+            }
+
+            $parts = explode(',', $rgb);
+            $r = (int) ($parts[0] ?? 0);
+            $g = (int) ($parts[1] ?? 0);
+            $b = (int) ($parts[2] ?? 0);
+
+            // "0,0,0" = transparent — skip
+            if ($r === 0 && $g === 0 && $b === 0) {
+                continue;
+            }
+
+            $color = imagecolorallocatealpha($img, $r, $g, $b, 0);
+            imagesetpixel($img, $x, $y, $color);
+        }
+
+        // Capture PNG to buffer
+        ob_start();
+        imagepng($img);
+        $pngData = ob_get_clean();
+        imagedestroy($img);
+
+        $filename = $entity->id . '.png';
+        \Illuminate\Support\Facades\Storage::disk('entity_images')->put($filename, $pngData);
+
+        $entity->update(['image' => $filename]);
+
+        Log::info('populateEntityImage completed', [
+            'player_id' => $player->id,
+            'entity_id' => $entity->id,
+            'filename'  => $filename,
         ]);
     }
 
