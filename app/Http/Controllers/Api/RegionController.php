@@ -8,17 +8,15 @@ use App\Models\Region;
 use Illuminate\Support\Str;
 use App\Models\Player;
 use App\Custom\Manipulation\ObjectCache;
+use App\Custom\Manipulation\ObjectClear;
 use App\Models\DrawRequest;
+use App\Custom\Draw\Complex\EntityAssemblerDraw;
 use App\Custom\Draw\Complex\Form\SelectDraw;
-use App\Custom\Draw\Complex\Form\MultiSelectDraw;
 use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Colors;
 use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Action\ActionForm;
-use App\Custom\Draw\Complex\Table\TableDraw;
-use App\Custom\Draw\Complex\Table\TableHeadDraw;
-use App\Custom\Draw\Complex\Table\TableCellDraw;
 use Illuminate\Support\Facades\Log;
 
 class RegionController extends Controller
@@ -81,153 +79,33 @@ class RegionController extends Controller
         $selectRegion->setBoxIconTextColor(Colors::BLACK);
         $selectRegion->build();
 
-        // MultiSelect for RuleChimicalElements (with details)
-        $rulesWithDetails = \App\Models\RuleChimicalElement::query()
-            ->where('type', \App\Models\RuleChimicalElement::TYPE_ENTITY)
-            ->whereHas('details')
-            ->get();
-
-        $multiSelectOptions = $rulesWithDetails->map(function ($rule) {
-            return ['id' => $rule->id, 'name' => $rule->title];
-        })->toArray();
-
-        $yMultiSelect = $y;
-        $xMultiSelect = $x + $width_input + ($width_input / 10);
-
-        $multiSelect = new MultiSelectDraw(Str::random(20), $sessionId);
-        $multiSelect->setName('str_rule_chimical_element_ids');
-        $multiSelect->setTitle('Elementi Chimici*');
-        $multiSelect->setOrigin($xMultiSelect, $yMultiSelect);
-        $multiSelect->setSize($width_input, $height_input);
-        $multiSelect->setBorderThickness(2);
-        $multiSelect->setBorderColor(Colors::DARK_GRAY);
-        $multiSelect->setTitleColor(Colors::BLACK);
-        $multiSelect->setBackgroundColor(Colors::WHITE);
-        $multiSelect->setBoxIconColor(Colors::LIGHT_GRAY);
-        $multiSelect->setBoxIconTextColor(Colors::BLACK);
-        $multiSelect->setValueColor(Colors::BLACK);
-        $multiSelect->setOptionId('id');
-        $multiSelect->setOptionText('name');
-        $multiSelect->setOptionShowDisplay(3);
-        $multiSelect->setOptions($multiSelectOptions);
-        $multiSelect->build();
-
-        //Table
-        $x = 15;
-        $y += 100;
-
-        $requestGene = \Illuminate\Http\Request::create('/api/registration_genes', 'GET');
-        $kernel = app()->make(\Illuminate\Contracts\Http\Kernel::class);
-        $response = $kernel->handle($requestGene);
-        $responseBody = json_decode($response->getContent(), true);
-        $genes = $responseBody['genes'] ?? [];
-
-        $table = new TableDraw(Str::random(20));
-        $table->setOrigin($x, $y);
-        $table->setWidth(1380);
-        $table->setRowHeight(50);
-        $table->setBorderThickness(2);
-        $table->setBorderColor(Colors::DARK_GRAY);
-
-        $head1 = new TableHeadDraw(Str::random(20));
-        $head1->setText('Nome Gene');
-        $head1->setSize(250, 50);
-        $head1->setBorderThickness(2);
-        $head1->setBorderColor(Colors::DARK_GRAY);
-        $table->addHead($head1);
-
-        $head2 = new TableHeadDraw(Str::random(20));
-        $head2->setText('Min');
-        $head2->setSize(100, 50);
-        $head2->setBorderThickness(2);
-        $head2->setBorderColor(Colors::DARK_GRAY);
-        $table->addHead($head2);
-
-        $head3 = new TableHeadDraw(Str::random(20));
-        $head3->setText('Range Max (Da-A)');
-        $head3->setSize(250, 50);
-        $head3->setBorderThickness(2);
-        $head3->setBorderColor(Colors::DARK_GRAY);
-        $table->addHead($head3);
-
-        $head4 = new TableHeadDraw(Str::random(20));
-        $head4->setText('Iniziale');
-        $head4->setSize(150, 50);
-        $head4->setBorderThickness(2);
-        $head4->setBorderColor(Colors::DARK_GRAY);
-        $table->addHead($head4);
-
-        $tableInputs = [];
-        foreach ($genes as $gene) {
-
-            $row = [];
-
-            // Col 1: Nome Gene
-            $cell1 = new TableCellDraw(Str::random(20));
-            $cell1->setContent($gene['name']);
-            $cell1->setBorderThickness(1);
-            $cell1->setBorderColor(Colors::DARK_GRAY);
-            $row[] = $cell1;
-
-            // Col 2
-            $cell2 = new TableCellDraw(Str::random(20));
-            $cell2->setContent($gene['min']);
-            $cell2->setBorderThickness(1);
-            $cell2->setBorderColor(Colors::DARK_GRAY);
-            $row[] = $cell2;
-
-            // Col 3
-            $cell3 = new TableCellDraw(Str::random(20));
-            $cell3->setBorderThickness(1);
-            $cell3->setBorderColor(Colors::DARK_GRAY);
-            if ($gene['max'] !== null) {
-                $cell3->setContent('Fisso: ' . $gene['max']);
-            } else {
-                $cell3->setContent($gene['max_from'] . ' / ' . $gene['max_to']);
-            }
-            $row[] = $cell3;
-
-            // Col 4
-            $cell4 = new TableCellDraw(Str::random(20));
-            $cell4->setSize(150, 50);
-            $cell4->setBorderThickness(1);
-            $cell4->setBorderColor(Colors::DARK_GRAY);
-            $inputGene = new InputDraw(Str::random(20), $sessionId);
-            $inputGene->setName('gene_value_' . $gene['id']);
-            $inputGene->setTitle('');
-            $inputGene->setType(InputDraw::TYPE_NUMBER);
-            $inputGene->setBorderThickness(1);
-            $inputGene->setBorderColor(Colors::DARK_GRAY);
-            $inputGene->setBackgroundColor(Colors::WHITE);
-            $inputGene->setSize(130, 68);
-            $inputGene->setValue($gene['max'] !== null ? $gene['min'] : $gene['max_from']);
-            if ($gene['max'] !== null) {
-                $inputGene->setMin($gene['min']);
-                $inputGene->setMax($gene['max']);
-            } else {
-                $inputGene->setMin($gene['max_from']);
-                $inputGene->setMax($gene['max_to']);
-            }
-            $cell4->setFormElement($inputGene);
-            $row[] = $cell4;
-
-            // Set consistent height for all cells in row
-            $cell1->setSize(250, 50);
-            $cell2->setSize(100, 50);
-            $cell3->setSize(250, 50);
-
-            $table->addRow($row);
-
-            $tableInputs[] = $inputGene;
-
+        // EntityAssemblerDraw (al posto del multiselect elementi chimici)
+        // Inviato solo se non già in cache (evita re-invio del payload da 2.7MB ad ogni cambio pianeta)
+        $xAssembler = (int) ($x + $width_input + ($width_input / 10));
+        $assemblerAlreadyInCache = ObjectCache::find($sessionId, 'register_assembler_button') !== null;
+        $assembler = new EntityAssemblerDraw('register_assembler_button');
+        $assembler->setOrigin($xAssembler, (int) $y);
+        $assembler->setBorderRadius(8);
+        $assembler->build();
+        if (!$assemblerAlreadyInCache) {
+            $drawItems = array_merge(
+                $drawItems,
+                $assembler->getDrawItemsWithObjectDraw($sessionId),
+            );
         }
 
-        $table->build();
+        // Cancella il bottone "Torna al Login" della schermata precedente
+        $objectClear = new ObjectClear('register_login_button', $sessionId);
+        $drawItems[] = $objectClear->get();
+        $objectClear = new ObjectClear('register_login_button_rect', $sessionId);
+        $drawItems[] = $objectClear->get();
+        $objectClear = new ObjectClear('register_login_button_text', $sessionId);
+        $drawItems[] = $objectClear->get();
 
         //Button Registrazione (Blu)
         $x = 15;
-        $y = $table->getBottomY() + 50;
-        $submitButton = new ButtonDraw(Str::random(20) . '_submit_button');
+        $y += 100;
+        $submitButton = new ButtonDraw('register_submit_button');
         $submitButton->setSize(400, 50);
         $submitButton->setOrigin($x, $y);
         $submitButton->setString('Registrazione');
@@ -237,7 +115,7 @@ class RegionController extends Controller
 
         //Button Torna al Login (Rosso)
         $xBack = $x + 400 + 20; // 400 width + 20 gap
-        $backButton = new ButtonDraw(Str::random(20) . '_back_button');
+        $backButton = new ButtonDraw('register_back_button');
         $backButton->setSize(400, 50);
         $backButton->setOrigin($xBack, $y);
         $backButton->setString('Torna al Login');
@@ -253,14 +131,11 @@ class RegionController extends Controller
         }
         $backButton->build();
 
-
         //Action Form
         $actionForm = new ActionForm();
         $actionForm->setSubmitFunction(resource_path('js/function/register/on_submit_register.blade.php'));
 
-
-
-        //Gost Input & Select
+        //Ghost Input & Select
         if ($name_input_uid) {
             $nameInput = new InputDraw($name_input_uid, $sessionId);
             $nameInput->setName('name');
@@ -304,19 +179,7 @@ class RegionController extends Controller
         }
 
         $actionForm->setSelect($selectRegion);
-        $actionForm->setMultiSelect($multiSelect);
-
-        //Table Inputs
-        $geneIds = [];
-        foreach ($genes as $gene) {
-            $geneIds[] = $gene['id'];
-            $actionForm->setExtraData('gene_min_' . $gene['id'], $gene['min']);
-        }
-        $actionForm->setExtraData('gene_ids', implode(',', $geneIds));
-
-        foreach ($tableInputs as $tableInput) {
-            $actionForm->setInput($tableInput);
-        }
+        $actionForm->setInput($assembler->getActionFormInput($sessionId));
         $actionForm->setButton($submitButton);
 
         //Add Back Button to items
@@ -326,21 +189,8 @@ class RegionController extends Controller
             $drawItems[] = $objectDraw->get();
         }
 
-
         //Get all
         $listItems = $selectRegion->getDrawItems();
-        foreach ($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        $listItems = $multiSelect->getDrawItems();
-        foreach ($listItems as $listItem) {
-            $objectDraw = new ObjectDraw($listItem, $sessionId);
-            $drawItems[] = $objectDraw->get();
-        }
-
-        $listItems = $table->getDrawItems();
         foreach ($listItems as $listItem) {
             $objectDraw = new ObjectDraw($listItem, $sessionId);
             $drawItems[] = $objectDraw->get();

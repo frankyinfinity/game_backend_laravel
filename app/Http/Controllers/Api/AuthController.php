@@ -28,25 +28,20 @@ class AuthController extends Controller
             'name_specie' => $request->name_specie,
             'tile_i' => intval($request->tile_i),
             'tile_j' => intval($request->tile_j),
-            'gene_ids' => $request->gene_ids,
         ];
-
-        // Add gene data to registration data
-        $requestArray = $request->toArray();
-        $gene_ids = explode(',', $request->gene_ids);
-        foreach ($gene_ids as $gene_id) {
-            $registrationData['gene_min_' . $gene_id] = $requestArray['gene_min_' . $gene_id];
-            $registrationData['gene_value_' . $gene_id] = $requestArray['gene_value_' . $gene_id];
-        }
 
         // Create Player with registration data
         $player = new Player;
         $player->user_id = $user->id;
-        $player->str_rule_chimical_element_ids = $request->str_rule_chimical_element_ids;
+        $player->str_assembler_json = $request->str_assembler_json;
+
+        // ottenerlo da str_assembler_json
+        //$player->str_rule_chimical_element_ids = $request->str_rule_chimical_element_ids;
+        
         $player->save();
 
         // Dispatch job with registration data
-        PlayerCreatedJob::dispatch($player, $registrationData);
+        //PlayerCreatedJob::dispatch($player, $registrationData);
         return response()->json(['success' => true]);
 
     }

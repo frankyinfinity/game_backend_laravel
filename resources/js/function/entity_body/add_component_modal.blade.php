@@ -344,6 +344,7 @@
         componentListContainer.style.padding = '0';
         componentListContainer.style.boxSizing = 'border-box';
         componentListContainer.style.minWidth = '260px';
+        componentListContainer.style.color = '#000';
         document.body.appendChild(componentListContainer);
         return componentListContainer;
     }
@@ -368,8 +369,8 @@
                 '</td>' +
                 '</tr>';
         }).join('');
-        container.innerHTML = '<div style="font-family:Arial;font-size:14px;font-weight:bold;margin-bottom:8px;">Componenti aggiunti</div>' +
-            '<table style="border-collapse:collapse;width:100%;font-family:Arial;font-size:12px;border:1px solid #000;background:#fff;"><tbody>' + rows + '</tbody></table>';
+        container.innerHTML = '<div style="font-family:Arial;font-size:14px;font-weight:bold;margin-bottom:8px;color:#000;">Componenti aggiunti</div>' +
+            '<table style="border-collapse:collapse;width:100%;font-family:Arial;font-size:12px;border:1px solid #000;background:#fff;color:#000;"><tbody>' + rows + '</tbody></table>';
         container.style.display = 'block';
 
         Array.prototype.forEach.call(container.querySelectorAll('[data-component-row-index]'), function(row) {

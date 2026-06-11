@@ -338,26 +338,27 @@
     function showAnchorTooltip(anchor, cellShape) {
         if (!anchorTooltipElement) {
             anchorTooltipElement = document.createElement('div');
-            anchorTooltipElement.style.position = 'absolute';
+            anchorTooltipElement.style.position = 'fixed';
             anchorTooltipElement.style.backgroundColor = 'white';
             anchorTooltipElement.style.border = '1px solid black';
+            anchorTooltipElement.style.borderRadius = '4px';
             anchorTooltipElement.style.padding = '4px 8px';
             anchorTooltipElement.style.fontSize = '12px';
             anchorTooltipElement.style.fontFamily = 'Arial';
-            anchorTooltipElement.style.zIndex = '9999';
+            anchorTooltipElement.style.zIndex = '200000';
             anchorTooltipElement.style.pointerEvents = 'none';
+            anchorTooltipElement.style.whiteSpace = 'nowrap';
             document.body.appendChild(anchorTooltipElement);
         }
 
         activeAnchorTooltipId = anchor.id;
         anchorTooltipElement.textContent = '#' + anchor.id + ' (X: ' + anchor.x + ' - Y: ' + anchor.y + ')';
+        anchorTooltipElement.style.color = '#000000';
         anchorTooltipElement.style.display = 'block';
 
-        // Position tooltip near the cell
-        var canvas = app.renderer.view;
-        var rect = canvas.getBoundingClientRect();
+        var rect = app.renderer.view.getBoundingClientRect();
         anchorTooltipElement.style.left = (rect.left + cellShape.x) + 'px';
-        anchorTooltipElement.style.top = (rect.top + cellShape.y - 25) + 'px';
+        anchorTooltipElement.style.top = (rect.top + cellShape.y - 28) + 'px';
     }
 
     function hideAnchorTooltip() {

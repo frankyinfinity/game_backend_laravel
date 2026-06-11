@@ -23,10 +23,18 @@ class EntityAssemblerDraw
     private $borderRadius = 0;
     private $gridScrollInitJs = "";
     private ?InputDraw $actionFormInput = null;
+    private int $originX = 0;
+    private int $originY = 0;
 
     public function __construct($uid)
     {
         $this->uid = $uid;
+    }
+
+    public function setOrigin(int $x, int $y): void
+    {
+        $this->originX = $x;
+        $this->originY = $y;
     }
 
     public function getDrawItems(): array
@@ -63,7 +71,7 @@ class EntityAssemblerDraw
     {
         if ($this->actionFormInput === null) {
             $input = new InputDraw("assembler_form_json", $sessionId);
-            $input->setName("assembler_json");
+            $input->setName("str_assembler_json");
             $input->setTitle("Assembler JSON");
             $input->setOrigin(20, 145);
             $input->setSize(520, 50);
@@ -88,8 +96,8 @@ class EntityAssemblerDraw
 
     public function build(): void
     {
-        $marginLeft = 20;
-        $marginTop = 20;
+        $marginLeft = 20 + $this->originX;
+        $marginTop = 20 + $this->originY;
 
         // Rectangle with rounded corners (resized)
         $buttonWidth = 170;
@@ -219,6 +227,10 @@ class EntityAssemblerDraw
             $jsOpen .= $this->gridScrollInitJs;
         }
         $jsOpen .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
+        $jsOpen .= "\n// Mostra overlay per bloccare click sotto la modal";
+        $jsOpen .= "\nvar overlayShape = shapes['{$modalUid}_overlay'];";
+        $jsOpen .= "\nif (overlayShape) { overlayShape.renderable = true; }";
+        $jsOpen .= "\nif (objects['{$modalUid}_overlay'] && objects['{$modalUid}_overlay'].attributes) { objects['{$modalUid}_overlay'].attributes.renderable = true; }";
         $jsOpen .= "\n})();";
         $jsOpen = str_replace("__MODAL_UID__", $modalUid, $jsOpen);
         $jsOpen = str_replace(
@@ -246,6 +258,16 @@ class EntityAssemblerDraw
 
         $modalX = 20;
         $modalY = 20;
+
+        // Overlay fullscreen che blocca i click sotto la modal
+        $overlay = new Rectangle($modalUid . "_overlay");
+        $overlay->setOrigin(0, 0);
+        $overlay->setSize(9999, 9999);
+        $overlay->setColor(0x000000);
+        $overlay->addAttributes("alpha", 0);
+        $overlay->addAttributes("z_index", 19999);
+        $overlay->setRenderable(false);
+        $this->drawItems[] = $overlay;
 
         // Modal body
         $body = new Rectangle($modalUid . "_body");
@@ -356,6 +378,10 @@ class EntityAssemblerDraw
             resource_path("js/function/modal/click_close_modal.blade.php"),
         );
         $jsClose = str_replace("__MODAL_UID__", $modalUid, $jsClose);
+        $jsClose .= "\n// Nasconde overlay al chiusura della modal";
+        $jsClose .= "\nvar overlayShape = shapes['{$modalUid}_overlay'];";
+        $jsClose .= "\nif (overlayShape) { overlayShape.renderable = false; }";
+        $jsClose .= "\nif (objects['{$modalUid}_overlay'] && objects['{$modalUid}_overlay'].attributes) { objects['{$modalUid}_overlay'].attributes.renderable = false; }";
         $jsClose .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
         $jsClose = Helper::setCommonJsCode($jsClose, Str::random(20));
         $closeButton->setInteractive(
@@ -2036,7 +2062,7 @@ class EntityAssemblerDraw
         $addModalUid = $parentModalUid . "_add";
 
         // Wider than the main modal to host badges on the right
-        $modalWidth = 1560;
+        $modalWidth = 1440;
         $modalHeight = 750;
         $modalX = 20;
         $modalY = 20;

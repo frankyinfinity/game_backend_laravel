@@ -430,7 +430,7 @@ class GameController extends Controller
 
         $y += 125;
 
-        $loginButton = new ButtonDraw(Str::random(20) . '_login_button');
+        $loginButton = new ButtonDraw('register_login_button');
         $loginButton->setSize($widthInput, $heightInput);
         $loginButton->setOrigin($x, $y);
         $loginButton->setString('Torna al Login');
