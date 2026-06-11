@@ -91,6 +91,71 @@ class EntityAssemblerDraw
         $square->setThickness(2);
         $square->setRenderable(true);
 
+        $resetButtonWidth = 120;
+        $resetButtonHeight = $buttonHeight;
+        $resetButtonX = $marginLeft + $buttonWidth + 20;
+        $resetButtonY = $marginTop;
+
+        $jsReset = "(function() {";
+        $jsReset .= "\nvar modalUid = 'objective_modal_assembler_{$this->uid}';";
+        $jsReset .=
+            "\nvar inputText = shapes['assembler_form_json_value_text'];";
+        $jsReset .= "\nif (inputText) { inputText.text = ''; }";
+        $jsReset .=
+            "\nif (objects['assembler_form_json_value_text']) { objects['assembler_form_json_value_text'].text = ''; }";
+        $jsReset .=
+            "\nif (objects['assembler_form_json_body_input'] && objects['assembler_form_json_body_input'].attributes) { objects['assembler_form_json_body_input'].attributes.value = ''; }";
+        $jsReset .= "\nvar jsonOutputText = shapes['{$this->uid}_json_output_value_text'];";
+        $jsReset .= "\nif (jsonOutputText) { jsonOutputText.text = ''; }";
+        $jsReset .= "\nif (objects['{$this->uid}_json_output_value_text']) { objects['{$this->uid}_json_output_value_text'].text = ''; }";
+        $jsReset .= "\nif (objects['{$this->uid}_json_output_body_input'] && objects['{$this->uid}_json_output_body_input'].attributes) { objects['{$this->uid}_json_output_body_input'].attributes.value = ''; }";
+        $jsReset .= "\nvar assemblerSquare = shapes['{$this->uid}_square'];";
+        $jsReset .=
+            "\nif (assemblerSquare) { assemblerSquare.tint = 0xE07B00; }";
+        $jsReset .= "\nif (objects['{$this->uid}_square']) { objects['{$this->uid}_square'].color = 0xE07B00; }";
+        $jsReset .= "\nwindow['assemblerSaved_' + modalUid] = false;";
+        $jsReset .=
+            "\nvar resetAddStateFn = window['resetAddComponentState_' + modalUid];";
+        $jsReset .=
+            "\nif (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
+        $jsReset .= "\n['{$this->uid}_reset_rect', '{$this->uid}_reset_text'].forEach(function(uid) {";
+        $jsReset .=
+            "\n    if (shapes[uid]) { shapes[uid].renderable = false; }";
+        $jsReset .=
+            "\n    if (objects[uid] && objects[uid].attributes) { objects[uid].attributes.renderable = false; }";
+        $jsReset .= "\n});";
+        $jsReset .= "\n})();";
+        $jsReset = Helper::setCommonJsCode($jsReset, Str::random(20));
+
+        $resetRect = new Rectangle($this->uid . "_reset_rect");
+        $resetRect->setSize($resetButtonWidth, $resetButtonHeight);
+        $resetRect->setOrigin($resetButtonX, $resetButtonY);
+        $resetRect->setColor(0xff0000);
+        $resetRect->setBorderRadius($this->borderRadius);
+        $resetRect->setBorderColor(0x000000);
+        $resetRect->setThickness(2);
+        $resetRect->setRenderable(false);
+        $resetRect->setInteractive(
+            BasicDraw::INTERACTIVE_POINTER_DOWN,
+            $jsReset,
+        );
+
+        $resetText = new Text($this->uid . "_reset_text");
+        $resetText->setCenterAnchor(true);
+        $resetText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $resetText->setFontSize(22);
+        $resetText->setOrigin(
+            $resetButtonX + $resetButtonWidth / 2,
+            $resetButtonY + $resetButtonHeight / 2,
+        );
+        $resetText->setText("reset");
+        $resetText->setColor(0xffffff);
+        $resetText->setRenderable(false);
+        $resetText->setInteractive(
+            BasicDraw::INTERACTIVE_POINTER_DOWN,
+            $jsReset,
+        );
+
         // Build modal first (creates grid and generates scroll init JS)
         $modalUid = "objective_modal_assembler_" . $this->uid;
         $this->buildModal($modalUid);
@@ -106,7 +171,7 @@ class EntityAssemblerDraw
         $jsOpen .=
             "\nvar normalizedSquareColor = typeof squareColor === 'string' ? squareColor.toLowerCase() : squareColor;";
         $jsOpen .=
-            "\nvar isGreenSquare = squareTint === 0x00FF00 || squareTint === 0x00ff00 || squareTint === 65280 || squareColor === 0x00FF00 || squareColor === 0x00ff00 || squareColor === 65280 || normalizedSquareColor === '#00ff00' || normalizedSquareColor === '0x00ff00' || normalizedSquareColor === '00ff00';";
+            "\nvar isGreenSquare = squareTint === 0x00FF00 || squareTint === 0x00ff00 || squareTint === 0x00AA00 || squareTint === 0x00aa00 || squareTint === 65280 || squareTint === 43520 || squareColor === 0x00FF00 || squareColor === 0x00ff00 || squareColor === 0x00AA00 || squareColor === 0x00aa00 || squareColor === 65280 || squareColor === 43520 || normalizedSquareColor === '#00ff00' || normalizedSquareColor === '0x00ff00' || normalizedSquareColor === '00ff00' || normalizedSquareColor === '#00aa00' || normalizedSquareColor === '0x00aa00' || normalizedSquareColor === '00aa00';";
         $jsOpen .= "\nif (window['assemblerSaved_{$modalUid}'] === true || isGreenSquare) { console.log('Assembler locked'); return; }";
         $jsOpen .=
             "\n" .
@@ -131,6 +196,8 @@ class EntityAssemblerDraw
         $this->drawItems[] = $rect;
         $this->drawItems[] = $text;
         $this->drawItems[] = $square;
+        $this->drawItems[] = $resetRect;
+        $this->drawItems[] = $resetText;
     }
 
     private function buildModal($modalUid): void

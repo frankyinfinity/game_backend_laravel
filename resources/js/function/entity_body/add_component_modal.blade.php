@@ -1025,8 +1025,20 @@
             }
             var assemblerSquare = shapes[assemblerButtonUid + '_square'];
             if (assemblerSquare) {
-                assemblerSquare.tint = 0x00AA00;
+                assemblerSquare.tint = 0x00FF00;
             }
+            if (objects[assemblerButtonUid + '_square']) {
+                objects[assemblerButtonUid + '_square'].color = 0x00FF00;
+            }
+            ['_reset_rect', '_reset_text'].forEach(function(suffix) {
+                var resetShape = shapes[assemblerButtonUid + suffix];
+                if (resetShape) {
+                    resetShape.renderable = true;
+                }
+                if (objects[assemblerButtonUid + suffix] && objects[assemblerButtonUid + suffix].attributes) {
+                    objects[assemblerButtonUid + suffix].attributes.renderable = true;
+                }
+            });
             window['assemblerSaved_' + parentModalUid] = true;
 
             var closeButtonObj = objects[parentModalUid + '_close_button'];
