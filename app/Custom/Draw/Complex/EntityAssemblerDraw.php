@@ -78,14 +78,14 @@ class EntityAssemblerDraw
         $text->setColor(0x0000ff);
         $text->setRenderable(true);
 
-        // White square with blue border inside button, centered vertically with margins from top/right/bottom
+        // Status square inside button: orange before save, green after save
         $squareSize = 36;
         $squareX = $marginLeft + $buttonWidth - $squareSize - 6;
         $squareY = $marginTop + $buttonHeight / 2 - $squareSize / 2;
         $square = new Rectangle($this->uid . "_square");
         $square->setSize($squareSize, $squareSize);
         $square->setOrigin($squareX, $squareY);
-        $square->setColor(0xffffff);
+        $square->setColor(0xe07b00);
         $square->setBorderRadius(2);
         $square->setBorderColor(0x0000ff);
         $square->setThickness(2);
@@ -108,14 +108,68 @@ class EntityAssemblerDraw
         if ($this->gridScrollInitJs) {
             $jsOpen .= $this->gridScrollInitJs;
         }
+        $jsOpen .= "\nvar assemblerSquare = shapes['{$this->uid}_square']; var canOpenAssembler = !!assemblerSquare && (assemblerSquare.tint === 0xE07B00 || assemblerSquare.tint === 0xe07b00); if (window['assemblerSaved_{$modalUid}'] === true || !canOpenAssembler) { console.log('Assembler locked'); } else {";
         $jsOpen .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
+        $jsOpen .= "\n}";
         $jsOpen = Helper::setCommonJsCode($jsOpen, Str::random(20));
         $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
         $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
 
+        $jsonOutputBg = new Rectangle($this->uid . "_json_output_body_input");
+        $jsonOutputBg->setOrigin($marginLeft, $marginTop + $buttonHeight + 12);
+        $jsonOutputBg->setSize(520, 44);
+        $jsonOutputBg->setColor(0xffffff);
+        $jsonOutputBg->setRenderable(true);
+        $jsonOutputBg->addAttributes("border_not_active_color", 0x555555);
+        $jsonOutputBg->addAttributes("border_active_color", 0x0000ff);
+        $jsonOutputBg->addAttributes("active", false);
+        $jsonOutputBg->addAttributes("type", "text");
+        $jsonOutputBg->addAttributes("value", "");
+
+        $jsonOutputBorder = new \App\Custom\Draw\Primitive\MultiLine(
+            $this->uid . "_json_output_border_input",
+        );
+        $jsonOutputBorder->setPoint(
+            $marginLeft,
+            $marginTop + $buttonHeight + 12,
+        );
+        $jsonOutputBorder->setPoint(
+            $marginLeft + 520,
+            $marginTop + $buttonHeight + 12,
+        );
+        $jsonOutputBorder->setPoint(
+            $marginLeft + 520,
+            $marginTop + $buttonHeight + 56,
+        );
+        $jsonOutputBorder->setPoint(
+            $marginLeft,
+            $marginTop + $buttonHeight + 56,
+        );
+        $jsonOutputBorder->setPoint(
+            $marginLeft,
+            $marginTop + $buttonHeight + 12,
+        );
+        $jsonOutputBorder->setThickness(2);
+        $jsonOutputBorder->setColor(0x555555);
+        $jsonOutputBorder->setRenderable(true);
+
+        $jsonOutputText = new Text($this->uid . "_json_output_value_text");
+        $jsonOutputText->setOrigin(
+            $marginLeft + 12,
+            $marginTop + $buttonHeight + 24,
+        );
+        $jsonOutputText->setText("");
+        $jsonOutputText->setColor(0x000000);
+        $jsonOutputText->setFontSize(14);
+        $jsonOutputText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $jsonOutputText->setRenderable(true);
+
         $this->drawItems[] = $rect;
         $this->drawItems[] = $text;
         $this->drawItems[] = $square;
+        $this->drawItems[] = $jsonOutputBg;
+        $this->drawItems[] = $jsonOutputBorder;
+        $this->drawItems[] = $jsonOutputText;
     }
 
     private function buildModal($modalUid): void

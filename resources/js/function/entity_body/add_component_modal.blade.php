@@ -287,8 +287,8 @@
         redrawAddedComponentsOnMainGrid();
     }
 
-    function updateSaveButtonVisibility() {
-        var visible = addedComponents.length > 0;
+    function updateSaveButtonVisibility(forceVisible) {
+        var visible = typeof forceVisible === 'boolean' ? forceVisible : addedComponents.length > 0;
         ['_save_button_rect', '_save_button_text'].forEach(function(suffix) {
             var shape = shapes[parentModalUid + suffix];
             if (shape) shape.renderable = visible;
@@ -318,6 +318,7 @@
             componentListContainer.style.display = 'none';
             componentListContainer.innerHTML = '';
         }
+        updateSaveButtonVisibility(false);
         for (var row = 0; row < 32; row++) {
             for (var col = 0; col < 32; col++) {
                 var cell = shapes[parentModalUid + '_grid_cell_' + row + '_' + col];
@@ -753,6 +754,7 @@
         closePreviewModal();
         if (componentListContainer) componentListContainer.style.display = 'none';
         setMainModalInteractivityDisabled(true);
+        updateSaveButtonVisibility(addedComponents.length > 0);
 
         // Show modal elements
         var body = shapes[addModalUid + '_body'];
@@ -988,7 +990,7 @@
                 }
             });
 
-            console.log(JSON.stringify({
+            var payload = {
                 body_selected: bodyData ? { id: bodyData.id || null, name: bodyData.name || null } : null,
                 zones_rgb: Object.values(zoneRgbMap),
                 components: addedComponents.map(function(item) {
@@ -1001,7 +1003,35 @@
                         }
                     };
                 })
-            }, null, 2));
+            };
+            var payloadJson = JSON.stringify(payload);
+            console.log(payloadJson);
+
+            var assemblerButtonUid = parentModalUid.replace('objective_modal_assembler_', '');
+            var jsonOutputText = shapes[assemblerButtonUid + '_json_output_value_text'];
+            if (jsonOutputText) {
+                jsonOutputText.text = payloadJson;
+            }
+            if (objects[assemblerButtonUid + '_json_output_body_input'] && objects[assemblerButtonUid + '_json_output_body_input'].attributes) {
+                objects[assemblerButtonUid + '_json_output_body_input'].attributes.value = payloadJson;
+            }
+            var assemblerSquare = shapes[assemblerButtonUid + '_square'];
+            if (assemblerSquare) {
+                assemblerSquare.tint = 0x00AA00;
+            }
+            window['assemblerSaved_' + parentModalUid] = true;
+
+            var closeButtonObj = objects[parentModalUid + '_close_button'];
+            var closeScript = closeButtonObj && closeButtonObj.attributes && closeButtonObj.attributes.interactives && closeButtonObj.attributes.interactives.items
+                ? closeButtonObj.attributes.interactives.items.pointerdown
+                : null;
+            if (typeof closeScript === 'string' && closeScript.length > 0) {
+                try {
+                    eval(closeScript);
+                } catch (error) {
+                    console.error(error);
+                }
+            }
         };
 
         window['saveAssemblerComponents_' + parentModalUid] = saveAction;
