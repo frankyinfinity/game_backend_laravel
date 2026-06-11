@@ -990,9 +990,47 @@
                 }
             });
 
+            var pixelsMap = {};
+            (baseMainGridPixels || []).forEach(function(pixel) {
+                if (!pixel || typeof pixel.x === 'undefined' || typeof pixel.y === 'undefined') return;
+                var baseTint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+                if (baseTint === 0xFFFFFF) return;
+                pixelsMap[pixel.x + '|' + pixel.y] = {
+                    x: pixel.x,
+                    y: pixel.y,
+                    tint: baseTint
+                };
+            });
+            addedComponents.forEach(function(item) {
+                (item.pixels || []).forEach(function(pixel) {
+                    var targetX = pixel.x + item.dx;
+                    var targetY = pixel.y + item.dy;
+                    if (targetX < 0 || targetX > 31 || targetY < 0 || targetY > 31) return;
+                    var componentTint = typeof pixel.tint === 'number' ? pixel.tint : 0x000000;
+                    var key = targetX + '|' + targetY;
+                    if (!pixelsMap[key] || pixelsMap[key].tint === 0xFFFFFF) {
+                        pixelsMap[key] = {
+                            x: targetX,
+                            y: targetY,
+                            tint: componentTint
+                        };
+                    }
+                });
+            });
+
             var payload = {
                 body_selected: bodyData ? { id: bodyData.id || null, name: bodyData.name || null } : null,
                 zones_rgb: Object.values(zoneRgbMap),
+                pixels: Object.values(pixelsMap).map(function(pixel) {
+                    var r = (pixel.tint >> 16) & 255;
+                    var g = (pixel.tint >> 8) & 255;
+                    var b = pixel.tint & 255;
+                    return {
+                        x: pixel.x,
+                        y: pixel.y,
+                        rgb: r + ',' + g + ',' + b
+                    };
+                }),
                 components: addedComponents.map(function(item) {
                     return {
                         id: item.id,
