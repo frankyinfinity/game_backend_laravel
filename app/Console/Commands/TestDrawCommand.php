@@ -2,7 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Custom\Action\ActionForm;
+use App\Custom\Colors;
+use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\EntityAssemblerDraw;
+use App\Custom\Draw\Complex\Form\InputDraw;
 use App\Custom\Draw\Complex\SliderDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
@@ -18,14 +22,14 @@ class TestDrawCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'test:draw';
+    protected $signature = "test:draw";
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send test draw events to the test page - modal draw test';
+    protected $description = "Send test draw events to the test page - modal draw test";
 
     /**
      * Execute the console command.
@@ -33,7 +37,7 @@ class TestDrawCommand extends Command
     public function handle()
     {
         $requestId = Str::uuid()->toString();
-        $sessionId = 'test_session_fixed';
+        $sessionId = "test_session_fixed";
 
         $eventPlayerId = 1;
 
@@ -51,10 +55,53 @@ class TestDrawCommand extends Command
         ObjectCache::clear($sessionId);
 
         // Use EntityAssemblerDraw
-        $entityAssembler = new EntityAssemblerDraw('assembler_button');
+        $entityAssembler = new EntityAssemblerDraw("assembler_button");
         $entityAssembler->setBorderRadius(8);
         $entityAssembler->build();
-        $drawItems = array_merge($drawItems, $entityAssembler->getDrawItemsWithObjectDraw($sessionId));
+        $drawItems = array_merge(
+            $drawItems,
+            $entityAssembler->getDrawItemsWithObjectDraw($sessionId),
+        );
+
+        $inputJson = new InputDraw("assembler_form_json", $sessionId);
+        $inputJson->setName("assembler_json");
+        $inputJson->setTitle("Assembler JSON");
+        $inputJson->setOrigin(20, 145);
+        $inputJson->setSize(520, 50);
+        $inputJson->setBorderThickness(2);
+        $inputJson->setBorderColor(Colors::DARK_GRAY);
+        $inputJson->setTitleColor(Colors::BLACK);
+        $inputJson->setBackgroundColor(Colors::WHITE);
+        $inputJson->setBoxIconColor(Colors::LIGHT_GRAY);
+        $inputJson->setBoxIconTextColor(Colors::BLACK);
+        $inputJson->setValue("");
+        $inputJson->build();
+        foreach ($inputJson->getDrawItems() as $item) {
+            $drawItems[] = new ObjectDraw($item, $sessionId)->get();
+        }
+
+        $testButton = new ButtonDraw("assembler_form_test_button");
+        $testButton->setSize(180, 50);
+        $testButton->setOrigin(20, 235);
+        $testButton->setString("test");
+        $testButton->setColorButton(Colors::BLUE);
+        $testButton->setColorString(Colors::WHITE);
+        $testButton->setTextFontSize(22);
+
+        $form = new ActionForm();
+        $form->setInput($inputJson);
+        $form->setSubmitFunction(
+            resource_path(
+                "js/function/entity/click_button_form_console_log.blade.php",
+            ),
+        );
+        $form->setButton($testButton);
+        foreach ($testButton->getDrawItems() as $item) {
+            $drawItems[] = new ObjectDraw(
+                $item->buildJson(),
+                $sessionId,
+            )->get();
+        }
 
         /*
         // Slider below assembler button
@@ -73,15 +120,15 @@ class TestDrawCommand extends Command
 
         ObjectCache::flush($sessionId);
 
-        $this->info('Total draw items: ' . count($drawItems));
+        $this->info("Total draw items: " . count($drawItems));
 
         DrawRequest::query()->create([
-            'session_id' => $sessionId,
-            'request_id' => $requestId,
-            'player_id' => $eventPlayerId,
-            'items' => json_encode($drawItems),
+            "session_id" => $sessionId,
+            "request_id" => $requestId,
+            "player_id" => $eventPlayerId,
+            "items" => json_encode($drawItems),
         ]);
 
-        $this->info('Test draw event sent. Check the /test page.');
+        $this->info("Test draw event sent. Check the /test page.");
     }
 }

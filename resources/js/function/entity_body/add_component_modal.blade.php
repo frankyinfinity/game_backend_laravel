@@ -1015,6 +1015,14 @@
             if (objects[assemblerButtonUid + '_json_output_body_input'] && objects[assemblerButtonUid + '_json_output_body_input'].attributes) {
                 objects[assemblerButtonUid + '_json_output_body_input'].attributes.value = payloadJson;
             }
+
+            var testInputText = shapes['assembler_form_json_value_text'];
+            if (testInputText) {
+                testInputText.text = payloadJson;
+            }
+            if (objects['assembler_form_json_body_input'] && objects['assembler_form_json_body_input'].attributes) {
+                objects['assembler_form_json_body_input'].attributes.value = payloadJson;
+            }
             var assemblerSquare = shapes[assemblerButtonUid + '_square'];
             if (assemblerSquare) {
                 assemblerSquare.tint = 0x00AA00;

@@ -95,81 +95,42 @@ class EntityAssemblerDraw
         $modalUid = "objective_modal_assembler_" . $this->uid;
         $this->buildModal($modalUid);
 
-        // Add click handler to open modal (with grid scroll init appended)
-        $jsOpen = file_get_contents(
-            resource_path("js/function/modal/click_open_modal.blade.php"),
-        );
+        // Add click handler to open modal only while the status square is not green.
+        $jsOpen = "(function() {";
+        $jsOpen .= "\nvar assemblerSquare = shapes['{$this->uid}_square'];";
+        $jsOpen .= "\nvar assemblerSquareObject = objects['{$this->uid}_square'];";
+        $jsOpen .=
+            "\nvar squareTint = assemblerSquare && typeof assemblerSquare.tint !== 'undefined' ? Number(assemblerSquare.tint) : null;";
+        $jsOpen .=
+            "\nvar squareColor = assemblerSquareObject && typeof assemblerSquareObject.color !== 'undefined' ? assemblerSquareObject.color : null;";
+        $jsOpen .=
+            "\nvar normalizedSquareColor = typeof squareColor === 'string' ? squareColor.toLowerCase() : squareColor;";
+        $jsOpen .=
+            "\nvar isGreenSquare = squareTint === 0x00FF00 || squareTint === 0x00ff00 || squareTint === 65280 || squareColor === 0x00FF00 || squareColor === 0x00ff00 || squareColor === 65280 || normalizedSquareColor === '#00ff00' || normalizedSquareColor === '0x00ff00' || normalizedSquareColor === '00ff00';";
+        $jsOpen .= "\nif (window['assemblerSaved_{$modalUid}'] === true || isGreenSquare) { console.log('Assembler locked'); return; }";
+        $jsOpen .=
+            "\n" .
+            file_get_contents(
+                resource_path("js/function/modal/click_open_modal.blade.php"),
+            );
+        if ($this->gridScrollInitJs) {
+            $jsOpen .= $this->gridScrollInitJs;
+        }
+        $jsOpen .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
+        $jsOpen .= "\n})();";
         $jsOpen = str_replace("__MODAL_UID__", $modalUid, $jsOpen);
         $jsOpen = str_replace(
             "__name__",
             "open_assembler_modal_" . $this->uid,
             $jsOpen,
         );
-        if ($this->gridScrollInitJs) {
-            $jsOpen .= $this->gridScrollInitJs;
-        }
-        $jsOpen .= "\nvar assemblerSquare = shapes['{$this->uid}_square']; var canOpenAssembler = !!assemblerSquare && (assemblerSquare.tint === 0xE07B00 || assemblerSquare.tint === 0xe07b00); if (window['assemblerSaved_{$modalUid}'] === true || !canOpenAssembler) { console.log('Assembler locked'); } else {";
-        $jsOpen .= "\nvar resetAddStateFn = window['resetAddComponentState_{$modalUid}']; if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
-        $jsOpen .= "\n}";
         $jsOpen = Helper::setCommonJsCode($jsOpen, Str::random(20));
         $rect->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
         $square->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsOpen);
 
-        $jsonOutputBg = new Rectangle($this->uid . "_json_output_body_input");
-        $jsonOutputBg->setOrigin($marginLeft, $marginTop + $buttonHeight + 12);
-        $jsonOutputBg->setSize(520, 44);
-        $jsonOutputBg->setColor(0xffffff);
-        $jsonOutputBg->setRenderable(true);
-        $jsonOutputBg->addAttributes("border_not_active_color", 0x555555);
-        $jsonOutputBg->addAttributes("border_active_color", 0x0000ff);
-        $jsonOutputBg->addAttributes("active", false);
-        $jsonOutputBg->addAttributes("type", "text");
-        $jsonOutputBg->addAttributes("value", "");
-
-        $jsonOutputBorder = new \App\Custom\Draw\Primitive\MultiLine(
-            $this->uid . "_json_output_border_input",
-        );
-        $jsonOutputBorder->setPoint(
-            $marginLeft,
-            $marginTop + $buttonHeight + 12,
-        );
-        $jsonOutputBorder->setPoint(
-            $marginLeft + 520,
-            $marginTop + $buttonHeight + 12,
-        );
-        $jsonOutputBorder->setPoint(
-            $marginLeft + 520,
-            $marginTop + $buttonHeight + 56,
-        );
-        $jsonOutputBorder->setPoint(
-            $marginLeft,
-            $marginTop + $buttonHeight + 56,
-        );
-        $jsonOutputBorder->setPoint(
-            $marginLeft,
-            $marginTop + $buttonHeight + 12,
-        );
-        $jsonOutputBorder->setThickness(2);
-        $jsonOutputBorder->setColor(0x555555);
-        $jsonOutputBorder->setRenderable(true);
-
-        $jsonOutputText = new Text($this->uid . "_json_output_value_text");
-        $jsonOutputText->setOrigin(
-            $marginLeft + 12,
-            $marginTop + $buttonHeight + 24,
-        );
-        $jsonOutputText->setText("");
-        $jsonOutputText->setColor(0x000000);
-        $jsonOutputText->setFontSize(14);
-        $jsonOutputText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
-        $jsonOutputText->setRenderable(true);
-
         $this->drawItems[] = $rect;
         $this->drawItems[] = $text;
         $this->drawItems[] = $square;
-        $this->drawItems[] = $jsonOutputBg;
-        $this->drawItems[] = $jsonOutputBorder;
-        $this->drawItems[] = $jsonOutputText;
     }
 
     private function buildModal($modalUid): void
