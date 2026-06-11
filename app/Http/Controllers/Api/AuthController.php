@@ -35,9 +35,20 @@ class AuthController extends Controller
         $player->user_id = $user->id;
         $player->str_assembler_json = $request->str_assembler_json;
 
-        // ottenerlo da str_assembler_json
-        //$player->str_rule_chimical_element_ids = $request->str_rule_chimical_element_ids;
-        
+        // Estrai str_rule_chimical_element_ids dagli EntityComponent indicati in str_assembler_json
+        $assemblerData = json_decode($request->str_assembler_json, true);
+        $componentIds = collect($assemblerData['components'] ?? [])->pluck('id')->filter()->unique()->values();
+
+        $ruleChimicalElementIds = \App\Models\EntityComponent::whereIn('id', $componentIds)
+            ->with('ruleChimicalElements')
+            ->get()
+            ->flatMap(fn($ec) => $ec->ruleChimicalElements->pluck('rule_chimical_element_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $player->str_rule_chimical_element_ids = $ruleChimicalElementIds->implode(',');
+
         $player->save();
 
         // Dispatch job with registration data
