@@ -4,6 +4,7 @@ namespace App\Custom\Draw\Complex;
 
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Text;
@@ -83,12 +84,13 @@ class EntityDraw
         $centerSquare = $square->getCenter();
 
         //Body
-        $circle = New Circle($dbEntity->uid);
-        $circle->setOrigin($centerSquare['x'], y: $centerSquare['y']);
-        $circle->setRadius($size / 3);
-
-        $formattedColor = $this->getColor();
-        $circle->setColor($formattedColor);
+        $entitySize = 32;
+        $imageUrl = \Illuminate\Support\Facades\Storage::disk('entity_images')->url($dbEntity->image);
+        $entityImage = new Image($dbEntity->uid);
+        $entityImage->setOrigin($centerSquare['x'], $centerSquare['y']);
+        $entityImage->setSize($entitySize, $entitySize);
+        $entityImage->setSrc($imageUrl);
+        $entityImage->setCenterAnchor(true);
 
         $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
         $jsContentClickEntity = file_get_contents($jsPathClickEntity);
@@ -109,12 +111,12 @@ class EntityDraw
         $jsContentClickEntity = str_replace('__player_port__', $playerWsPort, $jsContentClickEntity);
         $jsContentClickEntity = Helper::setCommonJsCode($jsContentClickEntity, Str::random(20));
 
-        $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickEntity);
+        $entityImage->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClickEntity);
         foreach ($dbEntity->getFieldAttributes() as $key => $value) {
-            $circle->addAttributes($key, $value);
+            $entityImage->addAttributes($key, $value);
         }
-        $circle->addAttributes('ws_port', $wsPort);
-        $circle->addAttributes('player_port', $playerWsPort);
+        $entityImage->addAttributes('ws_port', $wsPort);
+        $entityImage->addAttributes('player_port', $playerWsPort);
 
         //Panel
         $panelX = $centerSquare['x'] + ($size / 3);
@@ -303,7 +305,7 @@ class EntityDraw
         }
 
         //Set Children (Panel)
-        $circle->addChild($panel);
+        $entityImage->addChild($panel);
         $panel->addChild($text1);
         $panel->addChild($text2);
         foreach ($upButton->getDrawItems() as $item) {$panel->addChild($item);}
@@ -320,7 +322,7 @@ class EntityDraw
         }
 
         //Get JSON
-        $this->drawItems[] = $circle->buildJson();
+        $this->drawItems[] = $entityImage->buildJson();
         $this->drawItems[] = $panel->buildJson();
         $this->drawItems[] = $text1->buildJson();
         $this->drawItems[] = $text2->buildJson();

@@ -8,6 +8,7 @@ class Image extends BasicDraw
     private $src;
     private $width;
     private $height;
+    private bool $centerAnchor = false;
 
     public function __construct($uid = null)
     {
@@ -33,12 +34,18 @@ class Image extends BasicDraw
         $this->height = $height;
     }
 
+    public function setCenterAnchor(bool $value): void
+    {
+        $this->centerAnchor = $value;
+    }
+
     public function buildJson(): array
     {
         return $this->commonJson([
             'src' => $this->src,
             'width' => $this->width,
-            'height' => $this->height
+            'height' => $this->height,
+            'centerAnchor' => $this->centerAnchor,
         ]);
     }
 
