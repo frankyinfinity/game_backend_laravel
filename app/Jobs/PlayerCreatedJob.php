@@ -16,11 +16,17 @@ use App\Models\BirthRegionLimitDetail;
 use App\Models\ChimicalElement;
 use App\Models\ComplexChimicalElement;
 use App\Models\Entity;
+use App\Models\EntityBody;
+use App\Models\EntityBodyZone;
 use App\Models\EntityChimicalElement;
+use App\Models\EntityComponent;
+use App\Models\EntityDetail;
+use App\Models\EntityDetailData;
 use App\Models\EntityInformation;
 use App\Models\FamilyTile;
 use App\Models\FamilyTileDiffusion;
 use App\Models\FamilyTileLimit;
+use App\Models\Gene;
 use App\Models\Genome;
 use App\Models\Phase;
 use App\Models\PhaseColumn;
@@ -234,8 +240,14 @@ class PlayerCreatedJob implements ShouldQueue
             'tile_j' => $data['tile_j'],
         ]);
 
+        // Populate EntityDetail and EntityDetailData from str_assembler_json
+        $this->populateEntityDetails($player, $entity);
+
+        // Populate Genome and EntityInformation from str_assembler_json genes (summing values per gene)
+        $this->populateEntityInformation($player, $entity);
+
         // Create Genomes and Entity Information
-        $gene_ids = explode(',', $data['gene_ids']);
+        /*$gene_ids = explode(',', $data['gene_ids']);
         foreach ($gene_ids as $gene_id) {
             $min = $data['gene_min_' . $gene_id];
             $max = $data['gene_value_' . $gene_id];
@@ -252,12 +264,12 @@ class PlayerCreatedJob implements ShouldQueue
                 'genome_id' => $genome->id,
                 'value' => $value,
             ]);
-        }
+        }*/
 
         // Dispatch container creation job
         CreatePlayerContainerJob::dispatch($player);
-
         return $birthRegionIds;
+
     }
 
     /**
@@ -623,6 +635,181 @@ class PlayerCreatedJob implements ShouldQueue
 
             }
         }
+    }
+
+    /**
+     * Populate Genome and EntityInformation from str_assembler_json.
+     * Genes appearing in multiple components have their values summed.
+     */
+    protected function populateEntityInformation(Player $player, Entity $entity): void
+    {
+        Log::info('populateEntityInformation called', ['player_id' => $player->id, 'entity_id' => $entity->id]);
+
+        $assemblerJson = $player->str_assembler_json;
+        if (empty($assemblerJson)) {
+            return;
+        }
+
+        $assemblerData = json_decode($assemblerJson, true);
+        $components    = $assemblerData['components'] ?? [];
+        if (empty($components)) {
+            return;
+        }
+
+        // Collect all component IDs and eager-load their genes
+        $componentIds = collect($components)->pluck('id')->filter()->unique()->values()->all();
+
+        $entityComponents = EntityComponent::whereIn('id', $componentIds)
+            ->with('genes.gene')
+            ->get();
+
+        // Sum values per gene_id across all components
+        $geneValueMap = []; // [gene_id => total_value]
+        foreach ($entityComponents as $ec) {
+            foreach ($ec->genes as $geneRel) {
+                if (!$geneRel->gene) {
+                    continue;
+                }
+                $geneId = $geneRel->gene_id;
+                $geneValueMap[$geneId] = ($geneValueMap[$geneId] ?? 0) + (int) $geneRel->value;
+            }
+        }
+
+        if (empty($geneValueMap)) {
+            Log::info('No genes found in components', ['player_id' => $player->id]);
+            return;
+        }
+
+        // Load all needed genes in one query
+        $genes = Gene::whereIn('id', array_keys($geneValueMap))->get()->keyBy('id');
+
+        foreach ($geneValueMap as $geneId => $totalValue) {
+            $gene = $genes->get($geneId);
+            if (!$gene) {
+                Log::warning('Gene not found', ['gene_id' => $geneId]);
+                continue;
+            }
+
+            $genome = Genome::create([
+                'entity_id' => $entity->id,
+                'gene_id'   => $geneId,
+                'min'       => $gene->min ?? 0,
+                'max'       => $gene->max ?? $totalValue,
+            ]);
+
+            EntityInformation::create([
+                'genome_id' => $genome->id,
+                'value'     => $totalValue,
+            ]);
+        }
+
+        Log::info('populateEntityInformation completed', [
+            'player_id'  => $player->id,
+            'entity_id'  => $entity->id,
+            'genes_count' => count($geneValueMap),
+        ]);
+    }
+
+    /**
+     * Populate EntityDetail and EntityDetailData from str_assembler_json components.
+     */
+    protected function populateEntityDetails(Player $player, Entity $entity): void
+    {
+        Log::info('populateEntityDetails called', ['player_id' => $player->id, 'entity_id' => $entity->id]);
+
+        $assemblerJson = $player->str_assembler_json;
+        if (empty($assemblerJson)) {
+            Log::info('No str_assembler_json found for player', ['player_id' => $player->id]);
+            return;
+        }
+
+        $assemblerData = json_decode($assemblerJson, true);
+
+        // --- EntityBody ---
+        $bodyId = $assemblerData['body_selected']['id'] ?? null;
+        if ($bodyId) {
+            $entityBody = EntityBody::with('zones')->find($bodyId);
+            if ($entityBody) {
+                EntityDetail::create([
+                    'entity_id'       => $entity->id,
+                    'detailable_type' => EntityBody::class,
+                    'detailable_id'   => $entityBody->id,
+                ]);
+
+                // --- EntityBodyZone (one EntityDetail + EntityDetailData per zone) ---
+                foreach ($entityBody->zones as $zone) {
+                    $zoneDetail = EntityDetail::create([
+                        'entity_id'       => $entity->id,
+                        'detailable_type' => EntityBodyZone::class,
+                        'detailable_id'   => $zone->id,
+                    ]);
+
+                    $zoneKeyValues = [
+                        'name'  => $zone->name,
+                        'color' => $zone->color,
+                    ];
+
+                    foreach ($zoneKeyValues as $key => $value) {
+                        if ($value === null) {
+                            continue;
+                        }
+
+                        EntityDetailData::create([
+                            'entity_detail_id' => $zoneDetail->id,
+                            'key'              => $key,
+                            'value'            => (string) $value,
+                        ]);
+                    }
+                }
+            } else {
+                Log::warning('EntityBody not found', ['id' => $bodyId]);
+            }
+        }
+
+        // --- EntityComponent ---
+        $components = $assemblerData['components'] ?? [];
+        foreach ($components as $componentData) {
+            $componentId = $componentData['id'] ?? null;
+            if (!$componentId) {
+                continue;
+            }
+
+            $entityComponent = EntityComponent::find($componentId);
+            if (!$entityComponent) {
+                Log::warning('EntityComponent not found', ['id' => $componentId]);
+                continue;
+            }
+
+            $entityDetail = EntityDetail::create([
+                'entity_id'       => $entity->id,
+                'detailable_type' => EntityComponent::class,
+                'detailable_id'   => $entityComponent->id,
+            ]);
+
+            $keyValues = [
+                'name'             => $componentData['name'] ?? $entityComponent->name,
+                'body_anchor'      => $componentData['link_to_body']['body_anchor'] ?? null,
+                'component_anchor' => $componentData['link_to_body']['component_anchor'] ?? null,
+            ];
+
+            foreach ($keyValues as $key => $value) {
+                if ($value === null) {
+                    continue;
+                }
+
+                EntityDetailData::create([
+                    'entity_detail_id' => $entityDetail->id,
+                    'key'              => $key,
+                    'value'            => is_array($value) ? json_encode($value) : (string) $value,
+                ]);
+            }
+        }
+
+        Log::info('populateEntityDetails completed', [
+            'player_id'        => $player->id,
+            'entity_id'        => $entity->id,
+            'components_count' => count($components),
+        ]);
     }
 
     /**

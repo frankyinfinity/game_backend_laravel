@@ -52,7 +52,7 @@ class AuthController extends Controller
         $player->save();
 
         // Dispatch job with registration data
-        //PlayerCreatedJob::dispatch($player, $registrationData);
+        PlayerCreatedJob::dispatch($player, $registrationData);
         return response()->json(['success' => true]);
 
     }

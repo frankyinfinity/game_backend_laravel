@@ -94,6 +94,19 @@ class RegionController extends Controller
             );
         }
 
+        // Ad ogni cambio pianeta resetta lo stato salvato dell'assembler:
+        // riporta il quadratino a arancione e sblocca l'apertura della modal.
+        $assemblerModalUid = 'objective_modal_assembler_register_assembler_button';
+        $jsResetAssemblerState = "(function() {";
+        $jsResetAssemblerState .= "\n  window['assemblerSaved_{$assemblerModalUid}'] = false;";
+        $jsResetAssemblerState .= "\n  var sq = shapes['register_assembler_button_square'];";
+        $jsResetAssemblerState .= "\n  if (sq) { sq.tint = 0xE07B00; }";
+        $jsResetAssemblerState .= "\n  if (objects['register_assembler_button_square']) { objects['register_assembler_button_square'].color = 0xE07B00; }";
+        $jsResetAssemblerState .= "\n  var resetAddStateFn = window['resetAddComponentState_{$assemblerModalUid}'];";
+        $jsResetAssemblerState .= "\n  if (typeof resetAddStateFn === 'function') { resetAddStateFn(); }";
+        $jsResetAssemblerState .= "\n})();";
+        $drawItems[] = ['type' => 'code', 'code' => $jsResetAssemblerState];
+
         // Cancella il bottone "Torna al Login" della schermata precedente
         $objectClear = new ObjectClear('register_login_button', $sessionId);
         $drawItems[] = $objectClear->get();
