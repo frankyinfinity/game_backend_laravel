@@ -6,14 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Entity extends Model
 {
-
     protected $fillable = [
-        'specie_id',
-        'birth_region_id',
-        'uid',
-        'tile_i',
-        'tile_j',
-        'state',
+        "specie_id",
+        "birth_region_id",
+        "uid",
+        "tile_i",
+        "tile_j",
+        "state",
     ];
 
     const STATE_LIFE = 0;
@@ -22,21 +21,28 @@ class Entity extends Model
     public function getFieldAttributes(): array
     {
         return [
-            'tile_i' => $this->tile_i,
-            'tile_j' => $this->tile_j,
+            "tile_i" => $this->tile_i,
+            "tile_j" => $this->tile_j,
         ];
     }
 
-    public function specie(){
+    public function specie()
+    {
         return $this->belongsTo(Specie::class);
     }
 
-    public function genomes(){
+    public function genomes()
+    {
         return $this->hasMany(Genome::class);
     }
 
-    public function chimicalElements(){
+    public function chimicalElements()
+    {
         return $this->hasMany(EntityChimicalElement::class);
     }
 
+    public function entityDetails()
+    {
+        return $this->hasMany(EntityDetail::class);
+    }
 }

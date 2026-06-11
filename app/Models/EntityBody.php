@@ -11,11 +11,7 @@ class EntityBody extends Model
     const STATE_FINISH_ZONE = 2;
     const STATE_COMPLETED = 3;
 
-    protected $fillable = [
-        'name',
-        'state',
-        'image',
-    ];
+    protected $fillable = ["name", "state", "image"];
 
     public function isCreated()
     {
@@ -50,6 +46,11 @@ class EntityBody extends Model
      */
     public function anchors()
     {
-        return $this->morphMany(EntityAnchor::class, 'anchorable');
+        return $this->morphMany(EntityAnchor::class, "anchorable");
+    }
+
+    public function entityDetails()
+    {
+        return $this->morphMany(EntityDetail::class, "detailable");
     }
 }

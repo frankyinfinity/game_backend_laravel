@@ -12,15 +12,15 @@ class EntityComponent extends Model
     const STATE_COMPLETED = 2;
 
     protected $fillable = [
-        'name',
-        'image',
-        'state',
-        'entity_type_component_id',
+        "name",
+        "image",
+        "state",
+        "entity_type_component_id",
     ];
 
     protected $casts = [
-        'state' => 'integer',
-        'entity_type_component_id' => 'integer',
+        "state" => "integer",
+        "entity_type_component_id" => "integer",
     ];
 
     /**
@@ -53,9 +53,9 @@ class EntityComponent extends Model
     public static function getStateLabels(): array
     {
         return [
-            self::STATE_CREATED => 'Creato',
-            self::STATE_FINISH_DRAW => 'Disegno Terminato',
-            self::STATE_COMPLETED => 'Completato',
+            self::STATE_CREATED => "Creato",
+            self::STATE_FINISH_DRAW => "Disegno Terminato",
+            self::STATE_COMPLETED => "Completato",
         ];
     }
 
@@ -64,7 +64,10 @@ class EntityComponent extends Model
      */
     public function genes()
     {
-        return $this->hasMany(EntityComponentHasGene::class, 'entity_component_id');
+        return $this->hasMany(
+            EntityComponentHasGene::class,
+            "entity_component_id",
+        );
     }
 
     /**
@@ -72,7 +75,10 @@ class EntityComponent extends Model
      */
     public function ruleChimicalElements()
     {
-        return $this->hasMany(EntityComponentHasRuleChimicalElement::class, 'entity_component_id');
+        return $this->hasMany(
+            EntityComponentHasRuleChimicalElement::class,
+            "entity_component_id",
+        );
     }
 
     /**
@@ -80,7 +86,10 @@ class EntityComponent extends Model
      */
     public function entityTypeComponent()
     {
-        return $this->belongsTo(EntityTypeComponent::class, 'entity_type_component_id');
+        return $this->belongsTo(
+            EntityTypeComponent::class,
+            "entity_type_component_id",
+        );
     }
 
     /**
@@ -88,6 +97,11 @@ class EntityComponent extends Model
      */
     public function anchors()
     {
-        return $this->morphMany(EntityAnchor::class, 'anchorable');
+        return $this->morphMany(EntityAnchor::class, "anchorable");
+    }
+
+    public function entityDetails()
+    {
+        return $this->morphMany(EntityDetail::class, "detailable");
     }
 }
