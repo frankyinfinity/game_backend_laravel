@@ -7,6 +7,10 @@
 @stop
 
 @section('content')
+<div class="alert alert-light border shadow-sm mb-4" style="border-left:4px solid #ffc107 !important;">
+    <i class="fas fa-info-circle mr-2 text-warning"></i> Stato: <strong>{{ $element->getStateLabel() }}</strong>
+</div>
+
 <form action="{{ route('elements.update', $element) }}" method="POST">
     @csrf
     @method('PUT')

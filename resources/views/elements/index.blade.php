@@ -41,6 +41,7 @@
                             <th>Nome</th>
                             <th>Tipologia</th>
                             <th>Caratteristica</th>
+                            <th>Stato</th>
                             <th>Climi Validi</th>
                             <th>Azioni</th>
                         </tr>
@@ -89,6 +90,7 @@
                     {data:"name", name:"name"},
                     {data:"element_type_name", name:"element_type_name"},
                     {data:"characteristic", name:"characteristic"},
+                    {data:"state_display", name:"state_display", searchable: false, orderable: false},
                     {data:"climates_list", name:"climates_list"},
                     {data:"id", name:"id"},
                 ],
@@ -113,7 +115,7 @@
                         render: function(data, type, row){
                             return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
                         },
-                        targets:   7
+                        targets:   8
                     },
                 ],
             });

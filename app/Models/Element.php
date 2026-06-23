@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Element extends Model
 {
+    const STATE_CREATED = 0;
+
     const CONSUMABLE = 0;
     const INTERACTIVE = 1;
     const CHARACTERISTIC_TYPES = [
@@ -13,22 +15,35 @@ class Element extends Model
         self::INTERACTIVE => 'Interattivo'
     ];
 
-    protected $fillable = ['element_type_id', 'name', 'characteristic', 'brain_id'];
+    protected $fillable = ['element_type_id', 'name', 'state', 'characteristic', 'brain_id'];
 
-    /**
-     * Get the human-readable label for the characteristic
-     *
-     * @return string
-     */
+    protected $casts = [
+        'state' => 'integer',
+        'characteristic' => 'integer',
+        'brain_id' => 'integer',
+    ];
+
+    public function isCreated(): bool
+    {
+        return $this->state === self::STATE_CREATED;
+    }
+
+    public static function getStateLabels(): array
+    {
+        return [
+            self::STATE_CREATED => 'Creato',
+        ];
+    }
+
+    public function getStateLabel(): string
+    {
+        return self::getStateLabels()[$this->state] ?? 'Sconosciuto';
+    }
+
     public function getCharacteristicLabel()
     {
         return self::CHARACTERISTIC_TYPES[$this->characteristic] ?? 'Unknown';
     }
-
-    protected $casts = [
-        'characteristic' => 'integer',
-        'brain_id' => 'integer',
-    ];
 
     public function elementType()
     {

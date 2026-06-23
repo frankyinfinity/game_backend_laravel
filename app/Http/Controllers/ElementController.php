@@ -179,7 +179,10 @@ class ElementController extends Controller
             ->addColumn('characteristic', function ($row) {
                 return $row->getCharacteristicLabel();
             })
-            ->rawColumns(['graphics'])
+            ->addColumn('state_display', function ($row) {
+                return '<span class="badge badge-warning"><i class="fas fa-edit"></i> ' . $row->getStateLabel() . '</span>';
+            })
+            ->rawColumns(['graphics', 'state_display'])
             ->toJson();
     }
 
