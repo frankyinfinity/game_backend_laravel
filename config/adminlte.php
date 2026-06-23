@@ -444,6 +444,11 @@ return [
                     'icon_color' => 'purple',
                     'submenu' => [
                         [
+                            'text' => 'Tipologia Componente',
+                            'url'  => '/element-type-components',
+                            'icon' => 'fas fa-tag',
+                        ],
+                        [
                             'text' => 'Tipologie Elementi',
                             'url'  => '/element-types',
                             'icon' => 'fas fa-cube',
