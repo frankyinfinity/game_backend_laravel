@@ -454,6 +454,11 @@ return [
                             'icon' => 'fas fa-puzzle-piece',
                         ],
                         [
+                            'text' => 'Corpo Element',
+                            'url'  => '/element-bodies',
+                            'icon' => 'fas fa-child',
+                        ],
+                        [
                             'text' => 'Tipologie Elementi',
                             'url'  => '/element-types',
                             'icon' => 'fas fa-cube',

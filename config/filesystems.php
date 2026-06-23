@@ -118,6 +118,14 @@ return [
             'throw' => false,
         ],
 
+        'element_bodies' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/element_bodies'),
+            'url' => env('APP_URL').'/storage/element_bodies',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         'entity_images' => [
             'driver' => 'local',
             'root' => storage_path('app/public/entity_images'),

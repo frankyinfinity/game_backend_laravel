@@ -145,6 +145,26 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/element-type-components/list/table', [App\Http\Controllers\ElementTypeComponentController::class, 'listDataTable'])->name('element-type-components.datatable');
     Route::post('/element-type-components/delete', [App\Http\Controllers\ElementTypeComponentController::class, 'delete'])->name('element-type-components.delete');
 
+    //Element Bodies
+    Route::resource('element-bodies', App\Http\Controllers\ElementBodyController::class);
+    Route::post('/element-bodies/list/table', [App\Http\Controllers\ElementBodyController::class, 'listDataTable'])->name('element-bodies.datatable');
+    Route::post('/element-bodies/delete', [App\Http\Controllers\ElementBodyController::class, 'bulkDelete'])->name('element-bodies.delete');
+    Route::post('/element-bodies/action/toggle-state', [App\Http\Controllers\ElementBodyController::class, 'toggleState'])->name('element-bodies.toggle-state');
+
+    Route::group([
+        'as' => 'element-bodies.zones.',
+        'prefix' => '/element-bodies/{elementBody}/zones',
+    ], function () {
+        Route::get('/', [App\Http\Controllers\ElementBodyZoneController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\ElementBodyZoneController::class, 'store'])->name('store');
+        Route::post('/{zone}/add-detail', [App\Http\Controllers\ElementBodyZoneController::class, 'addDetail'])->name('add-detail');
+        Route::post('/{zone}/remove-detail/{detail}', [App\Http\Controllers\ElementBodyZoneController::class, 'removeDetail'])->name('remove-detail');
+        Route::post('/{zone}/replace-details', [App\Http\Controllers\ElementBodyZoneController::class, 'replaceDetails'])->name('replace-details');
+        Route::post('/{zone}/save-pixels', [App\Http\Controllers\ElementBodyZoneController::class, 'savePixels'])->name('save-pixels');
+        Route::put('/{zone}', [App\Http\Controllers\ElementBodyZoneController::class, 'update'])->name('update');
+        Route::delete('/{zone}', [App\Http\Controllers\ElementBodyZoneController::class, 'destroy'])->name('destroy');
+    });
+
     //Element Components
     Route::resource('element-components', App\Http\Controllers\ElementComponentController::class);
     Route::post('/element-components/list/table', [App\Http\Controllers\ElementComponentController::class, 'listDataTable'])->name('element-components.datatable');

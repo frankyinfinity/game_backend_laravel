@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ElementAnchor;
 use App\Models\ElementComponent;
+use App\Models\ElementBody;
 use Illuminate\Http\Request;
 
 class ElementAnchorController extends Controller
@@ -14,6 +15,9 @@ class ElementAnchorController extends Controller
             'element_component',
             'App\Models\ElementComponent',
             'AppModelsElementComponent' => ElementComponent::findOrFail($id),
+            'element_body',
+            'App\Models\ElementBody',
+            'AppModelsElementBody' => ElementBody::findOrFail($id),
             default => throw new \InvalidArgumentException("Invalid type: {$type}"),
         };
     }
