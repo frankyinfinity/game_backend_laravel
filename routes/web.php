@@ -163,6 +163,12 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/element-components/{elementComponent}/rules', [App\Http\Controllers\ElementComponentController::class, 'storeRule'])->name('element-components.rules.store');
     Route::delete('/element-components/rules/{elementComponentHasRule}', [App\Http\Controllers\ElementComponentController::class, 'destroyRule'])->name('element-components.rules.destroy');
 
+    // Element Components Effetti Consumo
+    Route::post('/element-components/{elementComponent}/consumption/table', [App\Http\Controllers\ElementComponentController::class, 'consumptionDataTable'])->name('element-components.consumption.datatable');
+    Route::get('/element-components/{elementComponent}/consumption/available', [App\Http\Controllers\ElementComponentController::class, 'getAvailableConsumptionGenes'])->name('element-components.consumption.available');
+    Route::post('/element-components/{elementComponent}/consumption', [App\Http\Controllers\ElementComponentController::class, 'storeConsumptionEffect'])->name('element-components.consumption.store');
+    Route::delete('/element-components/consumption/{consumptionEffect}', [App\Http\Controllers\ElementComponentController::class, 'destroyConsumptionEffect'])->name('element-components.consumption.destroy');
+
     // Element Components Brain (Cervello)
     Route::post('/element-components/{elementComponent}/brain/grid', [App\Http\Controllers\ElementComponentController::class, 'saveBrainGrid'])->name('element-components.brain.grid.save');
     Route::post('/element-components/{elementComponent}/brain/neurons', [App\Http\Controllers\ElementComponentController::class, 'saveBrainNeuron'])->name('element-components.brain.neurons.save');

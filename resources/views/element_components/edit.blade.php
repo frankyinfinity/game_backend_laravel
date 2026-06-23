@@ -54,6 +54,9 @@
                         <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-genes" role="tab">Geni</a></li>
                         <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-rules" role="tab">Elementi Chimici</a></li>
                     @endif
+                    @if($elementComponent->isConsumable())
+                        <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-consumption" role="tab">Effetti Consumo</a></li>
+                    @endif
                     @if($elementComponent->isInteractive() && ($elementComponent->isFinishDraw() || $elementComponent->isCompleted()))
                         <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-brain" role="tab">Cervello</a></li>
                     @endif
@@ -157,6 +160,25 @@
                     </div>
                     @endif
 
+                    @if($elementComponent->isConsumable())
+                    <!-- EFFETTI CONSUMO -->
+                    <div class="tab-pane fade" id="tab-consumption" role="tabpanel">
+                        <div class="mb-3 d-flex justify-content-between align-items-center">
+                            <h5 class="text-dark font-weight-bold mb-0">Effetti Consumo (Geni modificati)</h5>
+                            @if(!$elementComponent->isFinishDraw())
+                                <button type="button" class="btn btn-sm btn-success shadow-sm" id="btn-add-consumption"><i class="fas fa-plus"></i> Aggiungi Effetto</button>
+                            @endif
+                        </div>
+                        <div class="alert alert-info"><i class="fas fa-info-circle mr-1"></i> Definisci quali geni vengono modificati quando questo componente viene consumato.</div>
+                        <div class="table-responsive">
+                            <table id="consumption-table" class="table table-bordered table-hover w-100">
+                                <thead><tr><th>ID</th><th>Nome Gene</th><th>Key</th><th>Effetto</th><th>Azioni</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @endif
+
                     @if($elementComponent->isInteractive() && ($elementComponent->isFinishDraw() || $elementComponent->isCompleted()))
                     <!-- CERVELLO -->
                     <div class="tab-pane fade" id="tab-brain" role="tabpanel">
@@ -222,6 +244,34 @@
                         <select class="form-control" id="select-rule-id" name="rule_chimical_element_id" required>
                             <option value="">Seleziona una Regola...</option>
                         </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">Salva</button>
+                </div>
+            </form>
+        </div></div>
+    </div>
+
+    <!-- MODAL CONSUMPTION -->
+    <div class="modal fade" id="addConsumptionModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title font-weight-bold">Aggiungi Effetto Consumo</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <form id="addConsumptionForm">@csrf
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="font-weight-bold">Gene <span class="text-danger">*</span></label>
+                        <select class="form-control" id="select-consumption-gene-id" name="gene_id" required>
+                            <option value="">Seleziona un Gene...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold">Effetto (valore numerico) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="consumption-effect-value" name="effect" required placeholder="Es. 10 o -5">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -337,6 +387,47 @@
             return $('<span><i class="' + icon + ' fa-fw mr-2 text-dark"></i>' + state.text + '</span>');
         }
         $('#element_type_component_id').select2({ templateResult: formatType, templateSelection: formatType, placeholder: "Seleziona una Tipologia...", allowClear: true });
+
+        // ── CONSUMPTION EFFECTS ───────────────────────────────────────────────
+        @if($elementComponent->isConsumable())
+        var consumptionTable = $('#consumption-table').DataTable({
+            processing: true, serverSide: true,
+            ajax: { url: "{{ route('element-components.consumption.datatable', $elementComponent) }}", type: 'POST', data: { _token: '{{ csrf_token() }}' } },
+            columns: [
+                { data: 'id' }, { data: 'gene_name', orderable: false, searchable: false },
+                { data: 'gene_key', orderable: false, searchable: false }, { data: 'effect', orderable: false, searchable: false },
+                { data: null, orderable: false, searchable: false, render: function (d, t, row) {
+                    return isFinishDraw ? '<span class="text-muted"><i class="fas fa-lock"></i> Bloccato</span>'
+                        : '<button type="button" class="btn btn-xs btn-danger delete-consumption-btn" data-id="' + row.id + '"><i class="fas fa-trash"></i> Elimina</button>';
+                }}
+            ]
+        });
+
+        $('#btn-add-consumption').click(function () {
+            $.get("{{ route('element-components.consumption.available', $elementComponent) }}", function (data) {
+                var s = $('#select-consumption-gene-id').empty().append('<option value="">Seleziona un Gene...</option>');
+                $.each(data, function (i, g) { s.append('<option value="' + g.id + '">' + g.name + ' (' + g.key + ')</option>'); });
+                $('#consumption-effect-value').val('');
+                $('#addConsumptionModal').modal('show');
+            });
+        });
+
+        $('#addConsumptionForm').submit(function (e) {
+            e.preventDefault();
+            $.ajax({ url: "{{ route('element-components.consumption.store', $elementComponent) }}", type: 'POST', data: $(this).serialize(),
+                success: function (r) { if (r.success) { $('#addConsumptionModal').modal('hide'); consumptionTable.ajax.reload(); typeof toastr !== 'undefined' && toastr.success('Effetto aggiunto.'); } },
+                error: function (xhr) { alert('Errore: ' + (xhr.responseJSON?.message || 'sconosciuto')); }
+            });
+        });
+
+        $(document).on('click', '.delete-consumption-btn', function () {
+            if (!confirm('Eliminare effetto consumo?')) return;
+            var url = "{{ route('element-components.consumption.destroy', ':id') }}".replace(':id', $(this).data('id'));
+            $.ajax({ url: url, type: 'DELETE', data: { _token: '{{ csrf_token() }}' },
+                success: function (r) { if (r.success) { consumptionTable.ajax.reload(); typeof toastr !== 'undefined' && toastr.success('Eliminato.'); } }
+            });
+        });
+        @endif
     });
 </script>
 @stop

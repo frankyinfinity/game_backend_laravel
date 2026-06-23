@@ -34,6 +34,7 @@ class ElementComponent extends Model {
 
     public function genes() { return $this->hasMany(ElementComponentHasGene::class, 'element_component_id'); }
     public function ruleChimicalElements() { return $this->hasMany(ElementComponentHasRuleChimicalElement::class, 'element_component_id'); }
+    public function consumptionEffects() { return $this->hasMany(ElementComponentConsumptionEffect::class, 'element_component_id'); }
     public function elementTypeComponent() { return $this->belongsTo(ElementTypeComponent::class, 'element_type_component_id'); }
     public function anchors() { return $this->morphMany(ElementAnchor::class, 'anchorable'); }
     public function brain() { return $this->belongsTo(\App\Models\Brain::class); }

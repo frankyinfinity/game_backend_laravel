@@ -12,6 +12,7 @@ use App\Models\NeuronLink;
 use App\Models\RuleChimicalElement;
 use App\Models\ElementComponentHasGene;
 use App\Models\ElementComponentHasRuleChimicalElement;
+use App\Models\ElementComponentConsumptionEffect;
 use App\Models\ElementTypeComponent;
 use App\Helpers\NeuronTooltipHelper;
 use Illuminate\Http\Request;
@@ -220,6 +221,38 @@ class ElementComponentController extends Controller
     public function destroyRule(Request $request, ElementComponentHasRuleChimicalElement $elementComponentHasRule) {
         if ($elementComponentHasRule->elementComponent->isFinishDraw()) return response()->json(['success' => false, 'message' => 'Componente bloccato.'], 403);
         $elementComponentHasRule->delete();
+        return response()->json(['success' => true]);
+    }
+
+    // ─── CONSUMPTION EFFECTS ─────────────────────────────────────────────────────
+
+    public function consumptionDataTable(Request $request, ElementComponent $elementComponent) {
+        $query = ElementComponentConsumptionEffect::where('element_component_id', $elementComponent->id)->with('gene');
+        return datatables($query)
+            ->addColumn('gene_name', fn($row) => $row->gene ? $row->gene->name : '')
+            ->addColumn('gene_key', fn($row) => $row->gene ? $row->gene->key : '')
+            ->addColumn('effect', fn($row) => $row->effect)
+            ->toJson();
+    }
+
+    public function getAvailableConsumptionGenes(Request $request, ElementComponent $elementComponent) {
+        $alreadyIds = ElementComponentConsumptionEffect::where('element_component_id', $elementComponent->id)->pluck('gene_id')->toArray();
+        return response()->json(Gene::whereNotIn('id', $alreadyIds)->orderBy('name')->get());
+    }
+
+    public function storeConsumptionEffect(Request $request, ElementComponent $elementComponent) {
+        if ($elementComponent->isFinishDraw()) return response()->json(['success' => false, 'message' => 'Componente bloccato.'], 403);
+        $request->validate(['gene_id' => 'required|exists:genes,id', 'effect' => 'required|integer']);
+        if (ElementComponentConsumptionEffect::where('element_component_id', $elementComponent->id)->where('gene_id', $request->gene_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Effetto già presente per questo gene.'], 422);
+        }
+        ElementComponentConsumptionEffect::create(['element_component_id' => $elementComponent->id, 'gene_id' => $request->gene_id, 'effect' => $request->effect]);
+        return response()->json(['success' => true]);
+    }
+
+    public function destroyConsumptionEffect(Request $request, ElementComponentConsumptionEffect $consumptionEffect) {
+        if ($consumptionEffect->elementComponent->isFinishDraw()) return response()->json(['success' => false, 'message' => 'Componente bloccato.'], 403);
+        $consumptionEffect->delete();
         return response()->json(['success' => true]);
     }
 
