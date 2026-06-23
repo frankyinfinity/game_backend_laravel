@@ -449,6 +449,11 @@ return [
                             'icon' => 'fas fa-tag',
                         ],
                         [
+                            'text' => 'Componente Element',
+                            'url'  => '/element-components',
+                            'icon' => 'fas fa-puzzle-piece',
+                        ],
+                        [
                             'text' => 'Tipologie Elementi',
                             'url'  => '/element-types',
                             'icon' => 'fas fa-cube',

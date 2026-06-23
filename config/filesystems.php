@@ -102,6 +102,14 @@ return [
             'throw' => false,
         ],
 
+        'element_components' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/element_components'),
+            'url' => env('APP_URL').'/storage/element_components',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         'entity_bodies' => [
             'driver' => 'local',
             'root' => storage_path('app/public/entity_bodies'),

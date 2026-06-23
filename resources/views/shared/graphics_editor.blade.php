@@ -806,7 +806,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            if (hasGraphicsChanges) {
+            // Controlla se il canvas ha pixel non trasparenti
+            const pixelData = ctx.getImageData(0, 0, canvasSize, canvasSize).data;
+            let hasContent = false;
+            for (let i = 3; i < pixelData.length; i += 4) {
+                if (pixelData[i] > 0) { hasContent = true; break; }
+            }
+
+            if (hasGraphicsChanges || hasContent) {
                 imageInput.value = previewCanvas.toDataURL('image/png');
             } else {
                 imageInput.value = '';
@@ -815,5 +822,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initCanvases();
+
+    // Carica automaticamente l'immagine salvata nel canvas se esiste
+    const autoLoadImg = document.getElementById('current-image-' + modelType);
+    if (autoLoadImg) {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = autoLoadImg.src.split('?')[0] + '?t=' + new Date().getTime();
+        img.onload = function () {
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 32;
+            tempCanvas.height = 32;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(img, 0, 0, 32, 32);
+            const imageData = tempCtx.getImageData(0, 0, 32, 32);
+            const data = imageData.data;
+            for (let y = 0; y < 32; y++) {
+                for (let x = 0; x < 32; x++) {
+                    const i = (y * 32 + x) * 4;
+                    const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+                    if (a > 0) {
+                        ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (a/255) + ')';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+            updatePreview();
+            saveState();
+        };
+    }
 });
 </script>

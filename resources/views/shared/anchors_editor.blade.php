@@ -113,13 +113,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // CSRF Token
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     
+    const anchorBaseUrl = '{{ $anchorRoute ?? '/entity-anchors' }}';
+
     // Funzione principale per caricare le ancore
     function loadAnchors() {
         document.getElementById('anchors-loading-{{ $modelType }}').style.display = 'block';
         document.getElementById('anchors-empty-{{ $modelType }}').style.display = 'none';
         document.getElementById('anchors-list-wrapper-{{ $modelType }}').style.display = 'none';
         
-        fetch(`/entity-anchors?type=${encodeURIComponent(modelType)}&id=${modelId}`, {
+        fetch(`${anchorBaseUrl}?type=${encodeURIComponent(modelType)}&id=${modelId}`, {
             headers: {
                 'Accept': 'application/json'
             }
@@ -178,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Aggiungi nuova ancora
     function addAnchor(x, y) {
-        fetch('/entity-anchors', {
+        fetch(anchorBaseUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -212,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function deleteAnchor(anchorId) {
         if (!confirm('Vuoi eliminare questa ancora?')) return;
         
-        fetch(`/entity-anchors/${anchorId}`, {
+        fetch(`${anchorBaseUrl}/${anchorId}`, {
             method: 'DELETE',
             headers: {
                 'Accept': 'application/json',

@@ -145,6 +145,24 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/element-type-components/list/table', [App\Http\Controllers\ElementTypeComponentController::class, 'listDataTable'])->name('element-type-components.datatable');
     Route::post('/element-type-components/delete', [App\Http\Controllers\ElementTypeComponentController::class, 'delete'])->name('element-type-components.delete');
 
+    //Element Components
+    Route::resource('element-components', App\Http\Controllers\ElementComponentController::class);
+    Route::post('/element-components/list/table', [App\Http\Controllers\ElementComponentController::class, 'listDataTable'])->name('element-components.datatable');
+    Route::post('/element-components/delete', [App\Http\Controllers\ElementComponentController::class, 'delete'])->name('element-components.delete');
+    Route::post('/element-components/{elementComponent}/toggle-state', [App\Http\Controllers\ElementComponentController::class, 'toggleState'])->name('element-components.toggle-state');
+
+    // Element Components Geni
+    Route::post('/element-components/{elementComponent}/genes/table', [App\Http\Controllers\ElementComponentController::class, 'genesDataTable'])->name('element-components.genes.datatable');
+    Route::get('/element-components/{elementComponent}/genes/available', [App\Http\Controllers\ElementComponentController::class, 'getAvailableGenes'])->name('element-components.genes.available');
+    Route::post('/element-components/{elementComponent}/genes', [App\Http\Controllers\ElementComponentController::class, 'storeGene'])->name('element-components.genes.store');
+    Route::delete('/element-components/genes/{elementComponentHasGene}', [App\Http\Controllers\ElementComponentController::class, 'destroyGene'])->name('element-components.genes.destroy');
+
+    // Element Components Elementi Chimici
+    Route::post('/element-components/{elementComponent}/rules/table', [App\Http\Controllers\ElementComponentController::class, 'rulesDataTable'])->name('element-components.rules.datatable');
+    Route::get('/element-components/{elementComponent}/rules/available', [App\Http\Controllers\ElementComponentController::class, 'getAvailableRules'])->name('element-components.rules.available');
+    Route::post('/element-components/{elementComponent}/rules', [App\Http\Controllers\ElementComponentController::class, 'storeRule'])->name('element-components.rules.store');
+    Route::delete('/element-components/rules/{elementComponentHasRule}', [App\Http\Controllers\ElementComponentController::class, 'destroyRule'])->name('element-components.rules.destroy');
+
     //Chimical Elements
     Route::resource('chimical-elements', App\Http\Controllers\ChimicalElementController::class);
     Route::post('/chimical-elements/list/table', [App\Http\Controllers\ChimicalElementController::class, 'listDataTable'])->name('chimical-elements.datatable');
@@ -288,4 +306,9 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('/entity-anchors', [App\Http\Controllers\EntityAnchorController::class, 'index'])->name('entity-anchors.index');
     Route::post('/entity-anchors', [App\Http\Controllers\EntityAnchorController::class, 'store'])->name('entity-anchors.store');
     Route::delete('/entity-anchors/{entityAnchor}', [App\Http\Controllers\EntityAnchorController::class, 'destroy'])->name('entity-anchors.destroy');
+
+    // Element Anchors
+    Route::get('/element-anchors', [App\Http\Controllers\ElementAnchorController::class, 'index'])->name('element-anchors.index');
+    Route::post('/element-anchors', [App\Http\Controllers\ElementAnchorController::class, 'store'])->name('element-anchors.store');
+    Route::delete('/element-anchors/{elementAnchor}', [App\Http\Controllers\ElementAnchorController::class, 'destroy'])->name('element-anchors.destroy');
 });
