@@ -257,6 +257,10 @@ Route::group(['middleware' => ['auth']], function () {
     Route::put('/elements/{element}/diffusion', [App\Http\Controllers\ElementController::class, 'diffusionUpdate'])->name('elements.diffusion.update');
 
     //Elements
+    // Element Assembler API (must be before resource to avoid {element} conflict)
+    Route::get('/elements/assembler/bodies', [App\Http\Controllers\ElementController::class, 'assemblerBodies'])->name('elements.assembler.bodies');
+    Route::get('/elements/assembler/components', [App\Http\Controllers\ElementController::class, 'assemblerComponents'])->name('elements.assembler.components');
+
     Route::resource('elements', App\Http\Controllers\ElementController::class);
     Route::post('/elements/list/table', [App\Http\Controllers\ElementController::class, 'listDataTable'])->name('elements.datatable');
     Route::post('/elements/delete', [App\Http\Controllers\ElementController::class, 'delete'])->name('elements.delete');

@@ -494,6 +494,137 @@ class ElementController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Return all completed ElementBodies with their pixels, zones and anchors for the assembler.
+     */
+    public function assemblerBodies()
+    {
+        $bodies = \App\Models\ElementBody::with('zones.pixels', 'anchors')
+            ->where('state', \App\Models\ElementBody::STATE_COMPLETED)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($body) {
+                $pixels = [];
+                $zonePixelToZoneId = [];
+                $zoneIdToColor = [];
+                $zoneIdToName = [];
+
+                foreach ($body->zones as $zone) {
+                    $zoneIdToColor[$zone->id] = $zone->color ?? '#000000';
+                    $zoneIdToName[$zone->id] = $zone->name ?? 'Unknown';
+                    foreach ($zone->pixels as $pixel) {
+                        $gx = (int) floor($pixel->x / 2);
+                        $gy = (int) floor($pixel->y / 2);
+                        $zonePixelToZoneId[$gx . ',' . $gy] = $zone->id;
+                    }
+                }
+
+                if (!empty($body->image) && \Storage::disk('element_bodies')->exists($body->image)) {
+                    $imagePath = \Storage::disk('element_bodies')->path($body->image);
+                    $img = @imagecreatefromstring(file_get_contents($imagePath));
+                    if ($img) {
+                        $origW = imagesx($img);
+                        $origH = imagesy($img);
+                        $resized = imagecreatetruecolor(32, 32);
+                        $white = imagecolorallocate($resized, 255, 255, 255);
+                        imagefill($resized, 0, 0, $white);
+                        imagecopyresampled($resized, $img, 0, 0, 0, 0, 32, 32, $origW, $origH);
+                        for ($y = 0; $y < 32; $y++) {
+                            for ($x = 0; $x < 32; $x++) {
+                                $rgb = imagecolorat($resized, $x, $y);
+                                $r = ($rgb >> 16) & 0xFF;
+                                $g = ($rgb >> 8) & 0xFF;
+                                $b = $rgb & 0xFF;
+                                if ($r < 50 && $g < 50 && $b < 50) {
+                                    $key = $x . ',' . $y;
+                                    $myZoneId = $zonePixelToZoneId[$key] ?? null;
+                                    $hasZone = $myZoneId !== null;
+                                    $pixels[] = [
+                                        'x' => $x, 'y' => $y,
+                                        'has_zone' => $hasZone,
+                                        'zone_color' => $hasZone ? ($zoneIdToColor[$myZoneId] ?? '#000000') : null,
+                                        'zone_name' => $hasZone ? ($zoneIdToName[$myZoneId] ?? 'Unknown') : null,
+                                        'zone_id' => $hasZone ? $myZoneId : null,
+                                    ];
+                                }
+                            }
+                        }
+                        imagedestroy($img);
+                        imagedestroy($resized);
+                    }
+                }
+
+                return [
+                    'id' => $body->id,
+                    'name' => $body->name,
+                    'characteristic' => $body->characteristic,
+                    'pixels' => $pixels,
+                    'anchors' => $body->anchors->map(fn($a) => ['id' => $a->id, 'x' => $a->x, 'y' => $a->y])->toArray(),
+                ];
+            });
+
+        return response()->json($bodies);
+    }
+
+    /**
+     * Return all completed ElementComponents with their pixels and anchors for the assembler.
+     */
+    public function assemblerComponents()
+    {
+        $components = \App\Models\ElementComponent::with(['anchors', 'genes.gene', 'ruleChimicalElements.ruleChimicalElement', 'elementTypeComponent', 'consumptionEffects.gene'])
+            ->where('state', '>=', \App\Models\ElementComponent::STATE_FINISH_DRAW)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($comp) {
+                $pixels = [];
+                if (!empty($comp->image) && \Storage::disk('element_components')->exists($comp->image)) {
+                    $imagePath = \Storage::disk('element_components')->path($comp->image);
+                    $img = @imagecreatefromstring(file_get_contents($imagePath));
+                    if ($img) {
+                        $origW = imagesx($img);
+                        $origH = imagesy($img);
+                        $resized = imagecreatetruecolor(32, 32);
+                        $white = imagecolorallocate($resized, 255, 255, 255);
+                        imagefill($resized, 0, 0, $white);
+                        imagecopyresampled($resized, $img, 0, 0, 0, 0, 32, 32, $origW, $origH);
+                        for ($y = 0; $y < 32; $y++) {
+                            for ($x = 0; $x < 32; $x++) {
+                                $rgb = imagecolorat($resized, $x, $y);
+                                $r = ($rgb >> 16) & 0xFF;
+                                $g = ($rgb >> 8) & 0xFF;
+                                $b = $rgb & 0xFF;
+                                if (!($r > 240 && $g > 240 && $b > 240)) {
+                                    $pixels[] = ['x' => $x, 'y' => $y, 'r' => $r, 'g' => $g, 'b' => $b];
+                                }
+                            }
+                        }
+                        imagedestroy($img);
+                        imagedestroy($resized);
+                    }
+                }
+
+                $imageUrl = null;
+                if ($comp->image && \Storage::disk('element_components')->exists($comp->image)) {
+                    $imageUrl = asset('storage/element_components/' . $comp->image);
+                }
+
+                return [
+                    'id' => $comp->id,
+                    'name' => $comp->name,
+                    'characteristic' => $comp->characteristic,
+                    'type_name' => $comp->elementTypeComponent ? $comp->elementTypeComponent->name : '-',
+                    'image_url' => $imageUrl,
+                    'genes' => $comp->genes->map(fn($g) => $g->gene ? $g->gene->name : '')->filter()->values()->toArray(),
+                    'rules' => $comp->ruleChimicalElements->map(fn($r) => $r->ruleChimicalElement ? $r->ruleChimicalElement->name : '')->filter()->values()->toArray(),
+                    'consumption_effects' => $comp->consumptionEffects->map(fn($e) => $e->gene ? ($e->gene->name . ' (' . ($e->effect >= 0 ? '+' : '') . $e->effect . ')') : '')->filter()->values()->toArray(),
+                    'pixels' => $pixels,
+                    'anchors' => $comp->anchors->map(fn($a) => ['id' => $a->id, 'x' => $a->x, 'y' => $a->y])->toArray(),
+                ];
+            });
+
+        return response()->json($components);
+    }
+
     public function saveGraphics(Request $request, Element $element)
     {
         $request->validate([
