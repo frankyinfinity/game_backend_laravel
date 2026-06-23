@@ -1,3 +1,5 @@
+@php $locked = $element->isFinishAssembler(); @endphp
+
 <div class="form-group">
     <label for="name">Nome <span class="text-danger">*</span></label>
     <input type="text" 
@@ -5,7 +7,7 @@
             id="name" 
             name="name" 
             value="{{ old('name', $element->name) }}" 
-            required>
+            {{ $locked ? 'disabled' : 'required' }}>
     @error('name')
         <span class="invalid-feedback" role="alert">
             <strong>{{ $message }}</strong>
@@ -18,7 +20,7 @@
     <select class="form-control @error('characteristic') is-invalid @enderror" 
             id="characteristic" 
             name="characteristic" 
-            required>
+            {{ $locked ? 'disabled' : 'required' }}>
         @foreach(\App\Models\Element::CHARACTERISTIC_TYPES as $value => $label)
             <option value="{{ $value }}" {{ old('characteristic', $element->characteristic) == $value ? 'selected' : '' }}>
                 {{ $label }}
@@ -37,7 +39,7 @@
     <select class="form-control @error('element_type_id') is-invalid @enderror" 
             id="element_type_id" 
             name="element_type_id" 
-            required>
+            {{ $locked ? 'disabled' : 'required' }}>
         <option value="">Seleziona Tipologia</option>
         @foreach($elementTypes as $type)
             <option value="{{ $type->id }}" {{ old('element_type_id', $element->element_type_id) == $type->id ? 'selected' : '' }}>
@@ -58,7 +60,8 @@
             id="climates" 
             name="climates[]" 
             multiple
-            style="min-height: 200px;">
+            style="min-height: 200px;"
+            {{ $locked ? 'disabled' : '' }}>
         @foreach($climates as $climate)
             <option value="{{ $climate->id }}" 
                 {{ (collect(old('climates', $element->climates->pluck('id')))->contains($climate->id)) ? 'selected' : '' }}>
@@ -66,7 +69,9 @@
             </option>
         @endforeach
     </select>
+    @if(!$locked)
     <small class="form-text text-muted">Nota: Se modifichi i climi, salva per aggiornare il tab Diffusione.</small>
+    @endif
     @error('climates')
         <span class="invalid-feedback" role="alert">
             <strong>{{ $message }}</strong>

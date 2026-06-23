@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Element extends Model
 {
     const STATE_CREATED = 0;
+    const STATE_FINISH_ASSEMBLER = 1;
 
     const CONSUMABLE = 0;
     const INTERACTIVE = 1;
@@ -28,10 +29,16 @@ class Element extends Model
         return $this->state === self::STATE_CREATED;
     }
 
+    public function isFinishAssembler(): bool
+    {
+        return $this->state >= self::STATE_FINISH_ASSEMBLER;
+    }
+
     public static function getStateLabels(): array
     {
         return [
             self::STATE_CREATED => 'Creato',
+            self::STATE_FINISH_ASSEMBLER => 'Assemblaggio Terminato',
         ];
     }
 

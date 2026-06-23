@@ -51,7 +51,7 @@
             <div class="card-body p-2">
                 <div class="table-responsive mb-3">
                     <table id="asm-added-components-table" class="table table-bordered table-hover table-sm w-100">
-                        <thead class="bg-light"><tr><th>Nome</th><th>Body Anchor</th><th>Comp Anchor</th><th>Offset</th><th style="width:60px"></th></tr></thead>
+                        <thead class="bg-light"><tr><th>Nome</th><th>Body Anchor</th><th>Comp Anchor</th><th>Offset</th><th style="width:60px">Info</th>@if(!$element->isFinishAssembler())<th style="width:60px"></th>@endif</tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -76,13 +76,78 @@
                 </div>
             </div>
         </div>
+
+        @if($element->isFinishAssembler())
+        <!-- Card riepilogo dati aggregati -->
+        <div class="card card-outline card-info shadow-sm mb-3">
+            <div class="card-header">
+                <span class="font-weight-bold">
+                    @if($element->isConsumable())
+                    <i class="fas fa-utensils mr-1"></i> Effetti Consumo
+                    @else
+                    <i class="fas fa-dna mr-1"></i> Geni e Elementi Chimici
+                    @endif
+                </span>
+            </div>
+            <div class="card-body p-2">
+                @if($element->isConsumable())
+                <table class="table table-bordered table-hover table-sm w-100 mb-0">
+                    <thead class="bg-light"><tr><th>Gene</th><th>Effetto</th></tr></thead>
+                    <tbody>
+                        @forelse($element->genes as $gene)
+                        <tr><td>{{ $gene->name }}</td><td>{{ $gene->pivot->effect >= 0 ? '+' : '' }}{{ $gene->pivot->effect }}</td></tr>
+                        @empty
+                        <tr><td colspan="2" class="text-muted text-center">Nessun effetto consumo.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                @else
+                <h6 class="font-weight-bold mb-2"><i class="fas fa-dna mr-1 text-info"></i> Geni</h6>
+                <table class="table table-bordered table-hover table-sm w-100 mb-3">
+                    <thead class="bg-light"><tr><th>Gene</th><th>Effetto</th></tr></thead>
+                    <tbody>
+                        @forelse($element->genes as $gene)
+                        <tr><td>{{ $gene->name }}</td><td>{{ $gene->pivot->effect >= 0 ? '+' : '' }}{{ $gene->pivot->effect }}</td></tr>
+                        @empty
+                        <tr><td colspan="2" class="text-muted text-center">Nessun gene.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                <h6 class="font-weight-bold mb-2"><i class="fas fa-flask mr-1 text-warning"></i> Elementi Chimici</h6>
+                <table class="table table-bordered table-hover table-sm w-100 mb-0">
+                    <thead class="bg-light"><tr><th>Nome</th><th>Titolo</th></tr></thead>
+                    <tbody>
+                        @forelse($element->ruleChimicalElements as $rule)
+                        <tr><td>{{ $rule->name }}</td><td>{{ $rule->title }}</td></tr>
+                        @empty
+                        <tr><td colspan="2" class="text-muted text-center">Nessuna regola.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                @endif
+            </div>
+        </div>
+        @endif
     </div>
 </div>
 
 <div class="form-group mt-3">
     <label class="font-weight-bold">JSON Assemblaggio (output)</label>
-    <textarea class="form-control" id="asm-json-output" name="assembler_json" rows="6" readonly></textarea>
+    <input type="hidden" id="asm-json-output" name="assembler_json" value="">
 </div>
+
+@if(!$element->isFinishAssembler())
+<div class="mt-3 border-top pt-3">
+    <button type="button" class="btn btn-success shadow-sm" id="asm-finish-btn" disabled onclick="submitFinishAssembler();">
+        <i class="fas fa-check-circle mr-1"></i> Termina Assemblaggio e Blocca
+    </button>
+    <small class="text-muted ml-2">Seleziona un corpo e almeno un componente per abilitare.</small>
+</div>
+@else
+<div class="alert alert-success mt-3">
+    <i class="fas fa-lock mr-1"></i> Assemblaggio bloccato. Non è possibile modificare.
+</div>
+@endif
 
 <!-- MODAL -->
 <div class="modal fade" id="asmComponentModal" tabindex="-1">
@@ -92,11 +157,31 @@
             <table id="asm-components-datatable" class="table table-bordered table-hover table-sm w-100">
                 <thead class="bg-light"><tr>
                     <th style="width:50px">Img</th><th>Nome</th><th>Tipologia</th>
-                    @if($element->isConsumable())<th>Effetti Consumo</th>@else<th>Geni</th><th>Elementi Chimici</th>@endif
+                    @if($element->isConsumable())<th>Effetti Consumo</th>@else<th>Geni</th><th>Elementi Chimici</th><th>Cervello</th>@endif
                     <th>Anchors</th><th style="width:80px"></th>
                 </tr></thead>
                 <tbody></tbody>
             </table>
+        </div>
+    </div></div>
+</div>
+
+<!-- MODAL INFO COMPONENTE -->
+<div class="modal fade" id="asmInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title font-weight-bold" id="asm-info-modal-title"><i class="fas fa-info-circle mr-2"></i> Info Componente</h5><button type="button" class="close" data-dismiss="modal"><span>&times;</span></button></div>
+        <div class="modal-body" id="asm-info-modal-body"></div>
+    </div></div>
+</div>
+
+<!-- MODAL CERVELLO COMPONENTE -->
+<div class="modal fade" id="asmBrainModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title font-weight-bold"><i class="fas fa-brain mr-2"></i> Cervello Componente</h5><button type="button" class="close" data-dismiss="modal"><span>&times;</span></button></div>
+        <div class="modal-body text-center" style="position:relative;">
+            <canvas id="asm-brain-canvas" width="640" height="640" style="border:2px solid #dee2e6;border-radius:4px;background:#fff;"></canvas>
+            <div id="asm-brain-tooltip" style="display:none;position:absolute;background:#fff;border:1px solid #000;border-radius:4px;padding:4px 8px;font-size:12px;font-family:Consolas;pointer-events:none;z-index:10;white-space:nowrap;"></div>
+            <div id="asm-brain-info" class="mt-2 text-muted small"></div>
         </div>
     </div></div>
 </div>

@@ -7,9 +7,15 @@
 @stop
 
 @section('content')
+@if($element->isFinishAssembler())
+<div class="alert alert-success border shadow-sm mb-4" style="border-left:4px solid #28a745 !important;">
+    <i class="fas fa-check-circle mr-2 text-success"></i> Stato: <strong>{{ $element->getStateLabel() }}</strong> — Assemblaggio bloccato.
+</div>
+@else
 <div class="alert alert-light border shadow-sm mb-4" style="border-left:4px solid #ffc107 !important;">
     <i class="fas fa-info-circle mr-2 text-warning"></i> Stato: <strong>{{ $element->getStateLabel() }}</strong>
 </div>
+@endif
 
 <form action="{{ route('elements.update', $element) }}" method="POST">
     @csrf
@@ -24,6 +30,16 @@
                 <li class="nav-item">
                     <a class="nav-link" id="tab-assembler-link" data-toggle="pill" href="#tab-assembler" role="tab">Assemblaggio</a>
                 </li>
+                @if($element->isFinishAssembler() && $element->isConsumable())
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="pill" href="#tab-reward" role="tab">Ricompensa</a>
+                </li>
+                @endif
+                @if($element->isFinishAssembler() && $element->isInteractive())
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="pill" href="#tab-brain" role="tab">Cervello</a>
+                </li>
+                @endif
             </ul>
         </div>
 
@@ -40,19 +56,43 @@
                     @include('elements.tabs.assembler')
                 </div>
 
+                @if($element->isFinishAssembler() && $element->isConsumable())
+                <!-- TAB RICOMPENSA -->
+                <div class="tab-pane fade" id="tab-reward" role="tabpanel">
+                    <p class="text-muted">Nessuna ricompensa configurata.</p>
+                </div>
+                @endif
+
+                @if($element->isFinishAssembler() && $element->isInteractive())
+                <!-- TAB CERVELLO -->
+                <div class="tab-pane fade" id="tab-brain" role="tabpanel">
+                    <p class="text-muted">Nessun cervello configurato.</p>
+                </div>
+                @endif
+
             </div>
         </div>
 
         <div class="card-footer">
+            @if(!$element->isFinishAssembler())
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-save"></i> Aggiorna
             </button>
+            @endif
             <a href="{{ route('elements.index') }}" class="btn btn-secondary">
                 <i class="fas fa-times"></i> Annulla
             </a>
         </div>
     </div>
 </form>
+
+@if(!$element->isFinishAssembler())
+<!-- Form separato per finishAssembler (fuori dal form principale) -->
+<form action="{{ route('elements.finish-assembler', $element) }}" method="POST" id="asm-finish-form" style="display:none;">
+    @csrf
+    <input type="hidden" name="assembler_json" id="asm-finish-json" value="">
+</form>
+@endif
 @stop
 
 @section('js')
@@ -212,25 +252,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Added components DataTable
+    var isAssemblerLocked = {{ $element->isFinishAssembler() ? 'true' : 'false' }};
     var asmAddedDT = null;
     var asmAvailableDT = null;
     try {
+        var addedColumns = [
+            {data:'name'},{data:'body_anchor',render:function(d){return d?'('+d.x+','+d.y+')':'-';}},
+            {data:'comp_anchor',render:function(d){return d?'('+d.x+','+d.y+')':'-';}},
+            {data:null,render:function(d,t,row){return 'dx:'+row.dx+' dy:'+row.dy;}},
+            {data:null,orderable:false,render:function(d,t,row){return '<button type="button" class="btn btn-xs btn-info asm-info-comp" data-id="'+row.id+'"><i class="fas fa-info-circle"></i></button>';}}
+        ];
+        if (!isAssemblerLocked) {
+            addedColumns.push({data:null,orderable:false,render:function(d,t,row,meta){return '<button type="button" class="btn btn-xs btn-danger asm-remove-comp" data-index="'+meta.row+'"><i class="fas fa-trash"></i></button>';}});
+        }
         asmAddedDT = $('#asm-added-components-table').DataTable({
             destroy:true, paging:false, searching:false, info:false, ordering:false,
             language:{emptyTable:'Nessun componente aggiunto.'},
-            columns:[
-                {data:'name'},{data:'body_anchor',render:function(d){return d?'('+d.x+','+d.y+')':'-';}},
-                {data:'comp_anchor',render:function(d){return d?'('+d.x+','+d.y+')':'-';}},
-                {data:null,render:function(d,t,row){return 'dx:'+row.dx+' dy:'+row.dy;}},
-                {data:null,orderable:false,render:function(d,t,row,meta){return '<button type="button" class="btn btn-xs btn-danger asm-remove-comp" data-index="'+meta.row+'"><i class="fas fa-trash"></i></button>';}}
-            ]
+            columns: addedColumns
         });
     } catch(e) { console.warn('DataTable init error:', e); }
 
     function refreshAddedTable(){
         if(!asmAddedDT)return;
         asmAddedDT.clear();
-        asmAddedDT.rows.add(addedComponents.map(function(c){return{name:c.name,body_anchor:c.body_anchor,comp_anchor:c.comp_anchor,dx:c.dx,dy:c.dy};})).draw();
+        asmAddedDT.rows.add(addedComponents.map(function(c){return{id:c.id,name:c.name,body_anchor:c.body_anchor,comp_anchor:c.comp_anchor,dx:c.dx,dy:c.dy};})).draw();
     }
 
     $(document).on('click','.asm-remove-comp',function(){addedComponents.splice(+$(this).data('index'),1);drawMainCanvas();refreshAddedTable();updateJson();});
@@ -245,7 +290,14 @@ document.addEventListener('DOMContentLoaded', function() {
             {data:'name'},{data:'type_name'}
         ];
         if(isConsumable){columns.push({data:'consumption_effects',render:function(d){return(d&&d.length)?d.join(', '):'<span class="text-muted">-</span>';}});}
-        else{columns.push({data:'genes',render:function(d){return(d&&d.length)?d.join(', '):'<span class="text-muted">-</span>';}});columns.push({data:'rules',render:function(d){return(d&&d.length)?d.join(', '):'<span class="text-muted">-</span>';}});}
+        else{
+            columns.push({data:'genes',render:function(d){return(d&&d.length)?d.join(', '):'<span class="text-muted">-</span>';}});
+            columns.push({data:'rules',render:function(d){return(d&&d.length)?d.join(', '):'<span class="text-muted">-</span>';}});
+            columns.push({data:null,orderable:false,searchable:false,render:function(d,t,row){
+                if(!row.has_brain) return '<span class="text-muted">-</span>';
+                return '<button type="button" class="btn btn-xs btn-info asm-view-brain" data-id="'+row.id+'"><i class="fas fa-brain"></i> Vedi</button>';
+            }});
+        }
         columns.push({data:'anchors',render:function(d){return d?d.length:0;}});
         columns.push({data:null,orderable:false,searchable:false,render:function(d,t,row){return '<button type="button" class="btn btn-sm btn-success asm-select-comp" data-id="'+row.id+'"><i class="fas fa-plus"></i></button>';}});
         asmAvailableDT=$('#asm-components-datatable').DataTable({destroy:true,paging:true,pageLength:5,searching:true,info:true,ordering:true,language:{emptyTable:'Nessun componente disponibile.',search:'Cerca:'},data:filtered,columns:columns});
@@ -321,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // JSON
     function updateJson(){
-        if(!selectedBody){jsonOutput.value='';return;}
+        if(!selectedBody){jsonOutput.value='';updateFinishBtn();return;}
         var payload={
             body_selected:{id:selectedBody.id,name:selectedBody.name},
             zones_rgb:Object.keys(zoneColors).map(function(zid){
@@ -332,7 +384,17 @@ document.addEventListener('DOMContentLoaded', function() {
             pixels:buildComposedPixels(),
             components:addedComponents.map(function(c){return{id:c.id,name:c.name,link_to_body:{body_anchor:{x:c.body_anchor.x,y:c.body_anchor.y},component_anchor:{x:c.comp_anchor.x,y:c.comp_anchor.y}}};})
         };
-        jsonOutput.value=JSON.stringify(payload,null,2);
+        var jsonStr = JSON.stringify(payload,null,2);
+        jsonOutput.value = jsonStr;
+        // Sync to finish form
+        var finishJson = document.getElementById('asm-finish-json');
+        if (finishJson) finishJson.value = jsonStr;
+        updateFinishBtn();
+    }
+
+    function updateFinishBtn() {
+        var btn = document.getElementById('asm-finish-btn');
+        if (btn) btn.disabled = !(selectedBody && addedComponents.length > 0);
     }
 
     function buildComposedPixels(){
@@ -342,8 +404,233 @@ document.addEventListener('DOMContentLoaded', function() {
         return Object.values(map);
     }
 
+    // Disable everything if assembler is already finished
+    var savedAssemblerData = @json($savedAssemblerData ?? null);
+
+    if (isAssemblerLocked && savedAssemblerData) {
+        bodySelect.disabled = true;
+        compBtn.disabled = true;
+        moveUp.disabled = true; moveDown.disabled = true; moveLeft.disabled = true; moveRight.disabled = true;
+
+        // Populate components list immediately from saved data (no API dependency)
+        if (savedAssemblerData.components && savedAssemblerData.components.length) {
+            savedAssemblerData.components.forEach(function(sc) {
+                addedComponents.push({
+                    id: sc.id, name: sc.name || 'Componente #' + sc.id,
+                    pixels: [],
+                    anchors: [],
+                    body_anchor: sc.body_anchor, comp_anchor: sc.comp_anchor,
+                    dx: sc.dx, dy: sc.dy
+                });
+            });
+        }
+        refreshAddedTable();
+
+        // Draw the saved image directly on canvas
+        drawLockedCanvas();
+
+        // Also populate body select label
+        if (savedAssemblerData.body_id && savedAssemblerData.body_name) {
+            var opt = document.createElement('option');
+            opt.value = savedAssemblerData.body_id;
+            opt.textContent = savedAssemblerData.body_name + ' (#' + savedAssemblerData.body_id + ')';
+            opt.selected = true;
+            bodySelect.appendChild(opt);
+        }
+    } else if (isAssemblerLocked) {
+        bodySelect.disabled = true;
+        compBtn.disabled = true;
+        moveUp.disabled = true; moveDown.disabled = true; moveLeft.disabled = true; moveRight.disabled = true;
+    }
+
+    // Draw locked canvas from saved pixel data (final image)
+    function drawLockedCanvas() {
+        mainCtx.fillStyle = '#fff';
+        mainCtx.fillRect(0, 0, 512, 512);
+        if (savedAssemblerData && savedAssemblerData.pixels) {
+            savedAssemblerData.pixels.forEach(function(p) {
+                mainCtx.fillStyle = 'rgb(' + p.r + ',' + p.g + ',' + p.b + ')';
+                mainCtx.fillRect(p.x * CELL, p.y * CELL, CELL, CELL);
+            });
+        }
+        mainCtx.strokeStyle = 'rgba(200,200,200,0.2)';
+        mainCtx.lineWidth = 0.5;
+        for (var i = 0; i <= GRID; i++) {
+            mainCtx.beginPath(); mainCtx.moveTo(i*CELL, 0); mainCtx.lineTo(i*CELL, 512); mainCtx.stroke();
+            mainCtx.beginPath(); mainCtx.moveTo(0, i*CELL); mainCtx.lineTo(512, i*CELL); mainCtx.stroke();
+        }
+    }
+
+    // Submit finish assembler form
+    window.submitFinishAssembler = function() {
+        if (!confirm('Terminare assemblaggio? Questa azione è irreversibile.')) return;
+        var finishJson = document.getElementById('asm-finish-json');
+        if (finishJson) finishJson.value = jsonOutput.value;
+        document.getElementById('asm-finish-form').submit();
+    };
+
     refreshAddedTable();
     updateJson();
+
+    // ── Info modal ─────────────────────────────────────────────────
+    $(document).on('click', '.asm-open-brain-from-info', function() {
+        var compId = +$(this).data('comp-id');
+        $('#asmInfoModal').modal('hide');
+        $('#asmInfoModal').one('hidden.bs.modal', function() {
+            var btn = $('.asm-view-brain[data-id="' + compId + '"]');
+            if (btn.length) { btn.click(); }
+            else {
+                // Trigger brain view directly if button not in DOM (locked state)
+                var comp = allComponents.find(function(c) { return c.id === compId; });
+                if (comp && comp.brain) { showBrainModal(comp); }
+            }
+        });
+    });
+
+    $(document).on('click', '.asm-info-comp', function(e) {
+        e.stopPropagation();
+        var compId = +$(this).data('id');
+        var comp = allComponents.find(function(c) { return c.id === compId; });
+        if (!comp) {
+            // Fallback: cerca nei addedComponents (per lo stato locked)
+            comp = addedComponents.find(function(c) { return c.id === compId; });
+            if (!comp) return;
+            // Se non abbiamo dettagli dall'API, mostra solo il nome
+            comp = allComponents.find(function(c) { return c.id === compId; }) || comp;
+        }
+
+        var isConsumable = (elementCharacteristic === 0);
+        var html = '<h5 class="font-weight-bold mb-3">' + comp.name + '</h5>';
+
+        if (isConsumable) {
+            html += '<h6 class="font-weight-bold"><i class="fas fa-utensils mr-1 text-success"></i> Effetti Consumo</h6>';
+            if (comp.consumption_effects && comp.consumption_effects.length) {
+                html += '<ul class="list-group mb-3">';
+                comp.consumption_effects.forEach(function(e) { html += '<li class="list-group-item py-1">' + e + '</li>'; });
+                html += '</ul>';
+            } else { html += '<p class="text-muted">Nessun effetto consumo.</p>'; }
+        } else {
+            html += '<h6 class="font-weight-bold"><i class="fas fa-dna mr-1 text-info"></i> Geni</h6>';
+            if (comp.genes && comp.genes.length) {
+                html += '<ul class="list-group mb-3">';
+                comp.genes.forEach(function(g) { html += '<li class="list-group-item py-1">' + g + '</li>'; });
+                html += '</ul>';
+            } else { html += '<p class="text-muted">Nessun gene.</p>'; }
+
+            html += '<h6 class="font-weight-bold"><i class="fas fa-flask mr-1 text-warning"></i> Elementi Chimici</h6>';
+            if (comp.rules && comp.rules.length) {
+                html += '<ul class="list-group mb-3">';
+                comp.rules.forEach(function(r) { html += '<li class="list-group-item py-1">' + r + '</li>'; });
+                html += '</ul>';
+            } else { html += '<p class="text-muted">Nessuna regola.</p>'; }
+
+            html += '<h6 class="font-weight-bold"><i class="fas fa-brain mr-1 text-purple"></i> Cervello</h6>';
+            if (comp.has_brain) {
+                html += '<p class="text-success"><i class="fas fa-check-circle mr-1"></i> Cervello configurato (' + comp.brain.neurons.length + ' neuroni, griglia ' + comp.brain.grid_width + 'x' + comp.brain.grid_height + ')</p>';
+                html += '<button type="button" class="btn btn-sm btn-info asm-open-brain-from-info" data-comp-id="' + comp.id + '"><i class="fas fa-brain mr-1"></i> Visualizza Cervello</button>';
+            } else { html += '<p class="text-muted">Nessun cervello configurato.</p>'; }
+        }
+
+        $('#asm-info-modal-title').html('<i class="fas fa-info-circle mr-2"></i> ' + comp.name);
+        $('#asm-info-modal-body').html(html);
+        $('#asmInfoModal').modal('show');
+    });
+
+    // ── Brain viewer ────────────────────────────────────────────────
+    var TYPE_SYMBOLS = @json(\App\Models\Neuron::TYPE_SYMBOLS);
+    var TYPE_LABELS = @json(\App\Models\Neuron::TYPE_LABELS);
+    var brainNeuronsData = [];
+    var brainCellSize = 40;
+
+    $(document).on('click', '.asm-view-brain', function(e) {
+        e.stopPropagation();
+        var compId = +$(this).data('id');
+        var comp = allComponents.find(function(c) { return c.id === compId; });
+        if (!comp || !comp.brain) return;
+        showBrainModal(comp);
+    });
+
+    function showBrainModal(comp) {
+        var brain = comp.brain;
+        if (!brain) return;
+        var canvas = document.getElementById('asm-brain-canvas');
+        var ctx = canvas.getContext('2d');
+        var gw = brain.grid_width || 5, gh = brain.grid_height || 5;
+        brainCellSize = Math.floor(Math.min(640 / gw, 640 / gh));
+        var cw = gw * brainCellSize, ch = gh * brainCellSize;
+        canvas.width = cw; canvas.height = ch;
+        brainNeuronsData = brain.neurons || [];
+
+        // Background
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, cw, ch);
+
+        // Grid lines (dashed)
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+        for (var i = 0; i <= gw; i++) { ctx.beginPath(); ctx.moveTo(i*brainCellSize, 0); ctx.lineTo(i*brainCellSize, ch); ctx.stroke(); }
+        for (var j = 0; j <= gh; j++) { ctx.beginPath(); ctx.moveTo(0, j*brainCellSize); ctx.lineTo(cw, j*brainCellSize); ctx.stroke(); }
+        ctx.setLineDash([]);
+
+        // Draw links
+        var links = brain.links || [];
+        links.forEach(function(link) {
+            var fromN = brainNeuronsData.find(function(n) { return n.id === link.from_neuron_id; });
+            var toN = brainNeuronsData.find(function(n) { return n.id === link.to_neuron_id; });
+            if (!fromN || !toN) return;
+            var fx = fromN.grid_j * brainCellSize + brainCellSize;
+            var fy = fromN.grid_i * brainCellSize + brainCellSize / 2;
+            var tx = toN.grid_j * brainCellSize;
+            var ty = toN.grid_i * brainCellSize + brainCellSize / 2;
+            ctx.strokeStyle = link.color || '#16A34A';
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke();
+            // Arrow
+            var angle = Math.atan2(ty - fy, tx - fx);
+            ctx.fillStyle = link.color || '#16A34A';
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.lineTo(tx - 10 * Math.cos(angle - 0.4), ty - 10 * Math.sin(angle - 0.4));
+            ctx.lineTo(tx - 10 * Math.cos(angle + 0.4), ty - 10 * Math.sin(angle + 0.4));
+            ctx.closePath(); ctx.fill();
+        });
+
+        // Neurons
+        brain.neurons.forEach(function(n) {
+            var x = n.grid_j * brainCellSize, y = n.grid_i * brainCellSize;
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#111827'; ctx.lineWidth = 2;
+            ctx.fillRect(x+2, y+2, brainCellSize-4, brainCellSize-4);
+            ctx.strokeRect(x+2, y+2, brainCellSize-4, brainCellSize-4);
+            var symbol = TYPE_SYMBOLS[n.type] || '?';
+            ctx.fillStyle = '#1f2937';
+            ctx.font = 'bold ' + Math.floor(brainCellSize * 0.5) + 'px Consolas';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(symbol, x + brainCellSize/2, y + brainCellSize/2);
+        });
+
+        document.getElementById('asm-brain-info').textContent = 'Griglia: ' + gw + 'x' + gh + ' — Neuroni: ' + brain.neurons.length + ' — Link: ' + links.length;
+
+        // Tooltip on hover
+        canvas.onmousemove = function(ev) {
+            var rect = canvas.getBoundingClientRect();
+            var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+            var ci = Math.floor(my / brainCellSize), cj = Math.floor(mx / brainCellSize);
+            var neuron = brainNeuronsData.find(function(n) { return n.grid_i === ci && n.grid_j === cj; });
+            var tip = document.getElementById('asm-brain-tooltip');
+            if (neuron) {
+                tip.textContent = (TYPE_LABELS[neuron.type] || neuron.type) + (neuron.tooltip ? ' — ' + neuron.tooltip : '');
+                tip.style.display = 'block';
+                tip.style.left = (mx + 12) + 'px';
+                tip.style.top = (my - 20) + 'px';
+            } else {
+                tip.style.display = 'none';
+            }
+        };
+        canvas.onmouseleave = function() { document.getElementById('asm-brain-tooltip').style.display = 'none'; };
+
+        $('#asmBrainModal .modal-title').html('<i class="fas fa-brain mr-2"></i> Cervello: ' + comp.name);
+        $('#asmBrainModal').modal('show');
+    }
 });
 </script>
 @stop

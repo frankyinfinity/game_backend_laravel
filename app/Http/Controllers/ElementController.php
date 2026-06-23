@@ -305,6 +305,85 @@ class ElementController extends Controller
             ];
         });
 
+        // Build saved assembler data from ElementDetail (for locked state view)
+        $savedAssemblerData = null;
+        if ($element->isFinishAssembler()) {
+            $element->load(['details.elementDetailData', 'genes', 'ruleChimicalElements']);
+
+            $bodyDetail = $element->details->first(fn($d) => $d->detailable_type === \App\Models\ElementBody::class);
+            $componentDetails = $element->details->filter(fn($d) => $d->detailable_type === \App\Models\ElementComponent::class);
+
+            // Query separata: prendi i nomi dei componenti e del body
+            $componentIds = $componentDetails->pluck('detailable_id')->toArray();
+            $componentNames = \App\Models\ElementComponent::whereIn('id', $componentIds)->pluck('name', 'id')->toArray();
+            $bodyName = $bodyDetail ? (\App\Models\ElementBody::find($bodyDetail->detailable_id)->name ?? null) : null;
+
+            $savedAssemblerData = [
+                'body_id' => $bodyDetail ? $bodyDetail->detailable_id : null,
+                'body_name' => $bodyName,
+                'zones_rgb' => [],
+                'components' => [],
+                'pixels' => [],
+            ];
+
+            // Extract zone colors from body detail data
+            if ($bodyDetail) {
+                $zoneData = [];
+                foreach ($bodyDetail->elementDetailData as $data) {
+                    if (preg_match('/^zone_(\d+)_(r|g|b)$/', $data->key, $m)) {
+                        $zoneData[$m[1]][$m[2]] = (int) $data->value;
+                    }
+                }
+                foreach ($zoneData as $zoneId => $rgb) {
+                    $savedAssemblerData['zones_rgb'][$zoneId] = [
+                        'r' => $rgb['r'] ?? 0,
+                        'g' => $rgb['g'] ?? 0,
+                        'b' => $rgb['b'] ?? 0,
+                    ];
+                }
+            }
+
+            // Extract components with anchor data
+            foreach ($componentDetails as $cd) {
+                $comp = [
+                    'id' => $cd->detailable_id,
+                    'name' => $componentNames[$cd->detailable_id] ?? 'Componente #' . $cd->detailable_id,
+                    'body_anchor' => ['x' => 0, 'y' => 0],
+                    'comp_anchor' => ['x' => 0, 'y' => 0],
+                ];
+                foreach ($cd->elementDetailData as $data) {
+                    if ($data->key === 'body_anchor_x') $comp['body_anchor']['x'] = (int) $data->value;
+                    if ($data->key === 'body_anchor_y') $comp['body_anchor']['y'] = (int) $data->value;
+                    if ($data->key === 'component_anchor_x') $comp['comp_anchor']['x'] = (int) $data->value;
+                    if ($data->key === 'component_anchor_y') $comp['comp_anchor']['y'] = (int) $data->value;
+                }
+                $comp['dx'] = $comp['body_anchor']['x'] - $comp['comp_anchor']['x'];
+                $comp['dy'] = $comp['body_anchor']['y'] - $comp['comp_anchor']['y'];
+                $savedAssemblerData['components'][] = $comp;
+            }
+
+            // Read saved image to get pixel data for canvas rendering
+            $imageName = $element->id . '.png';
+            if (\Storage::disk('public')->exists('elements/' . $imageName)) {
+                $imgPath = \Storage::disk('public')->path('elements/' . $imageName);
+                $img = @imagecreatefrompng($imgPath);
+                if ($img) {
+                    for ($y = 0; $y < 32; $y++) {
+                        for ($x = 0; $x < 32; $x++) {
+                            $rgb = imagecolorat($img, $x, $y);
+                            $r = ($rgb >> 16) & 0xFF;
+                            $g = ($rgb >> 8) & 0xFF;
+                            $b = $rgb & 0xFF;
+                            if (!($r > 240 && $g > 240 && $b > 240)) {
+                                $savedAssemblerData['pixels'][] = ['x' => $x, 'y' => $y, 'r' => $r, 'g' => $g, 'b' => $b];
+                            }
+                        }
+                    }
+                    imagedestroy($img);
+                }
+            }
+        }
+
         return view('elements.edit', compact(
             'element',
             'elementTypes',
@@ -320,7 +399,8 @@ class ElementController extends Controller
             'brainChimicalElements',
             'brainComplexChimicalElements',
             'allRuleChimicalElements',
-            'informationGenes'
+            'informationGenes',
+            'savedAssemblerData'
         ));
     }
 
@@ -571,7 +651,7 @@ class ElementController extends Controller
      */
     public function assemblerComponents()
     {
-        $components = \App\Models\ElementComponent::with(['anchors', 'genes.gene', 'ruleChimicalElements.ruleChimicalElement', 'elementTypeComponent', 'consumptionEffects.gene'])
+        $components = \App\Models\ElementComponent::with(['anchors', 'genes.gene', 'ruleChimicalElements.ruleChimicalElement.chimicalElement', 'ruleChimicalElements.ruleChimicalElement.complexChimicalElement', 'elementTypeComponent', 'consumptionEffects.gene', 'brain.neurons.outgoingLinks.conditionOrder', 'brain.neurons.conditionOrders'])
             ->where('state', '>=', \App\Models\ElementComponent::STATE_FINISH_DRAW)
             ->orderBy('name')
             ->get()
@@ -614,15 +694,175 @@ class ElementController extends Controller
                     'characteristic' => $comp->characteristic,
                     'type_name' => $comp->elementTypeComponent ? $comp->elementTypeComponent->name : '-',
                     'image_url' => $imageUrl,
-                    'genes' => $comp->genes->map(fn($g) => $g->gene ? $g->gene->name : '')->filter()->values()->toArray(),
-                    'rules' => $comp->ruleChimicalElements->map(fn($r) => $r->ruleChimicalElement ? $r->ruleChimicalElement->name : '')->filter()->values()->toArray(),
+                    'genes' => $comp->genes->map(fn($g) => $g->gene ? ($g->gene->name . ': ' . ($g->value ?? 0)) : '')->filter()->values()->toArray(),
+                    'rules' => $comp->ruleChimicalElements->map(function($r) {
+                        if (!$r->ruleChimicalElement) return '';
+                        $rule = $r->ruleChimicalElement;
+                        $chemName = '';
+                        if ($rule->chimicalElement) $chemName = $rule->chimicalElement->name;
+                        elseif ($rule->complexChimicalElement) $chemName = $rule->complexChimicalElement->name;
+                        return $rule->name . ($chemName ? ' (' . $chemName . ')' : '');
+                    })->filter()->values()->toArray(),
                     'consumption_effects' => $comp->consumptionEffects->map(fn($e) => $e->gene ? ($e->gene->name . ' (' . ($e->effect >= 0 ? '+' : '') . $e->effect . ')') : '')->filter()->values()->toArray(),
+                    'brain' => $comp->brain ? [
+                        'grid_width' => $comp->brain->grid_width,
+                        'grid_height' => $comp->brain->grid_height,
+                        'neurons' => $comp->brain->neurons->map(fn($n) => [
+                            'id' => $n->id,
+                            'type' => $n->type,
+                            'grid_i' => (int) $n->grid_i,
+                            'grid_j' => (int) $n->grid_j,
+                            'tooltip' => \App\Helpers\NeuronTooltipHelper::generateTextFromNeuron($n),
+                        ])->toArray(),
+                        'links' => $comp->brain->neurons->flatMap(fn($n) => $n->outgoingLinks->map(fn($l) => [
+                            'from_neuron_id' => (int) $l->from_neuron_id,
+                            'to_neuron_id' => (int) $l->to_neuron_id,
+                            'condition' => $l->conditionOrder ? $l->conditionOrder->condition : null,
+                            'color' => $l->conditionOrder ? $l->conditionOrder->color : null,
+                        ]))->values()->toArray(),
+                    ] : null,
+                    'has_brain' => $comp->brain && $comp->brain->neurons->count() > 0,
                     'pixels' => $pixels,
                     'anchors' => $comp->anchors->map(fn($a) => ['id' => $a->id, 'x' => $a->x, 'y' => $a->y])->toArray(),
                 ];
             });
 
         return response()->json($components);
+    }
+
+    public function finishAssembler(Request $request, Element $element)
+    {
+        if ($element->state !== Element::STATE_CREATED) {
+            return redirect()->back()->with('error', 'Stato non valido per questa operazione.');
+        }
+
+        $request->validate([
+            'assembler_json' => 'required|string',
+        ]);
+
+        $json = json_decode($request->input('assembler_json'), true);
+        if (!$json || empty($json['body_selected'])) {
+            return redirect()->back()->with('error', 'JSON assemblaggio non valido. Seleziona un corpo.');
+        }
+
+        // ── 1) Populate ElementDetail ────────────────────────────────────────
+        $element->details()->delete();
+
+        if (!empty($json['components'])) {
+            foreach ($json['components'] as $compData) {
+                $detail = $element->details()->create([
+                    'detailable_type' => \App\Models\ElementComponent::class,
+                    'detailable_id'   => $compData['id'],
+                ]);
+                if (!empty($compData['link_to_body'])) {
+                    $link = $compData['link_to_body'];
+                    $detail->elementDetailData()->create(['key' => 'body_anchor_x', 'value' => (string) ($link['body_anchor']['x'] ?? 0)]);
+                    $detail->elementDetailData()->create(['key' => 'body_anchor_y', 'value' => (string) ($link['body_anchor']['y'] ?? 0)]);
+                    $detail->elementDetailData()->create(['key' => 'component_anchor_x', 'value' => (string) ($link['component_anchor']['x'] ?? 0)]);
+                    $detail->elementDetailData()->create(['key' => 'component_anchor_y', 'value' => (string) ($link['component_anchor']['y'] ?? 0)]);
+                }
+            }
+        }
+
+        if (!empty($json['body_selected']['id'])) {
+            $bodyDetail = $element->details()->create([
+                'detailable_type' => \App\Models\ElementBody::class,
+                'detailable_id'   => $json['body_selected']['id'],
+            ]);
+            if (!empty($json['zones_rgb'])) {
+                foreach ($json['zones_rgb'] as $zoneRgb) {
+                    $bodyDetail->elementDetailData()->create(['key' => 'zone_' . $zoneRgb['zone_id'] . '_r', 'value' => (string) $zoneRgb['r']]);
+                    $bodyDetail->elementDetailData()->create(['key' => 'zone_' . $zoneRgb['zone_id'] . '_g', 'value' => (string) $zoneRgb['g']]);
+                    $bodyDetail->elementDetailData()->create(['key' => 'zone_' . $zoneRgb['zone_id'] . '_b', 'value' => (string) $zoneRgb['b']]);
+                }
+            }
+        }
+
+        // ── 2) Populate genes and chemical rules from components ──────────────
+        $componentIds = collect($json['components'] ?? [])->pluck('id')->filter()->toArray();
+
+        if (!empty($componentIds)) {
+            // Aggregate genes: merge all genes from all components (sum effects for same gene)
+            $componentGenes = \App\Models\ElementComponentHasGene::whereIn('element_component_id', $componentIds)
+                ->get()
+                ->groupBy('gene_id');
+
+            $genesSync = [];
+            foreach ($componentGenes as $geneId => $records) {
+                $totalEffect = $records->sum('value');
+                $genesSync[$geneId] = ['effect' => $totalEffect];
+            }
+            $element->genes()->sync($genesSync);
+
+            // Aggregate chemical rules: merge all rules (unique)
+            $componentRules = \App\Models\ElementComponentHasRuleChimicalElement::whereIn('element_component_id', $componentIds)
+                ->pluck('rule_chimical_element_id')
+                ->unique()
+                ->toArray();
+            $element->ruleChimicalElements()->sync($componentRules);
+
+            // Aggregate consumption effects (for consumable): store as genes with effect
+            if ($element->isConsumable()) {
+                $consumptionEffects = \App\Models\ElementComponentConsumptionEffect::whereIn('element_component_id', $componentIds)
+                    ->get()
+                    ->groupBy('gene_id');
+
+                $consumptionSync = [];
+                foreach ($consumptionEffects as $geneId => $records) {
+                    $totalEffect = $records->sum('effect');
+                    if (isset($consumptionSync[$geneId])) {
+                        $consumptionSync[$geneId]['effect'] += $totalEffect;
+                    } else {
+                        $consumptionSync[$geneId] = ['effect' => $totalEffect];
+                    }
+                }
+                // Merge with existing genes (consumption effects override/add to genes)
+                foreach ($consumptionSync as $geneId => $data) {
+                    if (isset($genesSync[$geneId])) {
+                        $genesSync[$geneId]['effect'] += $data['effect'];
+                    } else {
+                        $genesSync[$geneId] = $data;
+                    }
+                }
+                $element->genes()->sync($genesSync);
+            }
+        }
+
+        // ── 3) Generate image from pixels (32x32) ────────────────────────────
+        if (!empty($json['pixels'])) {
+            $img = imagecreatetruecolor(32, 32);
+            $white = imagecolorallocate($img, 255, 255, 255);
+            imagefill($img, 0, 0, $white);
+
+            foreach ($json['pixels'] as $pixel) {
+                $x = (int) ($pixel['x'] ?? 0);
+                $y = (int) ($pixel['y'] ?? 0);
+                $r = (int) ($pixel['r'] ?? 0);
+                $g = (int) ($pixel['g'] ?? 0);
+                $b = (int) ($pixel['b'] ?? 0);
+                if ($x >= 0 && $x < 32 && $y >= 0 && $y < 32) {
+                    $color = imagecolorallocate($img, $r, $g, $b);
+                    imagesetpixel($img, $x, $y, $color);
+                }
+            }
+
+            $imageName = $element->id . '.png';
+
+            // Save to temp, then store
+            $tempPath = tempnam(sys_get_temp_dir(), 'elem_');
+            imagepng($img, $tempPath);
+            imagedestroy($img);
+
+            $imageContent = file_get_contents($tempPath);
+            \Storage::disk('uploads')->put('elements/' . $imageName, $imageContent);
+            \Storage::disk('public')->put('elements/' . $imageName, $imageContent);
+            unlink($tempPath);
+        }
+
+        // ── 4) Update state ──────────────────────────────────────────────────
+        $element->update(['state' => Element::STATE_FINISH_ASSEMBLER]);
+
+        return redirect()->route('elements.edit', $element)->with('success', 'Assemblaggio terminato e bloccato.');
     }
 
     public function saveGraphics(Request $request, Element $element)
