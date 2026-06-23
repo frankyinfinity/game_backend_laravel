@@ -74,4 +74,9 @@ class ElementBody extends Model
     {
         return $this->morphMany(ElementHasPositionDetail::class, 'detailable');
     }
+
+    public function elementDetails()
+    {
+        return $this->morphMany(ElementDetail::class, 'detailable');
+    }
 }

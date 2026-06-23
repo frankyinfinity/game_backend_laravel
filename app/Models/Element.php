@@ -80,6 +80,11 @@ class Element extends Model
         return $this->belongsToMany(RuleChimicalElement::class, 'element_has_rule_chimical_elements');
     }
 
+    public function details()
+    {
+        return $this->hasMany(ElementDetail::class);
+    }
+
     /**
      * Check if the element is consumable
      *
