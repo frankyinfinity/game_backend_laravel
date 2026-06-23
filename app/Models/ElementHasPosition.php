@@ -75,4 +75,9 @@ class ElementHasPosition extends Model
     {
         return $this->hasMany(ElementHasPositionReward::class);
     }
+
+    public function details()
+    {
+        return $this->hasMany(ElementHasPositionDetail::class);
+    }
 }

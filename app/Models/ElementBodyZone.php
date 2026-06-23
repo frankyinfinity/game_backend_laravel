@@ -24,4 +24,9 @@ class ElementBodyZone extends Model
     {
         return $this->hasMany(ElementBodyZonePixel::class);
     }
+
+    public function elementHasPositionDetails()
+    {
+        return $this->morphMany(ElementHasPositionDetail::class, 'detailable');
+    }
 }

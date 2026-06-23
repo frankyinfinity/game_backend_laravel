@@ -69,4 +69,9 @@ class ElementBody extends Model
     {
         return $this->morphMany(ElementAnchor::class, 'anchorable');
     }
+
+    public function elementHasPositionDetails()
+    {
+        return $this->morphMany(ElementHasPositionDetail::class, 'detailable');
+    }
 }
