@@ -163,6 +163,17 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/element-components/{elementComponent}/rules', [App\Http\Controllers\ElementComponentController::class, 'storeRule'])->name('element-components.rules.store');
     Route::delete('/element-components/rules/{elementComponentHasRule}', [App\Http\Controllers\ElementComponentController::class, 'destroyRule'])->name('element-components.rules.destroy');
 
+    // Element Components Brain (Cervello)
+    Route::post('/element-components/{elementComponent}/brain/grid', [App\Http\Controllers\ElementComponentController::class, 'saveBrainGrid'])->name('element-components.brain.grid.save');
+    Route::post('/element-components/{elementComponent}/brain/neurons', [App\Http\Controllers\ElementComponentController::class, 'saveBrainNeuron'])->name('element-components.brain.neurons.save');
+    Route::patch('/element-components/{elementComponent}/brain/neurons/{neuron}/move', [App\Http\Controllers\ElementComponentController::class, 'moveBrainNeuron'])->name('element-components.brain.neurons.move');
+    Route::post('/element-components/{elementComponent}/brain/neurons/{neuron}/condition-orders', [App\Http\Controllers\ElementComponentController::class, 'saveNeuronConditionOrders'])->name('element-components.brain.neurons.condition-orders.save');
+    Route::delete('/element-components/{elementComponent}/brain/neurons', [App\Http\Controllers\ElementComponentController::class, 'deleteBrainNeuron'])->name('element-components.brain.neurons.delete');
+    Route::post('/element-components/{elementComponent}/brain/neuron-links', [App\Http\Controllers\ElementComponentController::class, 'saveNeuronLink'])->name('element-components.brain.neuron-links.save');
+    Route::delete('/element-components/{elementComponent}/brain/neuron-links', [App\Http\Controllers\ElementComponentController::class, 'deleteNeuronLink'])->name('element-components.brain.neuron-links.delete');
+    Route::post('/element-components/{elementComponent}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\ElementComponentController::class, 'toggleCircuitActive'])->name('element-components.brain.circuits.toggle-active');
+    Route::delete('/element-components/{elementComponent}/brain/circuits/{circuit}', [App\Http\Controllers\ElementComponentController::class, 'deleteBrainCircuit'])->name('element-components.brain.circuits.delete');
+
     //Chimical Elements
     Route::resource('chimical-elements', App\Http\Controllers\ChimicalElementController::class);
     Route::post('/chimical-elements/list/table', [App\Http\Controllers\ChimicalElementController::class, 'listDataTable'])->name('chimical-elements.datatable');

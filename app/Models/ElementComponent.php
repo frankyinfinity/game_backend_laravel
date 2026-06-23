@@ -14,8 +14,8 @@ class ElementComponent extends Model {
         self::INTERACTIVE   => 'Interattivo',
     ];
 
-    protected $fillable = ['name', 'image', 'state', 'element_type_component_id', 'characteristic'];
-    protected $casts = ['state' => 'integer', 'element_type_component_id' => 'integer', 'characteristic' => 'integer'];
+    protected $fillable = ['name', 'image', 'state', 'element_type_component_id', 'characteristic', 'brain_id'];
+    protected $casts = ['state' => 'integer', 'element_type_component_id' => 'integer', 'characteristic' => 'integer', 'brain_id' => 'integer'];
 
     public function isCreated(): bool { return $this->state === self::STATE_CREATED; }
     public function isFinishDraw(): bool { return $this->state >= self::STATE_FINISH_DRAW; }
@@ -36,4 +36,5 @@ class ElementComponent extends Model {
     public function ruleChimicalElements() { return $this->hasMany(ElementComponentHasRuleChimicalElement::class, 'element_component_id'); }
     public function elementTypeComponent() { return $this->belongsTo(ElementTypeComponent::class, 'element_type_component_id'); }
     public function anchors() { return $this->morphMany(ElementAnchor::class, 'anchorable'); }
+    public function brain() { return $this->belongsTo(\App\Models\Brain::class); }
 }

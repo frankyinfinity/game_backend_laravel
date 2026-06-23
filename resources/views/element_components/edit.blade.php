@@ -50,10 +50,15 @@
                 <ul class="nav nav-tabs" id="main-tabs" role="tablist">
                     <li class="nav-item"><a class="nav-link active" data-toggle="pill" href="#tab-general" role="tab">Dati Generali</a></li>
                     <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-graphics" role="tab">Grafica</a></li>
-                    <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-genes" role="tab">Geni</a></li>
-                    <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-rules" role="tab">Elementi Chimici</a></li>
+                    @if($elementComponent->isInteractive())
+                        <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-genes" role="tab">Geni</a></li>
+                        <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-rules" role="tab">Elementi Chimici</a></li>
+                    @endif
+                    @if($elementComponent->isInteractive() && ($elementComponent->isFinishDraw() || $elementComponent->isCompleted()))
+                        <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-brain" role="tab">Cervello</a></li>
+                    @endif
                     @if($elementComponent->isFinishDraw() || $elementComponent->isCompleted())
-                    <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-ancore" role="tab">Ancore</a></li>
+                        <li class="nav-item"><a class="nav-link" data-toggle="pill" href="#tab-ancore" role="tab">Ancore</a></li>
                     @endif
                 </ul>
             </div>
@@ -119,6 +124,7 @@
                     </div>
 
                     <!-- GENI -->
+                    @if($elementComponent->isInteractive())
                     <div class="tab-pane fade" id="tab-genes" role="tabpanel">
                         <div class="mb-3 d-flex justify-content-between align-items-center">
                             <h5 class="text-dark font-weight-bold mb-0">Associazione Geni</h5>
@@ -149,7 +155,14 @@
                             </table>
                         </div>
                     </div>
+                    @endif
 
+                    @if($elementComponent->isInteractive() && ($elementComponent->isFinishDraw() || $elementComponent->isCompleted()))
+                    <!-- CERVELLO -->
+                    <div class="tab-pane fade" id="tab-brain" role="tabpanel">
+                        @include('element_components.tabs.brain')
+                    </div>
+                    @endif
                     @if($elementComponent->isFinishDraw() || $elementComponent->isCompleted())
                     <!-- ANCORE -->
                     <div class="tab-pane fade" id="tab-ancore" role="tabpanel">
