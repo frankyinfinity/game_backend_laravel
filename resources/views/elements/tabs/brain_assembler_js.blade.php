@@ -206,22 +206,22 @@ $(function() {
         });
     }
 
-    document.getElementById('el-brain-place-up').addEventListener('click', function() {
+    document.getElementById('el-brain-place-up') && document.getElementById('el-brain-place-up').addEventListener('click', function() {
         if (placingI > 0) { placingI--; drawPlacePreview(); }
     });
-    document.getElementById('el-brain-place-down').addEventListener('click', function() {
+    document.getElementById('el-brain-place-down') && document.getElementById('el-brain-place-down').addEventListener('click', function() {
         var cb = componentBrains[placingIndex]; if (!cb) return;
         if (placingI + cb.grid_height < gridHeight) { placingI++; drawPlacePreview(); }
     });
-    document.getElementById('el-brain-place-left').addEventListener('click', function() {
+    document.getElementById('el-brain-place-left') && document.getElementById('el-brain-place-left').addEventListener('click', function() {
         if (placingJ > 0) { placingJ--; drawPlacePreview(); }
     });
-    document.getElementById('el-brain-place-right').addEventListener('click', function() {
+    document.getElementById('el-brain-place-right') && document.getElementById('el-brain-place-right').addEventListener('click', function() {
         var cb = componentBrains[placingIndex]; if (!cb) return;
         if (placingJ + cb.grid_width < gridWidth) { placingJ++; drawPlacePreview(); }
     });
 
-    document.getElementById('el-brain-place-confirm').addEventListener('click', function() {
+    document.getElementById('el-brain-place-confirm') && document.getElementById('el-brain-place-confirm').addEventListener('click', function() {
         var cb = componentBrains[placingIndex];
         if (!cb) return;
         if (!canFit(cb, placingI, placingJ)) {
@@ -267,6 +267,7 @@ $(function() {
                 drawBrainGrid();
                 if (typeof toastr !== 'undefined') toastr.success('Cervello posizionato e salvato!');
                 else alert('Cervello posizionato e salvato!');
+                updateCompleteButton();
             } else {
                 if (typeof toastr !== 'undefined') toastr.error(d.message || 'Errore nel posizionamento.');
                 else alert(d.message || 'Errore nel posizionamento.');
@@ -371,6 +372,9 @@ $(function() {
                 existingLinks = d.links || [];
                 placedBrains = placedBrains.filter(function(p) { return p.index !== index; });
 
+                // Mark as not placed in local data
+                componentBrains[index].is_placed = false;
+
                 // Update UI: show place button, hide remove button, reset badge
                 btn.remove();
                 var badge = document.getElementById('el-brain-status-' + index);
@@ -389,13 +393,14 @@ $(function() {
                 drawBrainGrid();
                 if (typeof toastr !== 'undefined') toastr.success('Cervello rimosso!');
                 else alert('Cervello rimosso!');
+                updateCompleteButton();
             } else {
                 alert(d.message || 'Errore nella rimozione.');
             }
         }).catch(function(e) { console.error(e); alert('Errore di rete.'); });
     });
 
-    document.getElementById('el-brain-save-grid').addEventListener('click', function() {
+    document.getElementById('el-brain-save-grid') && document.getElementById('el-brain-save-grid').addEventListener('click', function() {
         gridWidth = Math.max(1, +widthInput.value || 10);
         gridHeight = Math.max(1, +heightInput.value || 10);
         // Reset placements if grid shrinks
@@ -456,5 +461,28 @@ $(function() {
 
     // Init
     drawBrainGrid();
+    updateCompleteButton();
+
+    // Redraw when tab becomes visible
+    $('a[href="#tab-brain"]').on('shown.bs.tab', function() {
+        drawBrainGrid();
+    });
+
+    function updateCompleteButton() {
+        var btn = document.getElementById('el-brain-complete-btn');
+        var hint = document.getElementById('el-brain-complete-hint');
+        if (!btn) return;
+        var totalBrains = componentBrains.length;
+        if (totalBrains === 0) { btn.disabled = true; return; }
+        // Count placed: from server (is_placed) + from session (placedBrains)
+        var placedCount = 0;
+        componentBrains.forEach(function(cb, idx) {
+            if (cb.is_placed) placedCount++;
+            else if (placedBrains.find(function(p) { return p.index === idx; })) placedCount++;
+        });
+        var allPlaced = (placedCount >= totalBrains);
+        btn.disabled = !allPlaced;
+        if (hint) hint.style.display = allPlaced ? 'none' : '';
+    }
 });
 </script>

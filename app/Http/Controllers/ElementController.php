@@ -180,6 +180,8 @@ class ElementController extends Controller
                 return $row->getCharacteristicLabel();
             })
             ->addColumn('state_display', function ($row) {
+                if ($row->isCompleted()) return '<span class="badge badge-success"><i class="fas fa-check-double"></i> ' . $row->getStateLabel() . '</span>';
+                if ($row->isFinishAssembler()) return '<span class="badge badge-info"><i class="fas fa-lock"></i> ' . $row->getStateLabel() . '</span>';
                 return '<span class="badge badge-warning"><i class="fas fa-edit"></i> ' . $row->getStateLabel() . '</span>';
             })
             ->rawColumns(['graphics', 'state_display'])
@@ -1052,6 +1054,39 @@ class ElementController extends Controller
         }
 
         return response()->json(['success' => true, 'neurons' => $remainingNeurons, 'links' => $remainingLinks]);
+    }
+
+    public function complete(Request $request, Element $element)
+    {
+        if ($element->state !== Element::STATE_FINISH_ASSEMBLER) {
+            return redirect()->back()->with('error', 'Stato non valido.');
+        }
+
+        if (!$element->isInteractive()) {
+            // For consumable, just complete
+            $element->update(['state' => Element::STATE_COMPLETED]);
+            return redirect()->route('elements.edit', $element)->with('success', 'Elemento completato.');
+        }
+
+        // For interactive: check all component brains are placed
+        $compDetails = $element->details()
+            ->where('detailable_type', \App\Models\ElementComponent::class)
+            ->get();
+
+        $placedBrainIds = $element->details()
+            ->where('detailable_type', \App\Models\Brain::class)
+            ->pluck('detailable_id')
+            ->toArray();
+
+        foreach ($compDetails as $detail) {
+            $comp = \App\Models\ElementComponent::find($detail->detailable_id);
+            if ($comp && $comp->brain_id && !in_array($comp->brain_id, $placedBrainIds)) {
+                return redirect()->back()->with('error', 'Devi posizionare tutti i cervelli dei componenti prima di completare.');
+            }
+        }
+
+        $element->update(['state' => Element::STATE_COMPLETED]);
+        return redirect()->route('elements.edit', $element)->with('success', 'Elemento completato e bloccato.');
     }
 
     public function finishAssembler(Request $request, Element $element)

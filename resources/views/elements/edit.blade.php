@@ -93,6 +93,13 @@
     <input type="hidden" name="assembler_json" id="asm-finish-json" value="">
 </form>
 @endif
+
+@if($element->isFinishAssembler() && $element->isInteractive() && !$element->isCompleted())
+<!-- Form separato per complete (fuori dal form principale) -->
+<form action="{{ route('elements.complete', $element) }}" method="POST" id="el-brain-complete-form" style="display:none;">
+    @csrf
+</form>
+@endif
 @stop
 
 @section('js')

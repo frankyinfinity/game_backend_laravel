@@ -2,16 +2,18 @@
 <div class="row mb-3">
     <div class="col-md-3">
         <label class="font-weight-bold">Larghezza Griglia</label>
-        <input type="number" class="form-control" id="el-brain-grid-width" min="1" value="{{ $brainGridWidth }}">
+        <input type="number" class="form-control" id="el-brain-grid-width" min="1" value="{{ $brainGridWidth }}" {{ $element->isCompleted() ? 'disabled' : '' }}>
     </div>
     <div class="col-md-3">
         <label class="font-weight-bold">Altezza Griglia</label>
-        <input type="number" class="form-control" id="el-brain-grid-height" min="1" value="{{ $brainGridHeight }}">
+        <input type="number" class="form-control" id="el-brain-grid-height" min="1" value="{{ $brainGridHeight }}" {{ $element->isCompleted() ? 'disabled' : '' }}>
     </div>
     <div class="col-md-6 d-flex align-items-end">
+        @if(!$element->isCompleted())
         <button type="button" class="btn btn-primary btn-sm" id="el-brain-save-grid">
             <i class="fas fa-save mr-1"></i> Salva Griglia
         </button>
+        @endif
     </div>
 </div>
 
@@ -52,14 +54,16 @@
                                 <button type="button" class="btn btn-xs btn-info el-brain-view-btn mr-1" data-index="{{ $loop->index }}" title="Visualizza">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                                @if(!$cb['is_placed'])
-                                <button type="button" class="btn btn-xs btn-success el-brain-place-btn" data-index="{{ $loop->index }}" title="Posiziona">
-                                    <i class="fas fa-plus-circle"></i>
-                                </button>
-                                @else
-                                <button type="button" class="btn btn-xs btn-danger el-brain-remove-btn" data-index="{{ $loop->index }}" data-brain-id="{{ $cb['brain_id'] }}" title="Rimuovi">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                @if(!$element->isCompleted())
+                                    @if(!$cb['is_placed'])
+                                    <button type="button" class="btn btn-xs btn-success el-brain-place-btn" data-index="{{ $loop->index }}" title="Posiziona">
+                                        <i class="fas fa-plus-circle"></i>
+                                    </button>
+                                    @else
+                                    <button type="button" class="btn btn-xs btn-danger el-brain-remove-btn" data-index="{{ $loop->index }}" data-brain-id="{{ $cb['brain_id'] }}" title="Rimuovi">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    @endif
                                 @endif
                             </td>
                         </tr>
@@ -73,6 +77,19 @@
         </div>
     </div>
 </div>
+
+@if(!$element->isCompleted())
+<div class="mt-3 border-top pt-3">
+    <button type="button" class="btn btn-success shadow-sm" id="el-brain-complete-btn" disabled onclick="if(confirm('Completare l\'elemento? Irreversibile.')) document.getElementById('el-brain-complete-form').submit();">
+        <i class="fas fa-check-double mr-1"></i> Completa Elemento
+    </button>
+    <small class="text-muted ml-2" id="el-brain-complete-hint">Posiziona tutti i cervelli per abilitare.</small>
+</div>
+@else
+<div class="alert alert-success mt-3">
+    <i class="fas fa-lock mr-1"></i> Elemento completato. Cervello bloccato.
+</div>
+@endif
 
 <!-- Modal Visualizza Brain Componente -->
 <div class="modal fade" id="elBrainViewModal" tabindex="-1">
