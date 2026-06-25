@@ -47,6 +47,7 @@ class ContainerController extends Controller
 
         // Get interactive elements for the modal select
         $interactiveElements = Element::where('characteristic', Element::INTERACTIVE)
+            ->where('state', Element::STATE_COMPLETED)
             ->with(['elementType'])
             ->orderBy('name')
             ->get();

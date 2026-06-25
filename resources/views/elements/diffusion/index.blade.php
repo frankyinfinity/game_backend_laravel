@@ -48,6 +48,7 @@
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
+                    data: { state: {{ \App\Models\Element::STATE_COMPLETED }} }
                 },
                 columns: [
                     {data:"id", name:"id"},

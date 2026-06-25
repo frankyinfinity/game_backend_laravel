@@ -157,7 +157,11 @@ class ElementController extends Controller
 
     public function listDataTable(Request $request)
     {
-        $query = Element::with(['elementType', 'climates'])->get();
+        $query = Element::with(['elementType', 'climates']);
+        if ($request->has('state')) {
+            $query->where('state', (int) $request->input('state'));
+        }
+        $query = $query->get();
 
         return datatables($query)
             ->addColumn('graphics', function ($row) {
