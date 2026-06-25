@@ -416,12 +416,26 @@ class ElementController extends Controller
                 $comp = \App\Models\ElementComponent::with('brain.neurons.outgoingLinks.conditionOrder', 'brain.neurons.conditionOrders')
                     ->find($detail->detailable_id);
                 if ($comp && $comp->brain && $comp->brain->neurons->count() > 0) {
+                    // Get neuron_ids in element brain if placed
+                    $neuronIdsInElement = [];
+                    if (in_array($comp->brain->id, $placedBrainIds)) {
+                        $brainDetailRecord = $element->details
+                            ->where('detailable_type', \App\Models\Brain::class)
+                            ->where('detailable_id', $comp->brain->id)
+                            ->first();
+                        if ($brainDetailRecord) {
+                            $nidsData = $brainDetailRecord->elementDetailData->firstWhere('key', 'neuron_ids');
+                            if ($nidsData) $neuronIdsInElement = json_decode($nidsData->value, true) ?: [];
+                        }
+                    }
+
                     $componentBrains[] = [
                         'component_id' => $comp->id,
                         'component_name' => $comp->name,
                         'detail_id' => $detail->id,
                         'brain_id' => $comp->brain->id,
                         'is_placed' => in_array($comp->brain->id, $placedBrainIds),
+                        'neuron_ids_in_element' => $neuronIdsInElement,
                         'grid_width' => $comp->brain->grid_width,
                         'grid_height' => $comp->brain->grid_height,
                         'neuron_count' => $comp->brain->neurons->count(),
@@ -919,8 +933,19 @@ class ElementController extends Controller
         ]);
 
         // Save position, neuron IDs and link IDs on ElementDetailData
-        $brainDetail->elementDetailData()->create(['key' => 'offset_i', 'value' => (string) $offsetI]);
-        $brainDetail->elementDetailData()->create(['key' => 'offset_j', 'value' => (string) $offsetJ]);
+        // Save positions of all START neurons
+        $startNeuronPositions = [];
+        foreach ($neuronIdMap as $oldId => $newId) {
+            $srcNeuron = $comp->brain->neurons->firstWhere('id', $oldId);
+            if ($srcNeuron && $srcNeuron->type === \App\Models\Neuron::TYPE_START) {
+                $startNeuronPositions[] = [
+                    'neuron_id' => $newId,
+                    'grid_i' => $srcNeuron->grid_i + $offsetI,
+                    'grid_j' => $srcNeuron->grid_j + $offsetJ,
+                ];
+            }
+        }
+        $brainDetail->elementDetailData()->create(['key' => 'start_neurons', 'value' => json_encode($startNeuronPositions)]);
         $brainDetail->elementDetailData()->create(['key' => 'neuron_ids', 'value' => json_encode(array_values($neuronIdMap))]);
         $brainDetail->elementDetailData()->create(['key' => 'link_ids', 'value' => json_encode(
             NeuronLink::whereIn('from_neuron_id', array_values($neuronIdMap))->pluck('id')->toArray()
@@ -935,7 +960,98 @@ class ElementController extends Controller
             $detail->elementDetailData()->updateOrCreate(['key' => 'brain_offset_j'], ['value' => (string) $offsetJ]);
         }
 
-        return response()->json(['success' => true, 'neurons_added' => count($neuronIdMap)]);
+        return response()->json([
+            'success' => true,
+            'neurons_added' => count($neuronIdMap),
+            'new_neurons' => collect($neuronIdMap)->map(function($newId, $oldId) use ($comp, $offsetI, $offsetJ) {
+                $src = $comp->brain->neurons->firstWhere('id', $oldId);
+                return $src ? ['id' => $newId, 'type' => $src->type, 'grid_i' => (int)$src->grid_i + $offsetI, 'grid_j' => (int)$src->grid_j + $offsetJ, 'tooltip' => \App\Helpers\NeuronTooltipHelper::generateTextFromNeuron($src)] : null;
+            })->filter()->values()->toArray(),
+            'new_links' => NeuronLink::whereIn('from_neuron_id', array_values($neuronIdMap))->get()->map(function($l) {
+                return ['from_neuron_id' => (int)$l->from_neuron_id, 'to_neuron_id' => (int)$l->to_neuron_id, 'color' => $l->conditionOrder ? $l->conditionOrder->color : '#16A34A'];
+            })->toArray(),
+        ]);
+    }
+
+    /**
+     * Remove a placed component brain from the element brain.
+     */
+    public function removeBrainComponent(Request $request, Element $element)
+    {
+        if (!$element->isFinishAssembler() || !$element->isInteractive()) {
+            return response()->json(['success' => false, 'message' => 'Operazione non valida.'], 403);
+        }
+
+        $request->validate(['brain_id' => 'required|integer']);
+
+        $brainIdToRemove = (int) $request->input('brain_id');
+
+        // Find the ElementDetail record for this brain
+        $brainDetail = $element->details()
+            ->where('detailable_type', \App\Models\Brain::class)
+            ->where('detailable_id', $brainIdToRemove)
+            ->first();
+
+        if (!$brainDetail) {
+            return response()->json(['success' => false, 'message' => 'Brain non trovato nei dettagli.'], 404);
+        }
+
+        // Get neuron_ids and link_ids from detail data
+        $neuronIdsData = $brainDetail->elementDetailData()->where('key', 'neuron_ids')->first();
+        $linkIdsData = $brainDetail->elementDetailData()->where('key', 'link_ids')->first();
+
+        $neuronIds = $neuronIdsData ? json_decode($neuronIdsData->value, true) : [];
+        $linkIds = $linkIdsData ? json_decode($linkIdsData->value, true) : [];
+
+        // Delete links
+        if (!empty($linkIds)) {
+            NeuronLink::whereIn('id', $linkIds)->delete();
+        }
+
+        // Delete neurons
+        if (!empty($neuronIds)) {
+            // Also delete any links that reference these neurons
+            NeuronLink::whereIn('from_neuron_id', $neuronIds)->orWhereIn('to_neuron_id', $neuronIds)->delete();
+            Neuron::whereIn('id', $neuronIds)->delete();
+        }
+
+        // Delete the ElementDetail and its data
+        $brainDetail->elementDetailData()->delete();
+        $brainDetail->delete();
+
+        // Also remove brain_placed from the component detail
+        $compDetail = $element->details()
+            ->where('detailable_type', \App\Models\ElementComponent::class)
+            ->get()
+            ->first(function ($d) use ($brainIdToRemove) {
+                $brainData = $d->elementDetailData()->where('key', 'brain_id')->where('value', (string) $brainIdToRemove)->first();
+                return $brainData !== null;
+            });
+
+        if ($compDetail) {
+            $compDetail->elementDetailData()->where('key', 'brain_placed')->delete();
+            $compDetail->elementDetailData()->where('key', 'brain_id')->delete();
+            $compDetail->elementDetailData()->where('key', 'brain_offset_i')->delete();
+            $compDetail->elementDetailData()->where('key', 'brain_offset_j')->delete();
+        }
+
+        // Return remaining neurons and links
+        $brain = $element->brain;
+        $remainingNeurons = [];
+        $remainingLinks = [];
+        if ($brain) {
+            $brain->load('neurons.outgoingLinks.conditionOrder');
+            $remainingNeurons = $brain->neurons->map(function($n) {
+                return ['id' => $n->id, 'type' => $n->type, 'grid_i' => (int) $n->grid_i, 'grid_j' => (int) $n->grid_j, 'tooltip' => \App\Helpers\NeuronTooltipHelper::generateTextFromNeuron($n)];
+            })->toArray();
+            $remainingLinks = $brain->neurons->flatMap(function($n) {
+                return $n->outgoingLinks->map(function($l) {
+                    return ['from_neuron_id' => (int) $l->from_neuron_id, 'to_neuron_id' => (int) $l->to_neuron_id, 'color' => $l->conditionOrder ? $l->conditionOrder->color : '#16A34A'];
+                });
+            })->values()->toArray();
+        }
+
+        return response()->json(['success' => true, 'neurons' => $remainingNeurons, 'links' => $remainingLinks]);
     }
 
     public function finishAssembler(Request $request, Element $element)

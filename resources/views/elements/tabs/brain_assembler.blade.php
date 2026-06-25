@@ -43,7 +43,7 @@
                             <td>{{ $cb['grid_width'] }}x{{ $cb['grid_height'] }}</td>
                             <td>
                                 @if($cb['is_placed'])
-                                <span class="badge badge-success">Posizionato</span>
+                                <span class="badge badge-success" id="el-brain-status-{{ $loop->index }}">Posizionato</span>
                                 @else
                                 <span class="badge badge-secondary" id="el-brain-status-{{ $loop->index }}">Non posizionato</span>
                                 @endif
@@ -55,6 +55,10 @@
                                 @if(!$cb['is_placed'])
                                 <button type="button" class="btn btn-xs btn-success el-brain-place-btn" data-index="{{ $loop->index }}" title="Posiziona">
                                     <i class="fas fa-plus-circle"></i>
+                                </button>
+                                @else
+                                <button type="button" class="btn btn-xs btn-danger el-brain-remove-btn" data-index="{{ $loop->index }}" data-brain-id="{{ $cb['brain_id'] }}" title="Rimuovi">
+                                    <i class="fas fa-trash"></i>
                                 </button>
                                 @endif
                             </td>

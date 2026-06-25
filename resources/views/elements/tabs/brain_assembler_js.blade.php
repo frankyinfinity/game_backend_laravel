@@ -77,6 +77,32 @@ $(function() {
                 brainCtx.fillText(TYPE_SYMBOLS_BRAIN[n.type] || '?', x + cs/2, y + cs/2);
             });
         });
+
+        // Highlight neurons of hovered row
+        if (highlightedIndex !== null) {
+            var cb = componentBrains[highlightedIndex];
+            if (cb) {
+                var pb = placedBrains.find(function(p) { return p.index === highlightedIndex; });
+                if (pb) {
+                    // Session-placed: highlight at offset positions
+                    cb.neurons.forEach(function(n) {
+                        var x = (n.grid_j + pb.offset_j) * cs, y = (n.grid_i + pb.offset_i) * cs;
+                        brainCtx.strokeStyle = '#ff0000'; brainCtx.lineWidth = 4;
+                        brainCtx.strokeRect(x, y, cs, cs);
+                    });
+                } else if (cb.neuron_ids_in_element) {
+                    // Already saved: highlight by neuron IDs
+                    cb.neuron_ids_in_element.forEach(function(nid) {
+                        var n = existingNeurons.find(function(en) { return en.id === nid; });
+                        if (n) {
+                            var x = n.grid_j * cs, y = n.grid_i * cs;
+                            brainCtx.strokeStyle = '#ff0000'; brainCtx.lineWidth = 4;
+                            brainCtx.strokeRect(x, y, cs, cs);
+                        }
+                    });
+                }
+            }
+        }
     }
 
     var hasBrain = {{ $element->brain_id ? 'true' : 'false' }};
@@ -216,11 +242,27 @@ $(function() {
         }).then(function(r) { return r.json(); }).then(function(d) {
             if (d.success) {
                 placedBrains.push({ index: placingIndex, offset_i: placingI, offset_j: placingJ });
+                // Update existing neurons/links with data from server
+                if (d.new_neurons) existingNeurons = existingNeurons.concat(d.new_neurons);
+                if (d.new_links) existingLinks = existingLinks.concat(d.new_links);
+
                 var badge = document.getElementById('el-brain-status-' + placingIndex);
                 if (badge) { badge.className = 'badge badge-success'; badge.textContent = 'Posizionato'; }
-                // Hide the place button
+                // Hide place button, show remove button
                 var placeBtn = document.querySelector('.el-brain-place-btn[data-index="' + placingIndex + '"]');
                 if (placeBtn) placeBtn.style.display = 'none';
+                var cb = componentBrains[placingIndex];
+                var td = placeBtn ? placeBtn.parentElement : null;
+                if (td && cb) {
+                    var removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'btn btn-xs btn-danger el-brain-remove-btn';
+                    removeBtn.dataset.index = placingIndex;
+                    removeBtn.dataset.brainId = cb.brain_id;
+                    removeBtn.title = 'Rimuovi';
+                    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    td.appendChild(removeBtn);
+                }
                 $('#elBrainPlaceModal').modal('hide');
                 drawBrainGrid();
                 if (typeof toastr !== 'undefined') toastr.success('Cervello posizionato e salvato!');
@@ -311,6 +353,48 @@ $(function() {
         placeBrain(index);
     });
 
+    // Remove placed brain
+    $(document).on('click', '.el-brain-remove-btn', function() {
+        if (!confirm('Rimuovere questo cervello dalla griglia?')) return;
+        var btn = $(this);
+        var brainId = +btn.data('brain-id');
+        var index = +btn.data('index');
+
+        fetch('{{ route("elements.brain.remove-component", $element) }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+            body: JSON.stringify({ brain_id: brainId })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.success) {
+                // Update local state with remaining neurons/links from server
+                existingNeurons = d.neurons || [];
+                existingLinks = d.links || [];
+                placedBrains = placedBrains.filter(function(p) { return p.index !== index; });
+
+                // Update UI: show place button, hide remove button, reset badge
+                btn.remove();
+                var badge = document.getElementById('el-brain-status-' + index);
+                if (badge) { badge.className = 'badge badge-secondary'; badge.textContent = 'Non posizionato'; }
+                var viewBtn = document.querySelector('.el-brain-view-btn[data-index="' + index + '"]');
+                if (viewBtn) {
+                    var newPlaceBtn = document.createElement('button');
+                    newPlaceBtn.type = 'button';
+                    newPlaceBtn.className = 'btn btn-xs btn-success el-brain-place-btn';
+                    newPlaceBtn.dataset.index = index;
+                    newPlaceBtn.title = 'Posiziona';
+                    newPlaceBtn.innerHTML = '<i class="fas fa-plus-circle"></i>';
+                    viewBtn.parentElement.appendChild(newPlaceBtn);
+                }
+
+                drawBrainGrid();
+                if (typeof toastr !== 'undefined') toastr.success('Cervello rimosso!');
+                else alert('Cervello rimosso!');
+            } else {
+                alert(d.message || 'Errore nella rimozione.');
+            }
+        }).catch(function(e) { console.error(e); alert('Errore di rete.'); });
+    });
+
     document.getElementById('el-brain-save-grid').addEventListener('click', function() {
         gridWidth = Math.max(1, +widthInput.value || 10);
         gridHeight = Math.max(1, +heightInput.value || 10);
@@ -340,6 +424,17 @@ $(function() {
                 else alert(d.message || 'Errore');
             }
         }).catch(function(e) { console.error(e); alert('Errore di rete.'); });
+    });
+
+    // Highlight neurons on row hover
+    var highlightedIndex = null;
+    $(document).on('mouseenter', '#el-brain-components-table tbody tr', function() {
+        highlightedIndex = +$(this).data('brain-index');
+        drawBrainGrid();
+    });
+    $(document).on('mouseleave', '#el-brain-components-table tbody tr', function() {
+        highlightedIndex = null;
+        drawBrainGrid();
     });
 
     // Tooltip on hover
