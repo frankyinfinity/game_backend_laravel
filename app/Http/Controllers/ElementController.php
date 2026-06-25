@@ -308,7 +308,7 @@ class ElementController extends Controller
         // Build saved assembler data from ElementDetail (for locked state view)
         $savedAssemblerData = null;
         if ($element->isFinishAssembler()) {
-            $element->load(['details.elementDetailData', 'genes', 'ruleChimicalElements']);
+            $element->load(['details.elementDetailData', 'genes', 'ruleChimicalElements', 'brain']);
 
             $bodyDetail = $element->details->first(fn($d) => $d->detailable_type === \App\Models\ElementBody::class);
             $componentDetails = $element->details->filter(fn($d) => $d->detailable_type === \App\Models\ElementComponent::class);
@@ -384,6 +384,60 @@ class ElementController extends Controller
             }
         }
 
+        // Build component brains data for brain assembler tab
+        $componentBrains = [];
+        $brainGridWidth = optional($element->brain)->grid_width ?? 10;
+        $brainGridHeight = optional($element->brain)->grid_height ?? 10;
+
+        // Load existing neurons in the element brain for display
+        $existingBrainNeurons = [];
+        $existingBrainLinks = [];
+        if ($element->brain) {
+            $element->brain->load('neurons.outgoingLinks.conditionOrder');
+            $existingBrainNeurons = $element->brain->neurons->map(function($n) {
+                return ['id' => $n->id, 'type' => $n->type, 'grid_i' => (int) $n->grid_i, 'grid_j' => (int) $n->grid_j, 'tooltip' => \App\Helpers\NeuronTooltipHelper::generateTextFromNeuron($n)];
+            })->toArray();
+            $existingBrainLinks = $element->brain->neurons->flatMap(function($n) {
+                return $n->outgoingLinks->map(function($l) {
+                    return ['from_neuron_id' => (int) $l->from_neuron_id, 'to_neuron_id' => (int) $l->to_neuron_id, 'color' => $l->conditionOrder ? $l->conditionOrder->color : '#16A34A'];
+                });
+            })->values()->toArray();
+        }
+
+        if ($element->isFinishAssembler() && $element->isInteractive()) {
+            $compDetails = $element->details->filter(fn($d) => $d->detailable_type === \App\Models\ElementComponent::class);
+            // Get all placed brain IDs from ElementDetail
+            $placedBrainIds = $element->details
+                ->where('detailable_type', \App\Models\Brain::class)
+                ->pluck('detailable_id')
+                ->toArray();
+
+            foreach ($compDetails as $detail) {
+                $comp = \App\Models\ElementComponent::with('brain.neurons.outgoingLinks.conditionOrder', 'brain.neurons.conditionOrders')
+                    ->find($detail->detailable_id);
+                if ($comp && $comp->brain && $comp->brain->neurons->count() > 0) {
+                    $componentBrains[] = [
+                        'component_id' => $comp->id,
+                        'component_name' => $comp->name,
+                        'detail_id' => $detail->id,
+                        'brain_id' => $comp->brain->id,
+                        'is_placed' => in_array($comp->brain->id, $placedBrainIds),
+                        'grid_width' => $comp->brain->grid_width,
+                        'grid_height' => $comp->brain->grid_height,
+                        'neuron_count' => $comp->brain->neurons->count(),
+                        'neurons' => $comp->brain->neurons->map(function($n) {
+                            return ['id' => $n->id, 'type' => $n->type, 'grid_i' => (int) $n->grid_i, 'grid_j' => (int) $n->grid_j, 'tooltip' => \App\Helpers\NeuronTooltipHelper::generateTextFromNeuron($n)];
+                        })->toArray(),
+                        'links' => $comp->brain->neurons->flatMap(function($n) {
+                            return $n->outgoingLinks->map(function($l) {
+                                return ['from_neuron_id' => (int) $l->from_neuron_id, 'to_neuron_id' => (int) $l->to_neuron_id, 'color' => $l->conditionOrder ? $l->conditionOrder->color : '#16A34A'];
+                            });
+                        })->values()->toArray(),
+                    ];
+                }
+            }
+        }
+
         return view('elements.edit', compact(
             'element',
             'elementTypes',
@@ -400,7 +454,12 @@ class ElementController extends Controller
             'brainComplexChimicalElements',
             'allRuleChimicalElements',
             'informationGenes',
-            'savedAssemblerData'
+            'savedAssemblerData',
+            'componentBrains',
+            'brainGridWidth',
+            'brainGridHeight',
+            'existingBrainNeurons',
+            'existingBrainLinks'
         ));
     }
 
@@ -728,6 +787,155 @@ class ElementController extends Controller
             });
 
         return response()->json($components);
+    }
+
+    /**
+     * Save brain grid dimensions (create brain if not exists).
+     */
+    public function saveBrainGrid(Request $request, Element $element)
+    {
+        if (!$element->isFinishAssembler() || !$element->isInteractive()) {
+            return response()->json(['success' => false, 'message' => 'Operazione non valida.'], 403);
+        }
+
+        $request->validate([
+            'grid_width' => 'required|integer|min:1',
+            'grid_height' => 'required|integer|min:1',
+        ]);
+
+        $gridWidth = (int) $request->input('grid_width');
+        $gridHeight = (int) $request->input('grid_height');
+
+        $brain = $element->brain;
+        if (!$brain) {
+            $brain = Brain::create(['uid' => (string) \Illuminate\Support\Str::uuid(), 'grid_width' => $gridWidth, 'grid_height' => $gridHeight]);
+            $element->brain_id = $brain->id;
+            $element->save();
+        } else {
+            $brain->update(['grid_width' => $gridWidth, 'grid_height' => $gridHeight]);
+        }
+
+        return response()->json(['success' => true, 'brain_id' => $brain->id]);
+    }
+
+    /**
+     * Place a component brain into the element brain grid.
+     * Saves on ElementDetail + copies neurons to brains table.
+     */
+    public function placeBrainComponent(Request $request, Element $element)
+    {
+        if (!$element->isFinishAssembler() || !$element->isInteractive()) {
+            return response()->json(['success' => false, 'message' => 'Operazione non valida.'], 403);
+        }
+
+        $request->validate([
+            'component_id' => 'required|integer',
+            'detail_id' => 'required|integer',
+            'offset_i' => 'required|integer|min:0',
+            'offset_j' => 'required|integer|min:0',
+        ]);
+
+        // Ensure element has a brain
+        $brain = $element->brain;
+        if (!$brain) {
+            return response()->json(['success' => false, 'message' => 'Salva prima le dimensioni della griglia.'], 422);
+        }
+
+        $comp = \App\Models\ElementComponent::with('brain.neurons.outgoingLinks.conditionOrder', 'brain.neurons.conditionOrders')
+            ->find($request->input('component_id'));
+
+        if (!$comp || !$comp->brain) {
+            return response()->json(['success' => false, 'message' => 'Componente senza cervello.'], 422);
+        }
+
+        $offsetI = (int) $request->input('offset_i');
+        $offsetJ = (int) $request->input('offset_j');
+        $neuronIdMap = [];
+
+        // Copy neurons with offset into element brain (skip if position already occupied)
+        foreach ($comp->brain->neurons as $srcNeuron) {
+            $targetI = $srcNeuron->grid_i + $offsetI;
+            $targetJ = $srcNeuron->grid_j + $offsetJ;
+
+            // Skip if a neuron already exists at this position in the element brain
+            $existing = Neuron::where('brain_id', $brain->id)->where('grid_i', $targetI)->where('grid_j', $targetJ)->first();
+            if ($existing) {
+                $neuronIdMap[$srcNeuron->id] = $existing->id;
+                continue;
+            }
+
+            $newNeuron = Neuron::create([
+                'brain_id' => $brain->id,
+                'type' => $srcNeuron->type,
+                'grid_i' => $srcNeuron->grid_i + $offsetI,
+                'grid_j' => $srcNeuron->grid_j + $offsetJ,
+                'radius' => $srcNeuron->radius,
+                'stop_before_target' => $srcNeuron->stop_before_target,
+                'target_type' => $srcNeuron->target_type,
+                'target_element_id' => $srcNeuron->target_element_id,
+                'chemical_element_id' => $srcNeuron->chemical_element_id,
+                'complex_chemical_element_id' => $srcNeuron->complex_chemical_element_id,
+                'gene_life_id' => $srcNeuron->gene_life_id,
+                'gene_attack_id' => $srcNeuron->gene_attack_id,
+                'element_infomation_id' => $srcNeuron->element_infomation_id,
+                'element_has_rule_chimical_element_id' => $srcNeuron->element_has_rule_chimical_element_id,
+            ]);
+            $neuronIdMap[$srcNeuron->id] = $newNeuron->id;
+
+            foreach ($srcNeuron->conditionOrders as $co) {
+                \App\Models\NeuronConditionOrder::create([
+                    'neuron_id' => $newNeuron->id,
+                    'condition' => $co->condition,
+                    'sort_order' => $co->sort_order,
+                    'color' => $co->color,
+                    'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
+                ]);
+            }
+        }
+
+        // Copy links with remapped IDs
+        foreach ($comp->brain->neurons as $srcNeuron) {
+            foreach ($srcNeuron->outgoingLinks as $link) {
+                $fromId = $neuronIdMap[$link->from_neuron_id] ?? null;
+                $toId = $neuronIdMap[$link->to_neuron_id] ?? null;
+                if (!$fromId || !$toId) continue;
+
+                $condition = $link->conditionOrder ? $link->conditionOrder->condition : null;
+                $conditionOrder = $condition ? \App\Models\NeuronConditionOrder::where('neuron_id', $fromId)->where('condition', $condition)->first() : null;
+
+                NeuronLink::create([
+                    'from_neuron_id' => $fromId,
+                    'to_neuron_id' => $toId,
+                    'neuron_condition_order_id' => $conditionOrder ? $conditionOrder->id : null,
+                ]);
+            }
+        }
+
+        // Save on ElementDetail: INSERT the brain_id of the component being placed
+        $brainDetail = \App\Models\ElementDetail::create([
+            'element_id' => $element->id,
+            'detailable_type' => \App\Models\Brain::class,
+            'detailable_id' => $comp->brain_id,
+        ]);
+
+        // Save position, neuron IDs and link IDs on ElementDetailData
+        $brainDetail->elementDetailData()->create(['key' => 'offset_i', 'value' => (string) $offsetI]);
+        $brainDetail->elementDetailData()->create(['key' => 'offset_j', 'value' => (string) $offsetJ]);
+        $brainDetail->elementDetailData()->create(['key' => 'neuron_ids', 'value' => json_encode(array_values($neuronIdMap))]);
+        $brainDetail->elementDetailData()->create(['key' => 'link_ids', 'value' => json_encode(
+            NeuronLink::whereIn('from_neuron_id', array_values($neuronIdMap))->pluck('id')->toArray()
+        )]);
+
+        // Also save offset info on the existing component detail
+        $detail = \App\Models\ElementDetail::find($request->input('detail_id'));
+        if ($detail) {
+            $detail->elementDetailData()->updateOrCreate(['key' => 'brain_placed'], ['value' => '1']);
+            $detail->elementDetailData()->updateOrCreate(['key' => 'brain_id'], ['value' => (string) $comp->brain_id]);
+            $detail->elementDetailData()->updateOrCreate(['key' => 'brain_offset_i'], ['value' => (string) $offsetI]);
+            $detail->elementDetailData()->updateOrCreate(['key' => 'brain_offset_j'], ['value' => (string) $offsetJ]);
+        }
+
+        return response()->json(['success' => true, 'neurons_added' => count($neuronIdMap)]);
     }
 
     public function finishAssembler(Request $request, Element $element)

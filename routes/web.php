@@ -266,6 +266,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/elements/delete', [App\Http\Controllers\ElementController::class, 'delete'])->name('elements.delete');
     Route::post('/elements/{element}/save-graphics', [App\Http\Controllers\ElementController::class, 'saveGraphics'])->name('elements.save-graphics');
     Route::post('/elements/{element}/finish-assembler', [App\Http\Controllers\ElementController::class, 'finishAssembler'])->name('elements.finish-assembler');
+    Route::post('/elements/{element}/brain/save-grid', [App\Http\Controllers\ElementController::class, 'saveBrainGrid'])->name('elements.brain.save-grid');
+    Route::post('/elements/{element}/brain/place-component', [App\Http\Controllers\ElementController::class, 'placeBrainComponent'])->name('elements.brain.place-component');
     Route::post('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'saveBrainNeuron'])->name('elements.brain.neurons.save');
     Route::patch('/elements/{element}/brain/neurons/{neuron}/move', [App\Http\Controllers\ElementController::class, 'moveBrainNeuron'])->name('elements.brain.neurons.move');
     Route::post('/elements/{element}/brain/neurons/{neuron}/condition-orders', [App\Http\Controllers\ElementController::class, 'saveNeuronConditionOrders'])->name('elements.brain.neurons.condition-orders.save');

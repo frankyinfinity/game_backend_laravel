@@ -66,7 +66,7 @@
                 @if($element->isFinishAssembler() && $element->isInteractive())
                 <!-- TAB CERVELLO -->
                 <div class="tab-pane fade" id="tab-brain" role="tabpanel">
-                    <p class="text-muted">Nessun cervello configurato.</p>
+                    @include('elements.tabs.brain_assembler')
                 </div>
                 @endif
 
@@ -633,4 +633,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+@if($element->isFinishAssembler() && $element->isInteractive())
+@include('elements.tabs.brain_assembler_js')
+@endif
 @stop
