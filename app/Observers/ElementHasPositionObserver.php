@@ -32,20 +32,46 @@ class ElementHasPositionObserver
      */
     public function created(ElementHasPosition $elementHasPosition): void
     {
+
         $element = $elementHasPosition->element;
 
+        //Interactive
+        $neuronMap = [];
+        $circuitMap = [];
+        $linkMap = [];
         if ($element->isInteractive()) {
             $this->initializeInformation($elementHasPosition);
             $this->initializeScore($elementHasPosition);
             $maps = $this->initializeChemicalRules($elementHasPosition);
             $neuronMap = $this->initializeBrain($elementHasPosition, $maps['ruleMap'], $maps['detailMap']);
-            $this->initializeCircuits($elementHasPosition, $neuronMap);
+            $circuitMap = $this->initializeCircuits($elementHasPosition, $neuronMap);
             $this->initializeContainer($elementHasPosition);
+
+            // Build link map from neuron map
+            if (!empty($neuronMap)) {
+                $oldNeuronIds = array_keys($neuronMap);
+                $oldLinks = \App\Models\NeuronLink::whereIn('from_neuron_id', $oldNeuronIds)->get();
+                $newLinks = \App\Models\ElementHasPositionNeuronLink::whereIn('from_element_has_position_neuron_id', array_values($neuronMap))->get();
+                // Map by from+to combo
+                foreach ($oldLinks as $oldLink) {
+                    $newFromId = $neuronMap[$oldLink->from_neuron_id] ?? null;
+                    $newToId = $neuronMap[$oldLink->to_neuron_id] ?? null;
+                    if ($newFromId && $newToId) {
+                        $newLink = $newLinks->first(fn($nl) => $nl->from_element_has_position_neuron_id == $newFromId && $nl->to_element_has_position_neuron_id == $newToId);
+                        if ($newLink) $linkMap[$oldLink->id] = $newLink->id;
+                    }
+                }
+            }
         }
 
+        //Consumable
         if ($element->isConsumable()) {
             $this->initializeRewards($elementHasPosition);
         }
+
+        // Clone ElementDetail, ElementBody and ElementComponent data into ElementHasPosition tables
+        $this->cloneDetailsToPosition($elementHasPosition, $neuronMap, $circuitMap, $linkMap);
+
     }
 
     private function initializeInformation(ElementHasPosition $elementHasPosition): void
@@ -192,11 +218,12 @@ class ElementHasPositionObserver
         return $templateToClonedNeuronId;
     }
 
-    private function initializeCircuits(ElementHasPosition $elementHasPosition, array $neuronMap): void
+    private function initializeCircuits(ElementHasPosition $elementHasPosition, array $neuronMap): array
     {
         $element = $elementHasPosition->element;
         $templateBrain = $element->brain;
         $now = now();
+        $circuitMap = []; // old_circuit_id => new_circuit_id
 
         if ($templateBrain !== null) {
             $templateBrain->load('circuits.details');
@@ -211,6 +238,7 @@ class ElementHasPositionObserver
                     'uid' => (string) Str::uuid(),
                     'start_element_has_position_neuron_id' => $neuronMap[(int) $templateCircuit->start_neuron_id] ?? null,
                 ]);
+                $circuitMap[$templateCircuit->id] = $clonedCircuit->id;
 
                 $detailData = [];
                 foreach ($templateCircuit->details as $templateDetail) {
@@ -230,6 +258,8 @@ class ElementHasPositionObserver
                 }
             }
         }
+
+        return $circuitMap;
     }
 
     private function initializeChemicalRules(ElementHasPosition $elementHasPosition): array
@@ -347,6 +377,139 @@ class ElementHasPositionObserver
     {
         if ($elementHasPosition->wasChanged('state') && $elementHasPosition->state === ElementHasPosition::STATE_DEATH) {
             $this->cleanupContainer($elementHasPosition);
+        }
+    }
+
+    private function cloneDetailsToPosition(ElementHasPosition $elementHasPosition, array $neuronMap = [], array $circuitMap = [], array $linkMap = []): void
+    {
+        $element = $elementHasPosition->element;
+        $element->load('details.elementDetailData');
+
+        // Maps: original ID => cloned ID (for polymorphic references)
+        $bodyMap = [];   // ElementBody.id => ElementHasPositionBody.id
+        $componentMap = []; // ElementComponent.id => ElementComponent.id (same, no clone needed for component itself)
+        $brainMap = [];  // Brain.id => Brain.id (same, already cloned in initializeBrain)
+
+        // 1) Clone ElementBody → ElementHasPositionBody
+        $bodyDetails = $element->details->filter(fn($d) => $d->detailable_type === \App\Models\ElementBody::class);
+        foreach ($bodyDetails as $bodyDetail) {
+            $elementBody = \App\Models\ElementBody::with('zones.details', 'zones.pixels')->find($bodyDetail->detailable_id);
+            if (!$elementBody) continue;
+
+            $ehpBody = \App\Models\ElementHasPositionBody::create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'name' => $elementBody->name,
+                'characteristic' => $elementBody->characteristic,
+                'image' => $elementBody->image,
+            ]);
+            $bodyMap[$elementBody->id] = $ehpBody->id;
+
+            foreach ($elementBody->zones as $zone) {
+                $ehpZone = \App\Models\ElementHasPositionBodyZone::create([
+                    'element_has_position_body_id' => $ehpBody->id,
+                    'name' => $zone->name,
+                    'color' => $zone->color,
+                ]);
+
+                $now = now();
+                $detailsData = $zone->details->map(fn($d) => [
+                    'element_has_position_body_zone_id' => $ehpZone->id,
+                    'x' => $d->x, 'y' => $d->y,
+                    'created_at' => $now, 'updated_at' => $now,
+                ])->toArray();
+                if (!empty($detailsData)) {
+                    \App\Models\ElementHasPositionBodyZoneDetail::insert($detailsData);
+                }
+
+                $pixelsData = $zone->pixels->map(fn($p) => [
+                    'element_has_position_body_zone_id' => $ehpZone->id,
+                    'x' => $p->x, 'y' => $p->y,
+                    'created_at' => $now, 'updated_at' => $now,
+                ])->toArray();
+                if (!empty($pixelsData)) {
+                    foreach (array_chunk($pixelsData, 1000) as $chunk) {
+                        \App\Models\ElementHasPositionBodyZonePixel::insert($chunk);
+                    }
+                }
+            }
+        }
+
+        // 2) Clone ElementComponent → ElementHasPositionComponent
+        $componentDetails = $element->details->filter(fn($d) => $d->detailable_type === \App\Models\ElementComponent::class);
+        $componentMap = []; // ElementComponent.id => ElementHasPositionComponent.id
+        foreach ($componentDetails as $compDetail) {
+            $elementComponent = \App\Models\ElementComponent::find($compDetail->detailable_id);
+            if (!$elementComponent) continue;
+
+            $ehpComponent = \App\Models\ElementHasPositionComponent::create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'element_component_id' => $elementComponent->id,
+                'name' => $elementComponent->name,
+                'characteristic' => $elementComponent->characteristic,
+                'image' => $elementComponent->image,
+            ]);
+            $componentMap[$elementComponent->id] = $ehpComponent->id;
+        }
+
+        // 3) Clone ElementDetail → ElementHasPositionDetail
+        // Replace polymorphic references with EHP equivalents
+        foreach ($element->details as $detail) {
+            $detailableType = $detail->detailable_type;
+            $detailableId = $detail->detailable_id;
+
+            // Map ElementBody → ElementHasPositionBody
+            if ($detailableType === \App\Models\ElementBody::class && isset($bodyMap[$detailableId])) {
+                $detailableType = \App\Models\ElementHasPositionBody::class;
+                $detailableId = $bodyMap[$detailableId];
+            }
+            // Map ElementComponent → ElementHasPositionComponent
+            if ($detailableType === \App\Models\ElementComponent::class && isset($componentMap[$detailableId])) {
+                $detailableType = \App\Models\ElementHasPositionComponent::class;
+                $detailableId = $componentMap[$detailableId];
+            }
+            // Brain stays as-is (already cloned in initializeBrain)
+
+            $ehpDetail = \App\Models\ElementHasPositionDetail::create([
+                'element_has_position_id' => $elementHasPosition->id,
+                'detailable_type' => $detailableType,
+                'detailable_id' => $detailableId,
+            ]);
+
+            foreach ($detail->elementDetailData as $data) {
+                $value = $data->value;
+
+                // Remap IDs in JSON arrays
+                if ($data->key === 'neuron_ids' && !empty($neuronMap)) {
+                    $oldIds = json_decode($value, true) ?: [];
+                    $newIds = array_filter(array_map(fn($id) => $neuronMap[$id] ?? null, $oldIds));
+                    $value = json_encode(array_values($newIds));
+                }
+                if ($data->key === 'link_ids' && !empty($linkMap)) {
+                    $oldIds = json_decode($value, true) ?: [];
+                    $newIds = array_filter(array_map(fn($id) => $linkMap[$id] ?? null, $oldIds));
+                    $value = json_encode(array_values($newIds));
+                }
+                if ($data->key === 'circuit_ids' && !empty($circuitMap)) {
+                    $oldIds = json_decode($value, true) ?: [];
+                    $newIds = array_filter(array_map(fn($id) => $circuitMap[$id] ?? null, $oldIds));
+                    $value = json_encode(array_values($newIds));
+                }
+                // Remap start_neurons neuron_id references
+                if ($data->key === 'start_neurons' && !empty($neuronMap)) {
+                    $startNeurons = json_decode($value, true) ?: [];
+                    $remapped = array_map(function($sn) use ($neuronMap) {
+                        $sn['neuron_id'] = $neuronMap[$sn['neuron_id']] ?? $sn['neuron_id'];
+                        return $sn;
+                    }, $startNeurons);
+                    $value = json_encode($remapped);
+                }
+
+                \App\Models\ElementHasPositionDetailData::create([
+                    'element_has_position_detail_id' => $ehpDetail->id,
+                    'key' => $data->key,
+                    'value' => $value,
+                ]);
+            }
         }
     }
 

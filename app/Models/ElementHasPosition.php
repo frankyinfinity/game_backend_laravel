@@ -85,4 +85,9 @@ class ElementHasPosition extends Model
     {
         return $this->hasOne(ElementHasPositionBody::class);
     }
+
+    public function components()
+    {
+        return $this->hasMany(ElementHasPositionComponent::class);
+    }
 }
