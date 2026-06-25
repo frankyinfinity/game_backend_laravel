@@ -953,6 +953,36 @@ class ElementController extends Controller
             NeuronLink::whereIn('from_neuron_id', array_values($neuronIdMap))->pluck('id')->toArray()
         )]);
 
+        // Copy NeuronCircuits from component brain to element brain
+        $circuitIds = [];
+        $compCircuits = $comp->brain->circuits ?? collect();
+        if ($compCircuits->isEmpty()) {
+            $compCircuits = \App\Models\NeuronCircuit::where('brain_id', $comp->brain->id)->with('details')->get();
+        }
+        foreach ($compCircuits as $srcCircuit) {
+            $newCircuit = \App\Models\NeuronCircuit::create([
+                'brain_id' => $brain->id,
+                'uid' => (string) \Illuminate\Support\Str::uuid(),
+                'state' => $srcCircuit->state,
+                'active' => $srcCircuit->active,
+                'color' => $srcCircuit->color,
+                'start_neuron_id' => isset($neuronIdMap[$srcCircuit->start_neuron_id]) ? $neuronIdMap[$srcCircuit->start_neuron_id] : null,
+            ]);
+            $circuitIds[] = $newCircuit->id;
+
+            // Copy circuit details (neuron associations)
+            foreach ($srcCircuit->details as $srcDetail) {
+                $newNeuronId = $neuronIdMap[$srcDetail->neuron_id] ?? null;
+                if ($newNeuronId) {
+                    \App\Models\NeuronCircuitDetail::create([
+                        'neuron_circuit_id' => $newCircuit->id,
+                        'neuron_id' => $newNeuronId,
+                    ]);
+                }
+            }
+        }
+        $brainDetail->elementDetailData()->create(['key' => 'circuit_ids', 'value' => json_encode($circuitIds)]);
+
         // Also save offset info on the existing component detail
         $detail = \App\Models\ElementDetail::find($request->input('detail_id'));
         if ($detail) {
@@ -998,12 +1028,20 @@ class ElementController extends Controller
             return response()->json(['success' => false, 'message' => 'Brain non trovato nei dettagli.'], 404);
         }
 
-        // Get neuron_ids and link_ids from detail data
+        // Get neuron_ids, link_ids and circuit_ids from detail data
         $neuronIdsData = $brainDetail->elementDetailData()->where('key', 'neuron_ids')->first();
         $linkIdsData = $brainDetail->elementDetailData()->where('key', 'link_ids')->first();
+        $circuitIdsData = $brainDetail->elementDetailData()->where('key', 'circuit_ids')->first();
 
         $neuronIds = $neuronIdsData ? json_decode($neuronIdsData->value, true) : [];
         $linkIds = $linkIdsData ? json_decode($linkIdsData->value, true) : [];
+        $circuitIds = $circuitIdsData ? json_decode($circuitIdsData->value, true) : [];
+
+        // Delete circuits and their details
+        if (!empty($circuitIds)) {
+            \App\Models\NeuronCircuitDetail::whereIn('neuron_circuit_id', $circuitIds)->delete();
+            \App\Models\NeuronCircuit::whereIn('id', $circuitIds)->delete();
+        }
 
         // Delete links
         if (!empty($linkIds)) {
@@ -1012,7 +1050,6 @@ class ElementController extends Controller
 
         // Delete neurons
         if (!empty($neuronIds)) {
-            // Also delete any links that reference these neurons
             NeuronLink::whereIn('from_neuron_id', $neuronIds)->orWhereIn('to_neuron_id', $neuronIds)->delete();
             Neuron::whereIn('id', $neuronIds)->delete();
         }
@@ -1062,8 +1099,15 @@ class ElementController extends Controller
             return redirect()->back()->with('error', 'Stato non valido.');
         }
 
-        if (!$element->isInteractive()) {
-            // For consumable, just complete
+        if ($element->isConsumable()) {
+            // Save reward scores (can be empty)
+            $rewardScores = $request->input('reward_scores', []);
+            $sync = [];
+            foreach (collect($rewardScores)->filter(fn($r) => !empty($r['score_id'])) as $r) {
+                $sync[$r['score_id']] = ['amount' => (int) ($r['amount'] ?? 1)];
+            }
+            $element->scores()->sync($sync);
+
             $element->update(['state' => Element::STATE_COMPLETED]);
             return redirect()->route('elements.edit', $element)->with('success', 'Elemento completato.');
         }

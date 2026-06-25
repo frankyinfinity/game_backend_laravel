@@ -1,3 +1,18 @@
+@if($element->isCompleted())
+<div class="card-body">
+    <div class="alert alert-success mb-3"><i class="fas fa-lock mr-1"></i> Elemento completato. Ricompense bloccate.</div>
+    <table class="table table-bordered table-sm">
+        <thead><tr><th>Punteggio</th><th>Quantità</th></tr></thead>
+        <tbody>
+            @forelse($element->scores as $score)
+            <tr><td>{{ $score->name }}</td><td>{{ $score->pivot->amount }}</td></tr>
+            @empty
+            <tr><td colspan="2" class="text-muted text-center">Nessuna ricompensa.</td></tr>
+            @endforelse
+        </tbody>
+    </table>
+</div>
+@else
 <div class="card-body">
     <div class="alert alert-info alert-dismissible">
         <h5><i class="icon fas fa-info"></i> Ricompensa Uscita!</h5>
@@ -95,4 +110,30 @@
     <button type="button" class="btn btn-success btn-sm mt-2" id="add-reward-row">
         <i class="fa fa-plus"></i> Aggiungi Ricompensa
     </button>
+
+    <div class="mt-3 border-top pt-3">
+        <button type="button" class="btn btn-success shadow-sm" onclick="submitRewardComplete();">
+            <i class="fas fa-check-double mr-1"></i> Completa Elemento
+        </button>
+    </div>
 </div>
+
+<script>
+window.submitRewardComplete = function() {
+    if (!confirm('Completare l\'elemento? Irreversibile.')) return;
+    var container = document.getElementById('el-reward-complete-inputs');
+    if (!container) return;
+    container.innerHTML = '';
+    var rows = document.querySelectorAll('#reward_table .reward-row');
+    rows.forEach(function(row, i) {
+        var scoreSelect = row.querySelector('[name*="[score_id]"]');
+        var amountInput = row.querySelector('[name*="[amount]"]');
+        if (scoreSelect && scoreSelect.value) {
+            container.innerHTML += '<input type="hidden" name="reward_scores[' + i + '][score_id]" value="' + scoreSelect.value + '">';
+            container.innerHTML += '<input type="hidden" name="reward_scores[' + i + '][amount]" value="' + (amountInput ? amountInput.value : '1') + '">';
+        }
+    });
+    document.getElementById('el-reward-complete-form').submit();
+};
+</script>
+@endif

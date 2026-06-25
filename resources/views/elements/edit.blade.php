@@ -59,7 +59,7 @@
                 @if($element->isFinishAssembler() && $element->isConsumable())
                 <!-- TAB RICOMPENSA -->
                 <div class="tab-pane fade" id="tab-reward" role="tabpanel">
-                    <p class="text-muted">Nessuna ricompensa configurata.</p>
+                    @include('elements.tabs.reward')
                 </div>
                 @endif
 
@@ -98,6 +98,14 @@
 <!-- Form separato per complete (fuori dal form principale) -->
 <form action="{{ route('elements.complete', $element) }}" method="POST" id="el-brain-complete-form" style="display:none;">
     @csrf
+</form>
+@endif
+
+@if($element->isFinishAssembler() && $element->isConsumable() && !$element->isCompleted())
+<!-- Form separato per complete consumable -->
+<form action="{{ route('elements.complete', $element) }}" method="POST" id="el-reward-complete-form" style="display:none;">
+    @csrf
+    <div id="el-reward-complete-inputs"></div>
 </form>
 @endif
 @stop
