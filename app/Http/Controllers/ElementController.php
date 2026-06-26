@@ -1209,6 +1209,26 @@ class ElementController extends Controller
                 ->toArray();
             $element->ruleChimicalElements()->sync($componentRules);
 
+            // Populate ElementInformation from component genes (for interactive elements)
+            if ($element->isInteractive()) {
+                $element->informations()->delete();
+                $componentGenesGrouped = \App\Models\ElementComponentHasGene::whereIn('element_component_id', $componentIds)
+                    ->get()
+                    ->groupBy('gene_id');
+
+                foreach ($componentGenesGrouped as $geneId => $records) {
+                    $totalValue = $records->sum('value');
+                    $element->informations()->create([
+                        'gene_id' => $geneId,
+                        'min_value' => 1,
+                        'max_value' => $totalValue,
+                        'max_from' => $totalValue,
+                        'max_to' => $totalValue,
+                        'value' => $totalValue,
+                    ]);
+                }
+            }
+
             // Aggregate consumption effects (for consumable): store as genes with effect
             if ($element->isConsumable()) {
                 $consumptionEffects = \App\Models\ElementComponentConsumptionEffect::whereIn('element_component_id', $componentIds)
