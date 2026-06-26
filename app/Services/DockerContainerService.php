@@ -1383,6 +1383,11 @@ class DockerContainerService
     {
         $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
 
+        // For large stdin payloads, use scp + remote execution to avoid plink stdin issues on Windows
+        if ($stdin !== null && strlen($stdin) > 65536) {
+            return $this->executeRemoteDockerCommandWithScp($dockerArgs, $stdin);
+        }
+
         $process = new Process([
             'gcloud', 'compute', 'ssh',
             '--zone', config('remote_docker.gcloud_zone'),
@@ -1403,6 +1408,59 @@ class DockerContainerService
         }
 
         return trim($process->getOutput());
+    }
+
+    /**
+     * For large stdin: copy file via scp, then run docker command reading from file.
+     */
+    private function executeRemoteDockerCommandWithScp(array $dockerArgs, string $stdin): string
+    {
+        $tempLocal = tempnam(sys_get_temp_dir(), 'docker_stdin_');
+        file_put_contents($tempLocal, $stdin);
+
+        $remotePath = '/tmp/docker_stdin_' . basename($tempLocal);
+
+        try {
+            // Step 1: Copy file to remote
+            $scpProcess = new Process([
+                'gcloud', 'compute', 'scp',
+                '--zone', config('remote_docker.gcloud_zone'),
+                '--project', config('remote_docker.gcloud_project'),
+                '--tunnel-through-iap',
+                $tempLocal,
+                config('remote_docker.gcloud_instance') . ':' . $remotePath,
+            ]);
+            $scpProcess->setTimeout(300);
+            $scpProcess->run();
+
+            if (!$scpProcess->isSuccessful()) {
+                throw new RuntimeException("SCP fallito: " . trim($scpProcess->getErrorOutput() ?: $scpProcess->getOutput()));
+            }
+
+            // Step 2: Run docker command with cat piped in
+            // Replace '-i' flag and pipe from file
+            $dockerArgsStr = implode(' ', array_map('escapeshellarg', $dockerArgs));
+            $remoteCmd = "cat {$remotePath} | docker {$dockerArgsStr} && rm -f {$remotePath}";
+
+            $sshProcess = new Process([
+                'gcloud', 'compute', 'ssh',
+                '--zone', config('remote_docker.gcloud_zone'),
+                config('remote_docker.gcloud_instance'),
+                '--project', config('remote_docker.gcloud_project'),
+                '--tunnel-through-iap',
+                '--command', $remoteCmd,
+            ]);
+            $sshProcess->setTimeout(300);
+            $sshProcess->run();
+
+            if (!$sshProcess->isSuccessful()) {
+                throw new RuntimeException("Comando Docker remoto fallito: " . trim($sshProcess->getErrorOutput() ?: $sshProcess->getOutput()));
+            }
+
+            return trim($sshProcess->getOutput());
+        } finally {
+            @unlink($tempLocal);
+        }
     }
 
     private function normalizeVolumeRelativePath(string $relativePath): string
