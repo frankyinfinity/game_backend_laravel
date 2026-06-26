@@ -2177,7 +2177,7 @@
                 headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                 success: function(response) {
                     if (response && response.success && response.volume) {
-                        updateVolumePanel(response.volume);
+                        updatePlayerVolume(response.volume);
                     }
                 }
             });
