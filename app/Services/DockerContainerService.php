@@ -354,6 +354,11 @@ class DockerContainerService
         ]);
 
         $process->setTimeout(300);
+        $env = getenv();
+        if (is_array($env)) {
+            $env['CLOUDSDK_PYTHON'] = 'C:\\Python314\\python.exe';
+            $process->setEnv($env);
+        }
         $process->run();
 
         if (!$process->isSuccessful()) {
@@ -1159,7 +1164,6 @@ class DockerContainerService
     public function readPlayerVolumeFile(Player $player, string $relativePath): ?string
     {
         $this->ensurePlayerVolume($player);
-        $this->ensureImageExists('player:latest');
 
         $filePath = $this->normalizeVolumeRelativePath($relativePath);
         \Log::info('Lettura file dal volume player', [
@@ -1169,6 +1173,7 @@ class DockerContainerService
         ]);
 
         try {
+            $catCommand = '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true';
             $playerContainer = $this->getPlayerContainer($player);
             if ($playerContainer !== null) {
                 try {
@@ -1177,10 +1182,10 @@ class DockerContainerService
                         (string) $playerContainer->container_id,
                         'sh',
                         '-lc',
-                        '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+                        $catCommand,
                     ]);
                 } catch (\Throwable $e) {
-                    \Log::warning('Lettura via docker exec fallita, fallback a docker run', [
+                    \Log::warning('Lettura via docker exec fallita, fallback a docker run con alpine', [
                         'player_id' => $player->id,
                         'container_id' => $playerContainer->container_id,
                         'path' => $filePath,
@@ -1189,26 +1194,24 @@ class DockerContainerService
                     $output = $this->executeRemoteDockerCommand([
                         'run',
                         '--rm',
-                        '--entrypoint',
-                        'sh',
                         '-v',
                         $this->resolvePlayerVolumeName($player) . ':/data',
-                        'player:latest',
-                        '-lc',
-                        '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+                        'alpine',
+                        'sh',
+                        '-c',
+                        $catCommand,
                     ]);
                 }
             } else {
                 $output = $this->executeRemoteDockerCommand([
                     'run',
                     '--rm',
-                    '--entrypoint',
-                    'sh',
                     '-v',
                     $this->resolvePlayerVolumeName($player) . ':/data',
-                    'player:latest',
-                    '-lc',
-                    '[ -f /data/' . $filePath . ' ] && cat /data/' . $filePath . ' || true',
+                    'alpine',
+                    'sh',
+                    '-c',
+                    $catCommand,
                 ]);
             }
         } catch (\Throwable $e) {
@@ -1277,7 +1280,6 @@ class DockerContainerService
     public function listPlayerVolumeFiles(Player $player, int $maxDepth = 4): array
     {
         $this->ensurePlayerVolume($player);
-        $this->ensureImageExists('player:latest');
 
         \Log::info('Listing file del volume player', [
             'player_id' => $player->id,
@@ -1285,60 +1287,81 @@ class DockerContainerService
             'max_depth' => max(1, $maxDepth),
         ]);
 
-        $listCommand = 'dir="/data/object-cache"; if [ -d "$dir" ]; then for file in "$dir"/*; do [ -f "$file" ] || continue; rel="${file#/data/}"; size=$(wc -c < "$file"); echo "$rel::$size"; done; fi | sort';
+        // Use ls -la approach to avoid shell variable escaping issues on Windows
+        $listCommand = 'ls -la /data/object-cache/ 2>/dev/null';
         $playerContainer = $this->getPlayerContainer($player);
-        if ($playerContainer !== null) {
-            try {
-                $output = $this->executeRemoteDockerCommand([
-                    'exec',
-                    (string) $playerContainer->container_id,
-                    'sh',
-                    '-lc',
-                    $listCommand,
-                ]);
-            } catch (\Throwable $e) {
-                \Log::warning('Listing via docker exec fallito, fallback a docker run', [
-                    'player_id' => $player->id,
-                    'container_id' => $playerContainer->container_id,
-                    'error' => $e->getMessage(),
-                ]);
+        $output = '';
+
+        try {
+            if ($playerContainer !== null) {
+                try {
+                    $output = $this->executeRemoteDockerCommand([
+                        'exec',
+                        (string) $playerContainer->container_id,
+                        'ls',
+                        '-la',
+                        '/data/object-cache/',
+                    ]);
+                } catch (\Throwable $e) {
+                    \Log::warning('Listing via docker exec fallito, fallback a docker run con alpine', [
+                        'player_id' => $player->id,
+                        'container_id' => $playerContainer->container_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $output = $this->executeRemoteDockerCommand([
+                        'run',
+                        '--rm',
+                        '-v',
+                        $this->resolvePlayerVolumeName($player) . ':/data',
+                        'alpine',
+                        'ls',
+                        '-la',
+                        '/data/object-cache/',
+                    ]);
+                }
+            } else {
                 $output = $this->executeRemoteDockerCommand([
                     'run',
                     '--rm',
-                    '--entrypoint',
-                    'sh',
                     '-v',
                     $this->resolvePlayerVolumeName($player) . ':/data',
-                    'player:latest',
-                    '-lc',
-                    $listCommand,
+                    'alpine',
+                    'ls',
+                    '-la',
+                    '/data/object-cache/',
                 ]);
             }
-        } else {
-            $output = $this->executeRemoteDockerCommand([
-                'run',
-                '--rm',
-                '--entrypoint',
-                'sh',
-                '-v',
-                $this->resolvePlayerVolumeName($player) . ':/data',
-                'player:latest',
-                '-lc',
-                $listCommand,
+        } catch (\Throwable $e) {
+            // Directory might not exist
+            \Log::warning('Volume listing fallito completamente', [
+                'player_id' => $player->id,
+                'error' => $e->getMessage(),
             ]);
+            return [];
         }
 
         $files = [];
         foreach (preg_split('/\\r\\n|\\r|\\n/', trim($output)) as $line) {
             $line = trim($line);
-            if ($line === '') {
+            if ($line === '' || str_starts_with($line, 'total')) {
                 continue;
             }
 
-            [$path, $size] = array_pad(explode('::', $line, 2), 2, '0');
+            // ls -la format: permissions links owner group size month day time filename
+            $parts = preg_split('/\s+/', $line, 9);
+            if (count($parts) < 9) {
+                continue;
+            }
+
+            $filename = $parts[8];
+            if ($filename === '.' || $filename === '..') {
+                continue;
+            }
+
+            $size = (int) ($parts[4] ?? 0);
             $files[] = [
-                'path' => $path,
-                'size' => (int) $size,
+                'path' => 'object-cache/' . $filename,
+                'size' => $size,
             ];
         }
 
@@ -1354,7 +1377,6 @@ class DockerContainerService
     public function getPlayerVolumeFileInfo(Player $player, string $relativePath): ?array
     {
         $this->ensurePlayerVolume($player);
-        $this->ensureImageExists('player:latest');
 
         $filePath = $this->normalizeVolumeRelativePath($relativePath);
 
@@ -1398,6 +1420,11 @@ class DockerContainerService
         ]);
 
         $process->setTimeout(300);
+        $env = getenv();
+        if (is_array($env)) {
+            $env['CLOUDSDK_PYTHON'] = 'C:\\Python314\\python.exe';
+            $process->setEnv($env);
+        }
         if ($stdin !== null) {
             $process->setInput($stdin);
         }
@@ -1431,6 +1458,11 @@ class DockerContainerService
                 config('remote_docker.gcloud_instance') . ':' . $remotePath,
             ]);
             $scpProcess->setTimeout(300);
+            $env = getenv();
+            if (is_array($env)) {
+                $env['CLOUDSDK_PYTHON'] = 'C:\\Python314\\python.exe';
+                $scpProcess->setEnv($env);
+            }
             $scpProcess->run();
 
             if (!$scpProcess->isSuccessful()) {
@@ -1451,6 +1483,11 @@ class DockerContainerService
                 '--command', $remoteCmd,
             ]);
             $sshProcess->setTimeout(300);
+            $env2 = getenv();
+            if (is_array($env2)) {
+                $env2['CLOUDSDK_PYTHON'] = 'C:\\Python314\\python.exe';
+                $sshProcess->setEnv($env2);
+            }
             $sshProcess->run();
 
             if (!$sshProcess->isSuccessful()) {

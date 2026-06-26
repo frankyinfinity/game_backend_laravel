@@ -78,9 +78,15 @@ class ContainerController extends Controller
     {
         set_time_limit(120);
 
+        Log::info('volumeSnapshot chiamato', ['player_id' => $player->id]);
+
+        $payload = $this->buildPlayerVolumePayload($player, $containerService);
+
+        Log::info('volumeSnapshot risultato', ['player_id' => $player->id, 'file_count' => $payload['file_count']]);
+
         return response()->json([
             'success' => true,
-            'volume' => $this->buildPlayerVolumePayload($player, $containerService),
+            'volume' => $payload,
         ]);
     }
 
@@ -304,24 +310,14 @@ class ContainerController extends Controller
         }
 
         $files = [];
-        $sessionId = trim((string) ($player->actual_session_id ?? ''));
-        if ($sessionId !== '') {
-            try {
-                $fileInfo = $containerService->getPlayerVolumeFileInfo(
-                    $player,
-                    ObjectCache::sessionVolumePath($sessionId)
-                );
-                if ($fileInfo !== null) {
-                    $files[] = $fileInfo;
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Unable to inspect player volume file', [
-                    'player_id' => $player->id,
-                    'volume_name' => $volumeName,
-                    'session_id' => $sessionId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        try {
+            $files = $containerService->listPlayerVolumeFiles($player);
+        } catch (\Throwable $e) {
+            Log::warning('Unable to list player volume files', [
+                'player_id' => $player->id,
+                'volume_name' => $volumeName,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return [

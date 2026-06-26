@@ -19,6 +19,7 @@ use App\Models\EntityChimicalElement;
 use App\Models\EntityInformation;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Support\ScrollGroup;
+use Illuminate\Support\Facades\Log;
 
 class EntityDraw
 {
@@ -86,6 +87,8 @@ class EntityDraw
         //Body
         $entitySize = 32;
         $imageUrl = \Illuminate\Support\Facades\Storage::disk('entity_images')->url($dbEntity->image);
+        Log::info('$imageUrl');
+        Log::info($imageUrl);
         $entityImage = new Image($dbEntity->uid);
         $entityImage->setOrigin($centerSquare['x'], $centerSquare['y']);
         $entityImage->setSize($entitySize, $entitySize);
