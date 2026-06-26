@@ -47,6 +47,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/containers/list/table', [App\Http\Controllers\ContainerController::class, 'listPlayersDataTable'])->name('containers.players.datatable');
     Route::get('/containers/{player}', [App\Http\Controllers\ContainerController::class, 'show'])->name('containers.show')->whereNumber('player');
     Route::get('/containers/{player}/snapshot', [App\Http\Controllers\ContainerController::class, 'snapshot'])->name('containers.snapshot')->whereNumber('player');
+    Route::get('/containers/{player}/volume-snapshot', [App\Http\Controllers\ContainerController::class, 'volumeSnapshot'])->name('containers.volume-snapshot')->whereNumber('player');
     Route::get('/containers/{player}/volume-file', [App\Http\Controllers\ContainerController::class, 'volumeFile'])->name('containers.volume-file')->whereNumber('player');
     Route::post('/containers/{player}/list/table', [App\Http\Controllers\ContainerController::class, 'listDataTable'])->name('containers.datatable')->whereNumber('player');
     Route::get('/game/birth-region/tiles', [App\Http\Controllers\Api\GameController::class, 'getBirthRegionTiles'])->name('game.birth-region.tiles');

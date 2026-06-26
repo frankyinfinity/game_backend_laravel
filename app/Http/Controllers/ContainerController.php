@@ -41,8 +41,8 @@ class ContainerController extends Controller
     public function show(Player $player, DockerContainerService $containerService)
     {
         $player->load(['user', 'birthRegion']);
-        $containers = $this->buildContainerPayloads($player, $containerService);
-        $volume = $this->buildPlayerVolumePayload($player, $containerService);
+        $containers = [];
+        $volume = [];
         $containerTypes = DockerContainer::parentTypeMeta();
 
         // Get interactive elements for the modal select
@@ -65,11 +65,22 @@ class ContainerController extends Controller
 
     public function snapshot(Player $player, DockerContainerService $containerService): JsonResponse
     {
+        set_time_limit(120);
+
         return response()->json([
             'success' => true,
             'containers' => $this->buildContainerPayloads($player, $containerService),
-            'volume' => $this->buildPlayerVolumePayload($player, $containerService),
             'updated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    public function volumeSnapshot(Player $player, DockerContainerService $containerService): JsonResponse
+    {
+        set_time_limit(120);
+
+        return response()->json([
+            'success' => true,
+            'volume' => $this->buildPlayerVolumePayload($player, $containerService),
         ]);
     }
 

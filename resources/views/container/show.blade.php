@@ -770,6 +770,7 @@
             bulk: "{{ route('containers.bulk-action') }}",
         };
         const SNAPSHOT_URL = "{{ route('containers.snapshot', $player) }}";
+        const VOLUME_SNAPSHOT_URL = "{{ route('containers.volume-snapshot', $player) }}";
         const VOLUME_FILE_URL = "{{ route('containers.volume-file', $player) }}";
         const CONTAINER_TYPES_META = @json($containerTypes);
         const TYPE_ORDER = Object.keys(CONTAINER_TYPES_META).sort(function (a, b) {
@@ -2160,12 +2161,26 @@
                 resizeCanvas(containerHost.clientHeight);
                 centerEmptyText(emptyText);
                 updateSelectedDetails(null);
-                setLastUpdated('Nessun container disponibile', false);
+                setLastUpdated('Caricamento containers...', false);
+                // Load containers async
+                refreshContainers(false);
             } else {
                 layoutCards();
                 setLastUpdated('Caricamento stato...', false);
                 refreshContainers(true);
             }
+
+            // Load volume data separately (async)
+            $.ajax({
+                url: VOLUME_SNAPSHOT_URL,
+                type: 'GET',
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                success: function(response) {
+                    if (response && response.success && response.volume) {
+                        updateVolumePanel(response.volume);
+                    }
+                }
+            });
 
             scheduleRefresh();
 
