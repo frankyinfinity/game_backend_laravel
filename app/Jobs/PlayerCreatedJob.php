@@ -62,6 +62,8 @@ class PlayerCreatedJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 300; // 5 minutes
+
     protected $player;
 
     protected $registrationData;
@@ -839,11 +841,6 @@ class PlayerCreatedJob implements ShouldQueue
             $r = (int) ($parts[0] ?? 0);
             $g = (int) ($parts[1] ?? 0);
             $b = (int) ($parts[2] ?? 0);
-
-            // "0,0,0" = transparent — skip
-            if ($r === 0 && $g === 0 && $b === 0) {
-                continue;
-            }
 
             $color = imagecolorallocatealpha($img, $r, $g, $b, 0);
             imagesetpixel($img, $x, $y, $color);

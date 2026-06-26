@@ -374,15 +374,16 @@ class ElementController extends Controller
                 $imgPath = \Storage::disk('public')->path('elements/' . $imageName);
                 $img = @imagecreatefrompng($imgPath);
                 if ($img) {
+                    imagealphablending($img, false);
                     for ($y = 0; $y < 32; $y++) {
                         for ($x = 0; $x < 32; $x++) {
-                            $rgb = imagecolorat($img, $x, $y);
-                            $r = ($rgb >> 16) & 0xFF;
-                            $g = ($rgb >> 8) & 0xFF;
-                            $b = $rgb & 0xFF;
-                            if (!($r > 240 && $g > 240 && $b > 240)) {
-                                $savedAssemblerData['pixels'][] = ['x' => $x, 'y' => $y, 'r' => $r, 'g' => $g, 'b' => $b];
-                            }
+                            $rgba = imagecolorat($img, $x, $y);
+                            $a = ($rgba >> 24) & 0x7F; // 127 = fully transparent, 0 = opaque
+                            if ($a >= 127) continue; // skip fully transparent
+                            $r = ($rgba >> 16) & 0xFF;
+                            $g = ($rgba >> 8) & 0xFF;
+                            $b = $rgba & 0xFF;
+                            $savedAssemblerData['pixels'][] = ['x' => $x, 'y' => $y, 'r' => $r, 'g' => $g, 'b' => $b];
                         }
                     }
                     imagedestroy($img);
@@ -1238,8 +1239,10 @@ class ElementController extends Controller
         // ── 3) Generate image from pixels (32x32) ────────────────────────────
         if (!empty($json['pixels'])) {
             $img = imagecreatetruecolor(32, 32);
-            $white = imagecolorallocate($img, 255, 255, 255);
-            imagefill($img, 0, 0, $white);
+            imagealphablending($img, false);
+            imagesavealpha($img, true);
+            $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
+            imagefill($img, 0, 0, $transparent);
 
             foreach ($json['pixels'] as $pixel) {
                 $x = (int) ($pixel['x'] ?? 0);
@@ -1248,7 +1251,7 @@ class ElementController extends Controller
                 $g = (int) ($pixel['g'] ?? 0);
                 $b = (int) ($pixel['b'] ?? 0);
                 if ($x >= 0 && $x < 32 && $y >= 0 && $y < 32) {
-                    $color = imagecolorallocate($img, $r, $g, $b);
+                    $color = imagecolorallocatealpha($img, $r, $g, $b, 0);
                     imagesetpixel($img, $x, $y, $color);
                 }
             }
