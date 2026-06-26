@@ -437,8 +437,11 @@ class ElementHasPositionObserver
         // 2) Clone ElementComponent → ElementHasPositionComponent
         $componentDetails = $element->details->filter(fn($d) => $d->detailable_type === \App\Models\ElementComponent::class);
         $componentMap = []; // ElementComponent.id => ElementHasPositionComponent.id
+        $componentBrainMap = []; // old Brain.id => new ElementHasPositionComponentBrain.id
+
         foreach ($componentDetails as $compDetail) {
-            $elementComponent = \App\Models\ElementComponent::find($compDetail->detailable_id);
+            $elementComponent = \App\Models\ElementComponent::with('brain.neurons.outgoingLinks.conditionOrder', 'brain.neurons.conditionOrders', 'brain.circuits.details')
+                ->find($compDetail->detailable_id);
             if (!$elementComponent) continue;
 
             $ehpComponent = \App\Models\ElementHasPositionComponent::create([
@@ -447,8 +450,95 @@ class ElementHasPositionObserver
                 'name' => $elementComponent->name,
                 'characteristic' => $elementComponent->characteristic,
                 'image' => $elementComponent->image,
+                'brain_id' => null,
             ]);
             $componentMap[$elementComponent->id] = $ehpComponent->id;
+
+            // Clone brain into ElementHasPositionComponentBrain + neurons/links/circuits
+            if ($elementComponent->brain && $elementComponent->brain->neurons->count() > 0) {
+                $ehpCompBrain = \App\Models\ElementHasPositionComponentBrain::create([
+                    'element_has_position_component_id' => $ehpComponent->id,
+                    'uid' => (string) Str::uuid(),
+                    'grid_width' => $elementComponent->brain->grid_width,
+                    'grid_height' => $elementComponent->brain->grid_height,
+                ]);
+                $ehpComponent->update(['brain_id' => $ehpCompBrain->id]);
+                $componentBrainMap[$elementComponent->brain_id] = $ehpCompBrain->id;
+
+                // Clone neurons
+                $compNeuronMap = [];
+                foreach ($elementComponent->brain->neurons as $srcNeuron) {
+                    $n = \App\Models\EhpComponentBrainNeuron::create([
+                        'ehp_component_brain_id' => $ehpCompBrain->id,
+                        'type' => $srcNeuron->type,
+                        'grid_i' => $srcNeuron->grid_i,
+                        'grid_j' => $srcNeuron->grid_j,
+                        'radius' => $srcNeuron->radius,
+                        'stop_before_target' => (bool) $srcNeuron->stop_before_target,
+                        'target_type' => $srcNeuron->target_type,
+                        'target_element_id' => $srcNeuron->target_element_id,
+                        'chemical_element_id' => $srcNeuron->chemical_element_id,
+                        'complex_chemical_element_id' => $srcNeuron->complex_chemical_element_id,
+                        'gene_life_id' => $srcNeuron->gene_life_id,
+                        'gene_attack_id' => $srcNeuron->gene_attack_id,
+                        'element_infomation_id' => $srcNeuron->element_infomation_id,
+                        'rule_chimical_element_id' => $srcNeuron->element_has_rule_chimical_element_id,
+                        'active' => true,
+                    ]);
+                    $compNeuronMap[$srcNeuron->id] = $n->id;
+
+                    foreach ($srcNeuron->conditionOrders as $co) {
+                        \App\Models\EhpComponentBrainNeuronConditionOrder::create([
+                            'ehp_component_brain_neuron_id' => $n->id,
+                            'condition' => $co->condition,
+                            'sort_order' => $co->sort_order,
+                            'color' => $co->color,
+                            'rule_detail_id' => $co->rule_chimical_element_detail_id,
+                        ]);
+                    }
+                }
+
+                // Clone links
+                foreach ($elementComponent->brain->neurons as $srcNeuron) {
+                    foreach ($srcNeuron->outgoingLinks as $link) {
+                        $fromId = $compNeuronMap[$link->from_neuron_id] ?? null;
+                        $toId = $compNeuronMap[$link->to_neuron_id] ?? null;
+                        if (!$fromId || !$toId) continue;
+                        $cond = $link->conditionOrder ? $link->conditionOrder->condition : null;
+                        $condOrder = $cond ? \App\Models\EhpComponentBrainNeuronConditionOrder::where('ehp_component_brain_neuron_id', $fromId)->where('condition', $cond)->first() : null;
+                        \App\Models\EhpComponentBrainNeuronLink::create([
+                            'from_neuron_id' => $fromId,
+                            'to_neuron_id' => $toId,
+                            'condition_order_id' => $condOrder ? $condOrder->id : null,
+                        ]);
+                    }
+                }
+
+                // Clone circuits
+                $srcCircuits = $elementComponent->brain->circuits ?? collect();
+                if ($srcCircuits->isEmpty()) {
+                    $srcCircuits = \App\Models\NeuronCircuit::where('brain_id', $elementComponent->brain->id)->with('details')->get();
+                }
+                foreach ($srcCircuits as $srcCircuit) {
+                    $newCircuit = \App\Models\EhpComponentBrainNeuronCircuit::create([
+                        'ehp_component_brain_id' => $ehpCompBrain->id,
+                        'uid' => (string) Str::uuid(),
+                        'state' => $srcCircuit->state,
+                        'active' => (bool) $srcCircuit->active,
+                        'color' => $srcCircuit->color,
+                        'start_neuron_id' => $compNeuronMap[$srcCircuit->start_neuron_id] ?? null,
+                    ]);
+                    foreach ($srcCircuit->details as $cd) {
+                        $nid = $compNeuronMap[$cd->neuron_id] ?? null;
+                        if ($nid) {
+                            \App\Models\EhpComponentBrainNeuronCircuitDetail::create([
+                                'circuit_id' => $newCircuit->id,
+                                'neuron_id' => $nid,
+                            ]);
+                        }
+                    }
+                }
+            }
         }
 
         // 3) Clone ElementDetail → ElementHasPositionDetail
@@ -502,6 +592,13 @@ class ElementHasPositionObserver
                         return $sn;
                     }, $startNeurons);
                     $value = json_encode($remapped);
+                }
+                // Skip brain_id - remap to new component brain id
+                if ($data->key === 'brain_id' && !empty($componentBrainMap)) {
+                    $oldBrainId = (int) $value;
+                    if (isset($componentBrainMap[$oldBrainId])) {
+                        $value = (string) $componentBrainMap[$oldBrainId];
+                    }
                 }
 
                 \App\Models\ElementHasPositionDetailData::create([

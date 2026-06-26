@@ -16,18 +16,12 @@ use WebSocket\Client;
 
 class DockerContainerService
 {
-    private string $sshBinaryPath;
-    private string $sshKeyPath;
-    private string $sshUserHost;
     private string $websocketGatewayContainer;
     private string $websocketGatewayImage;
     private int $websocketGatewayPort;
 
     public function __construct()
     {
-        $this->sshBinaryPath = (string) config('remote_docker.ssh_binary_path');
-        $this->sshKeyPath = (string) config('remote_docker.ssh_key_path');
-        $this->sshUserHost = (string) config('remote_docker.ssh_user_host');
         $this->websocketGatewayContainer = (string) config('remote_docker.websocket_gateway_container');
         $this->websocketGatewayImage = (string) config('remote_docker.websocket_gateway_image');
         $this->websocketGatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
@@ -351,13 +345,15 @@ class DockerContainerService
         $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
 
         $process = new Process([
-            $this->sshBinaryPath,
-            '-i',
-            $this->sshKeyPath,
-            $this->sshUserHost,
-            $dockerCmd,
+            'gcloud', 'compute', 'ssh',
+            '--zone', config('remote_docker.gcloud_zone'),
+            config('remote_docker.gcloud_instance'),
+            '--project', config('remote_docker.gcloud_project'),
+            '--tunnel-through-iap',
+            '--command', $dockerCmd,
         ]);
-        $process->setTimeout(300); // 5 minuti max per operazione
+
+        $process->setTimeout(300);
         $process->run();
 
         if (!$process->isSuccessful()) {
@@ -1388,13 +1384,15 @@ class DockerContainerService
         $dockerCmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
 
         $process = new Process([
-            $this->sshBinaryPath,
-            '-i',
-            $this->sshKeyPath,
-            $this->sshUserHost,
-            $dockerCmd,
+            'gcloud', 'compute', 'ssh',
+            '--zone', config('remote_docker.gcloud_zone'),
+            config('remote_docker.gcloud_instance'),
+            '--project', config('remote_docker.gcloud_project'),
+            '--tunnel-through-iap',
+            '--command', $dockerCmd,
         ]);
-        $process->setTimeout(300); // 5 minuti max per operazione
+
+        $process->setTimeout(300);
         if ($stdin !== null) {
             $process->setInput($stdin);
         }

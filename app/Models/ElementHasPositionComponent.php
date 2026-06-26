@@ -14,12 +14,14 @@ class ElementHasPositionComponent extends Model
         'name',
         'characteristic',
         'image',
+        'brain_id',
     ];
 
     protected $casts = [
         'element_has_position_id' => 'integer',
         'element_component_id' => 'integer',
         'characteristic' => 'integer',
+        'brain_id' => 'integer',
     ];
 
     public function elementHasPosition()
@@ -30,5 +32,10 @@ class ElementHasPositionComponent extends Model
     public function elementComponent()
     {
         return $this->belongsTo(ElementComponent::class);
+    }
+
+    public function brain()
+    {
+        return $this->belongsTo(ElementHasPositionComponentBrain::class, 'brain_id');
     }
 }

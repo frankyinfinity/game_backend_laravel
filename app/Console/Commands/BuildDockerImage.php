@@ -78,23 +78,46 @@ class BuildDockerImage extends Command
                 return 1;
             }
 
-            $sshKeyPath = (string) config('remote_docker.ssh_key_path');
-            $sshUserHost = (string) config('remote_docker.ssh_user_host');
+            $gcloudZone = config('remote_docker.gcloud_zone');
+            $gcloudInstance = config('remote_docker.gcloud_instance');
+            $gcloudProject = config('remote_docker.gcloud_project');
 
-            // Esegue un 'tar' della cartella corrente per inviare i file tramite stdIN a SSH,
-            // e ordina a docker sul server remoto di buildare dall'input standard '-'
-            $command = sprintf(
-                'cd /d %s && tar -cf - . | ssh -i "%s" %s docker build -t %s -',
-                escapeshellarg($buildPath),
-                $sshKeyPath,
-                $sshUserHost,
-                escapeshellarg($imageName)
+            // Step 1: Create tar locally
+            $tarFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'docker_build_' . time() . '.tar';
+            $tarCommand = sprintf('cd /d %s && tar -cf %s .', escapeshellarg($buildPath), escapeshellarg($tarFile));
+            exec($tarCommand, $output, $tarReturnCode);
+            if ($tarReturnCode !== 0) {
+                $this->error("Errore nella creazione del tar locale.");
+                return 1;
+            }
+
+            // Step 2: Copy tar to remote
+            $this->info("Copio i file sul server remoto...");
+            $scpCommand = sprintf(
+                'gcloud compute scp --zone %s --project %s --tunnel-through-iap %s %s:/tmp/docker_build.tar',
+                escapeshellarg($gcloudZone),
+                escapeshellarg($gcloudProject),
+                escapeshellarg($tarFile),
+                escapeshellarg($gcloudInstance)
             );
+            exec($scpCommand, $output, $scpReturnCode);
+            @unlink($tarFile);
+            if ($scpReturnCode !== 0) {
+                $this->error("Errore nel trasferimento dei file (exit code: $scpReturnCode)");
+                return 1;
+            }
 
-            $this->info("Eseguo su server remoto tramite streaming: $command");
+            // Step 3: Build on remote
+            $this->info("Eseguo build su server remoto...");
             $this->line('');
-
-            exec($command, $output, $returnCode);
+            $buildRemoteCmd = sprintf(
+                'gcloud compute ssh --zone %s %s --project %s --tunnel-through-iap --command %s',
+                escapeshellarg($gcloudZone),
+                escapeshellarg($gcloudInstance),
+                escapeshellarg($gcloudProject),
+                escapeshellarg('cat /tmp/docker_build.tar | docker build -t ' . $imageName . ' - && rm /tmp/docker_build.tar')
+            );
+            passthru($buildRemoteCmd, $returnCode);
 
             if ($returnCode !== 0) {
                 $this->error("Errore nella costruzione dell'immagine (exit code: $returnCode)");

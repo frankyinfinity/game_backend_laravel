@@ -33,26 +33,19 @@ class RemoteDockerCommand extends Command
             return 1;
         }
 
-        $sshKeyPath = (string) config('remote_docker.ssh_key_path');
-        $sshUserHost = (string) config('remote_docker.ssh_user_host');
-
         $dockerCommand = 'docker ' . $dockerCmdAction;
 
-        // Aggiungiamo -t a ssh per forzare un terminale (pseudo-TTY), utile per output formattati
-        // e se si vogliono lanciare comandi interattivi (es: docker exec -it).
         $fullCommand = sprintf(
-            'ssh -t -i %s %s %s',
-            escapeshellarg($sshKeyPath),
-            escapeshellarg($sshUserHost),
+            'gcloud compute ssh --zone %s %s --project %s --tunnel-through-iap --command %s',
+            escapeshellarg(config('remote_docker.gcloud_zone')),
+            escapeshellarg(config('remote_docker.gcloud_instance')),
+            escapeshellarg(config('remote_docker.gcloud_project')),
             escapeshellarg($dockerCommand)
         );
 
         $this->info("Esecuzione: $dockerCommand sul server remoto...");
-        $this->line("Eseguendo il comando: $fullCommand");
         $this->line('');
 
-        // Utilizziamo passthru() così l'output del comando (inclusi errori e formattazione/colori)
-        // viene inviato direttamente al terminale dell'utente.
         passthru($fullCommand, $returnCode);
 
         $this->line('');

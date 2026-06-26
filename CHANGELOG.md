@@ -1,5 +1,5 @@
 # game
-# ssh -i "C:\chiave_vm\ssh-key-2026-03-19.key" -N -R 8085:127.0.0.1:8085 opc@84.8.249.14
+# gcloud compute ssh --zone "europe-west12-c" "instance-game" --project "game-500515" --tunnel-through-iap -- -N -R 8085:127.0.0.1:8085
 
 # backend
 # php artisan serve --host=0.0.0.0 --port=8085
