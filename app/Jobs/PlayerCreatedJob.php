@@ -107,6 +107,13 @@ class PlayerCreatedJob implements ShouldQueue
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
+
+        // Create Docker containers - must be last
+        try {
+            $containerService->createContainersForPlayer($player);
+        } catch (\Throwable $e) {
+            \Log::error("Errore nella creazione dei container per il player {$player->id}: " . $e->getMessage());
+        }
     }
 
     /**
@@ -250,15 +257,6 @@ class PlayerCreatedJob implements ShouldQueue
 
         // Generate and save entity image from assembler pixels
         $this->populateEntityImage($player, $entity);
-
-        // Create Docker containers for the player
-        try {
-            /** @var DockerContainerService $containerService */
-            $containerService = app(DockerContainerService::class);
-            $containerService->createContainersForPlayer($player);
-        } catch (\Throwable $e) {
-            \Log::error("Errore nella creazione dei container per il player {$player->id}: " . $e->getMessage());
-        }
 
         return $birthRegionIds;
 
