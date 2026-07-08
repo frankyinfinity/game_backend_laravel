@@ -111,6 +111,9 @@ class PlayerCreatedJob implements ShouldQueue
         // Create Docker containers - must be last
         try {
             $containerService->createContainersForPlayer($player);
+            $player->active = true;
+            $player->save();
+            \Log::info('Player attivato dopo creazione container', ['player_id' => $player->id]);
         } catch (\Throwable $e) {
             \Log::error("Errore nella creazione dei container per il player {$player->id}: " . $e->getMessage());
         }

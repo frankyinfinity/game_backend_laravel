@@ -66,6 +66,14 @@ class AuthController extends Controller
             $user = \Illuminate\Support\Facades\Auth::user();
             $player = $user->players()->first();
 
+            if ($player && !$player->active) {
+                \Illuminate\Support\Facades\Auth::logout();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Il tuo account è in fase di preparazione. Attendi qualche minuto e riprova.',
+                ], 403);
+            }
+
             return response()->json([
                 'success' => true,
                 'is_player' => !is_null($player),

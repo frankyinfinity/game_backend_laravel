@@ -8,6 +8,10 @@ class Player extends Model
 {
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    protected $casts = [
+        'active' => 'boolean',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
