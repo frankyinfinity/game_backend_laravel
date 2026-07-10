@@ -50,6 +50,7 @@ use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
 use App\Models\TargetPlayer;
 use App\Services\DockerContainerService;
+use App\Jobs\CreatePlayerContainersJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -109,14 +110,7 @@ class PlayerCreatedJob implements ShouldQueue
         $this->cloneObjectiveStructure($player);
 
         // Create Docker containers - must be last
-        try {
-            $containerService->createContainersForPlayer($player);
-            $player->active = true;
-            $player->save();
-            \Log::info('Player attivato dopo creazione container', ['player_id' => $player->id]);
-        } catch (\Throwable $e) {
-            \Log::error("Errore nella creazione dei container per il player {$player->id}: " . $e->getMessage());
-        }
+        CreatePlayerContainersJob::dispatch($player);
     }
 
     /**
