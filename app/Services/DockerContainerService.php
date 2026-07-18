@@ -31,6 +31,16 @@ class DockerContainerService
     {
         $this->ensurePlayerVolume($player);
 
+        // Pre-verifica tutte le immagini necessarie in una sola chiamata SSH
+        $this->ensureImagesExist([
+            'entity:latest',
+            'map:latest',
+            'player:latest',
+            'objective:latest',
+            'cache-sync:latest',
+            'chimical-element:latest',
+        ]);
+
         $entities = Entity::query()
             ->whereHas('specie', function ($query) use ($player) {
                 $query->where('player_id', $player->id);
@@ -368,13 +378,42 @@ class DockerContainerService
         return trim($process->getOutput());
     }
 
+    /** @var array<string, bool> */
+    private array $verifiedImages = [];
+
     private function ensureImageExists(string $imageName): void
     {
+        if (isset($this->verifiedImages[$imageName])) {
+            return;
+        }
+
         try {
-            // docker image inspect restituira' codice 0 se esiste, altrimenti dardi l'errore
             $this->executeRemoteDockerCommand(['image', 'inspect', $imageName]);
+            $this->verifiedImages[$imageName] = true;
         } catch (\Exception $e) {
             throw new RuntimeException("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build. Detto errore: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Verifica più immagini con una sola chiamata SSH.
+     *
+     * @param string[] $imageNames
+     */
+    private function ensureImagesExist(array $imageNames): void
+    {
+        $toCheck = array_filter($imageNames, fn($n) => !isset($this->verifiedImages[$n]));
+        if (empty($toCheck)) {
+            return;
+        }
+
+        try {
+            $this->executeRemoteDockerCommand(array_merge(['image', 'inspect'], array_values($toCheck)));
+            foreach ($toCheck as $name) {
+                $this->verifiedImages[$name] = true;
+            }
+        } catch (\Exception $e) {
+            throw new RuntimeException("Una o più immagini non trovate: " . implode(', ', $toCheck) . ". Esegui prima: php artisan docker:build.");
         }
     }
 
