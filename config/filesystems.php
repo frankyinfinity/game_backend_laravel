@@ -1,32 +1,7 @@
 <?php
 
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Filesystem Disk
-    |--------------------------------------------------------------------------
-    |
-    | Here you may specify the default filesystem disk that should be used
-    | by the framework. The "local" disk, as well as a variety of cloud
-    | based disks are available to your application for file storage.
-    |
-    */
-
     'default' => env('FILESYSTEM_DISK', 'local'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Filesystem Disks
-    |--------------------------------------------------------------------------
-    |
-    | Below you may configure as many filesystem disks as necessary, and you
-    | may even configure multiple disks for the same driver. Examples for
-    | most supported storage drivers are configured here for reference.
-    |
-    | Supported drivers: "local", "ftp", "sftp", "s3"
-    |
-    */
 
     'disks' => [
 
@@ -40,7 +15,7 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -58,7 +33,7 @@ return [
         'birth_regions' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/birth_regions'),
-            'url' => env('APP_URL').'/storage/birth_regions',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/birth_regions',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -66,14 +41,14 @@ return [
         'map_tile' => [
             'driver' => 'local',
             'root' => storage_path('app/public/map_tiles'),
-            'url' => env('APP_URL').'/storage/map_tiles',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/map_tiles',
             'visibility' => 'public',
         ],
 
         'elements' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/elements'),
-            'url' => env('APP_URL').'/storage/elements',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/elements',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -81,7 +56,7 @@ return [
         'scores' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/scores'),
-            'url' => env('APP_URL').'/storage/scores',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/scores',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -89,7 +64,7 @@ return [
         'tile' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/tiles'),
-            'url' => env('APP_URL').'/storage/tiles',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/tiles',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -97,7 +72,7 @@ return [
         'entity_components' => [
             'driver' => 'local',
             'root' => storage_path('app/public/entity_components'),
-            'url' => env('APP_URL').'/storage/entity_components',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/entity_components',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -105,7 +80,7 @@ return [
         'element_components' => [
             'driver' => 'local',
             'root' => storage_path('app/public/element_components'),
-            'url' => env('APP_URL').'/storage/element_components',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/element_components',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -113,7 +88,7 @@ return [
         'entity_bodies' => [
             'driver' => 'local',
             'root' => storage_path('app/public/entity_bodies'),
-            'url' => env('APP_URL').'/storage/entity_bodies',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/entity_bodies',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -121,7 +96,7 @@ return [
         'element_bodies' => [
             'driver' => 'local',
             'root' => storage_path('app/public/element_bodies'),
-            'url' => env('APP_URL').'/storage/element_bodies',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/element_bodies',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -129,7 +104,7 @@ return [
         'entity_images' => [
             'driver' => 'local',
             'root' => storage_path('app/public/entity_images'),
-            'url' => env('APP_URL').'/storage/entity_images',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/entity_images',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -137,7 +112,7 @@ return [
         'rewards' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/rewards'),
-            'url' => env('APP_URL').'/storage/rewards',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/rewards',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -145,7 +120,7 @@ return [
         'rewards_player' => [
             'driver' => 'local',
             'root' => storage_path('app/uploads/rewards_player'),
-            'url' => env('APP_URL').'/storage/rewards_player',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/rewards_player',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -159,7 +134,7 @@ return [
         'genes' => [
             'driver' => 'local',
             'root' => storage_path('app/public/genes'),
-            'url' => env('APP_URL').'/storage/genes',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/genes',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -167,7 +142,7 @@ return [
         'chimical_elements' => [
             'driver' => 'local',
             'root' => storage_path('app/public/chimical_elements'),
-            'url' => env('APP_URL').'/storage/chimical_elements',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/chimical_elements',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -175,7 +150,7 @@ return [
         'complex_chimical_elements' => [
             'driver' => 'local',
             'root' => storage_path('app/public/complex_chimical_elements'),
-            'url' => env('APP_URL').'/storage/complex_chimical_elements',
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/complex_chimical_elements',
             'visibility' => 'public',
             'throw' => false,
         ],
@@ -193,17 +168,6 @@ return [
         ],
 
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Symbolic Links
-    |--------------------------------------------------------------------------
-    |
-    | Here you may configure the symbolic links that will be created when the
-    | `storage:link` Artisan command is executed. The array keys should be
-    | the locations of the links and the values should be their targets.
-    |
-    */
 
     'links' => [
         public_path('storage') => storage_path('app/public'),
