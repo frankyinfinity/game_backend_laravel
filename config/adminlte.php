@@ -492,6 +492,11 @@ return [
                     'url'  => '/websocket',
                     'icon' => 'fas fa-bolt',
                 ],
+                [
+                    'text' => 'Immagini Docker',
+                    'url'  => '/images',
+                    'icon' => 'fas fa-docker',
+                ],
             ]
         ],
         [

@@ -206,6 +206,15 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/chimical-elements/list/table', [App\Http\Controllers\ChimicalElementController::class, 'listDataTable'])->name('chimical-elements.datatable');
     Route::post('/chimical-elements/delete', [App\Http\Controllers\ChimicalElementController::class, 'delete'])->name('chimical-elements.delete');
 
+    //Images
+    Route::get('images', [App\Http\Controllers\ImageController::class, 'index'])->name('images.index');
+    Route::post('/images/list/table', [App\Http\Controllers\ImageController::class, 'listDataTable'])->name('images.datatable');
+    Route::get('images/{image}', [App\Http\Controllers\ImageController::class, 'show'])->name('images.show');
+    Route::post('images/{image}/activate', [App\Http\Controllers\ImageController::class, 'activate'])->name('images.activate');
+    Route::post('images/{image}/deactivate', [App\Http\Controllers\ImageController::class, 'deactivate'])->name('images.deactivate');
+    Route::get('images/{image}/download', [App\Http\Controllers\ImageController::class, 'downloadBuildInput'])->name('images.download');
+    Route::post('/images/delete', [App\Http\Controllers\ImageController::class, 'delete'])->name('images.delete');
+
     //Graphics AI
     Route::get('/graphics-editor/ai-models', [App\Http\Controllers\GraphicsAiController::class, 'models'])->name('graphics-editor.ai-models');
     Route::post('/graphics-editor/ai-generate', [App\Http\Controllers\GraphicsAiController::class, 'generate'])->name('graphics-editor.ai-generate');

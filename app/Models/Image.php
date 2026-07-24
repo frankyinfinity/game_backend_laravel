@@ -12,4 +12,9 @@ class Image extends Model
     {
         return $this->hasMany(Container::class);
     }
+
+    public function activeContainers()
+    {
+        return $this->hasMany(Container::class);
+    }
 }

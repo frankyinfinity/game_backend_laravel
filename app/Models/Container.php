@@ -46,4 +46,9 @@ class Container extends Model
     {
         return $this->belongsTo(Image::class);
     }
+
+    public function parent()
+    {
+        return $this->morphTo(__FUNCTION__, 'parent_type', 'parent_id');
+    }
 }
