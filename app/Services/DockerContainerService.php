@@ -6,6 +6,7 @@ use App\Models\BirthRegion;
 use App\Models\Container;
 use App\Models\Entity;
 use App\Models\ElementHasPosition;
+use App\Models\Image;
 use App\Models\Player;
 use RuntimeException;
 use InvalidArgumentException;
@@ -136,6 +137,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_ENTITY,
             'parent_id' => $entity->id,
             'ws_port' => $wsPort,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -172,6 +174,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_MAP,
             'parent_id' => $birthRegion->id,
             'ws_port' => $wsPort,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -208,6 +211,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_PLAYER,
             'parent_id' => $player->id,
             'ws_port' => $wsPort,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -241,6 +245,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_OBJECTIVE,
             'parent_id' => $player->id,
             'ws_port' => null,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -275,6 +280,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_CACHE_SYNC,
             'parent_id' => $player->id,
             'ws_port' => null,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -308,6 +314,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_CHIMICAL_ELEMENT,
             'parent_id' => $birthRegion->id,
             'ws_port' => null,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -344,6 +351,7 @@ class DockerContainerService
             'parent_type' => Container::PARENT_TYPE_ELEMENT_HAS_POSITION,
             'parent_id' => $elementHasPosition->id,
             'ws_port' => $wsPort,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }
 
@@ -393,6 +401,19 @@ class DockerContainerService
         } catch (\Exception $e) {
             throw new RuntimeException("Immagine '$imageName' non trovata. Esegui prima: php artisan docker:build. Detto errore: " . $e->getMessage());
         }
+    }
+
+    private function getImageIdFromDockerName(string $dockerImageName): ?int
+    {
+        $parts = explode(':', $dockerImageName);
+        $imageName = $parts[0];
+        $tag = $parts[1] ?? 'latest';
+
+        $image = Image::where('docker_image_name', $imageName)
+            ->where('docker_tag', $tag)
+            ->first();
+
+        return $image ? $image->id : null;
     }
 
     /**

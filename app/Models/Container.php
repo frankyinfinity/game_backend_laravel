@@ -41,4 +41,9 @@ class Container extends Model
             self::PARENT_TYPE_CHIMICAL_ELEMENT => ['label' => 'ChimicalElement', 'color' => '#ec4899', 'order' => 6],
         ];
     }
+
+    public function image()
+    {
+        return $this->belongsTo(Image::class);
+    }
 }
