@@ -325,12 +325,14 @@ class DockerContainerService
         $imageName = 'score:latest';
         $this->ensureImageExists($imageName);
 
+        $wsPort = $this->nextWsPort();
         $name = 'score_' . $player->id;
         $env = [
             'BACKEND_URL=' . $this->backendUrl(),
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'PLAYER_ID=' . $player->id,
+            'WS_PORT=' . $wsPort,
         ];
         $labels = $this->playerGroupingLabels($player->id, 'score');
 
@@ -339,7 +341,7 @@ class DockerContainerService
             $imageName,
             $env,
             $labels,
-            null,
+            $wsPort,
             $start,
             $this->playerVolumeMount($player)
         );
@@ -349,7 +351,7 @@ class DockerContainerService
             'name' => $name,
             'parent_type' => Container::PARENT_TYPE_SCORE,
             'parent_id' => $player->id,
-            'ws_port' => null,
+            'ws_port' => $wsPort,
             'image_id' => $this->getImageIdFromDockerName($imageName),
         ]);
     }

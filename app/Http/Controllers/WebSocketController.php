@@ -77,6 +77,10 @@ class WebSocketController extends Controller
                     ->orWhere(function ($subQuery) use ($elementHasPositionIds) {
                         $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION)
                             ->whereIn('parent_id', $elementHasPositionIds);
+                    })
+                    ->orWhere(function ($subQuery) use ($player) {
+                        $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_SCORE)
+                            ->where('parent_id', $player->id);
                     });
             })
             ->orderBy('id')

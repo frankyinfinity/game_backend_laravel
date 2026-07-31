@@ -2680,6 +2680,9 @@ class GameController extends Controller
                 })->orWhere(function ($sq2) use ($player) {
                     $sq2->where('parent_type', Container::PARENT_TYPE_PLAYER)
                         ->where('parent_id', $player->id);
+                })->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_SCORE)
+                        ->where('parent_id', $player->id);
                 });
                 if (!empty($elementHasPositionIds)) {
                     $q->orWhere(function ($sq2) use ($elementHasPositionIds) {

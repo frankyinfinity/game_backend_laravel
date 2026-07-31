@@ -1,9 +1,11 @@
 const http = require('http');
+const WebSocket = require('ws');
 
 const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
 const playerId = process.env.PLAYER_ID;
+const wsPort = Number(process.env.WS_PORT || 0);
 const cycleInterval = process.env.CYCLE_INTERVAL || 10000; // Default 10 seconds (same as chimical-element)
 
 console.log(`Score service started.`);
@@ -14,6 +16,7 @@ console.log(`Cycle Interval: ${cycleInterval}ms`);
 let sessionCookie = null;
 let xsrfToken = null;
 let responseJson = null;
+let wss = null;
 
 function parseCookies(response) {
   const list = {};
@@ -76,12 +79,13 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-                console.log('Login successful, starting cycle...');
-                runCycle();
-            } else {
-                console.error(`Login failed with status: ${resPost.statusCode}`);
-                resPost.on('data', d => console.error(d.toString()));
-            }
+        console.log('Login successful, starting cycle...');
+        runCycle();
+        startWebSocketServer();
+      } else {
+        console.error(`Login failed with status: ${resPost.statusCode}`);
+        resPost.on('data', d => console.error(d.toString()));
+      }
     });
 
     reqPost.on('error', (e) => console.error(`Login POST error: ${e.message}`));
@@ -158,6 +162,61 @@ function scheduleNextCycle() {
       scheduleNextCycle();
     });
   }, parseInt(cycleInterval));
+}
+
+function startWebSocketServer() {
+  if (wsPort > 0) {
+    wss = new WebSocket.Server({ port: wsPort });
+    console.log(`[Score] WebSocket server listening on port ${wsPort}`);
+
+    wss.on('connection', (ws) => {
+      console.log(`[Score] WebSocket client connected`);
+
+      ws.on('message', (message) => {
+        try {
+          const data = JSON.parse(message);
+          console.log(`[Score] Received command:`, data);
+
+          const command = data && data.command ? data.command : null;
+
+          switch (command) {
+            case 'get':
+              ws.send(JSON.stringify({
+                success: true,
+                command: 'get',
+                data: responseJson,
+              }));
+              break;
+            default:
+              ws.send(JSON.stringify({
+                success: false,
+                error: `Unknown command: ${command}`,
+              }));
+              break;
+          }
+        } catch (error) {
+          console.error(`[Score] Error parsing message:`, error.message);
+          ws.send(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+        }
+      });
+
+      ws.on('close', () => {
+        console.log(`[Score] WebSocket client disconnected`);
+      });
+
+      ws.on('error', (error) => {
+        console.error(`[Score] WebSocket error:`, error.message);
+      });
+
+      ws.send(JSON.stringify({
+        success: true,
+        message: 'Connected to score service',
+        player_id: playerId,
+      }));
+    });
+  } else {
+    console.log('WS_PORT missing or invalid, websocket server disabled for score.');
+  }
 }
 
 performLogin();

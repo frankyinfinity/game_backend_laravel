@@ -54,4 +54,18 @@ class Container extends Model
     {
         return $this->morphTo(__FUNCTION__, 'parent_type', 'parent_id');
     }
+    
+    protected static function booted()
+    {
+        \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
+            'Player' => Player::class,
+            'Map' => BirthRegion::class,
+            'Objective' => Player::class,
+            'Entity' => Entity::class,
+            'ElementHasPosition' => ElementHasPosition::class,
+            'CacheSync' => Player::class,
+            'ChimicalElement' => BirthRegion::class,
+            'Score' => Player::class,
+        ]);
+    }
 }

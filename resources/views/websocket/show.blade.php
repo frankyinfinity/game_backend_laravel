@@ -429,12 +429,12 @@
         function esc(s) { return String(s || '').replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,'&#039;'); }
 
         function ctTypeBadge(type) {
-            const m = {'Player':'primary','Map':'success','Entity':'warning','ElementHasPosition':'danger','Objective':'secondary','CacheSync':'info','ChimicalElement':'dark'};
+            const m = {'Player':'primary','Map':'success','Entity':'warning','ElementHasPosition':'danger','Objective':'secondary','CacheSync':'info','ChimicalElement':'dark','Score':'teal'};
             return '<span class="badge badge-' + (m[type]||'secondary') + '">' + esc(type) + '</span>';
         }
 
         function ctTypeOrder(type) {
-            const order = {'Player':0,'Map':1,'Objective':2,'Entity':3,'ElementHasPosition':4,'CacheSync':5,'ChimicalElement':6};
+            const order = {'Player':0,'Map':1,'Objective':2,'Entity':3,'ElementHasPosition':4,'CacheSync':5,'ChimicalElement':6,'Score':7};
             return order[type] !== undefined ? order[type] : 9;
         }
 
@@ -524,6 +524,9 @@
                     { cmd: 'get_status',      label: '📟 get_status',       desc: 'Stato elemento' },
                     { cmd: 'get_genes',       label: '🧬 get_genes',        desc: 'Geni correnti' },
                     { cmd: 'get_chimical_elements', label: '⚗️ chimical',  desc: 'Elementi chimici' },
+                ],
+                'Score': [
+                    { cmd: 'get',             label: '📊 get',              desc: 'Ottieni punteggi correnti' },
                 ],
             };
             return all[type] || [];
