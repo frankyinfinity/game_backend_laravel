@@ -1,0 +1,9 @@
+{
+  "name": "score-service",
+  "version": "1.0.0",
+  "description": "Score Docker service for calculating chemical element and gene scores",
+  "main": "index.js",
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

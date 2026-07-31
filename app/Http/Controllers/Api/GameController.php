@@ -852,6 +852,88 @@ class GameController extends Controller
         ]);
     }
 
+    public function calculateScore(Request $request): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+        $playerId = (int) $request->input('player_id');
+        
+        if ($playerId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'player_id obbligatorio',
+            ], 422);
+        }
+
+        $player = Player::find($playerId);
+        if ($player === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Player non trovato',
+            ], 404);
+        }
+
+        // Calcola i punteggi direttamente qui invece di usare un job
+        $updatedScores = [];
+        
+        // Recupera tutti gli ElementHasPositionScore del player
+        $elementHasPositionScores = ElementHasPositionScore::query()
+            ->whereHas('elementHasPosition', function ($query) use ($playerId) {
+                $query->where('player_id', $playerId);
+            })
+            ->with(['score'])
+            ->get();
+
+        // Raggruppa per score_id e somma le quantità
+        $scoreTotals = [];
+        foreach ($elementHasPositionScores as $elementHasPositionScore) {
+            $scoreId = $elementHasPositionScore->score_id;
+            $amount = $elementHasPositionScore->amount;
+            
+            if (!isset($scoreTotals[$scoreId])) {
+                $scoreTotals[$scoreId] = 0;
+            }
+            $scoreTotals[$scoreId] += $amount;
+        }
+
+        // Aggiorna o crea i PlayerHasScore
+        foreach ($scoreTotals as $scoreId => $totalAmount) {
+            $playerHasScore = PlayerHasScore::query()
+                ->where('player_id', $playerId)
+                ->where('score_id', $scoreId)
+                ->first();
+
+            if ($playerHasScore) {
+                $playerHasScore->update(['value' => $totalAmount]);
+            } else {
+                PlayerHasScore::create([
+                    'player_id' => $playerId,
+                    'score_id' => $scoreId,
+                    'value' => $totalAmount,
+                ]);
+            }
+        }
+
+        // Recupera tutti gli score del player con i valori aggiornati
+        $allPlayerScores = PlayerHasScore::query()
+            ->where('player_id', $playerId)
+            ->with('score')
+            ->get()
+            ->map(function ($playerHasScore) {
+                return [
+                    'score_id' => $playerHasScore->score_id,
+                    'name' => $playerHasScore->score->name ?? 'Unknown',
+                    'value' => $playerHasScore->value,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'player_id' => $playerId,
+            'message' => 'Punteggi calcolati con successo',
+            'scores' => $allPlayerScores,
+        ]);
+    }
+
     private function openMapWebSocket(string $host, int $targetPort)
     {
         $gatewayPort = (int) config('remote_docker.websocket_gateway_port', 9001);
@@ -2523,9 +2605,9 @@ class GameController extends Controller
         $validated = $request->validate([
             'element_has_position_id' => ['required', 'integer'],
         ]);
-        //$result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
-        //return response()->json($result['body'], $result['status']);
-        return response()->json(['success' => true]);
+        $result = $brainScheduleService->enqueue((int) $validated['element_has_position_id']);
+        return response()->json($result['body'], $result['status']);
+        //return response()->json(['success' => true]);
 
     }
 
@@ -2857,6 +2939,33 @@ class GameController extends Controller
                     break;
             }
             return response()->json(['success' => true, 'message' => "Azione $action eseguita con successo"]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function recreateAllPlayerContainers(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+        set_time_limit(300); // 5 minutes timeout
+
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer', 'exists:players,id'],
+        ]);
+
+        $player = Player::find($validated['player_id']);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        try {
+            $newContainers = $containerService->recreateAllPlayerContainers($player, false);
+            
+            return response()->json([
+                'success' => true, 
+                'message' => 'Container ricreati con successo',
+                'count' => count($newContainers)
+            ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }

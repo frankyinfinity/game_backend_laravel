@@ -1827,28 +1827,21 @@
                     return;
                 }
 
-                const ids = containersState.map(function (item) { return item.id; });
-                if (ids.length === 0) {
-                    Swal.fire('Nessun container da ricreare.');
-                    return;
-                }
-
                 $.ajax({
-                    url: ACTION_URLS.bulk,
+                    url: '{{ route('game.player.recreate_all_containers') }}',
                     type: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
                     data: {
-                        action: 'recreate',
-                        ids: ids
+                        player_id: {{ $player->id }}
                     },
                     success: function (response) {
                         if (response && response.success) {
                             refreshContainers(true);
                             Swal.fire({
                                 title: 'Successo',
-                                text: 'Tutti i container sono stati ricreati.',
+                                text: 'Tutti i container sono stati ricreati (' + (response.count || 0) + ' container).',
                                 type: 'success',
                                 timer: 2000,
                                 showConfirmButton: false

@@ -69,6 +69,11 @@ class BuildDockerImage extends Command
                 'path' => base_path('docker/chimical-element'),
                 'folder' => 'chimical-element'
             ],
+            [
+                'name' => 'score:latest',
+                'path' => base_path('docker/score'),
+                'folder' => 'score'
+            ],
         ];
 
         foreach ($images as $image) {

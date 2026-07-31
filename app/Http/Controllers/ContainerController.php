@@ -198,6 +198,8 @@ class ContainerController extends Controller
 
     public function bulkAction(Request $request, DockerContainerService $containerService): JsonResponse
     {
+        set_time_limit(300); // 5 minutes timeout for bulk operations
+
         $action = (string) $request->input('action', '');
         $ids = collect((array) $request->input('ids', []))
             ->map(fn ($id) => (int) $id)
@@ -361,6 +363,10 @@ class ContainerController extends Controller
                     })
                     ->orWhere(function ($subQuery) use ($player) {
                         $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_CACHE_SYNC)
+                            ->where('parent_id', $player->id);
+                    })
+                    ->orWhere(function ($subQuery) use ($player) {
+                        $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_SCORE)
                             ->where('parent_id', $player->id);
                     })
                     ->orWhere(function ($subQuery) use ($entityIds) {
