@@ -235,6 +235,13 @@ class GenerateMapJob implements ShouldQueue
             ->with('element')
             ->get();
 
+        // Update session_id for all ElementHasPosition records
+        foreach ($existingElementPositions as $existingElementPosition) {
+            $existingElementPosition->update([
+                'session_id' => $player->actual_session_id,
+            ]);
+        }
+
         foreach ($existingElementPositions as $existingElementPosition) {
             if ($existingElementPosition->element === null) {
                 continue;
