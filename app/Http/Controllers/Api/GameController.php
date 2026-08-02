@@ -872,48 +872,7 @@ class GameController extends Controller
             ], 404);
         }
 
-        // Calcola i punteggi direttamente qui invece di usare un job
-        $updatedScores = [];
-        
-        // Recupera tutti gli ElementHasPositionScore del player
-        $elementHasPositionScores = ElementHasPositionScore::query()
-            ->whereHas('elementHasPosition', function ($query) use ($playerId) {
-                $query->where('player_id', $playerId);
-            })
-            ->with(['score'])
-            ->get();
-
-        // Raggruppa per score_id e somma le quantità
-        $scoreTotals = [];
-        foreach ($elementHasPositionScores as $elementHasPositionScore) {
-            $scoreId = $elementHasPositionScore->score_id;
-            $amount = $elementHasPositionScore->amount;
-            
-            if (!isset($scoreTotals[$scoreId])) {
-                $scoreTotals[$scoreId] = 0;
-            }
-            $scoreTotals[$scoreId] += $amount;
-        }
-
-        // Aggiorna o crea i PlayerHasScore
-        foreach ($scoreTotals as $scoreId => $totalAmount) {
-            $playerHasScore = PlayerHasScore::query()
-                ->where('player_id', $playerId)
-                ->where('score_id', $scoreId)
-                ->first();
-
-            if ($playerHasScore) {
-                $playerHasScore->update(['value' => $totalAmount]);
-            } else {
-                PlayerHasScore::create([
-                    'player_id' => $playerId,
-                    'score_id' => $scoreId,
-                    'value' => $totalAmount,
-                ]);
-            }
-        }
-
-        // Recupera tutti gli score del player con i valori aggiornati
+        // Recupera tutti gli score del player direttamente da PlayerHasScore
         $allPlayerScores = PlayerHasScore::query()
             ->where('player_id', $playerId)
             ->with('score')
