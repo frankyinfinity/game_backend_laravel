@@ -12,6 +12,7 @@ use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Draw\Support\ScrollGroup;
 use App\Helper\Helper;
@@ -124,6 +125,13 @@ class GenerateMapJob implements ShouldQueue
             $objectDraw = new ObjectDraw($item, $player->actual_session_id);
             $drawItems[] = $objectDraw->get();
         }
+
+        // Start score websocket polling for real-time score updates
+        $scorePollScriptPath = resource_path('js/function/score/score_update_poll.blade.php');
+        $scorePollScript = file_get_contents($scorePollScriptPath);
+        $scorePollScript = Helper::setCommonJsCode($scorePollScript, Str::random(20));
+        $scorePollScript = str_replace('__PLAYER_ID__', (string) $player->id, $scorePollScript);
+        $drawItems[] = (new ObjectCode($scorePollScript, 500))->get();
 
         // Draw background image
         if ($birthRegion->imagename) {
