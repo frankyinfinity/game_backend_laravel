@@ -41,6 +41,7 @@ class DockerContainerService
             'cache-sync:latest',
             'chimical-element:latest',
             'score:latest',
+            'alert:latest',
         ]);
 
         $entities = Entity::query()
@@ -69,6 +70,7 @@ class DockerContainerService
         $this->createCacheSyncContainer($player, false);
         $this->createChimicalElementContainer($birthRegion, $player->id, false);
         $this->createScoreContainer($player, false);
+        $this->createAlertContainer($player, false);
     }
 
     public function startContainersForPlayer(Player $player): void
@@ -350,6 +352,38 @@ class DockerContainerService
             'container_id' => $containerId,
             'name' => $name,
             'parent_type' => Container::PARENT_TYPE_SCORE,
+            'parent_id' => $player->id,
+            'ws_port' => $wsPort,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
+        ]);
+    }
+
+    public function createAlertContainer(Player $player, bool $start = false): Container
+    {
+        $imageName = 'alert:latest';
+        $this->ensureImageExists($imageName);
+
+        $wsPort = $this->nextWsPort();
+        $name = 'alert_' . $player->id;
+        $env = [
+            'WS_PORT=' . $wsPort,
+        ];
+        $labels = $this->playerGroupingLabels($player->id, 'alert');
+
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            $wsPort,
+            $start,
+            $this->playerVolumeMount($player)
+        );
+
+        return Container::query()->create([
+            'container_id' => $containerId,
+            'name' => $name,
+            'parent_type' => Container::PARENT_TYPE_ALERT,
             'parent_id' => $player->id,
             'ws_port' => $wsPort,
             'image_id' => $this->getImageIdFromDockerName($imageName),
@@ -711,6 +745,10 @@ class DockerContainerService
                     $sq2->where('parent_type', Container::PARENT_TYPE_CACHE_SYNC)
                         ->where('parent_id', $player->id);
                 });
+                $q->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_ALERT)
+                        ->where('parent_id', $player->id);
+                });
                 if (!empty($elementHasPositionIds)) {
                     $q->orWhere(function ($sq2) use ($elementHasPositionIds) {
                         $sq2->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
@@ -983,6 +1021,10 @@ class DockerContainerService
                     $player = Player::find($parentId);
                     return $player ? $this->createScoreContainer($player, $start) : null;
 
+                case Container::PARENT_TYPE_ALERT:
+                    $player = Player::find($parentId);
+                    return $player ? $this->createAlertContainer($player, $start) : null;
+
                 default:
                     return null;
             }
@@ -998,92 +1040,100 @@ class DockerContainerService
         $elements = ElementHasPosition::where('player_id', $player->id)->get();
         $birthRegion = BirthRegion::find($player->birth_region_id);
 
+        // 1. Cancella tutti i container esistenti per questo player
+        $existingContainers = Container::query()
+            ->where(function ($q) use ($player, $birthRegion, $entities, $elements) {
+                // Player container
+                $q->orWhere(function ($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_PLAYER)
+                        ->where('parent_id', $player->id);
+                });
+                
+                // Map e ChimicalElement containers
+                if ($birthRegion) {
+                    $q->orWhere(function ($sq) use ($birthRegion) {
+                        $sq->where('parent_type', Container::PARENT_TYPE_MAP)
+                            ->where('parent_id', $birthRegion->id);
+                    });
+                    $q->orWhere(function ($sq) use ($birthRegion) {
+                        $sq->where('parent_type', Container::PARENT_TYPE_CHIMICAL_ELEMENT)
+                            ->where('parent_id', $birthRegion->id);
+                    });
+                }
+                
+                // Objective, Score, CacheSync, Alert containers
+                $q->orWhere(function ($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_OBJECTIVE)
+                        ->where('parent_id', $player->id);
+                });
+                $q->orWhere(function ($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_SCORE)
+                        ->where('parent_id', $player->id);
+                });
+                $q->orWhere(function ($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_CACHE_SYNC)
+                        ->where('parent_id', $player->id);
+                });
+                $q->orWhere(function ($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_ALERT)
+                        ->where('parent_id', $player->id);
+                });
+                
+                // Entity containers
+                if ($entities->isNotEmpty()) {
+                    $entityIds = $entities->pluck('id')->toArray();
+                    $q->orWhere(function ($sq) use ($entityIds) {
+                        $sq->where('parent_type', Container::PARENT_TYPE_ENTITY)
+                            ->whereIn('parent_id', $entityIds);
+                    });
+                }
+                
+                // ElementHasPosition containers
+                if ($elements->isNotEmpty()) {
+                    $elementIds = $elements->pluck('id')->toArray();
+                    $q->orWhere(function ($sq) use ($elementIds) {
+                        $sq->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+                            ->whereIn('parent_id', $elementIds);
+                    });
+                }
+            })
+            ->get();
+
+        // Ferma e cancella tutti i container
+        foreach ($existingContainers as $container) {
+            try {
+                $this->stopContainer($container);
+            } catch (\Throwable $e) {
+                \Log::warning("Errore stop container durante recreate all: " . $e->getMessage());
+            }
+            try {
+                $this->deleteContainer($container, true);
+            } catch (\Throwable $e) {
+                \Log::warning("Errore delete container durante recreate all: " . $e->getMessage());
+            }
+            $container->delete();
+        }
+
+        // 2. Ricrea tutti i container da zero
         $newContainers = [];
 
-        // Recreate or create Player container
-        $playerContainer = Container::where('parent_type', Container::PARENT_TYPE_PLAYER)
-            ->where('parent_id', $player->id)
-            ->first();
-        if ($playerContainer) {
-            $newContainers[] = $this->recreateContainer($playerContainer, $start);
-        } else {
-            $newContainers[] = $this->createPlayerContainer($player, $start);
-        }
-
-        // Recreate or create Map container
         if ($birthRegion) {
-            $mapContainer = Container::where('parent_type', Container::PARENT_TYPE_MAP)
-                ->where('parent_id', $birthRegion->id)
-                ->first();
-            if ($mapContainer) {
-                $newContainers[] = $this->recreateContainer($mapContainer, $start);
-            } else {
-                $newContainers[] = $this->createMapContainer($birthRegion, $player->id, $start);
-            }
-
-            // Recreate or create ChimicalElement container
-            $chimicalContainer = Container::where('parent_type', Container::PARENT_TYPE_CHIMICAL_ELEMENT)
-                ->where('parent_id', $birthRegion->id)
-                ->first();
-            if ($chimicalContainer) {
-                $newContainers[] = $this->recreateContainer($chimicalContainer, $start);
-            } else {
-                $newContainers[] = $this->createChimicalElementContainer($birthRegion, $player->id, $start);
-            }
-
-            // Recreate or create Score container
-            $scoreContainer = Container::where('parent_type', Container::PARENT_TYPE_SCORE)
-                ->where('parent_id', $player->id)
-                ->first();
-            if ($scoreContainer) {
-                $newContainers[] = $this->recreateContainer($scoreContainer, $start);
-            } else {
-                $newContainers[] = $this->createScoreContainer($player, $start);
-            }
+            $newContainers[] = $this->createMapContainer($birthRegion, $player->id, $start);
+            $newContainers[] = $this->createChimicalElementContainer($birthRegion, $player->id, $start);
+            $newContainers[] = $this->createScoreContainer($player, $start);
         }
 
-        // Recreate or create Objective container
-        $objectiveContainer = Container::where('parent_type', Container::PARENT_TYPE_OBJECTIVE)
-            ->where('parent_id', $player->id)
-            ->first();
-        if ($objectiveContainer) {
-            $newContainers[] = $this->recreateContainer($objectiveContainer, $start);
-        } else {
-            $newContainers[] = $this->createObjectiveContainer($player, $start);
-        }
+        $newContainers[] = $this->createPlayerContainer($player, $start);
+        $newContainers[] = $this->createObjectiveContainer($player, $start);
+        $newContainers[] = $this->createCacheSyncContainer($player, $start);
+        $newContainers[] = $this->createAlertContainer($player, $start);
 
-        // Recreate or create CacheSync container
-        $cacheSyncContainer = Container::where('parent_type', Container::PARENT_TYPE_CACHE_SYNC)
-            ->where('parent_id', $player->id)
-            ->first();
-        if ($cacheSyncContainer) {
-            $newContainers[] = $this->recreateContainer($cacheSyncContainer, $start);
-        } else {
-            $newContainers[] = $this->createCacheSyncContainer($player, $start);
-        }
-
-        // Recreate or create Entity containers
         foreach ($entities as $entity) {
-            $entityContainer = Container::where('parent_type', Container::PARENT_TYPE_ENTITY)
-                ->where('parent_id', $entity->id)
-                ->first();
-            if ($entityContainer) {
-                $newContainers[] = $this->recreateContainer($entityContainer, $start);
-            } else {
-                $newContainers[] = $this->createEntityContainer($entity, $player->id, $start);
-            }
+            $newContainers[] = $this->createEntityContainer($entity, $player->id, $start);
         }
 
-        // Recreate or create ElementHasPosition containers
         foreach ($elements as $element) {
-            $elementContainer = Container::where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
-                ->where('parent_id', $element->id)
-                ->first();
-            if ($elementContainer) {
-                $newContainers[] = $this->recreateContainer($elementContainer, $start);
-            } else {
-                $newContainers[] = $this->createElementHasPositionContainer($element, $start);
-            }
+            $newContainers[] = $this->createElementHasPositionContainer($element, $start);
         }
 
         return array_filter($newContainers);

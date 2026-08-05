@@ -74,6 +74,11 @@ class BuildDockerImage extends Command
                 'path' => base_path('docker/score'),
                 'folder' => 'score'
             ],
+            [
+                'name' => 'alert:latest',
+                'path' => base_path('docker/alert'),
+                'folder' => 'alert'
+            ],
         ];
 
         foreach ($images as $image) {

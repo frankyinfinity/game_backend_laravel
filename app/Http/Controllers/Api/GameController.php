@@ -591,6 +591,13 @@ class GameController extends Controller
         }
         ObjectCache::clear($sessionId);
 
+        // Stop player containers
+        $player = Player::find($playerId);
+        if ($player) {
+            StopPlayerContainersJob::dispatch($player);
+            Log::info("StopPlayerContainersJob dispatched for player {$playerId} from clear()");
+        }
+
         return response()->json(['success' => true, 'items' => $drawItems]);
     }
 

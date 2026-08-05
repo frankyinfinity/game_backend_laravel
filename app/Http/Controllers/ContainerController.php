@@ -369,6 +369,10 @@ class ContainerController extends Controller
                         $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_SCORE)
                             ->where('parent_id', $player->id);
                     })
+                    ->orWhere(function ($subQuery) use ($player) {
+                        $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_ALERT)
+                            ->where('parent_id', $player->id);
+                    })
                     ->orWhere(function ($subQuery) use ($entityIds) {
                         $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_ENTITY)
                             ->whereIn('parent_id', $entityIds);
@@ -387,6 +391,8 @@ class ContainerController extends Controller
             DockerContainer::PARENT_TYPE_MAP => 'Map #' . ($player->birth_region_id ?? '-'),
             DockerContainer::PARENT_TYPE_CACHE_SYNC => 'CacheSync #' . $player->id,
             DockerContainer::PARENT_TYPE_CHIMICAL_ELEMENT => 'ChimicalElement #' . ($player->birth_region_id ?? '-'),
+            DockerContainer::PARENT_TYPE_SCORE => 'Score #' . $player->id,
+            DockerContainer::PARENT_TYPE_ALERT => 'Alert #' . $player->id,
             DockerContainer::PARENT_TYPE_ENTITY => 'Entity #' . $container->parent_id,
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element #' . $container->parent_id,
             default => (string) $container->parent_type,
