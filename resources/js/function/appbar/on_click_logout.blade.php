@@ -3,6 +3,12 @@
 
         // Logout button click handler
         // NOTE: do not call /api/game/close on logout, to avoid deleting ElementHasPosition.
+
+        // Stop score websocket polling
+        if (typeof window.stopScorePolling === 'function') {
+            window.stopScorePolling();
+        }
+
         status('Pulizia schermo in corso...');
         
         $.ajax({

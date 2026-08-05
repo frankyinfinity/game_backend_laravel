@@ -105,6 +105,22 @@
             }, 1000);
         };
 
+        // Stop the score polling and close the websocket
+        const stopScorePolling = () => {
+            if (scorePollTimer) {
+                clearInterval(scorePollTimer);
+                scorePollTimer = null;
+            }
+            if (scoreWs) {
+                try { scoreWs.close(); } catch (e) { }
+                scoreWs = null;
+            }
+            console.log('[Score] Polling stopped');
+        };
+
+        // Expose stop function globally so logout can call it
+        window.stopScorePolling = stopScorePolling;
+
         // Fetch websocket info and connect to score container
         const initScorePolling = () => {
             if (typeof $ === 'undefined' || typeof BACK_URL === 'undefined') {
