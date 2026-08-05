@@ -13,9 +13,11 @@ use App\Models\Entity;
 use App\Models\EntityChimicalElement;
 use App\Models\Neuron;
 use App\Models\Player;
+use App\Models\Alert;
 use App\Models\PlayerModifier;
 use App\Models\Region;
 use App\Models\RuleChimicalElement;
+use App\Observers\AlertObserver;
 use App\Observers\BrainScheduleObserver;
 use App\Observers\DrawRequestObserver;
 use App\Observers\ElementHasPositionChimicalElementObserver;
@@ -61,5 +63,6 @@ class AppServiceProvider extends ServiceProvider
         ElementHasPositionChimicalElement::observe(ElementHasPositionChimicalElementObserver::class);
         ElementModifier::observe(ElementModifierObserver::class);
         Neuron::observe(NeuronObserver::class);
+        Alert::observe(AlertObserver::class);
     }
 }
