@@ -75,7 +75,6 @@ use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
 use App\Jobs\StopPlayerContainersJob;
-use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Draw\Complex\EntityDraw;
 use App\Services\BrainScheduleService;
 use App\Services\ObjectiveService;
@@ -2005,12 +2004,11 @@ class GameController extends Controller
 
                     Log::info("Awarded {$amount} {$score->name} to player {$player->id} for killing element at position");
 
-                    // Update ScoreDraw in UI
-                    $scoreDrawUid = 'player_' . $player->id . '_score_' . $score->id;
-                    $scoreDraw = new ScoreDraw($scoreDrawUid);
-                    $scoreDrawUpdate = $scoreDraw->updateValue($newValue, $player->actual_session_id);
-                    foreach ($scoreDrawUpdate as $data)
-                        $drawCommands[] = $data;
+                    // Update score text in UI
+                    $scoreTextUid = 'player_' . $player->id . '_score_' . $score->id . '_text';
+                    $objectUpdate = new ObjectUpdate($scoreTextUid, $player->actual_session_id);
+                    $objectUpdate->setAttribute('text', (string) $newValue);
+                    $drawCommands = array_merge($drawCommands, $objectUpdate->get());
 
                 }
             }

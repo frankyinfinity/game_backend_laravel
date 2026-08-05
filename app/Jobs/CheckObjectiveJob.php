@@ -4,8 +4,8 @@ namespace App\Jobs;
 
 use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
-use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Manipulation\ObjectCache;
+use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Models\AgePlayer;
@@ -625,11 +625,9 @@ class CheckObjectiveJob implements ShouldQueue
         foreach ($updatedScores as $scoreId => $newValue) {
             $scoreDrawUid = 'player_' . $playerId . '_score_' . (int) $scoreId;
             try {
-                $scoreDraw = new ScoreDraw($scoreDrawUid);
-                $updates = $scoreDraw->updateValue((string) $newValue, $sessionId);
-                foreach ($updates as $update) {
-                    $commands[] = $update;
-                }
+                $objectUpdate = new ObjectUpdate($scoreDrawUid . '_text', $sessionId);
+                $objectUpdate->setAttribute('text', (string) $newValue);
+                $commands = array_merge($commands, $objectUpdate->get());
             } catch (\Throwable $e) {
                 Log::warning('ScoreDraw update skipped after objective refresh', [
                     'player_id' => $playerId,

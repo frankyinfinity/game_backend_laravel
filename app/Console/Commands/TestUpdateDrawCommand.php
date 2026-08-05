@@ -2,10 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Draw\Complex\ScoreDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectUpdate;
-use App\Custom\Manipulation\ObjectClear;
 use App\Models\DrawRequest;
 use App\Models\Player;
 use App\Models\Score;
@@ -58,34 +56,11 @@ class TestUpdateDrawCommand extends Command
             return;
         }
 
-        // Update the score value using the score ID
-        $scoreDraw = new ScoreDraw('score_' . $scoreId);
-        
-        // Use the updateValue method - it will load all properties from cache
-        $operations = $scoreDraw->updateValue($newValue, $sessionId);
-
-        foreach ($operations as $operation) {
-            $type = $operation['type'];
-            
-            if ($type === 'update') {
-                $objectUpdate = new ObjectUpdate($operation['uid'], $sessionId);
-                foreach ($operation['attributes'] as $key => $value) {
-                    $objectUpdate->setAttributes($key, $value);
-                }
-                $drawItems = array_merge($drawItems, $objectUpdate->get());
-            } elseif ($type === 'clear') {
-                $objectClear = new ObjectClear($operation['uid'], $sessionId);
-                $drawItems[] = $objectClear->get();
-            } elseif ($type === 'draw') {
-                $drawItems[] = $operation['object'];
-            } elseif ($type === 'code') {
-                $drawItems[] = [
-                    'type' => 'code',
-                    'code' => $operation['code'] ?? '',
-                    'sleep' => $operation['sleep'] ?? 0,
-                ];
-            }
-        }
+        // Update the score value directly using ObjectUpdate
+        $scoreTextUid = 'score_' . $scoreId . '_text';
+        $objectUpdate = new ObjectUpdate($scoreTextUid, $sessionId);
+        $objectUpdate->setAttribute('text', (string) $newValue);
+        $drawItems = array_merge($drawItems, $objectUpdate->get());
 
         // Flush to cache
         ObjectCache::flush($sessionId);
