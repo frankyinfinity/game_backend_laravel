@@ -25,6 +25,8 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 //Test
 Route::get('/test', [App\Http\Controllers\TestController::class, 'index'])->name('test');
 Route::post('/test/action', [App\Http\Controllers\TestController::class, 'action'])->name('test.action');
+Route::get('/test/console', [App\Http\Controllers\TestController::class, 'console'])->name('test.console');
+Route::post('/test/console/exec', [App\Http\Controllers\TestController::class, 'consoleExec'])->name('test.console.exec');
 
 Route::group(['middleware' => ['auth']], function () {
 

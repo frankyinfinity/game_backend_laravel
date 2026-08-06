@@ -306,8 +306,19 @@ return [
         ],
         [
             'text' => 'Test',
-            'url'  => '/test',
             'icon' => 'fas fa-flask',
+            'submenu' => [
+                [
+                    'text' => 'Test Page',
+                    'url'  => '/test',
+                    'icon' => 'fas fa-vial',
+                ],
+                [
+                    'text' => 'Console',
+                    'url'  => '/test/console',
+                    'icon' => 'fas fa-terminal',
+                ],
+            ]
         ],
         [
             'header' => 'GESTIONE DATI',
