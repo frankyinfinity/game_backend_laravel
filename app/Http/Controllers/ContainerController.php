@@ -260,6 +260,7 @@ class ContainerController extends Controller
     private function buildContainerPayloads(Player $player, ?DockerContainerService $containerService = null)
     {
         $containers = $this->playerContainersQuery($player)
+            ->with('image')
             ->orderBy('id')
             ->get();
 
@@ -300,6 +301,7 @@ class ContainerController extends Controller
                     'status_label' => $this->statusLabel($status),
                     'status_color' => $this->statusColor($status),
                     'stats' => $containerStats,
+                    'image_version' => $container->image?->version,
                 ];
             })->values();
     }

@@ -500,6 +500,7 @@
                         <div class="col-6" style="padding: 0 3px;">
                             <div class="container-pill mb-1 w-100" style="border-radius: 4px;">T: <strong id="selected-container-type">-</strong></div>
                             <div class="container-pill mb-1 w-100" style="border-radius: 4px;">ID: <strong id="selected-container-id">-</strong></div>
+                            <div class="container-pill mb-1 w-100" style="border-radius: 4px;">Img: <strong id="selected-container-image-version">-</strong></div>
                         </div>
                         <div class="col-6" style="padding: 0 3px;">
                             <div class="container-pill mb-1 w-100" style="border-radius: 4px;">S: <strong id="selected-container-scope">-</strong></div>
@@ -952,7 +953,8 @@
                     container.scope,
                     container.parent_type,
                     container.status,
-                    container.status_label
+                    container.status_label,
+                    container.image_version
                 ].some(function (value) {
                     return normalizeValue(value).includes(filters.query);
                 });
@@ -1061,6 +1063,7 @@
                 scope: document.getElementById('selected-container-scope'),
                 id: document.getElementById('selected-container-id'),
                 port: document.getElementById('selected-container-port'),
+                imageVersion: document.getElementById('selected-container-image-version'),
                 status: document.getElementById('selected-container-status'),
                 statusChip: document.getElementById('selected-container-status-chip'),
                 statusDot: document.getElementById('selected-container-status-dot'),
@@ -1076,6 +1079,7 @@
                 fields.scope.textContent = '-';
                 fields.id.textContent = '-';
                 fields.port.textContent = '-';
+                fields.imageVersion.textContent = '-';
                 fields.status.textContent = '-';
                 fields.statusChip.className = 'status-chip is-unknown mb-2';
                 fields.statusDot.style.background = '#64748b';
@@ -1092,6 +1096,7 @@
             fields.scope.textContent = container.scope || '-';
             fields.id.textContent = shortId(container.container_id);
             fields.port.textContent = container.ws_port || '-';
+            fields.imageVersion.textContent = container.image_version || '-';
             fields.status.textContent = container.status_label || 'Unknown';
             fields.statusChip.className = 'status-chip is-' + String(container.status || 'unknown').toLowerCase() + ' mb-2';
             fields.statusDot.style.background = container.status_color || '#64748b';
@@ -1284,10 +1289,14 @@
             statusText.y = 14;
             card.addChild(statusText);
 
+            const metaLines = [
+                'WS: ' + (container.ws_port || '-'),
+            ];
+            if (container.image_version) {
+                metaLines.push('Img: ' + container.image_version);
+            }
             const meta = new PIXI.Text(
-                [
-                    'WS: ' + (container.ws_port || '-'),
-                ].join('\n'),
+                metaLines.join('\n'),
                 {
                     fontFamily: 'Arial',
                     fontSize: compact ? 10 : 11,

@@ -87,11 +87,14 @@ class BuildDockerImage extends Command
             $buildPath = $image['path'];
             $folder = $image['folder'];
 
-            // Read version from VERSION file
+            // Read version from package.json
             $newVersion = null;
-            $versionFile = base_path('docker/' . $folder . '/VERSION');
-            if (file_exists($versionFile)) {
-                $newVersion = trim(file_get_contents($versionFile));
+            $packageJsonFile = base_path('docker/' . $folder . '/package.json');
+            if (file_exists($packageJsonFile)) {
+                $packageJson = json_decode(file_get_contents($packageJsonFile), true);
+                if (isset($packageJson['version'])) {
+                    $newVersion = $packageJson['version'];
+                }
             }
 
             // Check if version exists in database
@@ -101,6 +104,7 @@ class BuildDockerImage extends Command
 
             $existingImage = Image::where('docker_image_name', $dockerImageName)
                 ->where('docker_tag', $tag)
+                ->where('is_active', true)
                 ->first();
 
             // Skip build if version hasn't changed
@@ -195,25 +199,23 @@ class BuildDockerImage extends Command
         $imageName = $parts[0];
         $tag = $parts[1] ?? 'latest';
 
-        // Deactivate all other versions of this docker image
+        // Deactivate the current active image for this docker image name and tag
+        // so that existing containers keep pointing to the old Image record
         Image::where('docker_image_name', $imageName)
             ->where('docker_tag', $tag)
+            ->where('is_active', true)
             ->update(['is_active' => false]);
 
-        // Create or update Image record and set as active
-        Image::updateOrCreate(
-            [
-                'docker_image_name' => $imageName,
-                'docker_tag' => $tag,
-            ],
-            [
-                'name' => ucfirst(str_replace('-', ' ', $imageName)),
-                'version' => $version,
-                'description' => "Docker image for $imageName",
-                'build_input_path' => $buildInputPath,
-                'is_active' => true,
-            ]
-        );
+        // Create a NEW Image record with the new version and set as active
+        Image::create([
+            'name' => ucfirst(str_replace('-', ' ', $imageName)),
+            'docker_image_name' => $imageName,
+            'docker_tag' => $tag,
+            'version' => $version,
+            'description' => "Docker image for $imageName",
+            'build_input_path' => $buildInputPath,
+            'is_active' => true,
+        ]);
 
         $this->info("📝 Immagine '$dockerImageName' salvata nel database (version: {$version}, active: ✅).");
     }

@@ -485,6 +485,7 @@ class DockerContainerService
 
         $image = Image::where('docker_image_name', $imageName)
             ->where('docker_tag', $tag)
+            ->where('is_active', true)
             ->first();
 
         return $image ? $image->id : null;
