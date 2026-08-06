@@ -1,9 +1,10 @@
 {
   "name": "alert-service",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Alert Docker service with websocket for sending alerts",
   "main": "index.js",
   "dependencies": {
+    "pusher": "^5.2.0",
     "ws": "^8.16.0"
   }
 }

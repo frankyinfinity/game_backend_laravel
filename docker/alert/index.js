@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const Pusher = require('pusher');
 
 const wsPort = Number(process.env.WS_PORT || 0);
 
@@ -7,7 +8,20 @@ console.log(`WS_PORT: ${wsPort || 'MISSING'}`);
 
 let wss = null;
 
-function buildAlertDrawItems(title, body, alertType) {
+// Initialize Pusher client targeting Reverb
+const pusher = new Pusher({
+  appId: process.env.REVERB_APP_ID || 'game',
+  key: process.env.REVERB_APP_KEY || 'game-key',
+  secret: process.env.REVERB_APP_SECRET || 'game-secret',
+  host: process.env.REVERB_HOST || 'localhost',
+  port: process.env.REVERB_PORT || '8081',
+  scheme: process.env.REVERB_SCHEME || 'http',
+  useTLS: (process.env.REVERB_SCHEME || 'http') === 'https',
+});
+
+console.log(`[Alert] Pusher initialized: ${process.env.REVERB_SCHEME || 'http'}://${process.env.REVERB_HOST || 'localhost'}:${process.env.REVERB_PORT || '8081'}`);
+
+function buildAlertDrawItems(title, body, alertType, playerId) {
   const typeMap = {
     'info': { border: '0x3B82F6', fill: '0xDBEAFE', text: '0x1E40AF' },
     'warning': { border: '0xF59E0B', fill: '0xFEF3C7', text: '0x92400E' },
@@ -40,7 +54,7 @@ function buildAlertDrawItems(title, body, alertType) {
   return {
     type: 'draw_interface',
     request_id: alertId,
-    player_id: 0,
+    player_id: playerId || 0,
     items: [
       {
         type: 'draw',
@@ -123,8 +137,22 @@ function startWebSocketServer() {
           switch (command) {
             case 'alert':
               const alertType = data.alert_type || data.type || 'info';
-              const drawPayload = buildAlertDrawItems(data.title, data.body, alertType);
-              console.log(`[Alert] Broadcasting draw_interface:`, drawPayload);
+              const playerId = data.player_id || 0;
+              const drawPayload = buildAlertDrawItems(data.title, data.body, alertType, playerId);
+              console.log(`[Alert] Sending draw_interface for player_id=${playerId}:`, JSON.stringify(drawPayload));
+
+              // Send to frontend via Pusher (player-specific channel)
+              const channelName = 'player_' + playerId + '_channel';
+              console.log(`[Alert] Triggering Pusher event on channel: ${channelName}`);
+              pusher.trigger(channelName, 'draw_interface', drawPayload)
+                .then(() => {
+                  console.log(`[Alert] Pusher event sent successfully to ${channelName}`);
+                })
+                .catch((err) => {
+                  console.error(`[Alert] Pusher trigger error:`, err.message);
+                });
+
+              // Also broadcast via raw WebSocket for backward compatibility
               wss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
                   client.send(JSON.stringify(drawPayload));

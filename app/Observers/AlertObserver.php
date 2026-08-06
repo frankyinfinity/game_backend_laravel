@@ -157,6 +157,7 @@ class AlertObserver
 
             $payload = [
                 'command' => 'alert',
+                'player_id' => $playerId,
                 'title' => (string) $alert->title,
                 'body' => (string) $alert->body,
                 'alert_type' => $alertType,
