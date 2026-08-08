@@ -152,12 +152,6 @@ function startWebSocketServer() {
                   console.error(`[Alert] Pusher trigger error:`, err.message);
                 });
 
-              // Also broadcast via raw WebSocket for backward compatibility
-              wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                  client.send(JSON.stringify(drawPayload));
-                }
-              });
               ws.send(JSON.stringify({ success: true, message: 'Alert sent' }));
               break;
             default:
