@@ -370,7 +370,7 @@ class DockerContainerService
             'REVERB_APP_ID=' . (env('REVERB_APP_ID') ?: 'game'),
             'REVERB_APP_KEY=' . (env('REVERB_APP_KEY') ?: 'game-key'),
             'REVERB_APP_SECRET=' . (env('REVERB_APP_SECRET') ?: 'game-secret'),
-            'REVERB_HOST=' . (env('REVERB_HOST') ?: 'localhost'),
+            'REVERB_HOST=' . (config('remote_docker.docker_host_ip') ?: env('REVERB_HOST') ?: 'localhost'),
             'REVERB_PORT=' . (env('REVERB_PORT') ?: '8081'),
             'REVERB_SCHEME=' . (env('REVERB_SCHEME') ?: 'http'),
         ];
