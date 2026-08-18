@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const Pusher = require('pusher');
+const fs = require('fs');
 
 const wsPort = Number(process.env.WS_PORT || 0);
 
@@ -8,18 +9,42 @@ console.log(`WS_PORT: ${wsPort || 'MISSING'}`);
 
 let wss = null;
 
+// Detect if running inside Docker; if so, 'localhost' cannot reach the host.
+function isRunningInDocker() {
+  try {
+    return fs.existsSync('/.dockerenv') || fs.readFileSync('/proc/1/cgroup', 'utf8').includes('docker');
+  } catch (_) {
+    return false;
+  }
+}
+
+function resolveReverbHost(rawHost) {
+  // When inside Docker, "localhost"/"127.0.0.1" means the container, not the host.
+  // Override to host.docker.internal (Windows/Mac) or fallback env var.
+  if (isRunningInDocker() && (rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost === '0.0.0.0')) {
+    const resolved = process.env.DOCKER_HOST_IP || 'host.docker.internal';
+    console.log(`[Alert] Docker detected: remapping REVERB_HOST "${rawHost}" → "${resolved}"`);
+    return resolved;
+  }
+  return rawHost;
+}
+
+const reverbHost = resolveReverbHost(process.env.REVERB_HOST || 'localhost');
+const reverbPort = process.env.REVERB_PORT || '8081';
+const reverbScheme = process.env.REVERB_SCHEME || 'http';
+
 // Initialize Pusher client targeting Reverb
 const pusher = new Pusher({
   appId: process.env.REVERB_APP_ID || 'game',
   key: process.env.REVERB_APP_KEY || 'game-key',
   secret: process.env.REVERB_APP_SECRET || 'game-secret',
-  host: process.env.REVERB_HOST || 'localhost',
-  port: process.env.REVERB_PORT || '8081',
-  scheme: process.env.REVERB_SCHEME || 'http',
-  useTLS: (process.env.REVERB_SCHEME || 'http') === 'https',
+  host: reverbHost,
+  port: reverbPort,
+  scheme: reverbScheme,
+  useTLS: reverbScheme === 'https',
 });
 
-console.log(`[Alert] Pusher initialized: ${process.env.REVERB_SCHEME || 'http'}://${process.env.REVERB_HOST || 'localhost'}:${process.env.REVERB_PORT || '8081'}`);
+console.log(`[Alert] Pusher initialized: ${reverbScheme}://${reverbHost}:${reverbPort}`);
 
 function buildAlertDrawItems(title, body, alertType, playerId) {
   const typeMap = {
@@ -149,7 +174,22 @@ function startWebSocketServer() {
                   console.log(`[Alert] Pusher event sent successfully to ${channelName}`);
                 })
                 .catch((err) => {
-                  console.error(`[Alert] Pusher trigger error:`, err.message);
+                  console.error(`[Alert] ⛔ Pusher trigger FAILED`);
+                  console.error(`[Alert]   Channel : ${channelName}`);
+                  console.error(`[Alert]   Event   : draw_interface`);
+                  console.error(`[Alert]   Target  : ${reverbScheme}://${reverbHost}:${reverbPort}`);
+                  console.error(`[Alert]   Message : ${err.message || '(no message)'}`);
+                  if (err.stack) {
+                    console.error(`[Alert]   Stack   : ${err.stack}`);
+                  }
+                  if (err.status || err.statusCode) {
+                    console.error(`[Alert]   HTTP Status: ${err.status || err.statusCode}`);
+                  }
+                  if (err.body) {
+                    console.error(`[Alert]   Response body:`, typeof err.body === 'string' ? err.body : JSON.stringify(err.body));
+                  }
+                  // Log the full error for deeper inspection
+                  console.error(`[Alert]   Raw error:`, err);
                 });
 
               ws.send(JSON.stringify({ success: true, message: 'Alert sent' }));
