@@ -365,14 +365,20 @@ class DockerContainerService
 
         $wsPort = $this->nextWsPort();
         $name = 'alert_' . $player->id;
+        $reverbHost = env('REVERB_HOST') ?: 'localhost';
+        if ($reverbHost === 'localhost' || $reverbHost === '127.0.0.1') {
+            // Con --network host e tunnel SSH, 127.0.0.1 del container è l'host remoto
+            $reverbHost = '127.0.0.1';
+        }
         $env = [
             'WS_PORT=' . $wsPort,
             'REVERB_APP_ID=' . (env('REVERB_APP_ID') ?: 'game'),
             'REVERB_APP_KEY=' . (env('REVERB_APP_KEY') ?: 'game-key'),
             'REVERB_APP_SECRET=' . (env('REVERB_APP_SECRET') ?: 'game-secret'),
-            'REVERB_HOST=' . (config('remote_docker.docker_host_ip') ?: env('REVERB_HOST') ?: 'localhost'),
+            'REVERB_HOST=' . $reverbHost,
             'REVERB_PORT=' . (env('REVERB_PORT') ?: '8081'),
             'REVERB_SCHEME=' . (env('REVERB_SCHEME') ?: 'http'),
+            'DOCKER_HOST_IP=' . (config('remote_docker.docker_host_ip') ?: ''),
         ];
         $labels = $this->playerGroupingLabels($player->id, 'alert');
 

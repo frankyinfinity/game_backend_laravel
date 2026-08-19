@@ -19,9 +19,9 @@ function isRunningInDocker() {
 }
 
 function resolveReverbHost(rawHost) {
-  // When inside Docker, "localhost"/"127.0.0.1" means the container, not the host.
-  // Override to host.docker.internal (Windows/Mac) or fallback env var.
-  if (isRunningInDocker() && (rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost === '0.0.0.0')) {
+  // When inside Docker without host networking, "localhost" means the container, not the host.
+  // However, 127.0.0.1 is an explicit loopback IP — respect it (used with --network host).
+  if (isRunningInDocker() && (rawHost === 'localhost' || rawHost === '0.0.0.0')) {
     const resolved = process.env.DOCKER_HOST_IP || 'host.docker.internal';
     console.log(`[Alert] Docker detected: remapping REVERB_HOST "${rawHost}" → "${resolved}"`);
     return resolved;
@@ -131,13 +131,11 @@ function buildAlertDrawItems(title, body, alertType, playerId) {
       {
         type: 'update',
         uid: titleUid,
-        sleep: 5000,
         attributes: { renderable: false },
       },
       {
         type: 'update',
         uid: bodyUid,
-        sleep: 5000,
         attributes: { renderable: false },
       },
     ],
