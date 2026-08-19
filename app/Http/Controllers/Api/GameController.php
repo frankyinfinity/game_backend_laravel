@@ -3414,4 +3414,33 @@ class GameController extends Controller
             ],
         ]);
     }
+    
+    public function createAlert(Request $request): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer', 'exists:players,id'],
+            'title' => ['required', 'string'],
+            'body' => ['required', 'string'],
+            'type' => ['nullable', 'string', 'in:info,warning,error,success'],
+        ]);
+
+        $typeMap = [
+            'info' => \App\Models\Alert::TYPE_INFO,
+            'warning' => \App\Models\Alert::TYPE_WARNING,
+            'error' => \App\Models\Alert::TYPE_ERROR,
+            'success' => \App\Models\Alert::TYPE_SUCCESS,
+        ];
+
+        $typeValue = $typeMap[$validated['type'] ?? 'info'] ?? \App\Models\Alert::TYPE_INFO;
+
+        \App\Models\Alert::create([
+            'player_id' => (int) $validated['player_id'],
+            'title' => $validated['title'],
+            'body' => $validated['body'],
+            'type' => $typeValue,
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Alert created']);
+    }
 }

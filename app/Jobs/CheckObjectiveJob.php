@@ -7,6 +7,7 @@ use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectUpdate;
 use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Models\AgePlayer;
 use App\Models\DrawRequest;
@@ -495,6 +496,38 @@ class CheckObjectiveJob implements ShouldQueue
                     $objectiveDrawCommands,
                     $this->buildScoreDrawUpdateCommands($playerId, $updatedScores, $sessionId)
                 );
+            }
+
+            // Aggiungi ObjectCode come ultimo comando: chiama API per creare Alert
+            if (!empty($completedTargetIds)) {
+                $completedTargetsData = [];
+                foreach ($completedTargetIds as $completedTargetId) {
+                    $tp = TargetPlayer::find($completedTargetId);
+                    if ($tp) {
+                        $completedTargetsData[] = [
+                            'title' => $tp->title ?: ('Obiettivo #' . $completedTargetId),
+                        ];
+                    }
+                }
+                if (!empty($completedTargetsData)) {
+                    $targetsJson = json_encode($completedTargetsData);
+                    $playerIdJs = (int) $playerId;
+
+                    $jsPath = resource_path('js/function/objective/create_alert.blade.php');
+                    $alertCode = '';
+                    if (is_file($jsPath)) {
+                        $alertCode = file_get_contents($jsPath);
+                        if ($alertCode !== false) {
+                            $alertCode = str_replace('__PLAYER_ID__', (string) $playerIdJs, $alertCode);
+                            $alertCode = str_replace('__TARGETS_JSON__', $targetsJson, $alertCode);
+                            $alertCode = \App\Helper\Helper::setCommonJsCode($alertCode, 'createAlert_' . \Illuminate\Support\Str::random(20));
+                        }
+                    }
+
+                    if ($alertCode !== '') {
+                        $objectiveDrawCommands[] = (new ObjectCode($alertCode, 500))->get();
+                    }
+                }
             }
 
             ObjectCache::flush($sessionId);
