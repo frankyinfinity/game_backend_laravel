@@ -124,10 +124,9 @@ class ScoreDraw {
         $rect->setBorderRadius($borderRadius);
         $rect->setRenderable($this->renderable);
 
-        // Tooltip: "nome: value"
+        // Tooltip: just the score name
         if ($this->scoreName !== null) {
-            $tooltipText = $this->scoreName . ': ' . $scoreValue;
-            $rect->addAttributes('tooltip_text', $tooltipText);
+            $rect->addAttributes('tooltip_text', $this->scoreName);
         }
 
         $this->drawItems[] = $rect;

@@ -58,24 +58,13 @@
         // Update score text objects in the UI
         const updateScoreText = (scoreId, newValue) => {
             const textUid = 'player_' + playerId + '_score_' + scoreId + '_text';
-            const rectUid = 'player_' + playerId + '_score_' + scoreId + '_rect';
             const valueStr = String(newValue);
-            
+
             // Update visible text
             if (objects[textUid]) {
                 objects[textUid].text = valueStr;
                 if (shapes[textUid]) {
                     shapes[textUid].text = valueStr;
-                }
-            }
-
-            // Update tooltip on the rect (formato "nome: value")
-            if (objects[rectUid] && objects[rectUid].attributes && objects[rectUid].attributes.tooltip_text) {
-                const oldTooltip = objects[rectUid].attributes.tooltip_text;
-                const colonIndex = oldTooltip.lastIndexOf(': ');
-                if (colonIndex !== -1) {
-                    const name = oldTooltip.substring(0, colonIndex);
-                    objects[rectUid].attributes.tooltip_text = name + ': ' + valueStr;
                 }
             }
         };
