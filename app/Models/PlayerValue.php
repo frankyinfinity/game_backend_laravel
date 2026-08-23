@@ -17,6 +17,7 @@ class PlayerValue extends Model
     public const KEY_ATTACK = 'attack';
     public const KEY_DIVISION = 'division';
     public const KEY_DIVISION_COST = 'division_cost';
+    public const KEY_EVOLUTION = 'evolution';
     public const KEY_LIFEPOINT_GENERATE_NEW_ENTITY = 'lifepoint_generate_new_entity';
     public const KEY_CHIMICAL_ELEMENT = 'chimical_element';
     public const KEY_CHIMICAL_ELEMENT_CONSUME = 'chimical_element_consume';
@@ -27,6 +28,7 @@ class PlayerValue extends Model
         self::KEY_CONSUME,
         self::KEY_ATTACK,
         self::KEY_DIVISION,
+        self::KEY_EVOLUTION,
         self::KEY_CHIMICAL_ELEMENT,
         self::KEY_CHIMICAL_ELEMENT_CONSUME,
     ];

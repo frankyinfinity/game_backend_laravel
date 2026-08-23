@@ -143,6 +143,9 @@ class HomeAppbarDraw extends AppbarDraw
                 $scoreValue = $playerScore->value ?? 0;
                 $scoreDraw->setScoreValue((string) $scoreValue);
                 
+                // Score name for tooltip
+                $scoreDraw->setScoreName($score->name ?? 'Score ' . $score->id);
+                
                 // White text
                 $scoreDraw->setTextColor('#FFFFFF');
                 $scoreDraw->setTextFontSize(16);

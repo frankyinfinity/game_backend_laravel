@@ -760,7 +760,9 @@
         }
 
         async function openAddScoreModal(colId, targetId) {
-            const res = await fetch(CONFIG.routes.scoresIndex);
+            const res = await fetch(CONFIG.routes.scoresIndex, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            });
             const json = await res.json();
             const select = $('#scoreSelect').empty();
             json.forEach(s => select.append(`<option value="${s.id}">${s.name}</option>`));

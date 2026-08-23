@@ -87,12 +87,39 @@
             return false;
         };
 
+        const resolveEvolutionEnabled = () => {
+            const wsResponse = (typeof AppData !== 'undefined') ? AppData.player_values_ws_response : null;
+            if (!wsResponse || typeof wsResponse !== 'object') return false;
+
+            const valuesFromDocker = wsResponse.data && wsResponse.data.values;
+            if (valuesFromDocker && typeof valuesFromDocker === 'object') {
+                return !!valuesFromDocker.evolution;
+            }
+
+            const directValues = wsResponse.values;
+            if (directValues && typeof directValues === 'object') {
+                return !!directValues.evolution;
+            }
+
+            return false;
+        };
+
         const applyDivisionButtonVisibility = () => {
             const divisionEnabled = resolveDivisionEnabled();
             const divisionButtonUids = [object_uid + '_button_division_rect', object_uid + '_button_division_text'];
             divisionButtonUids.forEach((uid) => {
                 if (shapes[uid]) {
                     shapes[uid].renderable = !!(show && divisionEnabled);
+                }
+            });
+        };
+
+        const applyEvolutionButtonVisibility = () => {
+            const evolutionEnabled = resolveEvolutionEnabled();
+            const evolutionButtonUids = [object_uid + '_button_evolution_rect', object_uid + '_button_evolution_text'];
+            evolutionButtonUids.forEach((uid) => {
+                if (shapes[uid]) {
+                    shapes[uid].renderable = !!(show && evolutionEnabled);
                 }
             });
         };
@@ -113,6 +140,7 @@
             }
         }
         applyDivisionButtonVisibility();
+        applyEvolutionButtonVisibility();
 
         // Quando apri il pannello entity, richiede player values al docker player via WS.
         if (show && playerPort) {
@@ -138,6 +166,7 @@
                         window.playerValuesWsResponse = response;
                         console.log('Player WS Response:', response);
                         applyDivisionButtonVisibility();
+                        applyEvolutionButtonVisibility();
                     } catch (e) {
                         console.error('Player WS Parse Error:', e);
                     }

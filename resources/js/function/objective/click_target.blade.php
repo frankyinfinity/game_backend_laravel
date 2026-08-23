@@ -24,12 +24,26 @@
                     }
                 }
             }
+            // Clear stored panel state
+            if (window.__openTargetPanels && window.__openTargetPanels[key]) {
+                delete window.__openTargetPanels[key];
+            }
         }
 
         // Toggle Target Panel
         let show = !isVisible;
         const panelZIndex = 50000;
         const panelChildZIndex = 50001;
+
+        // Store panel state for persistence across syncObjectCache
+        if (!window.__openTargetPanels) {
+            window.__openTargetPanels = {};
+        }
+        if (show) {
+            window.__openTargetPanels[panel_uid] = true;
+        } else {
+            delete window.__openTargetPanels[panel_uid];
+        }
 
         shapes[panel_uid].renderable = show;
         shapes[panel_uid].zIndex = panelZIndex;

@@ -31,6 +31,7 @@ class ScoreDraw {
     private $y;
     private $scoreValue;
     private $scoreImage;
+    private $scoreName;
     private $backgroundColor;
     private $borderColor;
     private $textColor;
@@ -58,6 +59,11 @@ class ScoreDraw {
     public function setScoreImage($imageSrc): void
     {
         $this->scoreImage = $imageSrc;
+    }
+
+    public function setScoreName($name): void
+    {
+        $this->scoreName = $name;
     }
 
     public function setBackgroundColor($color): void
@@ -117,6 +123,12 @@ class ScoreDraw {
         $rect->setBorderColor($borderColor);
         $rect->setBorderRadius($borderRadius);
         $rect->setRenderable($this->renderable);
+
+        // Tooltip: "nome: value"
+        if ($this->scoreName !== null) {
+            $tooltipText = $this->scoreName . ': ' . $scoreValue;
+            $rect->addAttributes('tooltip_text', $tooltipText);
+        }
 
         $this->drawItems[] = $rect;
 

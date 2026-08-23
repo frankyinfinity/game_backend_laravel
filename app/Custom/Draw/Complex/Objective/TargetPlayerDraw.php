@@ -5,10 +5,8 @@ namespace App\Custom\Draw\Complex\Objective;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Text;
-use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\Circle;
 use App\Custom\Draw\Primitive\MultiLine;
-use App\Custom\Draw\Complex\ScoreDraw;
 use App\Models\TargetPlayer;
 use App\Helper\Helper;
 use Illuminate\Support\Str;
@@ -170,30 +168,24 @@ class TargetPlayerDraw
         $costLabel->setRenderable(false);
         $panel->addChild($costLabel);
 
-        // Cost rows (ScoreDraw style) from target_has_score_player
+        // Cost rows: same position as ScoreDraw, text only "nome: value"
         $costStartY = $panelY + 165;
         foreach ($costRows as $index => $costRow) {
             if (!$costRow->score) {
                 continue;
             }
 
-            $scoreDraw = new ScoreDraw($this->uid . '_container_panel_cost_score_' . $costRow->score_id);
-            $scoreDraw->setOrigin($panelX + 20, $costStartY + ($index * ($costRowHeight + 8)));
-            $scoreDraw->setSize($panelWidth - 40, $costRowHeight);
-            $scoreDraw->setBackgroundColor('#4169E1');
-            $scoreDraw->setBorderColor('#5B7FE8');
-            $scoreDraw->setBorderRadius(8);
-            $scoreDraw->setScoreImage('/storage/scores/' . $costRow->score_id . '.png');
-            $scoreDraw->setScoreValue((string) ($costRow->value ?? 0));
-            $scoreDraw->setTextColor('#FFFFFF');
-            $scoreDraw->setTextFontSize(14);
-            $scoreDraw->setRenderable(false);
-            $scoreDraw->build();
-
-            foreach ($scoreDraw->getDrawItems() as $scoreItem) {
-                $panel->addChild($scoreItem);
-                $this->drawItems[] = $scoreItem;
-            }
+            $rowY = $costStartY + ($index * ($costRowHeight + 8));
+            $costText = new Text($this->uid . '_container_panel_cost_score_' . $costRow->score_id . '_text');
+            $costText->setOrigin($panelX + 20, $rowY + 12);
+            $costText->setCenterAnchor(false);
+            $costText->setText($costRow->score->name . ': ' . ($costRow->value ?? 0));
+            $costText->setFontFamily($this->textFontFamily);
+            $costText->setFontSize(14);
+            $costText->setColor('#000000');
+            $costText->setRenderable(false);
+            $panel->addChild($costText);
+            $this->drawItems[] = $costText;
         }
 
         if ($this->targetPlayer->state === TargetPlayer::STATE_UNLOCKED) {
