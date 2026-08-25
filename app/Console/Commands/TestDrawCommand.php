@@ -2,15 +2,13 @@
 
 namespace App\Console\Commands;
 
-use App\Custom\Action\ActionForm;
-use App\Custom\Colors;
-use App\Custom\Draw\Complex\ButtonDraw;
-use App\Custom\Draw\Complex\EntityAssemblerDraw;
-use App\Custom\Draw\Complex\SliderDraw;
+use App\Custom\Draw\Complex\EntityDraw;
+use App\Custom\Draw\Primitive\Square;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Models\DrawRequest;
+use App\Models\Entity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
@@ -28,7 +26,7 @@ class TestDrawCommand extends Command
      *
      * @var string
      */
-    protected $description = "Send test draw events to the test page - modal draw test";
+    protected $description = "Send test draw events to the test page - EntityDraw only";
 
     /**
      * Execute the console command.
@@ -53,52 +51,24 @@ class TestDrawCommand extends Command
 
         ObjectCache::clear($sessionId);
 
-        // Use EntityAssemblerDraw
-        $entityAssembler = new EntityAssemblerDraw("assembler_button");
-        $entityAssembler->setBorderRadius(8);
-        $entityAssembler->build();
-        $drawItems = array_merge(
-            $drawItems,
-            $entityAssembler->getDrawItemsWithObjectDraw($sessionId),
-        );
+        // Prende l'ultimo entity dal DB
+        $entity = Entity::query()->latest()->first();
 
-        $testButton = new ButtonDraw("assembler_form_test_button");
-        $testButton->setSize(180, 50);
-        $testButton->setOrigin(20, 235);
-        $testButton->setString("test");
-        $testButton->setColorButton(Colors::BLUE);
-        $testButton->setColorString(Colors::WHITE);
-        $testButton->setTextFontSize(22);
+        if ($entity !== null) {
+            $square = new Square('entity_square');
+            $square->setOrigin(100, 100);
+            $square->setSize(32);
 
-        $form = new ActionForm();
-        $form->setInput($entityAssembler->getActionFormInput($sessionId));
-        $form->setSubmitFunction(
-            resource_path(
-                "js/function/entity/click_button_form_console_log.blade.php",
-            ),
-        );
-        $form->setButton($testButton);
-        foreach ($testButton->getDrawItems() as $item) {
-            $drawItems[] = new ObjectDraw(
-                $item->buildJson(),
-                $sessionId,
-            )->get();
+            $entityDraw = new EntityDraw($entity, $square, false);
+
+            foreach ($entityDraw->getDrawItems() as $item) {
+                $drawItems[] = (new ObjectDraw($item, $sessionId))->get();
+            }
+
+            $this->info("EntityDraw for entity (uid: {$entity->uid}) added with forced division/evolution buttons.");
+        } else {
+            $this->warn("No entity found in DB.");
         }
-
-        /*
-        // Slider below assembler button
-        $slider = new SliderDraw('test_slider');
-        $slider->setOrigin(20, 85);
-        $slider->setSize(250, 60);
-        $slider->setMin(0);
-        $slider->setMax(100);
-        $slider->setValue(35);
-        $slider->setColor(0x0000FF);
-        $slider->setTitle('Volume');
-        $slider->setOnChange("console.log(value)");
-        $slider->build();
-        $drawItems = array_merge($drawItems, $slider->getDrawItemsWithObjectDraw($sessionId));
-        */
 
         ObjectCache::flush($sessionId);
 

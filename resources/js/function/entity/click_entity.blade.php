@@ -105,7 +105,8 @@
         };
 
         const applyDivisionButtonVisibility = () => {
-            const divisionEnabled = resolveDivisionEnabled();
+            const forceDrawButtons = objects[panel_uid] && objects[panel_uid].attributes && objects[panel_uid].attributes.force_draw_buttons;
+            const divisionEnabled = forceDrawButtons ? true : resolveDivisionEnabled();
             const divisionButtonUids = [object_uid + '_button_division_rect', object_uid + '_button_division_text'];
             divisionButtonUids.forEach((uid) => {
                 if (shapes[uid]) {
@@ -115,7 +116,8 @@
         };
 
         const applyEvolutionButtonVisibility = () => {
-            const evolutionEnabled = resolveEvolutionEnabled();
+            const forceDrawButtons = objects[panel_uid] && objects[panel_uid].attributes && objects[panel_uid].attributes.force_draw_buttons;
+            const evolutionEnabled = forceDrawButtons ? true : resolveEvolutionEnabled();
             const evolutionButtonUids = [object_uid + '_button_evolution_rect', object_uid + '_button_evolution_text'];
             evolutionButtonUids.forEach((uid) => {
                 if (shapes[uid]) {

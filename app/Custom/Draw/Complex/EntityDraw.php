@@ -17,6 +17,7 @@ use App\Models\Gene;
 use App\Models\Container;
 use App\Models\EntityChimicalElement;
 use App\Models\EntityInformation;
+use App\Models\PlayerValue;
 use Illuminate\Support\Str;
 use App\Custom\Draw\Support\ScrollGroup;
 use Illuminate\Support\Facades\Log;
@@ -27,15 +28,17 @@ class EntityDraw
     private Entity $dbEntity;
     private Square $square;
     private array $drawItems;
+    private bool $checkDrawButton;
     public function getDrawItems(): array
     {
         return $this->drawItems;
     }
 
-    public function __construct(Entity $dbEntity, Square $square) {
+    public function __construct(Entity $dbEntity, Square $square, bool $checkDrawButton = true) {
         $this->dbEntity = $dbEntity;
         $this->square = $square;
         $this->drawItems = [];
+        $this->checkDrawButton = $checkDrawButton;
         $this->build();
     }
     private function getGenomes() {
@@ -128,6 +131,11 @@ class EntityDraw
         $panel->setSize(400, 800);
         $panel->setColor(Colors::WHITE);
         $panel->setRenderable(false);
+
+        // When force-drawing buttons (checkDrawButton=false), signal JS to skip visibility checks
+        if (!$this->checkDrawButton) {
+            $panel->addAttributes('force_draw_buttons', true);
+        }
 
         //Text
         $panelX += 10;
@@ -223,39 +231,47 @@ class EntityDraw
         $rightButton->setRenderable(false);
         $rightButton->build();
 
-        // Division button (visible only when player_values.division is true)
-        $jsPathDivision = resource_path('js/function/entity/click_division.blade.php');
-        $jsContentDivision = file_get_contents($jsPathDivision);
-        $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
-
+        // Division button (visible only when player_values.division is true, or forced)
+        $divisionButton = null;
         $divisionButtonY = $panelY + $sizeButton + 15;
-        $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
-        $divisionButton->setSize(220, 40);
-        $divisionButton->setOrigin($movementButtonsStartX, $divisionButtonY);
-        $divisionButton->setString('Divisione');
-        $divisionButton->setColorButton(0x0000FF);
-        $divisionButton->setColorString($colorString);
-        $divisionButton->setTextFontSize(20);
-        $divisionButton->setOnClick($jsContentDivision);
-        $divisionButton->setRenderable(false);
-        $divisionButton->build();
+        $showDivision = !$this->checkDrawButton || PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_DIVISION]);
+        if ($showDivision) {
+            $jsPathDivision = resource_path('js/function/entity/click_division.blade.php');
+            $jsContentDivision = file_get_contents($jsPathDivision);
+            $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
 
-        // Evolution button (visible only when player_values.evolution is true)
-        $jsPathEvolution = resource_path('js/function/entity/click_evolution.blade.php');
-        $jsContentEvolution = file_get_contents($jsPathEvolution);
-        $jsContentEvolution = Helper::setCommonJsCode($jsContentEvolution, Str::random(20));
+            $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
+            $divisionButton->setSize(220, 40);
+            $divisionButton->setOrigin($movementButtonsStartX, $divisionButtonY);
+            $divisionButton->setString('Divisione');
+            $divisionButton->setColorButton(0x0000FF);
+            $divisionButton->setColorString($colorString);
+            $divisionButton->setTextFontSize(20);
+            $divisionButton->setOnClick($jsContentDivision);
+            $divisionButton->setRenderable(false);
+            $divisionButton->build();
+        }
 
-        $evolutionButtonY = $divisionButtonY + 40 + 15;
-        $evolutionButton = new ButtonDraw($dbEntity->uid.'_button_evolution');
-        $evolutionButton->setSize(220, 40);
-        $evolutionButton->setOrigin($movementButtonsStartX, $evolutionButtonY);
-        $evolutionButton->setString('Evoluzione');
-        $evolutionButton->setColorButton(0x800080);
-        $evolutionButton->setColorString($colorString);
-        $evolutionButton->setTextFontSize(20);
-        $evolutionButton->setOnClick($jsContentEvolution);
-        $evolutionButton->setRenderable(false);
-        $evolutionButton->build();
+        // Evolution button (visible only when player_values.evolution is true, or forced)
+        $evolutionButton = null;
+        $showEvolution = !$this->checkDrawButton || PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_EVOLUTION]);
+        if ($showEvolution) {
+            $jsPathEvolution = resource_path('js/function/entity/click_evolution.blade.php');
+            $jsContentEvolution = file_get_contents($jsPathEvolution);
+            $jsContentEvolution = Helper::setCommonJsCode($jsContentEvolution, Str::random(20));
+
+            $evolutionButtonY = ($divisionButton !== null ? $divisionButtonY : $divisionButtonY) + 40 + 15;
+            $evolutionButton = new ButtonDraw($dbEntity->uid.'_button_evolution');
+            $evolutionButton->setSize(220, 40);
+            $evolutionButton->setOrigin($movementButtonsStartX, $evolutionButtonY);
+            $evolutionButton->setString('Evoluzione');
+            $evolutionButton->setColorButton(0x800080);
+            $evolutionButton->setColorString($colorString);
+            $evolutionButton->setTextFontSize(20);
+            $evolutionButton->setOnClick($jsContentEvolution);
+            $evolutionButton->setRenderable(false);
+            $evolutionButton->build();
+        }
 
         //Progress Bar
         $itemBars = [];
@@ -267,7 +283,15 @@ class EntityDraw
             ->get();
 
         $panelX = $centerSquare['x'] + ($size / 3) + 10;
-        $panelY += $sizeButton + 165; // extra 55px for evolution button below division
+        // Calculate extra spacing based on which division/evolution buttons are visible
+        $extraButtonSpacing = 0;
+        if ($divisionButton !== null) {
+            $extraButtonSpacing += 55; // division button height + gap
+        }
+        if ($evolutionButton !== null) {
+            $extraButtonSpacing += 55; // evolution button height + gap
+        }
+        $panelY += $sizeButton + 55 + $extraButtonSpacing;
 
         $genomeIds = $dbEntity->genomes->pluck('id')->toArray();
         $entityInformations = EntityInformation::query()
@@ -330,8 +354,12 @@ class EntityDraw
         foreach ($leftButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($downButton->getDrawItems() as $item) {$panel->addChild($item);}
         foreach ($rightButton->getDrawItems() as $item) {$panel->addChild($item);}
-        foreach ($divisionButton->getDrawItems() as $item) {$panel->addChild($item);}
-        foreach ($evolutionButton->getDrawItems() as $item) {$panel->addChild($item);}
+        if ($divisionButton !== null) {
+            foreach ($divisionButton->getDrawItems() as $item) {$panel->addChild($item);}
+        }
+        if ($evolutionButton !== null) {
+            foreach ($evolutionButton->getDrawItems() as $item) {$panel->addChild($item);}
+        }
         foreach ($itemBars as $items) {
             foreach ($items as $item) {
                 if (is_object($item)) {
@@ -349,8 +377,12 @@ class EntityDraw
         foreach ($leftButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($downButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($rightButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
-        foreach ($divisionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
-        foreach ($evolutionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        if ($divisionButton !== null) {
+            foreach ($divisionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        }
+        if ($evolutionButton !== null) {
+            foreach ($evolutionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
+        }
         foreach ($itemBars as $items) {
             foreach ($items as $item) {
                 if (is_object($item)) {
