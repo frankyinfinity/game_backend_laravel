@@ -123,10 +123,10 @@ class EntityEvolutionDraw
                     $cell->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN,$js);
                     $bd=2;
                     $ox=$gx+$c*$cs+1;$oy=$gy+$r*$cs+1;
-                    if($p['bt']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_t');$b->setOrigin($ox,$oy);$b->setSize($ci,$bd);$b->setColor(0xFFFFFF);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();$tintJs.="var tb=shapes['{$b->getUid()}'];if(tb)tb.tint=".$zc.";";}
-                    if($p['bb']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_b');$b->setOrigin($ox,$oy+$ci-$bd+1);$b->setSize($ci,$bd);$b->setColor(0xFFFFFF);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();$tintJs.="var tb=shapes['{$b->getUid()}'];if(tb)tb.tint=".$zc.";";}
-                    if($p['bl']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_l');$b->setOrigin($ox,$oy);$b->setSize($bd,$ci);$b->setColor(0xFFFFFF);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();$tintJs.="var tb=shapes['{$b->getUid()}'];if(tb)tb.tint=".$zc.";";}
-                    if($p['br']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_r');$b->setOrigin($ox+$ci-$bd+1,$oy);$b->setSize($bd,$ci);$b->setColor(0xFFFFFF);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();$tintJs.="var tb=shapes['{$b->getUid()}'];if(tb)tb.tint=".$zc.";";}
+                    if($p['bt']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_t');$b->setOrigin($ox,$oy);$b->setSize($ci,$bd);$b->setColor(0x808080);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();}
+                    if($p['bb']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_b');$b->setOrigin($ox,$oy+$ci-$bd+1);$b->setSize($ci,$bd);$b->setColor(0x808080);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();}
+                    if($p['bl']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_l');$b->setOrigin($ox,$oy);$b->setSize($bd,$ci);$b->setColor(0x808080);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();}
+                    if($p['br']){$b=new Rectangle($modalUid.'_zbd_'.$r.'_'.$c.'_r');$b->setOrigin($ox+$ci-$bd+1,$oy);$b->setSize($bd,$ci);$b->setColor(0x808080);$b->setRenderable(false);$b->addAttributes('z_index',20045);$this->drawItems[]=$b;$gridUids[]=$b->getUid();}
                 }
                 $this->drawItems[]=$cell;
                 $gridUids[]=$cell->getUid();
@@ -214,9 +214,7 @@ class EntityEvolutionDraw
             $inline.="var zid=window['_curZoneId_{$modalUid}'];if(zid){";
             $inline.="var px=window['_evoPixels_{$modalUid}'];";
             $inline.="for(var i=0;i<px.length;i++){if(px[i].zone_id===zid){var s=shapes[px[i].cell];if(s)s.tint=pc;}}";
-            $inline.="for(var i=0;i<px.length;i++){if(px[i].zone_id===zid){";
-            $inline.="var bds=['_zbd_'+px[i].y+'_'+px[i].x+'_t','_zbd_'+px[i].y+'_'+px[i].x+'_b','_zbd_'+px[i].y+'_'+px[i].x+'_l','_zbd_'+px[i].y+'_'+px[i].x+'_r'];";
-            $inline.="bds.forEach(function(bu){var b=shapes['{$modalUid}'+bu];if(b)b.tint=pc;});}}";
+
             $inline.="}";
             $inline.="})();";
             $sl=new SliderDraw($modalUid.'_'.$sc['s']);
