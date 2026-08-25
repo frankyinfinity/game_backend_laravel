@@ -383,6 +383,28 @@ class EntityDraw
         if ($evolutionButton !== null) {
             foreach ($evolutionButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         }
+
+        // EntityEvolutionDraw: modal per modificare i colori delle zone
+        $evolutionDraw = new EntityEvolutionDraw($dbEntity);
+        $evolutionDraw->build();
+        foreach ($evolutionDraw->getDrawItems() as $item) {
+            $this->drawItems[] = $item->buildJson();
+        }
+        // Inietta initJs nell'evoluzione button
+        if ($evolutionButton !== null && $evolutionDraw->getInitJs() !== '') {
+            $jsWithInit = $evolutionDraw->getInitJs() . "\n" . $jsContentEvolution;
+            foreach ($this->drawItems as &$di) {
+                $uid = $di['uid'] ?? '';
+                if ($uid === ($dbEntity->uid . '_button_evolution_rect') || $uid === ($dbEntity->uid . '_button_evolution_text')) {
+                    if (isset($di['attributes']['interactives']['items']['pointerdown'])) {
+                        $newJs = Helper::setCommonJsCode($jsWithInit, Str::random(20));
+                        $di['attributes']['interactives']['items']['pointerdown'] = $newJs;
+                    }
+                }
+            }
+            unset($di);
+        }
+
         foreach ($itemBars as $items) {
             foreach ($items as $item) {
                 if (is_object($item)) {
