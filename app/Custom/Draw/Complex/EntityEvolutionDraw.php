@@ -281,9 +281,10 @@ class EntityEvolutionDraw
         $js.="var suids=".$slUidsJson.";";
         $js.="suids.forEach(function(u){if(shapes[u])shapes[u].renderable=true;if(objects[u]&&objects[u].attributes)objects[u].attributes.renderable=true;});";
         $js.="uids.forEach(function(u){if(shapes[u])shapes[u].renderable=true;if(objects[u]&&objects[u].attributes)objects[u].attributes.renderable=true;});";
-        $js.="var sq=shapes['{$modalUid}_zone_color_square'];if(sq)sq.tint=found.color;";
+        $js.="var zc=found.color;if(window['_evoModifiedZones_{$modalUid}']&&window['_evoModifiedZones_{$modalUid}'][found.zone_id]!==undefined)zc=window['_evoModifiedZones_{$modalUid}'][found.zone_id];";
+        $js.="var sq=shapes['{$modalUid}_zone_color_square'];if(sq)sq.tint=zc;";
         $js.="var nm=objects['{$modalUid}_zone_name_text'];if(nm){nm.text=found.name;if(shapes['{$modalUid}_zone_name_text'])shapes['{$modalUid}_zone_name_text'].text=found.name;}";
-        $js.="var cr=(found.color>>16)&255,cg=(found.color>>8)&255,cb=found.color&255;";
+        $js.="var cr=(zc>>16)&255,cg=(zc>>8)&255,cb=zc&255;";
         $js.="window['_setSliderVal_{$modalUid}'](cr,cg,cb);";
         $js.="};";
         // _setSliderVal
@@ -295,7 +296,7 @@ class EntityEvolutionDraw
         $js.="window['_sliderFill_{$modalUid}']=function(trackUid,fillUid,val,color){";
         $js.="var tk=shapes[trackUid];var f=shapes[fillUid];if(!tk||!f)return;";
         $js.="var w=Math.max(1,Math.round((val/255)*trackW));";
-        $js.="f.clear();f.beginFill(color);f.drawRoundedRect(0,0,w,8,2);f.endFill();";
+        $js.="f.clear();f.beginFill(color);f.drawRect(0,0,w,8);f.endFill();";
         $js.="f.x=tk.x;f.y=tk.y;";
         $js.="};}";
         $js.="var kr=shapes['{$modalUid}_slider_red_knob'];";

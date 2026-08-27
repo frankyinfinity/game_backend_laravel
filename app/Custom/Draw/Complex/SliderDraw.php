@@ -177,7 +177,7 @@ class SliderDraw
             "        if (newX < trackX) newX = trackX;" .
             "        if (newX > trackX + trackWidth) newX = trackX + trackWidth;" .
             "        knob.x = newX;" .
-            "        if (trackFill) { trackFill.width = Math.max(1, newX - trackX); }" .
+            "        if (trackFill) { trackFill.clear(); trackFill.beginFill(" . (int) $this->color . "); trackFill.drawRect(0, 0, Math.max(1, newX - trackX), 8); trackFill.endFill(); }" .
             "        var ratio = (newX - trackX) / trackWidth;" .
             "        var value = " . $this->min . " + Math.round(ratio * " . ($this->max - $this->min) . ");" .
             ($this->onChange !== '' ? "        " . $this->onChange . ";" : "") .
