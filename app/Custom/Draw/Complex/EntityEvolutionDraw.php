@@ -214,7 +214,8 @@ class EntityEvolutionDraw
             $inline.="var zid=window['_curZoneId_{$modalUid}'];if(zid){";
             $inline.="var px=window['_evoPixels_{$modalUid}'];";
             $inline.="for(var i=0;i<px.length;i++){if(px[i].zone_id===zid){var s=shapes[px[i].cell];if(s)s.tint=pc;}}";
-
+            $inline.="if(!window['_evoModifiedZones_{$modalUid}'])window['_evoModifiedZones_{$modalUid}']={};";
+            $inline.="window['_evoModifiedZones_{$modalUid}'][zid]=pc;";
             $inline.="}";
             $inline.="})();";
             $sl=new SliderDraw($modalUid.'_'.$sc['s']);
@@ -231,6 +232,30 @@ class EntityEvolutionDraw
             }
         }
         $slUidsJson=json_encode($slUids);
+
+        // ===== SALVA BUTTON =====
+        $jsPathSave = resource_path('js/function/entity/save_evolution_zones.blade.php');
+        $jsContentSave = file_get_contents($jsPathSave);
+        $jsContentSave = str_replace('__MODAL_UID__', $modalUid, $jsContentSave);
+        $jsContentSave = Helper::setCommonJsCode($jsContentSave, Str::random(20));
+        $btnW=180;$btnH=30;
+        // Bottom-right corner of the modal
+        $btnX=$mx+$mw-$btnW-20;
+        $btnY=$my+$mh-$btnH-20;
+        $saveBtn=new ButtonDraw($modalUid.'_save_button');
+        $saveBtn->setSize($btnW,$btnH);
+        $saveBtn->setOrigin($btnX,$btnY);
+        $saveBtn->setString('Salva');
+        $saveBtn->setColorButton(0x2E7D32);
+        $saveBtn->setColorString(0xFFFFFF);
+        $saveBtn->setTextFontSize(18);
+        $saveBtn->setOnClick($jsContentSave);
+        $saveBtn->setRenderable(false);
+        $saveBtn->build();
+        foreach($saveBtn->getDrawItems() as $it){
+            $it->addAttributes('z_index',50060);
+            $this->drawItems[]=$it;
+        }
 
         // ===== JS HANDLERS =====
         $pixelJs=[];
@@ -262,13 +287,26 @@ class EntityEvolutionDraw
         $js.="window['_setSliderVal_{$modalUid}'](cr,cg,cb);";
         $js.="};";
         // _setSliderVal
+        $trackXNum = $px + 10;
+        $trackWNum = $pw - 20;
         $js.="window['_setSliderVal_{$modalUid}']=function(r,g,b){";
-        $js.="var tr=shapes['{$modalUid}_slider_red_track_bg'];var kr=shapes['{$modalUid}_slider_red_knob'];";
-        $js.="if(tr&&kr)kr.x=tr.x+(r/255)*tr.width;";
-        $js.="var tg=shapes['{$modalUid}_slider_green_track_bg'];var kg=shapes['{$modalUid}_slider_green_knob'];";
-        $js.="if(tg&&kg)kg.x=tg.x+(g/255)*tg.width;";
-        $js.="var tb=shapes['{$modalUid}_slider_blue_track_bg'];var kb=shapes['{$modalUid}_slider_blue_knob'];";
-        $js.="if(tb&&kb)kb.x=tb.x+(b/255)*tb.width;";
+        $js.="var trackX={$trackXNum},trackW={$trackWNum};";
+        $js.="if(typeof window['_sliderFill_{$modalUid}']!=='function'){";
+        $js.="window['_sliderFill_{$modalUid}']=function(trackUid,fillUid,val,color){";
+        $js.="var tk=shapes[trackUid];var f=shapes[fillUid];if(!tk||!f)return;";
+        $js.="var w=Math.max(1,Math.round((val/255)*trackW));";
+        $js.="f.clear();f.beginFill(color);f.drawRoundedRect(0,0,w,8,2);f.endFill();";
+        $js.="f.x=tk.x;f.y=tk.y;";
+        $js.="};}";
+        $js.="var kr=shapes['{$modalUid}_slider_red_knob'];";
+        $js.="if(kr)kr.x=trackX+(r/255)*trackW;";
+        $js.="window['_sliderFill_{$modalUid}']('{$modalUid}_slider_red_track_bg','{$modalUid}_slider_red_track_fill',r,0xFF0000);";
+        $js.="var kg=shapes['{$modalUid}_slider_green_knob'];";
+        $js.="if(kg)kg.x=trackX+(g/255)*trackW;";
+        $js.="window['_sliderFill_{$modalUid}']('{$modalUid}_slider_green_track_bg','{$modalUid}_slider_green_track_fill',g,0x00FF00);";
+        $js.="var kb=shapes['{$modalUid}_slider_blue_knob'];";
+        $js.="if(kb)kb.x=trackX+(b/255)*trackW;";
+        $js.="window['_sliderFill_{$modalUid}']('{$modalUid}_slider_blue_track_bg','{$modalUid}_slider_blue_track_fill',b,0x0000FF);";
         $js.="};";
         // closeZonePanel
         $js.="window['closeZonePanel_{$modalUid}']=function(){";

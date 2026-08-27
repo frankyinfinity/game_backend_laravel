@@ -72,6 +72,12 @@ window['__name__'] = function() {
         });
     });
 
+    // Hide the "Salva" button of the evolution zone panel if present
+    ['_save_button_rect', '_save_button_text'].forEach(function(suffix) {
+        var uid = modalUid + suffix;
+        if (shapes[uid]) shapes[uid].renderable = false;
+    });
+
     // Hide direction buttons if the modal has them
     var dirButtons = ['dir_up', 'dir_down', 'dir_left', 'dir_right'];
     dirButtons.forEach(function(dir) {

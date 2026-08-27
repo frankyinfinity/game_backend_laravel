@@ -23,6 +23,7 @@
             const idsToToggle = [
                 modalUid + '_body', modalUid + '_header', modalUid + '_title',
                 modalUid + '_close_button', modalUid + '_close_text', modalUid + '_content_viewport',
+                modalUid + '_save_button_rect', modalUid + '_save_button_text',
             ];
 
             idsToToggle.forEach(function(uid) {
