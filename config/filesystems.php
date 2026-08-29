@@ -155,6 +155,22 @@ return [
             'throw' => false,
         ],
 
+        'evolution_paths' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/evolution_paths'),
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/evolution_paths',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
+        'evolution_steps' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/evolution_steps'),
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/evolution_steps',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
