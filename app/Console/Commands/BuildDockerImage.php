@@ -79,6 +79,11 @@ class BuildDockerImage extends Command
                 'path' => base_path('docker/alert'),
                 'folder' => 'alert'
             ],
+            [
+                'name' => 'evolution:latest',
+                'path' => base_path('docker/evolution'),
+                'folder' => 'evolution'
+            ],
         ];
 
         foreach ($images as $image) {

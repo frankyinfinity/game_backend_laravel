@@ -47,8 +47,38 @@ class EntityEvolutionDraw
             }
         }
 
+        // Read the ACTUAL colors of the Entity from its current image (disk entity_images).
+        // When the modal opens, zone pixels must reflect the entity's current appearance,
+        // falling back to the default zone color (EntityBodyZone.color) where no pixel exists.
+        $entityColors = []; $entityMask = [];
+        if ($entity->image && Storage::disk('entity_images')->exists($entity->image)) {
+            $entImage = @imagecreatefromstring(Storage::disk('entity_images')->get($entity->image));
+            if ($entImage) {
+                $eow = imagesx($entImage); $eoh = imagesy($entImage);
+                $ers = imagecreatetruecolor(32, 32);
+                imagefill($ers, 0, 0, imagecolorallocate($ers, 255, 255, 255));
+                imagecopyresampled($ers, $entImage, 0, 0, 0, 0, 32, 32, $eow, $eoh);
+                for ($y = 0; $y < 32; $y++) {
+                    for ($x = 0; $x < 32; $x++) {
+                        $er = imagecolorat($ers, $x, $y);
+                        $erA = ($er >> 24) & 0x7F;
+                        $erR = ($er >> 16) & 0xFF;
+                        $erG = ($er >> 8) & 0xFF;
+                        $erB = $er & 0xFF;
+                        // Skip background: alpha alto (trasparente) o quasi bianco
+                        if ($erA < 100 && !($erR > 250 && $erG > 250 && $erB > 250)) {
+                            $entityColors[$x][$y] = ($erR << 16) | ($erG << 8) | $erB;
+                            $entityMask[$y][$x] = true;
+                        }
+                    }
+                }
+                imagedestroy($ers); imagedestroy($entImage);
+            }
+        }
+
         // Process entity body image -> 32x32 pixel array
         $pixels = [];
+        $eOffX = 0; $eOffY = 0;
         if ($body->image && Storage::disk('entity_bodies')->exists($body->image)) {
             $imgPath = Storage::disk('entity_bodies')->path($body->image);
             $img = @imagecreatefromstring(file_get_contents($imgPath));
@@ -57,6 +87,41 @@ class EntityEvolutionDraw
                 $rs = imagecreatetruecolor(32, 32);
                 imagefill($rs, 0, 0, imagecolorallocate($rs, 255, 255, 255));
                 imagecopyresampled($rs, $img, 0, 0, 0, 0, 32, 32, $ow, $oh);
+                // Maschera della sagoma del body (pixel neri) per l'allineamento con l'entity
+                $bodyMask = [];
+                for ($y = 0; $y < 32; $y++) {
+                    for ($x = 0; $x < 32; $x++) {
+                        $rgb = imagecolorat($rs, $x, $y);
+                        $r = ($rgb>>16)&0xFF;$g=($rgb>>8)&0xFF;$b=$rgb&0xFF;
+                        if ($r < 50 && $g < 50 && $b < 50) {
+                            $bodyMask[$y][$x] = true;
+                        }
+                    }
+                }
+                // Auto-allineamento: l'immagine dell'Entity (creatura assemblata) puo' avere il body
+                // posizionato con un offset rispetto all'immagine del body. Trovo lo shift (dx,dy)
+                // che massimizza la sovrapposizione delle due sagome, cosi' ogni cella di zona
+                // legge il colore dell'Entity esattamente alla sua posizione visiva.
+                if (!empty($entityMask) && !empty($bodyMask)) {
+                    $bestScore = -1; $bestDist = PHP_INT_MAX;
+                    for ($dy = -8; $dy <= 8; $dy++) {
+                        for ($dx = -8; $dx <= 8; $dx++) {
+                            $inter = 0; $total = 0;
+                            foreach ($bodyMask as $by => $brow) {
+                                foreach ($brow as $bx => $v) {
+                                    $total++;
+                                    if (isset($entityMask[$by + $dy][$bx + $dx])) $inter++;
+                                }
+                            }
+                            if ($total === 0 || ($inter / $total) < 0.5) continue;
+                            $dist = abs($dx) + abs($dy);
+                            if ($inter > $bestScore || ($inter === $bestScore && $dist < $bestDist)) {
+                                $bestScore = $inter; $bestDist = $dist;
+                                $eOffX = $dx; $eOffY = $dy;
+                            }
+                        }
+                    }
+                }
                 for ($y = 0; $y < 32; $y++) {
                     for ($x = 0; $x < 32; $x++) {
                         $rgb = imagecolorat($rs, $x, $y);
@@ -64,9 +129,12 @@ class EntityEvolutionDraw
                         if ($r < 50 && $g < 50 && $b < 50) {
                             $zid = $zonePixelMap[$x*2][$y*2] ?? null;
                             $has = $zid !== null;
+                            // Colore attuale dell'Entity (dalla sua immagine, letto allineato alla
+                            // posizione del body), fallback sul colore di default della zona
+                            $pixelColor = $has ? ($entityColors[$x + $eOffX][$y + $eOffY] ?? ($zoneColors[$zid] ?? 0)) : null;
                             $pixels[] = [
                                 'x'=>$x,'y'=>$y,'has_zone'=>$has,'zone_id'=>$zid,
-                                'color'=>$has?($zoneColors[$zid]??0):null,
+                                'color'=>$pixelColor,
                                 'name'=>$has?($zoneNames[$zid]??''):null,
                                 'bt'=>$has&&($zonePixelMap[$x*2][($y-1)*2]??null)!==$zid,
                                 'bb'=>$has&&($zonePixelMap[$x*2][($y+1)*2]??null)!==$zid,
@@ -237,6 +305,20 @@ class EntityEvolutionDraw
         $jsPathSave = resource_path('js/function/entity/save_evolution_zones.blade.php');
         $jsContentSave = file_get_contents($jsPathSave);
         $jsContentSave = str_replace('__MODAL_UID__', $modalUid, $jsContentSave);
+
+        // Info websocket del container Evolution legato al player
+        $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $playerId = (int) $entity->specie->player_id;
+        $evolutionContainer = \App\Models\Container::query()
+            ->where('parent_type', \App\Models\Container::PARENT_TYPE_EVOLUTION)
+            ->where('parent_id', $playerId)
+            ->first();
+        $evolutionWsPort = $evolutionContainer ? $evolutionContainer->ws_port : null;
+
+        $jsContentSave = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentSave);
+        $jsContentSave = str_replace('__port__', $evolutionWsPort ?? '', $jsContentSave);
+        $jsContentSave = str_replace('__PLAYER_ID__', (string) $playerId, $jsContentSave);
+        $jsContentSave = str_replace('__ENTITY_ID__', (string) $entity->id, $jsContentSave);
         $jsContentSave = Helper::setCommonJsCode($jsContentSave, Str::random(20));
         $btnW=180;$btnH=30;
         // Bottom-right corner of the modal

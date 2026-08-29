@@ -17,6 +17,7 @@ class Container extends Model
     const PARENT_TYPE_CHIMICAL_ELEMENT = 'ChimicalElement';
     const PARENT_TYPE_SCORE = 'Score';
     const PARENT_TYPE_ALERT = 'Alert';
+    const PARENT_TYPE_EVOLUTION = 'Evolution';
 
     public static function parentTypes(): array
     {
@@ -30,6 +31,7 @@ class Container extends Model
             self::PARENT_TYPE_CHIMICAL_ELEMENT,
             self::PARENT_TYPE_SCORE,
             self::PARENT_TYPE_ALERT,
+            self::PARENT_TYPE_EVOLUTION,
         ];
     }
 
@@ -45,6 +47,7 @@ class Container extends Model
             self::PARENT_TYPE_CHIMICAL_ELEMENT => ['label' => 'ChimicalElement', 'color' => '#ec4899', 'order' => 6],
             self::PARENT_TYPE_SCORE => ['label' => 'Score', 'color' => '#14b8a6', 'order' => 7],
             self::PARENT_TYPE_ALERT => ['label' => 'Alert', 'color' => '#f97316', 'order' => 8],
+            self::PARENT_TYPE_EVOLUTION => ['label' => 'Evolution', 'color' => '#8b5cf6', 'order' => 9],
         ];
     }
 
@@ -70,6 +73,7 @@ class Container extends Model
             'ChimicalElement' => BirthRegion::class,
             'Score' => Player::class,
             'Alert' => Player::class,
+            'Evolution' => Player::class,
         ]);
     }
 }

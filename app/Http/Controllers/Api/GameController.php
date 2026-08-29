@@ -26,6 +26,7 @@ use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
 use App\Jobs\CalculateChimicalElementJob;
 use App\Jobs\ConsumeChimicalElementJob;
+use App\Jobs\EvolutionSaveJob;
 use App\Models\GeneratorChimicalElement;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionScore;
@@ -2647,6 +2648,9 @@ class GameController extends Controller
                 })->orWhere(function ($sq2) use ($player) {
                     $sq2->where('parent_type', Container::PARENT_TYPE_SCORE)
                         ->where('parent_id', $player->id);
+                })->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_EVOLUTION)
+                        ->where('parent_id', $player->id);
                 });
                 if (!empty($elementHasPositionIds)) {
                     $q->orWhere(function ($sq2) use ($elementHasPositionIds) {
@@ -3442,5 +3446,30 @@ class GameController extends Controller
         ]);
 
         return response()->json(['success' => true, 'message' => 'Alert created']);
+    }
+
+    /**
+     * Salva i dati di evoluzione ricevuti dal container Docker "Evolution".
+     *
+     * Il container espone un WebSocket con il comando 'save': quando riceve
+     * il comando con un JSON, inoltra il JSON a questa API (evolution/save).
+     * Il JSON ricevuto viene passato interamente a EvolutionSaveJob (in coda),
+     * che si occupa del log (e in futuro della lavorazione).
+     */
+    public function evolutionSave(Request $request): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+
+        $playerId = (int) ($request->input('player_id') ?? $request->input('playerId') ?? 0);
+        $payload = $request->except(['_token']);
+
+        // Tutto il JSON viene passato al job: il log avviene dentro il job
+        EvolutionSaveJob::dispatch($playerId, $payload);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Evolution data received (queued)',
+            'player_id' => $playerId,
+        ]);
     }
 }

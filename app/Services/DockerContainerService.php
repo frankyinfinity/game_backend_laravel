@@ -42,6 +42,7 @@ class DockerContainerService
             'chimical-element:latest',
             'score:latest',
             'alert:latest',
+            'evolution:latest',
         ]);
 
         $entities = Entity::query()
@@ -71,6 +72,7 @@ class DockerContainerService
         $this->createChimicalElementContainer($birthRegion, $player->id, false);
         $this->createScoreContainer($player, false);
         $this->createAlertContainer($player, false);
+        $this->createEvolutionContainer($player, false);
     }
 
     public function startContainersForPlayer(Player $player): void
@@ -396,6 +398,42 @@ class DockerContainerService
             'container_id' => $containerId,
             'name' => $name,
             'parent_type' => Container::PARENT_TYPE_ALERT,
+            'parent_id' => $player->id,
+            'ws_port' => $wsPort,
+            'image_id' => $this->getImageIdFromDockerName($imageName),
+        ]);
+    }
+
+    public function createEvolutionContainer(Player $player, bool $start = false): Container
+    {
+        $imageName = 'evolution:latest';
+        $this->ensureImageExists($imageName);
+
+        $wsPort = $this->nextWsPort();
+        $name = 'evolution_' . $player->id;
+        $env = [
+            'BACKEND_URL=' . $this->backendUrl(),
+            'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
+            'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
+            'PLAYER_ID=' . $player->id,
+            'WS_PORT=' . $wsPort,
+        ];
+        $labels = $this->playerGroupingLabels($player->id, 'evolution');
+
+        $containerId = $this->createAndMaybeStartCLI(
+            $name,
+            $imageName,
+            $env,
+            $labels,
+            $wsPort,
+            $start,
+            $this->playerVolumeMount($player)
+        );
+
+        return Container::query()->create([
+            'container_id' => $containerId,
+            'name' => $name,
+            'parent_type' => Container::PARENT_TYPE_EVOLUTION,
             'parent_id' => $player->id,
             'ws_port' => $wsPort,
             'image_id' => $this->getImageIdFromDockerName($imageName),
@@ -772,6 +810,10 @@ class DockerContainerService
                     $sq2->where('parent_type', Container::PARENT_TYPE_SCORE)
                         ->where('parent_id', $player->id);
                 });
+                $q->orWhere(function ($sq2) use ($player) {
+                    $sq2->where('parent_type', Container::PARENT_TYPE_EVOLUTION)
+                        ->where('parent_id', $player->id);
+                });
             })
             ->get();
     }
@@ -1038,6 +1080,10 @@ class DockerContainerService
                     $player = Player::find($parentId);
                     return $player ? $this->createAlertContainer($player, $start) : null;
 
+                case Container::PARENT_TYPE_EVOLUTION:
+                    $player = Player::find($parentId);
+                    return $player ? $this->createEvolutionContainer($player, $start) : null;
+
                 default:
                     return null;
             }
@@ -1091,6 +1137,10 @@ class DockerContainerService
                     $sq->where('parent_type', Container::PARENT_TYPE_ALERT)
                         ->where('parent_id', $player->id);
                 });
+                $q->orWhere(function ($sq) use ($player) {
+                    $sq->where('parent_type', Container::PARENT_TYPE_EVOLUTION)
+                        ->where('parent_id', $player->id);
+                });
                 
                 // Entity containers
                 if ($entities->isNotEmpty()) {
@@ -1140,6 +1190,7 @@ class DockerContainerService
         $newContainers[] = $this->createObjectiveContainer($player, $start);
         $newContainers[] = $this->createCacheSyncContainer($player, $start);
         $newContainers[] = $this->createAlertContainer($player, $start);
+        $newContainers[] = $this->createEvolutionContainer($player, $start);
 
         foreach ($entities as $entity) {
             $newContainers[] = $this->createEntityContainer($entity, $player->id, $start);

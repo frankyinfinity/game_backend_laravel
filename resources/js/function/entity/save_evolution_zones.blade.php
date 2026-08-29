@@ -53,6 +53,57 @@ window['__name__'] = function() {
     }
 
     console.log('[Evolution Save] Zonal modificate salvate:', jsonString);
+
+    // ===== Invio del JSON finale al websocket 'save' del container evolution =====
+    var port = '__port__';
+    if (!port) {
+        console.error('[Evolution Save] WebSocket port not found for evolution container');
+        return;
+    }
+
+    var wsUrl = '__gateway_base__' + port;
+
+    // Global cache
+    window.gameWebSockets = window.gameWebSockets || {};
+    var ws = window.gameWebSockets[port];
+
+    var sendCommand = function() {
+        ws.send(JSON.stringify({
+            command: 'save',
+            entity_id: parseInt('__ENTITY_ID__', 10),
+            zones: modifiedZones
+        }));
+    };
+
+    var onMessage = function(event) {
+        var response;
+        try {
+            response = JSON.parse(event.data);
+        } catch (e) {
+            response = event.data;
+        }
+        console.log('[Evolution Save] WS Response:', response);
+    };
+
+    if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        ws = new WebSocket(wsUrl);
+        window.gameWebSockets[port] = ws;
+
+        ws.onopen = function() {
+            console.log('[Evolution Save] WS Connected to ' + wsUrl);
+            sendCommand();
+        };
+        ws.onmessage = onMessage;
+        ws.onerror = function(error) {
+            console.error('[Evolution Save] WS Error:', error);
+        };
+    } else {
+        if (ws.readyState === WebSocket.OPEN) {
+            sendCommand();
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+            ws.addEventListener('open', sendCommand, { once: true });
+        }
+    }
 };
 window['__name__']();
 </script>

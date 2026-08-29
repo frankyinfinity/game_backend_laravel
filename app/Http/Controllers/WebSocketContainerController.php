@@ -134,6 +134,9 @@ class WebSocketContainerController extends Controller
                 })->orWhere(function ($subQuery) use ($player) {
                     $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_CACHE_SYNC)
                         ->where('parent_id', $player->id);
+                })->orWhere(function ($subQuery) use ($player) {
+                    $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_EVOLUTION)
+                        ->where('parent_id', $player->id);
                 })->orWhere(function ($subQuery) use ($entityIds) {
                     $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_ENTITY)
                         ->whereIn('parent_id', $entityIds);
@@ -190,6 +193,10 @@ class WebSocketContainerController extends Controller
                         })
                         ->orWhere(function ($subQuery) use ($player) {
                             $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_CACHE_SYNC)
+                                ->where('parent_id', $player->id);
+                        })
+                        ->orWhere(function ($subQuery) use ($player) {
+                            $subQuery->where('parent_type', DockerContainer::PARENT_TYPE_EVOLUTION)
                                 ->where('parent_id', $player->id);
                         })
                         ->orWhere(function ($subQuery) use ($entityIds) {
@@ -258,6 +265,7 @@ class WebSocketContainerController extends Controller
             DockerContainer::PARENT_TYPE_CHIMICAL_ELEMENT => 'ChimicalElement #' . ($player->birth_region_id ?? '-'),
             DockerContainer::PARENT_TYPE_ENTITY => 'Entity #' . $container->parent_id,
             DockerContainer::PARENT_TYPE_ELEMENT_HAS_POSITION => 'Element #' . $container->parent_id,
+            Container::PARENT_TYPE_EVOLUTION => 'Evolution #' . $player->id,
             default => (string) $container->parent_type,
         };
     }
