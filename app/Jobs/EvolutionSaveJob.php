@@ -4,9 +4,12 @@ namespace App\Jobs;
 
 use App\Models\Entity;
 use App\Models\EntityBody;
+use App\Models\EntityBodyZone;
 use App\Models\EntityBodyZonePixel;
 use App\Models\EntityDetail;
 use App\Models\EvolutionPath;
+use App\Models\EvolutionStep;
+use App\Models\EvolutionStepDetail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -39,9 +42,20 @@ class EvolutionSaveJob implements ShouldQueue
     private const ALIGNMENT_SEARCH = 8;
 
     /**
+     * Di quanto si sposta il colore ad ogni passo di evoluzione. I canali e
+     * le zone avanzano IN SEQUENZA (prima il canale R di una zona, poi il G,
+     * poi il B, poi si passa alla zona successiva): ad ogni passo si muove
+     * un solo canale di una sola zona. Es. con 1, una zona da R 120 verso
+     * R 150 genera 30 EvolutionStep (R 121, R 122, ... fino a R 150).
+     */
+    private const COLOR_STEP = 1;
+
+    /**
      * @param int   $playerId ID del player proprietario del container Evolution
      * @param array $payload  Tutto il JSON ricevuto dall'API evolution/save
-     *                        (es. { entity_id: 1, zones: [{ zone_id, zone_name, r, g, b }] })
+     *                        (es. { entity_id: 1, zones: [{ zone_id, zone_name, r, g, b }] }).
+     *                        Oltre alla EvolutionPath (colore d'arrivo) vengono creati tutti
+     *                        gli EvolutionStep intermedi dal colore attuale al colore richiesto.
      */
     public function __construct(
         public int $playerId,
@@ -121,36 +135,61 @@ class EvolutionSaveJob implements ShouldQueue
             // Auto-allineamento tra la sagoma del body e quella dell'Entity
             $offset = $this->computeAlignmentOffset($entity);
 
-            // Colora le zone sull'immagine dell'Entity
+            // Colore attuale di ogni zona sull'immagine dell'Entity:
+            // e' il punto di partenza dei passaggi di evoluzione
+            $currentColors = $this->currentZoneColors($image, $zonePixels, $offset);
+
+            // Numero di passaggi necessari per arrivare ai colori richiesti
+            $stepsCount = $this->computeStepsCount($currentColors, $zoneColors);
+
+            // Colora le zone sull'immagine dell'Entity con il colore d'arrivo
             $paintedPixels = $this->colorZones($image, $zoneColors, $zonePixels, $offset);
 
-            // Esporta il PNG (con alpha, come l'immagine originale)
-            imagealphablending($image, false);
-            imagesavealpha($image, true);
-            ob_start();
-            imagepng($image);
-            $pngData = ob_get_clean();
+            // Esporta il PNG finale (con alpha, come l'immagine originale)
+            $pngData = $this->imageToPng($image);
         } finally {
             imagedestroy($image);
         }
 
-        // Salva il file (disco evolution_paths) e il record EvolutionPath.
-        // Il nome definitivo del file richiede l'id del record, quindi viene
-        // creato prima con un placeholder e aggiornato dopo il salvataggio
-        // (stesso approccio della divisione entity in GameController).
+        // Salva il file (disco evolution_paths) e il record EvolutionPath, poi
+        // tutti i passaggi (EvolutionStep) dal colore attuale fino al colore
+        // d'arrivo richiesto dal JSON, ognuno con la sua immagine (disco
+        // evolution_steps) e gli EvolutionStepDetail con i colori del passo.
+        // Il nome definitivo dei file richiede gli id dei record, quindi i
+        // record vengono creati prima con un placeholder e aggiornati dopo il
+        // salvataggio (stesso approccio della divisione entity in GameController).
         $path = null;
+        $savedFiles = [];
         try {
             /** @var EvolutionPath $path */
+            // Nasce in STATE_CREATED; passa a STATE_READY quando l'ultimo
+            // EvolutionStep e' stato creato (vedi createEvolutionSteps).
             $path = EvolutionPath::query()->create([
                 'specie_id' => (int) $entity->specie_id,
                 'uid'       => uniqid('', true),
                 'imagename' => '__pending__',
                 'finish'    => false,
+                'state'     => EvolutionPath::STATE_CREATED,
             ]);
 
             $imagename = $path->id . '.png';
             Storage::disk('evolution_paths')->put($imagename, $pngData);
             $path->update(['imagename' => $imagename]);
+            $savedFiles[] = ['evolution_paths', $imagename];
+
+            // Tutti i passaggi dal colore attuale fino all'arrivo. Anche quando
+            // sono zero (zone gia' al colore d'arrivo) si passa da
+            // createEvolutionSteps: alla fine il path va in STATE_READY.
+            $this->createEvolutionSteps(
+                $path,
+                $entity,
+                $zonePixels,
+                $offset,
+                $currentColors,
+                $zoneColors,
+                $stepsCount,
+                $savedFiles
+            );
 
             Log::info('[EvolutionSaveJob] EvolutionPath salvata con immagine delle zone colorate', [
                 'player_id'         => $this->playerId,
@@ -159,12 +198,19 @@ class EvolutionSaveJob implements ShouldQueue
                 'imagename'         => $imagename,
                 'zones_colored'     => count($zoneColors),
                 'pixels_colored'    => $paintedPixels,
+                'steps_created'     => $stepsCount,
+                'path_state'        => $path->state,
             ]);
         } catch (\Throwable $e) {
-            // Se il salvataggio del file fallisce, la EvolutionPath non va lasciata
-            // sul DB con un imagename placeholder: annulla tutto e rilancia.
+            // Se un salvataggio fallisce, la EvolutionPath non va lasciata sul DB
+            // con imagename placeholder: le FK sono in cascade, quindi cancellando
+            // la EvolutionPath vengono rimossi anche gli EvolutionStep e i relativi
+            // EvolutionStepDetail. I file gia' creati vengono rimossi a mano.
             if ($path !== null) {
                 $path->delete();
+            }
+            foreach ($savedFiles as [$disk, $file]) {
+                Storage::disk($disk)->delete($file);
             }
             throw $e;
         }
@@ -364,7 +410,9 @@ class EvolutionSaveJob implements ShouldQueue
     }
 
     /**
-     * Colora sull'immagine dell'Entity i pixel delle zone indicate dal JSON.
+     * Colora sull'immagine i pixel delle zone con i colori indicati
+     * (zone_id => ['r','g','b']). Usato sia per il colore d'arrivo del JSON
+     * sia per il colore di ciascun passo intermedio di evoluzione.
      *
      * Ogni pixel di zona (griglia 64x64 del body) corrisponde alla cella
      * (px/2, py/2) dell'immagine 32x32, traslata dell'offset di allineamento.
@@ -407,6 +455,306 @@ class EvolutionSaveJob implements ShouldQueue
         }
 
         return $painted;
+    }
+
+    /**
+     * Esporta l'immagine GD come PNG preservando il canale alpha.
+     *
+     * @param \GdImage|resource $image
+     */
+    private function imageToPng($image): string
+    {
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        ob_start();
+        imagepng($image);
+
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Crea una copia indipendente dell'immagine (preservando l'alpha):
+     * usata come base per generare l'immagine di ciascun passo.
+     *
+     * @param \GdImage|resource $image
+     * @return \GdImage|resource
+     */
+    private function cloneImage($image)
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        $copy = imagecreatetruecolor($width, $height);
+        imagealphablending($copy, false);
+        imagesavealpha($copy, true);
+        imagecopy($copy, $image, 0, 0, 0, 0, $width, $height);
+
+        return $copy;
+    }
+
+    /**
+     * Legge il colore attuale di ogni zona direttamente dall'immagine
+     * dell'Entity (media dei pixel visibili della zona, deduplicando le
+     * coordinate mappate perche' piu' pixel di zona (griglia 64x64) cadono
+     * sulla stessa cella 32x32). Se una zona non ha pixel visibili viene
+     * usato il colore di default della zona su DB (entity_body_zones.color).
+     *
+     * @param \GdImage|resource $image
+     * @return array<int, array{r: int, g: int, b: int}> zone_id => colore attuale
+     */
+    private function currentZoneColors($image, array $zonePixels, array $offset): array
+    {
+        $zoneIds = array_keys($zonePixels);
+        $defaultColors = EntityBodyZone::query()->whereIn('id', $zoneIds)->pluck('color', 'id');
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $factor = (int) (self::ZONE_GRID_SIZE / self::RENDER_SIZE);
+
+        $sums = [];
+        $counts = [];
+        foreach ($zonePixels as $zoneId => $pixels) {
+            $seen = [];
+            foreach ($pixels as [$px, $py]) {
+                $x = intdiv($px, $factor) + $offset['x'];
+                $y = intdiv($py, $factor) + $offset['y'];
+                if ($x < 0 || $x >= $width || $y < 0 || $y >= $height) {
+                    continue;
+                }
+
+                // Stessa cella gia' conteggiata per questa zona
+                $key = $x . ',' . $y;
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+
+                // Solo pixel visibili (alpha GD: 0=opaco, 127=trasparente)
+                $rgb = imagecolorat($image, $x, $y);
+                if ((($rgb >> 24) & 0x7F) >= 100) {
+                    continue;
+                }
+
+                $sums[$zoneId][0] = ($sums[$zoneId][0] ?? 0) + (($rgb >> 16) & 0xFF);
+                $sums[$zoneId][1] = ($sums[$zoneId][1] ?? 0) + (($rgb >> 8) & 0xFF);
+                $sums[$zoneId][2] = ($sums[$zoneId][2] ?? 0) + ($rgb & 0xFF);
+                $counts[$zoneId] = ($counts[$zoneId] ?? 0) + 1;
+            }
+        }
+
+        $colors = [];
+        foreach ($zoneIds as $zoneId) {
+            if (($counts[$zoneId] ?? 0) > 0) {
+                $colors[$zoneId] = [
+                    'r' => (int) round($sums[$zoneId][0] / $counts[$zoneId]),
+                    'g' => (int) round($sums[$zoneId][1] / $counts[$zoneId]),
+                    'b' => (int) round($sums[$zoneId][2] / $counts[$zoneId]),
+                ];
+            } else {
+                $default = (int) ($defaultColors[$zoneId] ?? 0);
+                $colors[$zoneId] = [
+                    'r' => ($default >> 16) & 0xFF,
+                    'g' => ($default >> 8) & 0xFF,
+                    'b' => $default & 0xFF,
+                ];
+            }
+        }
+
+        return $colors;
+    }
+
+    /**
+     * Numero di passaggi necessari per portare tutte le zone richieste dal
+     * JSON al colore d'arrivo. I passaggi sono IN SEQUENZA (ogni passo muove
+     * un solo canale di una sola zona: prima i passi del canale R di una
+     * zona, poi quelli del canale G, poi del B, poi la zona successiva),
+     * quindi il totale e' la SOMMA dei passi di ogni canale di ogni zona
+     * (arrotondati per eccesso rispetto a COLOR_STEP).
+     * Es. con COLOR_STEP = 1 e R da 120 a 150 => 30 passaggi.
+     *
+     * @param array<int, array{r: int, g: int, b: int}> $currentColors
+     * @param array<int, array{r: int, g: int, b: int}> $zoneColors
+     */
+    private function computeStepsCount(array $currentColors, array $zoneColors): int
+    {
+        $stepsCount = 0;
+        foreach ($zoneColors as $zoneId => $target) {
+            $current = $currentColors[$zoneId] ?? ['r' => 0, 'g' => 0, 'b' => 0];
+
+            foreach (['r', 'g', 'b'] as $channel) {
+                $delta = abs($target[$channel] - $current[$channel]);
+                $stepsCount += (int) ceil($delta / self::COLOR_STEP);
+            }
+        }
+
+        return $stepsCount;
+    }
+
+    /**
+     * Valore di un singolo canale R/G/B al passo k RELATIVO al canale: il
+     * canale si sposta verso il target di COLOR_STEP per passo e l'ultimo
+     * passo arriva esattamente al colore richiesto dal JSON.
+     */
+    private function channelValueAtStep(int $current, int $target, int $step): int
+    {
+        $delta = $target - $current;
+        $moved = min(abs($delta), $step * self::COLOR_STEP);
+
+        return $current + (($delta <=> 0) * $moved);
+    }
+
+    /**
+     * Colore di ogni zona al passo complessivo indicato (1-based).
+     *
+     * I passaggi sono IN SEQUENZA (stesso ordine di computeStepsCount):
+     * prima tutti i passi del canale R di una zona, poi quelli del canale G,
+     * poi del B, poi si passa alla zona successiva. Ad ogni passo si muove
+     * un solo canale di una sola zona, quindi:
+     * - i canali gia' completati sono al colore d'arrivo;
+     * - il canale "in movimento" e' al suo valore intermedio;
+     * - i canali non ancora iniziati restano al colore attuale.
+     *
+     * @param array<int, array{r: int, g: int, b: int}> $currentColors
+     * @param array<int, array{r: int, g: int, b: int}> $zoneColors
+     * @return array<int, array{r: int, g: int, b: int}> zone_id => colore al passo
+     */
+    private function stepColorsAt(int $step, array $currentColors, array $zoneColors): array
+    {
+        $colors = [];
+        $offset = 0; // passi gia' consumati dai canali precedenti
+
+        foreach ($zoneColors as $zoneId => $target) {
+            $current = $currentColors[$zoneId] ?? ['r' => 0, 'g' => 0, 'b' => 0];
+
+            foreach (['r', 'g', 'b'] as $channel) {
+                $delta = $target[$channel] - $current[$channel];
+                $channelSteps = (int) ceil(abs($delta) / self::COLOR_STEP);
+
+                if ($channelSteps === 0) {
+                    // canale fermo: attuale == d'arrivo
+                    $colors[$zoneId][$channel] = $current[$channel];
+                    continue;
+                }
+
+                if ($step <= $offset) {
+                    // non ancora iniziato: resta al colore attuale
+                    $colors[$zoneId][$channel] = $current[$channel];
+                } elseif ($step >= $offset + $channelSteps) {
+                    // gia' completato: al colore d'arrivo
+                    $colors[$zoneId][$channel] = $target[$channel];
+                } else {
+                    // canale "in movimento" a questo passo
+                    $colors[$zoneId][$channel] = $this->channelValueAtStep(
+                        $current[$channel],
+                        $target[$channel],
+                        $step - $offset
+                    );
+                }
+
+                $offset += $channelSteps;
+            }
+        }
+
+        return $colors;
+    }
+
+    /**
+     * Crea tutti gli EvolutionStep dall'attuale colore delle zone fino al
+     * colore d'arrivo richiesto dal JSON: un passo per ogni scatto del
+     * colore (COLOR_STEP), ognuno con la propria immagine sul disco
+     * evolution_steps e gli EvolutionStepDetail con il colore di ogni zona
+     * a quel passo (key: "zone_{id}", value: colore int 0xRRGGBB).
+     * I passaggi sono IN SEQUENZA (prima il canale R di una zona, poi il G,
+     * poi il B, poi la zona successiva): ad ogni passo si muove un solo
+     * canale di una sola zona. L'ultimo passo e' l'arrivo.
+     * Il campo `finish` non viene MAI impostato a true dal job: resta
+     * sempre false (sia per EvolutionPath sia per EvolutionStep).
+     * Al termine, quando l'ultimo EvolutionStep e' stato creato, il path
+     * passa da STATE_CREATED a STATE_READY.
+     *
+     * @param array<int, array<int, array{0: int, 1: int}>> $zonePixels zone_id => [[x (0-63), y (0-63)], ...]
+     * @param array<int, array{r: int, g: int, b: int}> $currentColors zone_id => colore attuale
+     * @param array<int, array{r: int, g: int, b: int}> $zoneColors zone_id => colore d'arrivo dal JSON
+     * @param array<int, array{0: string, 1: string}> $savedFiles [disk, file] di tutti i file creati (per eventuale cleanup)
+     */
+    private function createEvolutionSteps(
+        EvolutionPath $path,
+        Entity $entity,
+        array $zonePixels,
+        array $offset,
+        array $currentColors,
+        array $zoneColors,
+        int $stepsCount,
+        array &$savedFiles
+    ): void {
+        // Immagine dell'Entity allo stato attuale: base di ogni passo
+        $baseImage = $this->loadEntityImage($entity);
+        if ($baseImage === null) {
+            Log::warning("[EvolutionSaveJob] Immagine dell'Entity non trovata, EvolutionStep non creati", [
+                'player_id' => $this->playerId,
+                'entity_id' => $entity->id,
+                'image'     => $entity->image,
+            ]);
+            return;
+        }
+
+        try {
+            $now = now();
+            $detailRows = [];
+
+            for ($stepNumber = 1; $stepNumber <= $stepsCount; $stepNumber++) {
+                // Colore di ogni zona a questo passo (passi in sequenza:
+                // ad ogni passo si muove un solo canale di una sola zona)
+                $stepColors = $this->stepColorsAt($stepNumber, $currentColors, $zoneColors);
+
+                // Immagine del passo: copia dell'immagine attuale dell'Entity
+                // con le zone richieste colorate al colore di questo passo
+                $stepImage = $this->cloneImage($baseImage);
+                try {
+                    $this->colorZones($stepImage, $stepColors, $zonePixels, $offset);
+                    $stepPngData = $this->imageToPng($stepImage);
+                } finally {
+                    imagedestroy($stepImage);
+                }
+
+                /** @var EvolutionStep $step */
+                // NB: `finish` non viene MAI impostato a true dal job
+                // (vale sia per EvolutionStep sia per EvolutionPath).
+                $step = EvolutionStep::query()->create([
+                    'evolution_path_id' => $path->id,
+                    'uid'               => uniqid('', true),
+                    'imagename'         => '__pending__',
+                    'finish'            => false,
+                ]);
+
+                $stepImagename = $step->id . '.png';
+                Storage::disk('evolution_steps')->put($stepImagename, $stepPngData);
+                $step->update(['imagename' => $stepImagename]);
+                $savedFiles[] = ['evolution_steps', $stepImagename];
+
+                // Colore di ogni zona a questo passo
+                foreach ($stepColors as $zoneId => $color) {
+                    $detailRows[] = [
+                        'evolution_step_id' => $step->id,
+                        'key'               => 'zone_' . $zoneId,
+                        'value'             => (string) (($color['r'] << 16) | ($color['g'] << 8) | $color['b']),
+                        'created_at'        => $now,
+                        'updated_at'        => $now,
+                    ];
+                }
+            }
+
+            // Dettagli di tutti i passaggi, inseriti in blocco
+            foreach (array_chunk($detailRows, 1000) as $chunk) {
+                EvolutionStepDetail::insert($chunk);
+            }
+
+            // Tutti gli EvolutionStep sono stati creati (anche zero, se le zone
+            // erano gia' al colore d'arrivo): il path passa a READY
+            $path->update(['state' => EvolutionPath::STATE_READY]);
+        } finally {
+            imagedestroy($baseImage);
+        }
     }
 }
 
