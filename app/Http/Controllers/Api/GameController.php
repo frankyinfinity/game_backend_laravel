@@ -3454,7 +3454,8 @@ class GameController extends Controller
      * Il container espone un WebSocket con il comando 'save': quando riceve
      * il comando con un JSON, inoltra il JSON a questa API (evolution/save).
      * Il JSON ricevuto viene passato interamente a EvolutionSaveJob (in coda),
-     * che si occupa del log (e in futuro della lavorazione).
+     * che si occupa di colorare le zone sull'immagine dell'Entity secondo il
+     * JSON e di salvare il file (disco evolution_paths) e il record EvolutionPath.
      */
     public function evolutionSave(Request $request): \Illuminate\Http\JsonResponse
     {
