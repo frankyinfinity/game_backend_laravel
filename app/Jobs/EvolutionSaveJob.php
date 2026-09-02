@@ -662,8 +662,9 @@ class EvolutionSaveJob implements ShouldQueue
      * Crea tutti gli EvolutionStep dall'attuale colore delle zone fino al
      * colore d'arrivo richiesto dal JSON: un passo per ogni scatto del
      * colore (COLOR_STEP), ognuno con la propria immagine sul disco
-     * evolution_steps e gli EvolutionStepDetail con il colore di ogni zona
-     * a quel passo (key: "zone_{id}", value: colore int 0xRRGGBB).
+     * evolution_steps e gli EvolutionStepDetail con, per ogni zona, le
+     * chiavi ZONE_ID / R / G / B (id della zona e canali al colore a quel
+     * passo).
      * I passaggi sono IN SEQUENZA (prima il canale R di una zona, poi il G,
      * poi il B, poi la zona successiva): ad ogni passo si muove un solo
      * canale di una sola zona. L'ultimo passo e' l'arrivo.
@@ -732,12 +733,33 @@ class EvolutionSaveJob implements ShouldQueue
                 $step->update(['imagename' => $stepImagename]);
                 $savedFiles[] = ['evolution_steps', $stepImagename];
 
-                // Colore di ogni zona a questo passo
+                // Dettagli di ogni zona a questo passo: chiavi ZONE_ID / R / G / B
                 foreach ($stepColors as $zoneId => $color) {
                     $detailRows[] = [
                         'evolution_step_id' => $step->id,
-                        'key'               => 'zone_' . $zoneId,
-                        'value'             => (string) (($color['r'] << 16) | ($color['g'] << 8) | $color['b']),
+                        'key'               => 'ZONE_ID',
+                        'value'             => (string) $zoneId,
+                        'created_at'        => $now,
+                        'updated_at'        => $now,
+                    ];
+                    $detailRows[] = [
+                        'evolution_step_id' => $step->id,
+                        'key'               => 'R',
+                        'value'             => (string) $color['r'],
+                        'created_at'        => $now,
+                        'updated_at'        => $now,
+                    ];
+                    $detailRows[] = [
+                        'evolution_step_id' => $step->id,
+                        'key'               => 'G',
+                        'value'             => (string) $color['g'],
+                        'created_at'        => $now,
+                        'updated_at'        => $now,
+                    ];
+                    $detailRows[] = [
+                        'evolution_step_id' => $step->id,
+                        'key'               => 'B',
+                        'value'             => (string) $color['b'],
                         'created_at'        => $now,
                         'updated_at'        => $now,
                     ];
