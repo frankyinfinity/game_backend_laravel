@@ -212,6 +212,11 @@ class EvolutionSaveJob implements ShouldQueue
             foreach ($savedFiles as [$disk, $file]) {
                 Storage::disk($disk)->delete($file);
             }
+            // La cartella degli step (intitolata all'id della EvolutionPath)
+            // dopo la cancellazione dei file resta vuota: viene rimossa anch'essa.
+            if ($path !== null) {
+                Storage::disk('evolution_steps')->deleteDirectory((string) $path->id);
+            }
             throw $e;
         }
     }
@@ -661,8 +666,10 @@ class EvolutionSaveJob implements ShouldQueue
     /**
      * Crea tutti gli EvolutionStep dall'attuale colore delle zone fino al
      * colore d'arrivo richiesto dal JSON: un passo per ogni scatto del
-     * colore (COLOR_STEP), ognuno con la propria immagine sul disco
-     * evolution_steps e gli EvolutionStepDetail con, per ogni zona, le
+     * colore (COLOR_STEP), ognuno con la propria immagine nella cartella
+     * dell'EvolutionPath sul disco evolution_steps
+     * (evolution_steps/{id_evolution_path}/{id_step}.png) e gli
+     * EvolutionStepDetail con, per ogni zona, le
      * chiavi ZONE_ID / R / G / B (id della zona e canali al colore a quel
      * passo).
      * I passaggi sono IN SEQUENZA (prima il canale R di una zona, poi il G,
@@ -703,6 +710,12 @@ class EvolutionSaveJob implements ShouldQueue
             $now = now();
             $detailRows = [];
 
+            // Ogni EvolutionPath ha la propria cartella sul disco evolution_steps
+            // (intitolata all'id dell'EvolutionPath): i file dei suoi passaggi
+            // vengono salvati dentro quella cartella.
+            $stepFolder = (string) $path->id;
+            Storage::disk('evolution_steps')->makeDirectory($stepFolder);
+
             for ($stepNumber = 1; $stepNumber <= $stepsCount; $stepNumber++) {
                 // Colore di ogni zona a questo passo (passi in sequenza:
                 // ad ogni passo si muove un solo canale di una sola zona)
@@ -728,7 +741,7 @@ class EvolutionSaveJob implements ShouldQueue
                     'finish'            => false,
                 ]);
 
-                $stepImagename = $step->id . '.png';
+                $stepImagename = $stepFolder . '/' . $step->id . '.png';
                 Storage::disk('evolution_steps')->put($stepImagename, $stepPngData);
                 $step->update(['imagename' => $stepImagename]);
                 $savedFiles[] = ['evolution_steps', $stepImagename];
