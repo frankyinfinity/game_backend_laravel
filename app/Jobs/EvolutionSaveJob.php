@@ -10,6 +10,7 @@ use App\Models\EntityDetail;
 use App\Models\EvolutionPath;
 use App\Models\EvolutionStep;
 use App\Models\EvolutionStepDetail;
+use App\Models\PlayerValue;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -787,6 +788,9 @@ class EvolutionSaveJob implements ShouldQueue
             // Tutti gli EvolutionStep sono stati creati (anche zero, se le zone
             // erano gia' al colore d'arrivo): il path passa a READY
             $path->update(['state' => EvolutionPath::STATE_READY]);
+
+            // Blocca il pulsante Evoluzione perché lo stato è cambiato
+            PlayerValue::setFlag($this->playerId, PlayerValue::KEY_BLOCK_EVOLUTION, true);
         } finally {
             imagedestroy($baseImage);
         }

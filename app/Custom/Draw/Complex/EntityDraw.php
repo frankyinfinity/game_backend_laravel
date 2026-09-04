@@ -255,6 +255,7 @@ class EntityDraw
         // Evolution button (visible only when player_values.evolution is true, or forced)
         $evolutionButton = null;
         $showEvolution = !$this->checkDrawButton || PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_EVOLUTION]);
+        $isBlockEvolution = PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_BLOCK_EVOLUTION]);
         if ($showEvolution) {
             $jsPathEvolution = resource_path('js/function/entity/click_evolution.blade.php');
             $jsContentEvolution = file_get_contents($jsPathEvolution);
@@ -265,10 +266,16 @@ class EntityDraw
             $evolutionButton->setSize(220, 40);
             $evolutionButton->setOrigin($movementButtonsStartX, $evolutionButtonY);
             $evolutionButton->setString('Evoluzione');
-            $evolutionButton->setColorButton(0x800080);
+            // Se BLOCK_EVOLUTION è true, il pulsante è grigio e non cliccabile
+            if ($isBlockEvolution) {
+                $evolutionButton->setColorButton(0x404040);
+                $evolutionButton->setOnClick(null);
+            } else {
+                $evolutionButton->setColorButton(0x800080);
+                $evolutionButton->setOnClick($jsContentEvolution);
+            }
             $evolutionButton->setColorString($colorString);
             $evolutionButton->setTextFontSize(20);
-            $evolutionButton->setOnClick($jsContentEvolution);
             $evolutionButton->setRenderable(false);
             $evolutionButton->build();
         }
@@ -390,8 +397,8 @@ class EntityDraw
         foreach ($evolutionDraw->getDrawItems() as $item) {
             $this->drawItems[] = $item->buildJson();
         }
-        // Inietta initJs nell'evoluzione button
-        if ($evolutionButton !== null && $evolutionDraw->getInitJs() !== '') {
+        // Inietta initJs nell'evoluzione button (solo se NON è bloccato)
+        if ($evolutionButton !== null && $evolutionDraw->getInitJs() !== '' && !$isBlockEvolution) {
             $jsWithInit = $evolutionDraw->getInitJs() . "\n" . $jsContentEvolution;
             foreach ($this->drawItems as &$di) {
                 $uid = $di['uid'] ?? '';

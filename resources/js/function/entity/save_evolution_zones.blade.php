@@ -85,6 +85,60 @@ window['__name__'] = function() {
         console.log('[Evolution Save] WS Response:', response);
     };
 
+    // Funzione per chiudere la modal di evoluzione
+    var closeModal = function() {
+        var idsToHide = [
+            modalUid + '_body', modalUid + '_header', modalUid + '_title',
+            modalUid + '_close_button', modalUid + '_close_text', modalUid + '_content_viewport',
+            modalUid + '_save_button_rect', modalUid + '_save_button_text',
+        ];
+
+        idsToHide.forEach(function(uid) {
+            if (shapes[uid]) shapes[uid].renderable = false;
+            if (objects[uid] && objects[uid].attributes) objects[uid].attributes.renderable = false;
+        });
+
+        // Nasconde anche la griglia se presente
+        if (typeof window['showGrid_' + modalUid] === 'function') {
+            window['showGrid_' + modalUid](false);
+        }
+
+        if (typeof AppData !== 'undefined') AppData.open_modals[modalUid] = false;
+        window.__disableGlobalPan = false;
+        if (app && app.stage) app.stage.sortChildren();
+    };
+
+    // Funzione per rendere grigio il pulsante 'evoluzione' nell'entity panel
+    var grayOutEvolutionButton = function() {
+        var entityUid = (typeof AppData !== 'undefined') ? AppData.actual_focus_uid_entity : null;
+        if (!entityUid) {
+            console.warn('[Evolution Save] No entity uid found for graying out evolution button');
+            return;
+        }
+
+        var evolutionButtonRectUid = entityUid + '_button_evolution_rect';
+        var evolutionButtonTextUid = entityUid + '_button_evolution_text';
+
+        // Cambia il colore solo del rect a grigio scuro (mantieni il testo bianco) e rimuovi il pointer
+        if (shapes[evolutionButtonRectUid]) {
+            shapes[evolutionButtonRectUid].tint = 0x404040;
+            shapes[evolutionButtonRectUid].renderable = true;
+            shapes[evolutionButtonRectUid].interactive = false;
+            shapes[evolutionButtonRectUid].buttonMode = false;
+        }
+        if (shapes[evolutionButtonTextUid]) {
+            shapes[evolutionButtonTextUid].renderable = true;
+        }
+
+        // Rimuovi l'interattività dal pulsante (rendendolo non cliccabile)
+        if (objects[evolutionButtonRectUid]) {
+            objects[evolutionButtonRectUid].attributes = objects[evolutionButtonRectUid].attributes || {};
+            objects[evolutionButtonRectUid].attributes.interactives = {};
+        }
+
+        console.log('[Evolution Save] Evolution button grayed out for entity:', entityUid);
+    };
+
     if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
         ws = new WebSocket(wsUrl);
         window.gameWebSockets[port] = ws;
@@ -93,7 +147,13 @@ window['__name__'] = function() {
             console.log('[Evolution Save] WS Connected to ' + wsUrl);
             sendCommand();
         };
-        ws.onmessage = onMessage;
+        ws.onmessage = function(event) {
+            onMessage(event);
+            // Chiude la modal dopo aver ricevuto la risposta dal server
+            closeModal();
+            // Rende grigio il pulsante 'evoluzione'
+            grayOutEvolutionButton();
+        };
         ws.onerror = function(error) {
             console.error('[Evolution Save] WS Error:', error);
         };
@@ -103,6 +163,15 @@ window['__name__'] = function() {
         } else if (ws.readyState === WebSocket.CONNECTING) {
             ws.addEventListener('open', sendCommand, { once: true });
         }
+        // Chiude la modal dopo aver inviato il comando
+        // Usiamo onmessage per chiudere la modal dopo la risposta
+        var originalOnMessage = ws.onmessage;
+        ws.onmessage = function(event) {
+            if (originalOnMessage) originalOnMessage(event);
+            closeModal();
+            // Rende grigio il pulsante 'evoluzione'
+            grayOutEvolutionButton();
+        };
     }
 };
 window['__name__']();

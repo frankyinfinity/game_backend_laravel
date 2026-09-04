@@ -115,15 +115,49 @@
             });
         };
 
+        const resolveBlockEvolutionEnabled = () => {
+            const wsResponse = (typeof AppData !== 'undefined') ? AppData.player_values_ws_response : null;
+            if (!wsResponse || typeof wsResponse !== 'object') return false;
+
+            const valuesFromDocker = wsResponse.data && wsResponse.data.values;
+            if (valuesFromDocker && typeof valuesFromDocker === 'object') {
+                return !!valuesFromDocker.block_evolution;
+            }
+
+            const directValues = wsResponse.values;
+            if (directValues && typeof directValues === 'object') {
+                return !!directValues.block_evolution;
+            }
+
+            return false;
+        };
+
         const applyEvolutionButtonVisibility = () => {
             const forceDrawButtons = objects[panel_uid] && objects[panel_uid].attributes && objects[panel_uid].attributes.force_draw_buttons;
             const evolutionEnabled = forceDrawButtons ? true : resolveEvolutionEnabled();
-            const evolutionButtonUids = [object_uid + '_button_evolution_rect', object_uid + '_button_evolution_text'];
-            evolutionButtonUids.forEach((uid) => {
+            const blockEvolution = resolveBlockEvolutionEnabled();
+            const evolutionButtonRectUid = object_uid + '_button_evolution_rect';
+            const evolutionButtonTextUid = object_uid + '_button_evolution_text';
+            
+            // Gestisci la visibilità del pulsante
+            [evolutionButtonRectUid, evolutionButtonTextUid].forEach((uid) => {
                 if (shapes[uid]) {
                     shapes[uid].renderable = !!(show && evolutionEnabled);
                 }
             });
+            
+            // Se block_evolution è true, rendi grigio solo il rect (non il testo) e rimuovi il pointer
+            if (shapes[evolutionButtonRectUid]) {
+                if (blockEvolution && evolutionEnabled) {
+                    shapes[evolutionButtonRectUid].tint = 0x404040;
+                    shapes[evolutionButtonRectUid].interactive = false;
+                    shapes[evolutionButtonRectUid].buttonMode = false;
+                } else {
+                    shapes[evolutionButtonRectUid].tint = 0xFFFFFF;
+                    shapes[evolutionButtonRectUid].interactive = true;
+                    shapes[evolutionButtonRectUid].buttonMode = true;
+                }
+            }
         };
 
         // Figli del pannello entity

@@ -59,7 +59,7 @@ class TestDrawCommand extends Command
             $square->setOrigin(100, 100);
             $square->setSize(32);
 
-            $entityDraw = new EntityDraw($entity, $square, false);
+            $entityDraw = new EntityDraw($entity, $square, true);
 
             foreach ($entityDraw->getDrawItems() as $item) {
                 $drawItems[] = (new ObjectDraw($item, $sessionId))->get();

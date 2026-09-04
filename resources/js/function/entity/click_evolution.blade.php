@@ -6,6 +6,14 @@
             return;
         }
 
+        // Controlla se il pulsante è grigio (bloccato) - non aprire la modal
+        const evolutionButtonRectUid = entityUid + '_button_evolution_rect';
+        const evolutionButtonRect = shapes[evolutionButtonRectUid];
+        if (evolutionButtonRect && evolutionButtonRect.tint === 0x404040) {
+            console.log('Evolution button is blocked (gray), modal will not open');
+            return;
+        }
+
         const modalUid = entityUid + '_evolution_modal';
 
         const toggleModal = function() {
