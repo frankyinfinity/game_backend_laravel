@@ -24,6 +24,7 @@ use App\Models\BirthRegionDetail;
 use App\Models\BirthRegionDetailData;
 use App\Models\ElementHasTile;
 use App\Models\BirthClimate;
+use App\Models\FamilyTile;
 use App\Jobs\CalculateChimicalElementJob;
 use App\Jobs\ConsumeChimicalElementJob;
 use App\Jobs\EvolutionSaveJob;
