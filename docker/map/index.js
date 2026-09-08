@@ -20,6 +20,7 @@ let sessionCookie = null;
 let xsrfToken = null;
 let latestTilesByBirthRegion = null;
 let latestBirthRegionDetails = null;
+let tileWalkable = null;
 
 function findTileInCache(tileI, tileJ) {
   if (!latestTilesByBirthRegion || !Array.isArray(latestTilesByBirthRegion.tiles)) {
@@ -41,8 +42,28 @@ function findDetailsInCache(tileI, tileJ) {
   )) || null;
 }
 
+function parseTileWalkableFromApiResponse(response) {
+  // La variabile viene popolata SOLO dalla risposta API
+  if (response && Array.isArray(response.tile_walkable)) {
+    console.log(`[Map] tileWalkable received from API: ${response.tile_walkable.length}x${response.tile_walkable[0]?.length || 0}`);
+    return response.tile_walkable;
+  }
+
+  console.log('[Map] parseTileWalkableFromApiResponse: no tile_walkable array in API response');
+  return null;
+}
+
 function handleWebSocketCommand(data, ws) {
   const { command, params } = data || {};
+
+  if (command === 'get_tile_walkable') {
+    ws.send(JSON.stringify({
+      success: true,
+      tile_walkable: tileWalkable,
+      dimensions: tileWalkable ? { rows: tileWalkable.length, cols: tileWalkable[0].length } : null,
+    }));
+    return;
+  }
 
   if (command === 'get_tile_info') {
     const tileI = params ? params.tile_i : undefined;
@@ -218,6 +239,9 @@ async function bootstrapAndStartLoop() {
     console.error(`[Map] Initial get_tiles_by_birth_region error: ${error.message}`);
   }
 
+  // Fetch tile walkable once after login
+  fetchTileWalkableOnce();
+
   setTimeout(() => {
     callGetBirthRegionDetails()
       .then((details) => {
@@ -308,6 +332,14 @@ function callGetBirthRegionDetails() {
   );
 }
 
+function callGetTileWalkable() {
+  return callGameApi(
+    '/api/auth/game/get_tile_walkable',
+    { birth_region_id: birthRegionId },
+    'get_tile_walkable'
+  );
+}
+
 async function runCycle() {
   const results = await Promise.allSettled([
     callSetElementInMap(),
@@ -326,6 +358,17 @@ async function runCycle() {
   }
 
   scheduleNextCycle();
+}
+
+function fetchTileWalkableOnce() {
+  callGetTileWalkable()
+    .then((response) => {
+      tileWalkable = parseTileWalkableFromApiResponse(response);
+      console.log(`[Map] tileWalkable loaded once: ${tileWalkable ? `${tileWalkable.length}x${tileWalkable[0]?.length || 0}` : 'null'}`);
+    })
+    .catch((error) => {
+      console.error(`[Map] fetchTileWalkableOnce error: ${error.message}`);
+    });
 }
 
 function runBirthRegionDetailsCycle() {

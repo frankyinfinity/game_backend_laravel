@@ -784,6 +784,61 @@ class GameController extends Controller
         ]);
     }
 
+    public function getTileWalkable(Request $request): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+        $birthRegionId = (int) $request->input('birth_region_id');
+        if ($birthRegionId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'birth_region_id obbligatorio',
+            ], 422);
+        }
+
+        $birthRegion = BirthRegion::query()
+            ->with(['birthClimate'])
+            ->find($birthRegionId);
+
+        if ($birthRegion === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Birth region non trovata',
+            ], 404);
+        }
+
+        $tiles = Helper::getBirthRegionTiles($birthRegion)->values()->toArray();
+
+        // Find map dimensions
+        $maxI = 0;
+        $maxJ = 0;
+        foreach ($tiles as $tileData) {
+            if ($tileData['i'] > $maxI) $maxI = $tileData['i'];
+            if ($tileData['j'] > $maxJ) $maxJ = $tileData['j'];
+        }
+
+        // Create 2D array filled with 0 (not walkable by default)
+        $tileWalkable = array_fill(0, $maxI + 1, array_fill(0, $maxJ + 1, 0));
+
+        // Set walkable based on tile type: 1 = liquid (walkable), 0 = solid (not walkable)
+        foreach ($tiles as $tileData) {
+            $i = (int) $tileData['i'];
+            $j = (int) $tileData['j'];
+            $tileType = $tileData['tile']['type'] ?? null;
+            // TYPE_LIQUID = 1 (walkable), TYPE_SOLID = 0 (not walkable)
+            $tileWalkable[$i][$j] = ($tileType == FamilyTile::TYPE_LIQUID) ? 1 : 0;
+        }
+
+        return response()->json([
+            'success' => true,
+            'birth_region_id' => $birthRegionId,
+            'tile_walkable' => $tileWalkable,
+            'dimensions' => [
+                'rows' => $maxI + 1,
+                'cols' => $maxJ + 1,
+            ],
+        ]);
+    }
+
     public function getBirthRegionDetails(Request $request): \Illuminate\Http\JsonResponse
     {
         ini_set('memory_limit', '-1');
