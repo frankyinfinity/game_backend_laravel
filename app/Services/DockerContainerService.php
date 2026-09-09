@@ -129,6 +129,9 @@ class DockerContainerService
             'REVERB_APP_ID=' . (env('REVERB_APP_ID') ?: 'game'),
             'REVERB_APP_KEY=' . (env('REVERB_APP_KEY') ?: 'game-key'),
             'REVERB_APP_SECRET=' . (env('REVERB_APP_SECRET') ?: 'game-secret'),
+            'WS_GATEWAY_HOST=' . (env('WS_GATEWAY_CONTAINER') ?: 'ws-gateway'),
+            'WS_GATEWAY_PORT=' . (env('WS_GATEWAY_PORT') ?: '9001'),
+            'MAP_WS_PORT=' . (env('MAP_WS_PORT') ?: '8080'),
         ];
 
         $labels = $this->playerGroupingLabels($playerId, 'entity');

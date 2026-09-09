@@ -71,8 +71,9 @@ let localCurrentTileI = null;
 let localCurrentTileJ = null;
 let isPositionInitialized = false;
 
-// Configurazione per connettersi al container map
-const mapWsHost = process.env.MAP_WS_HOST || 'map';
+// Configurazione per connettersi al container map tramite ws-gateway
+const wsGatewayHost = process.env.WS_GATEWAY_HOST || 'ws-gateway';
+const wsGatewayPort = process.env.WS_GATEWAY_PORT || 9001;
 const mapWsPort = process.env.MAP_WS_PORT || 8080;
 
 // function to handle login and session
@@ -436,11 +437,14 @@ wss.on('connection', (ws) => {
 function handleWebSocketCommand(data, ws) {
   const { command, params } = data;
 
+  // Supporta sia params.target_i che data.target_i direttamente
+  const moveParams = params || data;
+
   switch (command) {
     case 'move':
       // Esegui un movimento con azione specifica (up, down, left, right) o coordinate target
-      if (params && (params.action || (params.target_i !== undefined && params.target_j !== undefined))) {
-        performMovement(params, (result) => {
+      if (moveParams && (moveParams.action || (moveParams.target_i !== undefined && moveParams.target_j !== undefined))) {
+        performMovement(moveParams, (result) => {
           ws.send(JSON.stringify(result));
         });
       } else {
@@ -548,10 +552,11 @@ function handleWebSocketCommand(data, ws) {
   }
 }
 
-// Funzione per connettersi al map container via WebSocket e ottenere l'array walkable
+// Funzione per connettersi al map container via WebSocket (tramite ws-gateway) e ottenere l'array walkable
 function getWalkableFromMap(callback) {
-  const mapWsUrl = `ws://${mapWsHost}:${mapWsPort}`;
-  console.log(`[Entity ${entityUid}] Connecting to map WebSocket: ${mapWsUrl}`);
+  // Usa il ws-gateway come tramite, specificando la porta del map container
+  const mapWsUrl = `ws://${wsGatewayHost}:${wsGatewayPort}?port=${mapWsPort}`;
+  console.log(`[Entity ${entityUid}] Connecting to map via ws-gateway: ${mapWsUrl}`);
 
   const ws = new WebSocket(mapWsUrl);
   let isResolved = false;
@@ -921,6 +926,7 @@ function fetchCurrentPositionFromApi(callback) {
 // Funzione per eseguire un movimento specifico
 // Utilizza WebSocket per ottenere l'array walkable dal map container
 // e calcola il percorso con BFS dalla posizione attuale al target
+// Supporta sia coordinate target (target_i, target_j) che azioni (up, down, left, right)
 function performMovement(params, callback) {
   if (!sessionCookie) {
     callback({ success: false, error: 'No session cookie' });
@@ -931,13 +937,63 @@ function performMovement(params, callback) {
   let targetI, targetJ;
 
   if (params.target_i !== undefined && params.target_j !== undefined) {
+    // Modalità coordinate: clicco su un tile
     targetI = Number(params.target_i);
     targetJ = Number(params.target_j);
+  } else if (params.action) {
+    // Modalità azione: uso le freccette (up, down, left, right)
+    const action = params.action.toLowerCase();
+    const actionMap = {
+      'up': { di: -1, dj: 0 },
+      'down': { di: 1, dj: 0 },
+      'left': { di: 0, dj: -1 },
+      'right': { di: 0, dj: 1 },
+    };
+
+    if (!actionMap[action]) {
+      callback({ success: false, error: `Invalid action: ${params.action}` });
+      return;
+    }
+
+    // Per le azioni, abbiamo bisogno della posizione corrente prima di calcolare il target
+    const getPositionForAction = () => {
+      if (isPositionInitialized && localCurrentTileI !== null && localCurrentTileJ !== null) {
+        return { i: localCurrentTileI, j: localCurrentTileJ };
+      }
+      return null;
+    };
+
+    const currentPos = getPositionForAction();
+    if (!currentPos) {
+      // Se non abbiamo la posizione, la otteniamo dall'API
+      fetchCurrentPositionFromApi((result) => {
+        if (result.success) {
+          localCurrentTileI = result.tile_i;
+          localCurrentTileJ = result.tile_j;
+          isPositionInitialized = true;
+          targetI = result.tile_i + actionMap[action].di;
+          targetJ = result.tile_j + actionMap[action].dj;
+          startMovement(targetI, targetJ, callback);
+        } else {
+          callback({ success: false, error: 'Failed to get current position for action' });
+        }
+      });
+      return;
+    }
+
+    targetI = currentPos.i + actionMap[action].di;
+    targetJ = currentPos.j + actionMap[action].dj;
   } else {
-    callback({ success: false, error: 'Target coordinates (target_i, target_j) are required' });
+    callback({ success: false, error: 'Target coordinates (target_i, target_j) or action is required' });
     return;
   }
 
+  // Avvia il movimento con le coordinate target calcolate
+  startMovement(targetI, targetJ, callback);
+}
+
+// Funzione condivisa per avviare il movimento (usata sia da coordinate che da azioni)
+function startMovement(targetI, targetJ, callback) {
   // Funzione per inizializzare la posizione (solo la prima volta tramite API)
   const initializePosition = (onInitialized) => {
     if (isPositionInitialized && localCurrentTileI !== null && localCurrentTileJ !== null) {
