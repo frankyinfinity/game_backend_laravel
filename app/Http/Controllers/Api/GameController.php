@@ -1262,6 +1262,37 @@ class GameController extends Controller
     }
 
     /**
+     * Ottiene la posizione attuale di un'entity
+     */
+    public function getPosition(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entityUid = $request->query('entity_uid');
+
+        if (!$entityUid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'entity_uid is required',
+            ], 400);
+        }
+
+        $entity = Entity::query()->where('uid', $entityUid)->first();
+
+        if (!$entity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'entity_uid' => $entityUid,
+            'tile_i' => (int) $entity->tile_i,
+            'tile_j' => (int) $entity->tile_j,
+        ]);
+    }
+
+    /**
      * Gestisce il movimento di un'entity
      */
     public function movement(Request $request): \Illuminate\Http\JsonResponse
