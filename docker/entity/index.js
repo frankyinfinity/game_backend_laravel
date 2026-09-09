@@ -675,7 +675,7 @@ function findPathBFS(tileWalkable, startI, startJ, targetI, targetJ) {
   return { success: false, error: 'No path found to target' };
 }
 
-// Funzione per disegnare il path tramite Pusher (stesso pattern del container alert)
+// Funzione per disegnare il path come linea rossa con punti al centro dei tile
 function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
   if (!path || path.length === 0) {
     console.log(`[Entity ${entityUid}] No path to draw`);
@@ -683,81 +683,60 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
   }
 
   const requestId = 'path_' + Date.now();
-  const pathColor = '0x10B981'; // Verde per il path
-  const targetColor = '0xEF4444'; // Rosso per il target
-  const currentColor = '0x3B82F6'; // Blu per la posizione corrente
+  const tileSize = 32;
+  const pathColor = '0xEF4444'; // Rosso per il path
 
   // Costruisci gli elementi del path da disegnare
   const pathItems = [];
 
-  // Aggiungi un rettangolo trasparente per ogni tile del path
-  path.forEach((step, index) => {
+  // Calcola i centri di tutti i tile (incluso quello iniziale)
+  const centers = [];
+
+  // Posizione iniziale
+  const startCenterX = currentJ * tileSize + tileSize / 2;
+  const startCenterY = currentI * tileSize + tileSize / 2;
+  centers.push({ x: startCenterX, y: startCenterY });
+
+  // Centri di ogni tile nel path
+  path.forEach((step) => {
+    const centerX = step.j * tileSize + tileSize / 2;
+    const centerY = step.i * tileSize + tileSize / 2;
+    centers.push({ x: centerX, y: centerY });
+  });
+
+  // Disegna le linee che collegano i punti
+  for (let i = 0; i < centers.length - 1; i++) {
     pathItems.push({
       type: 'draw',
       object: {
-        uid: `${requestId}_tile_${index}`,
-        type: 'rectangle',
-        x: step.j * 32, // Assuming 32px tile size
-        y: step.i * 32,
-        width: 32,
-        height: 32,
+        uid: `${requestId}_line_${i}`,
+        type: 'line',
+        x1: centers[i].x,
+        y1: centers[i].y,
+        x2: centers[i + 1].x,
+        y2: centers[i + 1].y,
         color: pathColor,
-        borderColor: pathColor,
-        thickness: 2,
-        borderRadius: 4,
-        opacity: 0.5,
+        thickness: 3,
       },
     });
-  });
+  }
 
-  // Aggiungi il marker per la posizione corrente
-  pathItems.push({
-    type: 'draw',
-    object: {
-      uid: `${requestId}_current`,
-      type: 'rectangle',
-      x: currentJ * 32,
-      y: currentI * 32,
-      width: 32,
-      height: 32,
-      color: currentColor,
-      borderColor: currentColor,
-      thickness: 3,
-      borderRadius: 8,
-      opacity: 0.7,
-    },
-  });
-
-  // Aggiungi il marker per il target
-  pathItems.push({
-    type: 'draw',
-    object: {
-      uid: `${requestId}_target`,
-      type: 'rectangle',
-      x: targetJ * 32,
-      y: targetI * 32,
-      width: 32,
-      height: 32,
-      color: targetColor,
-      borderColor: targetColor,
-      thickness: 3,
-      borderRadius: 8,
-      opacity: 0.7,
-    },
-  });
-
-  // Aggiungi il testo con la distanza
-  pathItems.push({
-    type: 'draw',
-    object: {
-      uid: `${requestId}_text`,
-      type: 'text',
-      text: `Path: ${path.length} steps`,
-      x: targetJ * 32,
-      y: targetI * 32 - 20,
-      fontSize: 14,
-      color: '0x000000',
-    },
+  // Disegna i punti (cerchi) al centro di ogni tile
+  centers.forEach((center, index) => {
+    const isStart = index === 0;
+    pathItems.push({
+      type: 'draw',
+      object: {
+        uid: `${requestId}_dot_${index}`,
+        type: 'circle',
+        x: center.x,
+        y: center.y,
+        radius: isStart ? 8 : 6,
+        color: pathColor,
+        borderColor: pathColor,
+        thickness: isStart ? 3 : 2,
+      },
+    });
   });
 
   const drawPayload = {
@@ -770,7 +749,6 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
   // Invia tramite Pusher (stesso pattern del container alert)
   const channelName = 'player_' + playerId + '_channel';
   console.log(`[Entity ${entityUid}] Drawing path via Pusher on channel: ${channelName}`);
-  console.log(`[Entity ${entityUid}] Draw payload: ${JSON.stringify(drawPayload)}`);
 
   pusher.trigger(channelName, 'draw_interface', drawPayload)
     .then(() => {
@@ -779,10 +757,122 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
     .catch((err) => {
       console.error(`[Entity ${entityUid}] ⛔ Pusher draw FAILED`);
       console.error(`[Entity ${entityUid}]   Channel : ${channelName}`);
-      console.error(`[Entity ${entityUid}]   Event   : draw_interface`);
       console.error(`[Entity ${entityUid}]   Target  : ${reverbScheme}://${reverbHost}:${reverbPort}`);
       console.error(`[Entity ${entityUid}]   Message : ${err.message || '(no message)'}`);
     });
+}
+
+// Funzione per cancellare il path disegnato (linee e punti)
+function clearPathViaPusher(pathLength) {
+  const requestId = 'path_clear_' + Date.now();
+
+  // Costruisci gli elementi da rimuovere (linee e punti)
+  const clearItems = [];
+
+  // Cancella le linee (sono pathLength - 1 linee tra pathLength punti)
+  // Ma abbiamo pathLength + 1 punti (incluso start), quindi pathLength linee
+  const totalLines = pathLength;
+  for (let i = 0; i < totalLines; i++) {
+    clearItems.push({
+      type: 'update',
+      uid: `path_${requestId}_line_${i}`,
+      attributes: { renderable: false },
+    });
+  }
+
+  // Cancella i punti (pathLength + 1 punti, incluso start)
+  const totalDots = pathLength + 1;
+  for (let i = 0; i < totalDots; i++) {
+    clearItems.push({
+      type: 'update',
+      uid: `path_${requestId}_dot_${i}`,
+      attributes: { renderable: false },
+    });
+  }
+
+  const clearPayload = {
+    type: 'draw_interface',
+    request_id: requestId,
+    player_id: playerId,
+    items: clearItems,
+  };
+
+  const channelName = 'player_' + playerId + '_channel';
+  console.log(`[Entity ${entityUid}] Clearing path via Pusher on channel: ${channelName}`);
+
+  pusher.trigger(channelName, 'draw_interface', clearPayload)
+    .then(() => {
+      console.log(`[Entity ${entityUid}] Path cleared successfully via Pusher`);
+    })
+    .catch((err) => {
+      console.error(`[Entity ${entityUid}] ⛔ Pusher clear FAILED: ${err.message}`);
+    });
+}
+
+// Funzione per muovere l'entity tile per tile con animazione
+// Invia tutti i dati del movimento in un'unica chiamata Pusher
+function moveEntityAlongPath(path, callback) {
+  if (!path || path.length === 0) {
+    console.log(`[Entity ${entityUid}] No path to move along`);
+    if (callback) callback();
+    return;
+  }
+
+  const totalSteps = path.length;
+  const moveInterval = 400; // 400ms per tile
+
+  console.log(`[Entity ${entityUid}] Starting movement along ${totalSteps} tiles`);
+
+  // Prepara tutti i step del movimento
+  const movementSteps = path.map((step, index) => ({
+    tile_i: step.i,
+    tile_j: step.j,
+    step: index + 1,
+    delay_ms: (index + 1) * moveInterval,
+  }));
+
+  // Invia tutti i dati del movimento in un'unica chiamata Pusher
+  const movePayload = {
+    type: 'entity_movement',
+    entity_uid: entityUid,
+    steps: movementSteps,
+    total_steps: totalSteps,
+    interval_ms: moveInterval,
+    path_length: totalSteps,
+  };
+
+  const channelName = 'player_' + playerId + '_channel';
+  console.log(`[Entity ${entityUid}] Sending movement data via Pusher on channel: ${channelName}`);
+
+  pusher.trigger(channelName, 'entity_movement', movePayload)
+    .then(() => {
+      console.log(`[Entity ${entityUid}] Movement data sent successfully via Pusher`);
+    })
+    .catch((err) => {
+      console.error(`[Entity ${entityUid}] ⛔ Movement data FAILED: ${err.message}`);
+    });
+
+  // Aggiorna la posizione locale dopo l'invio
+  let currentStep = 0;
+  const updatePosition = () => {
+    if (currentStep >= totalSteps) {
+      console.log(`[Entity ${entityUid}] Movement completed!`);
+      // Cancella il path una volta arrivati alla fine
+      clearPathViaPusher(totalSteps);
+      if (callback) callback();
+      return;
+    }
+
+    const step = path[currentStep];
+    localCurrentTileI = step.i;
+    localCurrentTileJ = step.j;
+    currentStep++;
+
+    setTimeout(updatePosition, moveInterval);
+  };
+
+  // Inizia l'aggiornamento della posizione locale
+  setTimeout(updatePosition, moveInterval);
 }
 
 // Funzione per ottenere la posizione attuale dal backend (solo la prima volta)
@@ -897,17 +987,15 @@ function performMovement(params, callback) {
     console.log(`[Entity ${entityUid}] Movement Result:`);
     console.log(JSON.stringify(movementResult, null, 2));
 
-    // Disegna il path tramite Pusher (stile uguale al vecchio movimento via API)
+    // Disegna il path tramite Pusher (linea rossa con punti)
     if (pathResult.success && pathResult.path.length > 0) {
       drawPathViaPusher(pathResult.path, currentI, currentJ, targetI, targetJ);
-    }
 
-    // Aggiorna la posizione locale se il percorso è stato trovato
-    if (pathResult.success && pathResult.path.length > 0) {
-      const lastStep = pathResult.path[pathResult.path.length - 1];
-      localCurrentTileI = lastStep.i;
-      localCurrentTileJ = lastStep.j;
-      console.log(`[Entity ${entityUid}] Local position updated to: (${localCurrentTileI}, ${localCurrentTileJ})`);
+      // Avvia il movimento dell'entity lungo il path (400ms per tile)
+      moveEntityAlongPath(pathResult.path, () => {
+        // Questo viene chiamato quando il movimento è completato
+        console.log(`[Entity ${entityUid}] Movement along path completed`);
+      });
     }
 
     callback({
