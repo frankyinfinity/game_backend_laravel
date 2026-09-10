@@ -57,8 +57,11 @@ function handleWebSocketCommand(data, ws) {
   const { command, params } = data || {};
 
   if (command === 'get_tile_walkable') {
+    const requestId = data.request_id ?? params?.request_id ?? null;
     ws.send(JSON.stringify({
       success: true,
+      request_id: requestId,
+      command: 'get_tile_walkable',
       tile_walkable: tileWalkable,
       dimensions: tileWalkable ? { rows: tileWalkable.length, cols: tileWalkable[0].length } : null,
     }));
@@ -346,11 +349,24 @@ async function runCycle() {
   const results = await Promise.allSettled([
     callSetElementInMap(),
     callGetTilesByBirthRegion(),
+    callGetTileWalkable(),
   ]);
 
   const getTilesResult = results[1];
   if (getTilesResult && getTilesResult.status === 'fulfilled') {
     latestTilesByBirthRegion = getTilesResult.value;
+  }
+
+  // Mantieni fresco l'array walkable: se la prima fetch fallisce (o il map
+  // parte prima che l'API sia pronta), dai tentativi successivi l'array
+  // verrà comunque popolato → le entity non restano bloccate su
+  // "tile_walkable: null" per sempre.
+  const getWalkableResult = results[2];
+  if (getWalkableResult && getWalkableResult.status === 'fulfilled') {
+    const walkable = parseTileWalkableFromApiResponse(getWalkableResult.value);
+    if (walkable) {
+      tileWalkable = walkable;
+    }
   }
 
   for (const result of results) {

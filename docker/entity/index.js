@@ -54,6 +54,10 @@ const CHIMICAL_WAIT_SECONDS = 30;
 const POSITION_WAIT_SECONDS = 10;
 const DEGRADATION_WAIT_SECONDS = 60;
 
+// Timeout per le richieste walkable al map (sovrascrivibili via env, es. nei test)
+const WALKABLE_RESPONSE_TIMEOUT_MS = parseInt(process.env.WALKABLE_RESPONSE_TIMEOUT_MS || '5000', 10);
+const WALKABLE_RETRY_DELAY_MS = parseInt(process.env.WALKABLE_RETRY_DELAY_MS || '1000', 10);
+
 // Queue per serializzare le chiamate API e evitare socket hang up
 let apiQueue = [];
 let isApiCallInProgress = false;
@@ -76,6 +80,8 @@ function enqueueApiCall(fn, callback) {
   apiQueue.push({ fn, callback });
   processApiQueue();
 }
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Variabili per tracciare la posizione attuale e i geni
 let currentTileI = entityTileI;
@@ -473,6 +479,9 @@ function handleWebSocketCommand(data, ws) {
       // Esegui un movimento con azione specifica (up, down, left, right) o coordinate target
       if (moveParams && (moveParams.action || (moveParams.target_i !== undefined && moveParams.target_j !== undefined))) {
         performMovement(moveParams, (result) => {
+          if (!result || !result.success) {
+            console.error(`[Entity ${entityUid}] ⛔ Move failed: ${JSON.stringify(result)}`);
+          }
           ws.send(JSON.stringify(result));
         });
       } else {
@@ -582,7 +591,10 @@ function handleWebSocketCommand(data, ws) {
 
 // Funzione per connettersi al map container e ottenere l'array walkable
 // Prova automaticamente: 1) via ws-gateway, 2) connessione diretta al map
+// Ogni richiesta usa un request_id univoco: vengono accettate SOLO le risposte
+// con lo stesso request_id (il messaggio di benvenuto del map viene ignorato).
 function getWalkableFromMap(callback) {
+  const requestId = 'walkable_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
   const maxRetriesPerMethod = 2;
 
   // Metodo 1: Connessione via ws-gateway
@@ -604,33 +616,54 @@ function getWalkableFromMap(callback) {
           tryDirectConnection();
         }
       }
-    }, 3000);
+    }, WALKABLE_RESPONSE_TIMEOUT_MS);
 
     ws.on('open', () => {
       console.log(`[Entity ${entityUid}] Connected via ws-gateway, requesting walkable array...`);
-      ws.send(JSON.stringify({ command: 'get_tile_walkable' }));
+      ws.send(JSON.stringify({ request_id: requestId, command: 'get_tile_walkable' }));
     });
 
     ws.on('message', (data) => {
+      let response;
       try {
-        const response = JSON.parse(data.toString());
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeout);
-          ws.close();
-          if (response.success && response.tile_walkable) {
-            console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
-            callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
-          } else {
-            callback({ success: false, error: 'Invalid response from map', response });
-          }
-        }
+        response = JSON.parse(data.toString());
       } catch (error) {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeout);
-          ws.close();
-          tryDirectConnection();
+        // Frame non JSON: non è la risposta che cerchiamo
+        return;
+      }
+
+      // Ignora i messaggi che non sono la risposta alla nostra richiesta
+      // (es. il messaggio di benvenuto del map) → non risolviamo più il
+      // movimento con un falso errore.
+      if (String(response.request_id || '') !== String(requestId)) {
+        return;
+      }
+
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeout);
+        ws.close();
+
+        if (response.success && Array.isArray(response.tile_walkable)) {
+          console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
+          callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
+        } else if (response.success && response.tile_walkable === null) {
+          // Il map non ha ancora caricato l'array walkable: riprova
+          console.error(`[Entity ${entityUid}] Map walkable array not ready yet (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
+          if (retryCount < maxRetriesPerMethod) {
+            setTimeout(() => tryViaGateway(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
+          } else {
+            // Fallback: prova connessione diretta
+            tryDirectConnection();
+          }
+        } else {
+          console.error(`[Entity ${entityUid}] Invalid response from map: ${JSON.stringify(response)}`);
+          if (retryCount < maxRetriesPerMethod) {
+            setTimeout(() => tryViaGateway(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
+          } else {
+            // Fallback: prova connessione diretta
+            tryDirectConnection();
+          }
         }
       }
     });
@@ -673,36 +706,57 @@ function getWalkableFromMap(callback) {
         if (retryCount < maxRetriesPerMethod) {
           setTimeout(() => tryDirectConnection(retryCount + 1), 500);
         } else {
-          callback({ success: false, error: 'All connection methods failed' });
+          console.error(`[Entity ${entityUid}] ⛔ All connection methods failed (requestId ${requestId})`);
+          callback({ success: false, error: 'All connection methods failed', request_id: requestId });
         }
       }
-    }, 3000);
+    }, WALKABLE_RESPONSE_TIMEOUT_MS);
 
     ws.on('open', () => {
       console.log(`[Entity ${entityUid}] Connected directly to map, requesting walkable array...`);
-      ws.send(JSON.stringify({ command: 'get_tile_walkable' }));
+      ws.send(JSON.stringify({ request_id: requestId, command: 'get_tile_walkable' }));
     });
 
     ws.on('message', (data) => {
+      let response;
       try {
-        const response = JSON.parse(data.toString());
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeout);
-          ws.close();
-          if (response.success && response.tile_walkable) {
-            console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
-            callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
-          } else {
-            callback({ success: false, error: 'Invalid response from map', response });
-          }
-        }
+        response = JSON.parse(data.toString());
       } catch (error) {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeout);
-          ws.close();
-          callback({ success: false, error: `Parse error: ${error.message}` });
+        // Frame non JSON: non è la risposta che cerchiamo
+        return;
+      }
+
+      // Ignora i messaggi che non sono la risposta alla nostra richiesta
+      // (es. il messaggio di benvenuto del map).
+      if (String(response.request_id || '') !== String(requestId)) {
+        return;
+      }
+
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeout);
+        ws.close();
+
+        if (response.success && Array.isArray(response.tile_walkable)) {
+          console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
+          callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
+        } else if (response.success && response.tile_walkable === null) {
+          // Il map non ha ancora caricato l'array walkable: riprova
+          console.error(`[Entity ${entityUid}] Map walkable array not ready yet (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
+          if (retryCount < maxRetriesPerMethod) {
+            setTimeout(() => tryDirectConnection(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
+          } else {
+            console.error(`[Entity ${entityUid}] ⛔ Map never provided the walkable array (requestId ${requestId})`);
+            callback({ success: false, error: 'Walkable array not available from map', request_id: requestId });
+          }
+        } else {
+          console.error(`[Entity ${entityUid}] Invalid response from map: ${JSON.stringify(response)}`);
+          if (retryCount < maxRetriesPerMethod) {
+            setTimeout(() => tryDirectConnection(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
+          } else {
+            console.error(`[Entity ${entityUid}] ⛔ All connection methods failed (requestId ${requestId})`);
+            callback({ success: false, error: 'All connection methods failed', request_id: requestId });
+          }
         }
       }
     });
@@ -1202,6 +1256,7 @@ function startMovement(targetI, targetJ, callback) {
     // Ottieni l'array walkable dal map container via WebSocket
     getWalkableFromMap((walkableResult) => {
       if (!walkableResult.success) {
+        console.error(`[Entity ${entityUid}] ⛔ Failed to get walkable array: ${walkableResult.error}`);
         callback({ success: false, error: `Failed to get walkable array: ${walkableResult.error}` });
         return;
       }
@@ -1217,6 +1272,15 @@ function startMovement(targetI, targetJ, callback) {
   });
 }
 
-// Start flow
+// Start flow: eseguito solo quando lo script viene avviato direttamente
+// (node index.js dentro il container). Importandolo come modulo (es. nei
+// test) il login non parte automaticamente.
+if (require.main === module) {
+  performLogin();
+}
 
-performLogin();
+module.exports = {
+  getWalkableFromMap,
+  findPathBFS,
+  performMovement,
+};

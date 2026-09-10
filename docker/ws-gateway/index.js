@@ -4,6 +4,9 @@ const { URL } = require('url');
 const gatewayPort = parseInt(process.env.GATEWAY_PORT || '9001', 10);
 // I container girano con --network host: il gateway inoltra a 127.0.0.1:<porta>
 const targetHost = process.env.GATEWAY_TARGET_HOST || '127.0.0.1';
+// Se l'upstream (es. il map container) non risponde entro questo tempo,
+// chiudiamo il client invece di lasciarlo appeso in attesa per sempre.
+const UPSTREAM_CONNECT_TIMEOUT_MS = parseInt(process.env.GATEWAY_UPSTREAM_TIMEOUT_MS || '8000', 10);
 
 if (!Number.isInteger(gatewayPort) || gatewayPort <= 0) {
   throw new Error(`Invalid GATEWAY_PORT: ${process.env.GATEWAY_PORT}`);
@@ -41,6 +44,25 @@ server.on('connection', (client, req) => {
   let upstreamReady = false;
   let clientClosed = false;
 
+  // Timeout sull'apertura dell'upstream: se non si apre entro il limite
+  // (es. map container non raggiungibile su questa porta), chiudiamo il
+  // client così chi ha fatto la richiesta può riprovare o usare un fallback.
+  const upstreamConnectTimer = setTimeout(() => {
+    if (!upstreamReady && !clientClosed) {
+      console.error(`[Gateway] Upstream ${upstreamUrl} did not open within ${UPSTREAM_CONNECT_TIMEOUT_MS}ms; closing client`);
+      try {
+        upstream.close();
+      } catch (error) {
+        // ignore
+      }
+      if (client.readyState === WebSocket.OPEN) {
+        client.close(1011, 'Upstream connection timeout');
+      }
+    }
+  }, UPSTREAM_CONNECT_TIMEOUT_MS);
+
+  const clearUpstreamConnectTimer = () => clearTimeout(upstreamConnectTimer);
+
   const flushPendingMessages = () => {
     while (pendingMessages.length > 0 && upstream.readyState === WebSocket.OPEN) {
       const message = pendingMessages.shift();
@@ -64,6 +86,7 @@ server.on('connection', (client, req) => {
 
   client.on('close', () => {
     clientClosed = true;
+    clearUpstreamConnectTimer();
     try {
       upstream.close();
     } catch (error) {
@@ -76,6 +99,7 @@ server.on('connection', (client, req) => {
   });
 
   upstream.on('open', () => {
+    clearUpstreamConnectTimer();
     upstreamReady = true;
     flushPendingMessages();
   });
@@ -87,12 +111,14 @@ server.on('connection', (client, req) => {
   });
 
   upstream.on('close', (code, reason) => {
+    clearUpstreamConnectTimer();
     if (!clientClosed && client.readyState === WebSocket.OPEN) {
       client.close(code || 1000, reason ? reason.toString() : 'Upstream closed');
     }
   });
 
   upstream.on('error', (error) => {
+    clearUpstreamConnectTimer();
     console.error('[Gateway] Upstream error:', error.message);
     if (client.readyState === WebSocket.OPEN) {
       client.close(1011, error.message || 'Upstream connection failed');
