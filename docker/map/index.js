@@ -124,8 +124,10 @@ function handleWebSocketCommand(data, ws) {
   }));
 }
 
-const wss = new WebSocket.Server({ port: wsPort });
-console.log(`WebSocket server listening on port ${wsPort}`);
+const wss = new WebSocket.Server({ port: wsPort, host: '0.0.0.0' });
+wss.on('listening', () => {
+  console.log(`[Map] WebSocket server listening on 0.0.0.0:${wsPort}`);
+});
 
 wss.on('connection', (ws) => {
   ws.send(JSON.stringify({

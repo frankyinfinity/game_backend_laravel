@@ -55,17 +55,20 @@ class DockerContainerService
             throw new RuntimeException("Nessuna entity trovata per il player {$player->id}");
         }
 
-        foreach ($entities as $entity) {
-            /** @var Entity $entity */
-            $this->createEntityContainer($entity, $player->id, false);
-        }
-
         $birthRegion = BirthRegion::query()->find($player->birth_region_id);
         if (!$birthRegion) {
             throw new RuntimeException("Nessuna birthRegion trovata per il player {$player->id}");
         }
 
-        $this->createMapContainer($birthRegion, $player->id, false);
+        // Crea PRIMA il map container: le entity hanno bisogno della sua ws_port reale
+        $mapContainer = $this->createMapContainer($birthRegion, $player->id, false);
+        $mapWsPort = $mapContainer && $mapContainer->ws_port ? (int) $mapContainer->ws_port : null;
+
+        foreach ($entities as $entity) {
+            /** @var Entity $entity */
+            $this->createEntityContainer($entity, $player->id, false, $mapWsPort);
+        }
+
         $this->createPlayerContainer($player, false);
         $this->createObjectiveContainer($player, false);
         $this->createCacheSyncContainer($player, false);
@@ -107,10 +110,16 @@ class DockerContainerService
         }
     }
 
-    public function createEntityContainer(Entity $entity, int $playerId, bool $start = false): Container
+    public function createEntityContainer(Entity $entity, int $playerId, bool $start = false, ?int $mapWsPort = null): Container
     {
         $imageName = 'entity:latest';
         $this->ensureImageExists($imageName);
+
+        // Su --network host i nomi contenitore NON risolvono: serve l'IP dell'host (127.0.0.1)
+        $dockerHostIp = (string) (config('remote_docker.docker_host_ip') ?: '127.0.0.1');
+
+        // Porta reale del map container (dinamica, non 8080): la cerca se non passata
+        $mapWsPort = $mapWsPort ?: $this->resolveMapWsPort($playerId);
 
         $wsPort = $this->nextWsPort();
         $name = 'entity_' . $entity->uid;
@@ -129,9 +138,11 @@ class DockerContainerService
             'REVERB_APP_ID=' . (env('REVERB_APP_ID') ?: 'game'),
             'REVERB_APP_KEY=' . (env('REVERB_APP_KEY') ?: 'game-key'),
             'REVERB_APP_SECRET=' . (env('REVERB_APP_SECRET') ?: 'game-secret'),
-            'WS_GATEWAY_HOST=' . (env('WS_GATEWAY_CONTAINER') ?: 'ws-gateway'),
+            'WS_GATEWAY_HOST=' . $dockerHostIp,
             'WS_GATEWAY_PORT=' . (env('WS_GATEWAY_PORT') ?: '9001'),
-            'MAP_WS_PORT=' . (env('MAP_WS_PORT') ?: '8080'),
+            'MAP_WS_PORT=' . ($mapWsPort ?: (env('MAP_WS_PORT') ?: '8080')),
+            'MAP_DIRECT_HOST=' . $dockerHostIp,
+            'MAP_DIRECT_PORT=' . ($mapWsPort ?: (env('MAP_WS_PORT') ?: '8080')),
         ];
 
         $labels = $this->playerGroupingLabels($playerId, 'entity');
@@ -576,6 +587,27 @@ class DockerContainerService
     {
         $maxPort = Container::query()->whereNotNull('ws_port')->max('ws_port') ?? 9000;
         return $maxPort + 1;
+    }
+
+    /**
+     * Recupera la ws_port reale del container MAP per il birth_region del player.
+     * Con --network host la porta del map è dinamica (9000+), non 8080.
+     */
+    private function resolveMapWsPort(int $playerId): ?int
+    {
+        $player = Player::query()->find($playerId);
+        if (!$player || (int) $player->birth_region_id <= 0) {
+            return null;
+        }
+
+        $mapContainer = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_MAP)
+            ->where('parent_id', $player->birth_region_id)
+            ->whereNotNull('ws_port')
+            ->orderByDesc('id')
+            ->first();
+
+        return $mapContainer ? (int) $mapContainer->ws_port : null;
     }
 
     public function ensureWebSocketGatewayRunning(): void

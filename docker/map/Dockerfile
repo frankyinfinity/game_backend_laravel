@@ -11,5 +11,8 @@ COPY index.js .
 COPY package*.json ./
 RUN npm install
 
+# Esponi la porta per il WebSocket
+EXPOSE 8080
+
 # Comando per eseguire lo script
 CMD ["node", "index.js"]

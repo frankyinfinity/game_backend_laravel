@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const { URL } = require('url');
 
 const gatewayPort = parseInt(process.env.GATEWAY_PORT || '9001', 10);
+// I container girano con --network host: il gateway inoltra a 127.0.0.1:<porta>
 const targetHost = process.env.GATEWAY_TARGET_HOST || '127.0.0.1';
 
 if (!Number.isInteger(gatewayPort) || gatewayPort <= 0) {
@@ -10,11 +11,14 @@ if (!Number.isInteger(gatewayPort) || gatewayPort <= 0) {
 
 const server = new WebSocket.Server({
   port: gatewayPort,
+  host: '0.0.0.0',
   perMessageDeflate: false,
 });
 
-console.log(`WebSocket gateway listening on port ${gatewayPort}`);
-console.log(`Routing upstream connections to ${targetHost}`);
+server.on('listening', () => {
+  console.log(`[Gateway] WebSocket gateway listening on 0.0.0.0:${gatewayPort}`);
+  console.log(`[Gateway] Routing upstream connections to ${targetHost}`);
+});
 
 server.on('connection', (client, req) => {
   const requestUrl = new URL(req.url || '/', 'http://localhost');

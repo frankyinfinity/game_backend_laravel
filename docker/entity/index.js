@@ -29,7 +29,6 @@ function resolveReverbHost(rawHost) {
   // However, 127.0.0.1 is an explicit loopback IP — respect it (used with --network host).
   if (isRunningInDocker() && (rawHost === 'localhost' || rawHost === '0.0.0.0')) {
     const resolved = process.env.DOCKER_HOST_IP || 'host.docker.internal';
-    console.log(`[Entity] Docker detected: remapping REVERB_HOST "${rawHost}" → "${resolved}"`);
     return resolved;
   }
   return rawHost;
@@ -50,15 +49,33 @@ const pusher = new Pusher({
   useTLS: reverbScheme === 'https',
 });
 
-console.log(`[Entity] Pusher initialized: ${reverbScheme}://${reverbHost}:${reverbPort}`);
+const GENES_WAIT_SECONDS = 30;
+const CHIMICAL_WAIT_SECONDS = 30;
+const POSITION_WAIT_SECONDS = 10;
+const DEGRADATION_WAIT_SECONDS = 60;
 
-const GENES_WAIT_SECONDS = 1;
-const CHIMICAL_WAIT_SECONDS = 1;
+// Queue per serializzare le chiamate API e evitare socket hang up
+let apiQueue = [];
+let isApiCallInProgress = false;
 
-console.log(`Entity service started.`);
-console.log(`Entity UID: ${entityUid}`);
-console.log(`Tile Position: (${entityTileI}, ${entityTileJ})`);
-console.log(`Using Credentials: ${apiUserEmail} / ${apiUserPassword ? '******' : 'MISSING'}`);
+function processApiQueue() {
+  if (isApiCallInProgress || apiQueue.length === 0) return;
+  
+  const nextCall = apiQueue.shift();
+  isApiCallInProgress = true;
+  
+  const callback = nextCall.callback;
+  nextCall.fn(() => {
+    isApiCallInProgress = false;
+    if (callback) callback();
+    processApiQueue();
+  });
+}
+
+function enqueueApiCall(fn, callback) {
+  apiQueue.push({ fn, callback });
+  processApiQueue();
+}
 
 // Variabili per tracciare la posizione attuale e i geni
 let currentTileI = entityTileI;
@@ -71,10 +88,19 @@ let localCurrentTileI = null;
 let localCurrentTileJ = null;
 let isPositionInitialized = false;
 
+// Variabile per tracciare l'ultimo requestId del path disegnato (per poterlo cancellare)
+let lastPathRequestId = null;
+
 // Configurazione per connettersi al container map tramite ws-gateway
-const wsGatewayHost = process.env.WS_GATEWAY_HOST || 'ws-gateway';
+// IMPORTANTE: i container girano con --network host => niente DNS Docker,
+// i nomi ("ws-gateway", "map") NON risolvono → va usato 127.0.0.1.
+const wsGatewayHost = process.env.WS_GATEWAY_HOST || '127.0.0.1';
 const wsGatewayPort = process.env.WS_GATEWAY_PORT || 9001;
 const mapWsPort = process.env.MAP_WS_PORT || 8080;
+
+// Configurazione per connessione diretta al map (fallback)
+const mapDirectHost = process.env.MAP_DIRECT_HOST || '127.0.0.1';
+const mapDirectPort = process.env.MAP_DIRECT_PORT || 8080;
 
 // function to handle login and session
 let sessionCookie = null;
@@ -111,8 +137,6 @@ function updateSession(response) {
 }
 
 function performLogin() {
-  console.log('Attempting login...');
-
   // Step 1: GET / to get initial cookies and CSRF token
   const optionsGet = {
     hostname: new URL(backendUrl).hostname,
@@ -148,7 +172,6 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        console.log('Login successful (or redirect received), starting creation loop...');
         // Avvia i cicli separati
         scheduleNextCycle();
         scheduleGenesFetch();
@@ -172,144 +195,148 @@ function performLogin() {
 
 function fetchCurrentPosition() {
   if (!sessionCookie) {
-    console.log('No session cookie, skipping fetch...');
     scheduleNextCycle(); // Riprogramma il prossimo ciclo anche se non c'è la sessione
     return;
   }
 
-  const path = `/entities/position?uid=${entityUid}`;
+  enqueueApiCall((done) => {
+    const path = `/entities/position?uid=${entityUid}`;
 
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: path,
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cookie': sessionCookie
-    },
-  };
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Cookie': sessionCookie
+      },
+    };
 
-  const req = http.request(options, (res) => {
-    let data = '';
+    const req = http.request(options, (res) => {
+      let data = '';
 
-    res.on('data', (chunk) => {
-      data += chunk;
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.success) {
+            currentTileI = response.tile_i;
+            currentTileJ = response.tile_j;
+          } else {
+            console.error(`Status ${res.statusCode}: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          if (res.statusCode === 401 || res.statusCode === 419) {
+            console.error('Session expired or unauthorized, maybe re-login needed?');
+          } else {
+            console.error(`Error parsing response: ${error.message}. Status: ${res.statusCode}`);
+          }
+        }
+        scheduleNextCycle();
+        done();
+      });
     });
 
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success) {
-          currentTileI = response.tile_i;
-          currentTileJ = response.tile_j;
-          console.log(`[Entity ${entityUid}] Still alive... Position: (${currentTileI}, ${currentTileJ})`);
-
-
-          scheduleNextCycle();
-        } else {
-          console.error(`Status ${res.statusCode}: ${response.message || 'Unknown error'}`);
-          scheduleNextCycle(); // Riprogramma anche in caso di errore
-        }
-      } catch (error) {
-        if (res.statusCode === 401 || res.statusCode === 419) {
-          console.error('Session expired or unauthorized, maybe re-login needed?');
-        } else {
-          console.error(`Error parsing response: ${error.message}. Status: ${res.statusCode}`);
-        }
-        scheduleNextCycle(); // Riprogramma anche in caso di errore
-      }
+    req.on('error', (error) => {
+      console.error(`Error fetching position: ${error.message}`);
+      scheduleNextCycle();
+      done();
     });
-  });
 
-  req.on('error', (error) => {
-    console.error(`Error fetching position: ${error.message}`);
-    scheduleNextCycle(); // Riprogramma anche in caso di errore di rete
+    req.end();
   });
-
-  req.end();
 }
 
 
 function fetchCurrentGenes() {
   if (!sessionCookie) return;
 
-  const path = `/entities/genes?uid=${entityUid}`;
+  enqueueApiCall((done) => {
+    const path = `/entities/genes?uid=${entityUid}`;
 
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: path,
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cookie': sessionCookie
-    },
-  };
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Cookie': sessionCookie
+      },
+    };
 
-  const req = http.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => { data += chunk; });
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success) {
-          currentGenes = response.genes;
-          console.log(`[Entity ${entityUid}] Current Gene Values:`, JSON.stringify(currentGenes));
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.success) {
+            currentGenes = response.genes;
+          }
+        } catch (error) {
+          console.error(`[Entity ${entityUid}] Error parsing gene values: ${error.message}`);
         }
-      } catch (error) {
-        console.error(`[Entity ${entityUid}] Error parsing gene values: ${error.message}`);
-      }
+        done();
+      });
     });
-  });
 
-  req.on('error', (error) => {
-    console.error(`[Entity ${entityUid}] Error fetching genes: ${error.message}`);
-  });
+    req.on('error', (error) => {
+      console.error(`[Entity ${entityUid}] Error fetching genes: ${error.message}`);
+      done();
+    });
 
-  req.end();
+    req.end();
+  });
 }
 
 function fetchCurrentChimicalElements() {
   if (!sessionCookie) return;
 
-  const path = `/entities/chimical-elements?uid=${entityUid}`;
+  enqueueApiCall((done) => {
+    const path = `/entities/chimical-elements?uid=${entityUid}`;
 
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: path,
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cookie': sessionCookie
-    },
-  };
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Cookie': sessionCookie
+      },
+    };
 
-  const req = http.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => { data += chunk; });
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success) {
-          currentChimicalElements = response.chimical_elements;
-          console.log(`[Entity ${entityUid}] Current Chimical Elements:`, JSON.stringify(currentChimicalElements));
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.success) {
+            currentChimicalElements = response.chimical_elements;
+          }
+        } catch (error) {
+          console.error(`[Entity ${entityUid}] Error parsing chimical elements: ${error.message}`);
         }
-      } catch (error) {
-        console.error(`[Entity ${entityUid}] Error parsing chimical elements: ${error.message}`);
-      }
+        done();
+      });
     });
-  });
 
-  req.on('error', (error) => {
-    console.error(`[Entity ${entityUid}] Error fetching chimical elements: ${error.message}`);
-  });
+    req.on('error', (error) => {
+      console.error(`[Entity ${entityUid}] Error fetching chimical elements: ${error.message}`);
+      done();
+    });
 
-  req.end();
+    req.end();
+  });
 }
 
 
@@ -333,80 +360,81 @@ function scheduleChimicalElementsFetch() {
   }, CHIMICAL_WAIT_SECONDS * 1000);
 }
 
-// Timer per la degradazione (10 secondi)
+// Timer per la degradazione
 let degradationTimer = null;
 function scheduleEntityDegradationCheck() {
   if (degradationTimer) clearTimeout(degradationTimer);
   degradationTimer = setTimeout(() => {
     checkEntityDegradation();
     scheduleEntityDegradationCheck();
-  }, 10000);
+  }, DEGRADATION_WAIT_SECONDS * 1000);
 }
 
 function checkEntityDegradation() {
   if (!sessionCookie) return;
 
-  const path = '/api/auth/game/entity/check_degradation';
-  const postData = JSON.stringify({ entity_uid: entityUid });
+  enqueueApiCall((done) => {
+    const path = '/api/auth/game/entity/check_degradation';
+    const postData = JSON.stringify({ entity_uid: entityUid });
 
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: path,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(postData),
-      'Accept': 'application/json',
-      'Cookie': sessionCookie,
-      'X-XSRF-TOKEN': xsrfToken
-    },
-  };
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
 
-  const req = http.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => { data += chunk; });
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success) {
-          console.log('[Entity ' + entityUid + '] Entity degradation check completed');
-        } else {
-          console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (!response.success) {
+            console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('[Entity ' + entityUid + '] Error parsing entity degradation response: ' + error.message);
         }
-      } catch (error) {
-        console.error('[Entity ' + entityUid + '] Error parsing entity degradation response: ' + error.message);
-      }
+        done();
+      });
     });
-  });
 
-  req.on('error', (error) => {
-    console.error('[Entity ' + entityUid + '] Error calling entity degradation API: ' + error.message);
-  });
+    req.on('error', (error) => {
+      console.error('[Entity ' + entityUid + '] Error calling entity degradation API: ' + error.message);
+      done();
+    });
 
-  req.write(postData);
-  req.end();
+    req.write(postData);
+    req.end();
+  });
 }
 
 // Funzione per programmare il prossimo ciclo (solo position)
 function scheduleNextCycle() {
   setTimeout(() => {
     fetchCurrentPosition();
-  }, 2000);
+  }, POSITION_WAIT_SECONDS * 1000);
 }
 
 // ========== WebSocket Server ==========
-const wss = new WebSocket.Server({ port: wsPort });
+const wss = new WebSocket.Server({ port: wsPort, host: '0.0.0.0' });
 
-console.log(`WebSocket server listening on port ${wsPort}`);
+wss.on('listening', () => {
+  console.log(`[Entity ${entityUid}] WebSocket server listening on 0.0.0.0:${wsPort}`);
+});
 
 wss.on('connection', (ws) => {
-  console.log(`[WebSocket] Client connected to entity ${entityUid}`);
-
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      console.log(`[WebSocket] Received command:`, data);
 
       // Gestisci i comandi ricevuti
       handleWebSocketCommand(data, ws);
@@ -417,7 +445,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    console.log(`[WebSocket] Client disconnected`);
+    // Client disconnected
   });
 
   ws.on('error', (error) => {
@@ -552,67 +580,161 @@ function handleWebSocketCommand(data, ws) {
   }
 }
 
-// Funzione per connettersi al map container via WebSocket (tramite ws-gateway) e ottenere l'array walkable
+// Funzione per connettersi al map container e ottenere l'array walkable
+// Prova automaticamente: 1) via ws-gateway, 2) connessione diretta al map
 function getWalkableFromMap(callback) {
-  // Usa il ws-gateway come tramite, specificando la porta del map container
-  const mapWsUrl = `ws://${wsGatewayHost}:${wsGatewayPort}?port=${mapWsPort}`;
-  console.log(`[Entity ${entityUid}] Connecting to map via ws-gateway: ${mapWsUrl}`);
+  const maxRetriesPerMethod = 2;
 
-  const ws = new WebSocket(mapWsUrl);
-  let isResolved = false;
+  // Metodo 1: Connessione via ws-gateway
+  const tryViaGateway = (retryCount = 0) => {
+    const mapWsUrl = `ws://${wsGatewayHost}:${wsGatewayPort}?port=${mapWsPort}`;
+    console.log(`[Entity ${entityUid}] Trying ws-gateway: ${mapWsUrl} (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
 
-  const timeout = setTimeout(() => {
-    if (!isResolved) {
-      isResolved = true;
-      ws.close();
-      callback({ success: false, error: 'Timeout connecting to map WebSocket' });
-    }
-  }, 5000);
+    const ws = new WebSocket(mapWsUrl);
+    let isResolved = false;
 
-  ws.on('open', () => {
-    console.log(`[Entity ${entityUid}] Connected to map WebSocket, requesting walkable array...`);
-    ws.send(JSON.stringify({ command: 'get_tile_walkable' }));
-  });
-
-  ws.on('message', (data) => {
-    try {
-      const response = JSON.parse(data.toString());
+    const timeout = setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
-        clearTimeout(timeout);
         ws.close();
-        if (response.success && response.tile_walkable) {
-          console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
-          callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
+        if (retryCount < maxRetriesPerMethod) {
+          tryViaGateway(retryCount + 1);
         } else {
-          callback({ success: false, error: 'Invalid response from map', response });
+          // Fallback: prova connessione diretta
+          tryDirectConnection();
         }
       }
-    } catch (error) {
+    }, 3000);
+
+    ws.on('open', () => {
+      console.log(`[Entity ${entityUid}] Connected via ws-gateway, requesting walkable array...`);
+      ws.send(JSON.stringify({ command: 'get_tile_walkable' }));
+    });
+
+    ws.on('message', (data) => {
+      try {
+        const response = JSON.parse(data.toString());
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeout);
+          ws.close();
+          if (response.success && response.tile_walkable) {
+            console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
+            callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
+          } else {
+            callback({ success: false, error: 'Invalid response from map', response });
+          }
+        }
+      } catch (error) {
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeout);
+          ws.close();
+          tryDirectConnection();
+        }
+      }
+    });
+
+    ws.on('error', (error) => {
       if (!isResolved) {
         isResolved = true;
         clearTimeout(timeout);
-        ws.close();
-        callback({ success: false, error: `Parse error: ${error.message}` });
+        console.log(`[Entity ${entityUid}] ws-gateway error: ${error.message}`);
+        if (retryCount < maxRetriesPerMethod) {
+          setTimeout(() => tryViaGateway(retryCount + 1), 500);
+        } else {
+          // Fallback: prova connessione diretta
+          tryDirectConnection();
+        }
       }
-    }
-  });
+    });
 
-  ws.on('error', (error) => {
-    if (!isResolved) {
-      isResolved = true;
-      clearTimeout(timeout);
-      callback({ success: false, error: `WebSocket error: ${error.message}` });
-    }
-  });
+    ws.on('close', () => {
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeout);
+        tryDirectConnection();
+      }
+    });
+  };
 
-  ws.on('close', () => {
-    if (!isResolved) {
-      isResolved = true;
-      clearTimeout(timeout);
-      callback({ success: false, error: 'WebSocket closed unexpectedly' });
-    }
-  });
+  // Metodo 2: Connessione diretta al map container
+  const tryDirectConnection = (retryCount = 0) => {
+    const directUrl = `ws://${mapDirectHost}:${mapDirectPort}`;
+    console.log(`[Entity ${entityUid}] Trying direct connection: ${directUrl} (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
+
+    const ws = new WebSocket(directUrl);
+    let isResolved = false;
+
+    const timeout = setTimeout(() => {
+      if (!isResolved) {
+        isResolved = true;
+        ws.close();
+        if (retryCount < maxRetriesPerMethod) {
+          setTimeout(() => tryDirectConnection(retryCount + 1), 500);
+        } else {
+          callback({ success: false, error: 'All connection methods failed' });
+        }
+      }
+    }, 3000);
+
+    ws.on('open', () => {
+      console.log(`[Entity ${entityUid}] Connected directly to map, requesting walkable array...`);
+      ws.send(JSON.stringify({ command: 'get_tile_walkable' }));
+    });
+
+    ws.on('message', (data) => {
+      try {
+        const response = JSON.parse(data.toString());
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeout);
+          ws.close();
+          if (response.success && response.tile_walkable) {
+            console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
+            callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
+          } else {
+            callback({ success: false, error: 'Invalid response from map', response });
+          }
+        }
+      } catch (error) {
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeout);
+          ws.close();
+          callback({ success: false, error: `Parse error: ${error.message}` });
+        }
+      }
+    });
+
+    ws.on('error', (error) => {
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeout);
+        console.log(`[Entity ${entityUid}] Direct connection error: ${error.message}`);
+        if (retryCount < maxRetriesPerMethod) {
+          setTimeout(() => tryDirectConnection(retryCount + 1), 500);
+        } else {
+          callback({ success: false, error: 'All connection methods failed' });
+        }
+      }
+    });
+
+    ws.on('close', () => {
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeout);
+        if (retryCount < maxRetriesPerMethod) {
+          setTimeout(() => tryDirectConnection(retryCount + 1), 500);
+        } else {
+          callback({ success: false, error: 'All connection methods failed' });
+        }
+      }
+    });
+  };
+
+  // Inizia con il primo metodo (ws-gateway)
+  tryViaGateway();
 }
 
 // Algoritmo BFS per trovare il percorso più breve tra due punti su una griglia walkable
@@ -688,6 +810,7 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
   }
 
   const requestId = 'path_' + Date.now();
+  lastPathRequestId = requestId; // Salva il requestId per poterlo cancellare dopo
   const tileSize = 32;
   const pathColor = '0xEF4444'; // Rosso per il path
 
@@ -769,7 +892,13 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
 
 // Funzione per cancellare il path disegnato (linee e punti)
 function clearPathViaPusher(pathLength) {
-  const requestId = 'path_clear_' + Date.now();
+  if (!lastPathRequestId) {
+    console.log(`[Entity ${entityUid}] No path to clear`);
+    return;
+  }
+
+  // Usa lo stesso requestId usato per disegnare il path
+  const requestId = lastPathRequestId;
 
   // Costruisci gli elementi da rimuovere (linee e punti)
   const clearItems = [];
@@ -780,7 +909,7 @@ function clearPathViaPusher(pathLength) {
   for (let i = 0; i < totalLines; i++) {
     clearItems.push({
       type: 'update',
-      uid: `path_${requestId}_line_${i}`,
+      uid: `${requestId}_line_${i}`,
       attributes: { renderable: false },
     });
   }
@@ -790,7 +919,7 @@ function clearPathViaPusher(pathLength) {
   for (let i = 0; i < totalDots; i++) {
     clearItems.push({
       type: 'update',
-      uid: `path_${requestId}_dot_${i}`,
+      uid: `${requestId}_dot_${i}`,
       attributes: { renderable: false },
     });
   }
