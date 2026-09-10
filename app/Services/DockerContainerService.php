@@ -118,6 +118,15 @@ class DockerContainerService
         // Su --network host i nomi contenitore NON risolvono: serve l'IP dell'host (127.0.0.1)
         $dockerHostIp = (string) (config('remote_docker.docker_host_ip') ?: '127.0.0.1');
 
+        // Reverb (Pusher) deve essere raggiunto sul loopback della VM (127.0.0.1):
+        // i tunnel invertiti di start.bat (ssh -R 8081:127.0.0.1:8081) ascoltano
+        // solo su loopback, non sul gateway del bridge Docker. Stesso pattern di
+        // createAlertContainer().
+        $reverbHost = env('REVERB_HOST') ?: 'localhost';
+        if ($reverbHost === 'localhost' || $reverbHost === '127.0.0.1') {
+            $reverbHost = '127.0.0.1';
+        }
+
         // Porta reale del map container (dinamica, non 8080): la cerca se non passata
         $mapWsPort = $mapWsPort ?: $this->resolveMapWsPort($playerId);
 
@@ -132,12 +141,13 @@ class DockerContainerService
             'API_USER_EMAIL=' . (env('API_USER_EMAIL') ?: 'api@email.it'),
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'WS_PORT=' . $wsPort,
-            'REVERB_HOST=' . (env('REVERB_HOST') ?: 'localhost'),
+            'REVERB_HOST=' . $reverbHost,
             'REVERB_PORT=' . (env('REVERB_PORT') ?: '8081'),
             'REVERB_SCHEME=' . (env('REVERB_SCHEME') ?: 'http'),
             'REVERB_APP_ID=' . (env('REVERB_APP_ID') ?: 'game'),
             'REVERB_APP_KEY=' . (env('REVERB_APP_KEY') ?: 'game-key'),
             'REVERB_APP_SECRET=' . (env('REVERB_APP_SECRET') ?: 'game-secret'),
+            'DOCKER_HOST_IP=' . $dockerHostIp,
             'WS_GATEWAY_HOST=' . $dockerHostIp,
             'WS_GATEWAY_PORT=' . (env('WS_GATEWAY_PORT') ?: '9001'),
             'MAP_WS_PORT=' . ($mapWsPort ?: (env('MAP_WS_PORT') ?: '8080')),

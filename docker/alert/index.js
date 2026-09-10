@@ -19,10 +19,13 @@ function isRunningInDocker() {
 }
 
 function resolveReverbHost(rawHost) {
-  // When inside Docker without host networking, "localhost" means the container, not the host.
-  // However, 127.0.0.1 is an explicit loopback IP — respect it (used with --network host).
+  // I container girano con --network host: condividono la rete della VM, quindi
+  // 127.0.0.1 del container È il loopback della VM. Reverb è raggiungibile lì
+  // grazie ai tunnel invertiti di start.bat (ssh -R 8081:127.0.0.1:8081).
+  // "host.docker.internal" risolverebbe al gateway del bridge Docker (172.17.x.x)
+  // dove i tunnel NON ascoltano.
   if (isRunningInDocker() && (rawHost === 'localhost' || rawHost === '0.0.0.0')) {
-    const resolved = process.env.DOCKER_HOST_IP || 'host.docker.internal';
+    const resolved = process.env.DOCKER_HOST_IP || '127.0.0.1';
     console.log(`[Alert] Docker detected: remapping REVERB_HOST "${rawHost}" → "${resolved}"`);
     return resolved;
   }

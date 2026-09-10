@@ -13,7 +13,7 @@ const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
 const apiUserPassword = process.env.API_USER_PASSWORD;
 const wsPort = process.env.WS_PORT || 8080;
-const playerId = process.env.PLAYER_ID || 0;
+const playerId = process.env.ENTITY_PLAYER_ID || process.env.PLAYER_ID || 0;
 
 // Detect if running inside Docker; if so, 'localhost' cannot reach the host.
 function isRunningInDocker() {
@@ -25,10 +25,16 @@ function isRunningInDocker() {
 }
 
 function resolveReverbHost(rawHost) {
-  // When inside Docker without host networking, "localhost" means the container, not the host.
-  // However, 127.0.0.1 is an explicit loopback IP — respect it (used with --network host).
+  // I container girano con --network host (vedi DockerContainerService):
+  // condividono la rete della VM, quindi 127.0.0.1 del container È il loopback
+  // della VM stessa. I servizi host (backend :8085, Reverb :8081) sono esposti
+  // sulla VM proprio tramite loopback con i tunnel invertiti di start.bat
+  // (ssh -R 8085/8081:127.0.0.1:...). "host.docker.internal" invece risolve
+  // al gateway del bridge Docker (172.17.x.x) dove i tunnel NON ascoltano.
+  // 127.0.0.1 è l'IP esplicito di loopback: viene sempre rispettato.
   if (isRunningInDocker() && (rawHost === 'localhost' || rawHost === '0.0.0.0')) {
-    const resolved = process.env.DOCKER_HOST_IP || 'host.docker.internal';
+    const resolved = process.env.DOCKER_HOST_IP || '127.0.0.1';
+    console.log(`[Entity ${entityUid}] Docker detected: remapping REVERB_HOST "${rawHost}" → "${resolved}"`);
     return resolved;
   }
   return rawHost;
@@ -142,8 +148,103 @@ function updateSession(response) {
   }
 }
 
+// ========== Gestione sessione con auto-retry ==========
+// Il login parte al boot e, se il backend o il tunnel SSH non è ancora
+// raggiungibile, viene riprovato con backoff finché non riesce: il container
+// si auto-ripara quando l'infrastruttura torna su.
+let loginInProgress = false;
+let loginAttempts = 0;
+let loginRetryTimer = null;
+let cyclesStarted = false;
+const loginWaiters = [];
+
+function notifyLoginWaiters() {
+  const waiters = loginWaiters.splice(0);
+  const ok = !!sessionCookie;
+  waiters.forEach((w) => {
+    try { w(ok); } catch (e) { /* ignore */ }
+  });
+}
+
+function startCyclesOnce() {
+  if (cyclesStarted) return;
+  cyclesStarted = true;
+  scheduleNextCycle();
+  scheduleGenesFetch();
+  scheduleChimicalElementsFetch();
+  scheduleEntityDegradationCheck();
+}
+
+// Ripristina la sessione se il backend risponde 401/419 (sessione scaduta).
+function handleAuthFailure(res, context) {
+  if (res && (res.statusCode === 401 || res.statusCode === 419)) {
+    console.error(`[Entity ${entityUid}] ${context}: session expired/unauthorized, re-logging in...`);
+    sessionCookie = null;
+    xsrfToken = null;
+    performLogin();
+    return true;
+  }
+  return false;
+}
+
+// Aspetta che la sessione sia disponibile (attivando il login se manca).
+// Se entro timeoutMs non c'è ancora sessione, invoca callback(false).
+function ensureSession(callback, timeoutMs = 8000) {
+  if (sessionCookie) {
+    if (callback) callback(true);
+    return;
+  }
+
+  let settled = false;
+  const timeoutTimer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    const idx = loginWaiters.indexOf(handler);
+    if (idx >= 0) loginWaiters.splice(idx, 1);
+    if (callback) callback(!!sessionCookie);
+  }, timeoutMs);
+
+  const handler = (ok) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeoutTimer);
+    if (callback) callback(ok);
+  };
+
+  loginWaiters.push(handler);
+  performLogin();
+}
+
 function performLogin() {
-  // Step 1: GET / to get initial cookies and CSRF token
+  if (loginInProgress) return;
+  if (sessionCookie) {
+    notifyLoginWaiters();
+    return;
+  }
+
+  loginInProgress = true;
+  loginAttempts++;
+
+  const finishLogin = (success) => {
+    loginInProgress = false;
+
+    if (success) {
+      loginAttempts = 0;
+      startCyclesOnce();
+      console.log(`[Entity ${entityUid}] Login successful (session ready)`);
+      notifyLoginWaiters();
+    } else {
+      // Backoff esponenziale (2s → max 30s), retry all'infinito per auto-riparazione.
+      // NON notificare i loginWaiters: devono rimanere in attesa del retry.
+      // Il timeout di ensureSession (8s) li liberà comunque se il login impiega troppo tempo.
+      const delay = Math.min(30000, 2000 * Math.pow(2, Math.min(loginAttempts - 1, 5)));
+      console.error(`[Entity ${entityUid}] Login failed (attempt ${loginAttempts}), retrying in ${Math.round(delay / 1000)}s...`);
+      if (loginRetryTimer) clearTimeout(loginRetryTimer);
+      loginRetryTimer = setTimeout(() => performLogin(), delay);
+    }
+  };
+
+  // Step 1: GET /login → cookie e CSRF token
   const optionsGet = {
     hostname: new URL(backendUrl).hostname,
     port: new URL(backendUrl).port || 80,
@@ -154,7 +255,6 @@ function performLogin() {
   const reqGet = http.request(optionsGet, (res) => {
     updateSession(res);
 
-    // Prepare post data
     const postData = new URLSearchParams({
       'email': apiUserEmail,
       'password': apiUserPassword,
@@ -178,24 +278,26 @@ function performLogin() {
       updateSession(resPost);
 
       if (resPost.statusCode === 302 || resPost.statusCode === 200 || resPost.statusCode === 204) {
-        // Avvia i cicli separati
-        scheduleNextCycle();
-        scheduleGenesFetch();
-        scheduleChimicalElementsFetch();
-        scheduleEntityDegradationCheck();
+        finishLogin(true);
       } else {
         console.error(`Login failed with status: ${resPost.statusCode}`);
-        // Try reading body for error
-        resPost.on('data', d => console.error(d.toString()));
+        resPost.on('data', (d) => console.error(d.toString()));
+        finishLogin(false);
       }
     });
 
-    reqPost.on('error', (e) => console.error(`Login POST error: ${e.message}`));
+    reqPost.on('error', (e) => {
+      console.error(`Login POST error: ${e.message}`);
+      finishLogin(false);
+    });
     reqPost.write(postData);
     reqPost.end();
   });
 
-  reqGet.on('error', (e) => console.error(`Initial GET error: ${e.message}`));
+  reqGet.on('error', (e) => {
+    console.error(`Initial GET error: ${e.message}`);
+    finishLogin(false);
+  });
   reqGet.end();
 }
 
@@ -237,8 +339,8 @@ function fetchCurrentPosition() {
             console.error(`Status ${res.statusCode}: ${response.message || 'Unknown error'}`);
           }
         } catch (error) {
-          if (res.statusCode === 401 || res.statusCode === 419) {
-            console.error('Session expired or unauthorized, maybe re-login needed?');
+          if (handleAuthFailure(res, 'fetchCurrentPosition')) {
+            // Sessione scaduta → il re-login è stato avviato
           } else {
             console.error(`Error parsing response: ${error.message}. Status: ${res.statusCode}`);
           }
@@ -285,6 +387,8 @@ function fetchCurrentGenes() {
           const response = JSON.parse(data);
           if (response.success) {
             currentGenes = response.genes;
+          } else if (handleAuthFailure(res, 'fetchCurrentGenes')) {
+            // re-login avviato
           }
         } catch (error) {
           console.error(`[Entity ${entityUid}] Error parsing gene values: ${error.message}`);
@@ -328,6 +432,8 @@ function fetchCurrentChimicalElements() {
           const response = JSON.parse(data);
           if (response.success) {
             currentChimicalElements = response.chimical_elements;
+          } else if (handleAuthFailure(res, 'fetchCurrentChimicalElements')) {
+            // re-login avviato
           }
         } catch (error) {
           console.error(`[Entity ${entityUid}] Error parsing chimical elements: ${error.message}`);
@@ -404,7 +510,11 @@ function checkEntityDegradation() {
         try {
           const response = JSON.parse(data);
           if (!response.success) {
-            console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
+            if (handleAuthFailure(res, 'checkEntityDegradation')) {
+              // re-login avviato
+            } else {
+              console.error('[Entity ' + entityUid + '] Entity degradation check failed: ' + (response.message || 'Unknown error'));
+            }
           }
         } catch (error) {
           console.error('[Entity ' + entityUid + '] Error parsing entity degradation response: ' + error.message);
@@ -1112,7 +1222,15 @@ function fetchCurrentPositionFromApi(callback) {
 // Supporta sia coordinate target (target_i, target_j) che azioni (up, down, left, right)
 function performMovement(params, callback) {
   if (!sessionCookie) {
-    callback({ success: false, error: 'No session cookie' });
+    // Sessione non ancora pronta (login al boot in corso o riprovato):
+    // aspetta (attivando il login) prima di rinunciare.
+    ensureSession((ok) => {
+      if (!ok || !sessionCookie) {
+        callback({ success: false, error: 'No session cookie (login non riuscito)' });
+        return;
+      }
+      performMovement(params, callback);
+    }, 10000);
     return;
   }
 
@@ -1283,4 +1401,8 @@ module.exports = {
   getWalkableFromMap,
   findPathBFS,
   performMovement,
+  performLogin,
+  ensureSession,
+  resolveReverbHost,
+  playerId,
 };
