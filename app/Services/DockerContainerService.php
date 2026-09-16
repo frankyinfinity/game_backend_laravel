@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helper\Helper;
 use App\Models\BirthRegion;
 use App\Models\Container;
 use App\Models\Entity;
@@ -153,6 +154,13 @@ class DockerContainerService
             'MAP_WS_PORT=' . ($mapWsPort ?: (env('MAP_WS_PORT') ?: '8080')),
             'MAP_DIRECT_HOST=' . $dockerHostIp,
             'MAP_DIRECT_PORT=' . ($mapWsPort ?: (env('MAP_WS_PORT') ?: '8080')),
+            // Geometria della mappa e scroll group (stesse costanti usate dal
+            // disegno della mappa): servono al container entity per posizionare
+            // path ed entity quando le coordinate dei tile non sono disponibili
+            'TILE_SIZE=' . Helper::TILE_SIZE,
+            'MAP_START_X=' . Helper::MAP_START_X,
+            'MAP_START_Y=' . Helper::MAP_START_Y,
+            'MAP_SCROLL_GROUP=' . Helper::MAP_SCROLL_GROUP_MAIN,
         ];
 
         $labels = $this->playerGroupingLabels($playerId, 'entity');

@@ -60,9 +60,20 @@ const CHIMICAL_WAIT_SECONDS = 30;
 const POSITION_WAIT_SECONDS = 10;
 const DEGRADATION_WAIT_SECONDS = 60;
 
-// Timeout per le richieste walkable al map (sovrascrivibili via env, es. nei test)
+// Timeout/ritardo per le richieste di dati al map container (array walkable e
+// coordinate pixel dei tile); sovrascrivibili via env, es. nei test
 const WALKABLE_RESPONSE_TIMEOUT_MS = parseInt(process.env.WALKABLE_RESPONSE_TIMEOUT_MS || '5000', 10);
 const WALKABLE_RETRY_DELAY_MS = parseInt(process.env.WALKABLE_RETRY_DELAY_MS || '1000', 10);
+
+// Geometria della mappa e scroll group (allineati a Helper::TILE_SIZE,
+// Helper::MAP_START_X/Y e Helper::MAP_SCROLL_GROUP_MAIN del backend).
+// Servono per posizionare path ed entity quando le coordinate dei tile non sono
+// disponibili e per far scorrere il path insieme alla mappa.
+const TILE_SIZE = parseInt(process.env.TILE_SIZE || '40', 10);
+const MAP_START_X = parseInt(process.env.MAP_START_X || '0', 10);
+const MAP_START_Y = parseInt(process.env.MAP_START_Y || '80', 10);
+const MAP_SCROLL_GROUP = process.env.MAP_SCROLL_GROUP || 'map_main';
+const PATH_Z_INDEX = parseInt(process.env.PATH_Z_INDEX || '9000', 10);
 
 // Queue per serializzare le chiamate API e evitare socket hang up
 let apiQueue = [];
@@ -699,38 +710,111 @@ function handleWebSocketCommand(data, ws) {
   }
 }
 
-// Funzione per connettersi al map container e ottenere l'array walkable
-// Prova automaticamente: 1) via ws-gateway, 2) connessione diretta al map
+// Configurazione delle richieste di dati al map container: ogni dato è
+// identificato dal comando WebSocket e dalla chiave della risposta che lo contiene.
+const MAP_DATA_REQUESTS = {
+  walkable: {
+    requestIdPrefix: 'walkable',
+    command: 'get_tile_walkable',
+    responseKey: 'tile_walkable',
+  },
+  coordinates: {
+    requestIdPrefix: 'coordinates',
+    command: 'get_tile_coordinates',
+    responseKey: 'tile_coordinates',
+  },
+};
+
+// Richiede un dato al map container via WebSocket.
+// Prova automaticamente: 1) via ws-gateway, 2) connessione diretta al map.
 // Ogni richiesta usa un request_id univoco: vengono accettate SOLO le risposte
 // con lo stesso request_id (il messaggio di benvenuto del map viene ignorato).
-function getWalkableFromMap(callback) {
-  const requestId = 'walkable_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-  const maxRetriesPerMethod = 2;
+function requestMapData(config, callback) {
+  const { requestIdPrefix, command, responseKey } = config;
+  const requestId = requestIdPrefix + '_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+  const maxAttempts = 3;
 
-  // Metodo 1: Connessione via ws-gateway
-  const tryViaGateway = (retryCount = 0) => {
-    const mapWsUrl = `ws://${wsGatewayHost}:${wsGatewayPort}?port=${mapWsPort}`;
-    console.log(`[Entity ${entityUid}] Trying ws-gateway: ${mapWsUrl} (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
+  // Trasporti provati in ordine: prima il ws-gateway, poi la connessione diretta
+  const transports = [
+    {
+      label: 'ws-gateway',
+      buildUrl: () => `ws://${wsGatewayHost}:${wsGatewayPort}?port=${mapWsPort}`,
+    },
+    {
+      label: 'direct',
+      buildUrl: () => `ws://${mapDirectHost}:${mapDirectPort}`,
+    },
+  ];
+
+  let isSettled = false;
+
+  const finish = (payload) => {
+    if (isSettled) {
+      return;
+    }
+    isSettled = true;
+    callback(payload);
+  };
+
+  // Nessun trasporto ha fornito i dati: il movimento non può proseguire
+  const failAll = () => {
+    console.error(`[Entity ${entityUid}] ⛔ Map never provided ${responseKey} (requestId ${requestId})`);
+    finish({ success: false, error: `${responseKey} not available from map`, request_id: requestId });
+  };
+
+  // Passa al tentativo successivo (stesso trasporto, poi il trasporto successivo)
+  const nextAttempt = (transportIndex, attemptIndex) => {
+    if (isSettled) {
+      return;
+    }
+    if (attemptIndex + 1 < maxAttempts) {
+      setTimeout(() => attemptTransport(transportIndex, attemptIndex + 1), WALKABLE_RETRY_DELAY_MS);
+      return;
+    }
+    if (transportIndex + 1 < transports.length) {
+      attemptTransport(transportIndex + 1, 0);
+      return;
+    }
+    failAll();
+  };
+
+  const attemptTransport = (transportIndex, attemptIndex) => {
+    if (isSettled) {
+      return;
+    }
+
+    const transport = transports[transportIndex];
+    const mapWsUrl = transport.buildUrl();
+    console.log(`[Entity ${entityUid}] Requesting ${responseKey} via ${transport.label}: ${mapWsUrl} (attempt ${attemptIndex + 1}/${maxAttempts})`);
 
     const ws = new WebSocket(mapWsUrl);
-    let isResolved = false;
+    let isAttemptSettled = false;
+
+    // Risolve il tentativo una sola volta (timeout, risposta, errore o chiusura)
+    const settleAttempt = (handler) => {
+      if (isAttemptSettled) {
+        return false;
+      }
+      isAttemptSettled = true;
+      clearTimeout(timeout);
+      try {
+        ws.close();
+      } catch (error) {
+        // Socket già chiuso: nessuna azione necessaria
+      }
+      handler();
+      return true;
+    };
 
     const timeout = setTimeout(() => {
-      if (!isResolved) {
-        isResolved = true;
-        ws.close();
-        if (retryCount < maxRetriesPerMethod) {
-          tryViaGateway(retryCount + 1);
-        } else {
-          // Fallback: prova connessione diretta
-          tryDirectConnection();
-        }
-      }
+      settleAttempt(() => {
+        console.log(`[Entity ${entityUid}] Timeout (${WALKABLE_RESPONSE_TIMEOUT_MS}ms) for ${responseKey} via ${transport.label}`);
+        nextAttempt(transportIndex, attemptIndex);
+      });
     }, WALKABLE_RESPONSE_TIMEOUT_MS);
 
     ws.on('open', () => {
-      console.log(`[Entity ${entityUid}] Connected via ws-gateway, requesting walkable array...`);
-      ws.send(JSON.stringify({ request_id: requestId, command: 'get_tile_walkable' }));
+      ws.send(JSON.stringify({ request_id: requestId, command: command }));
     });
 
     ws.on('message', (data) => {
@@ -749,156 +833,53 @@ function getWalkableFromMap(callback) {
         return;
       }
 
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        ws.close();
-
-        if (response.success && Array.isArray(response.tile_walkable)) {
-          console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
-          callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
-        } else if (response.success && response.tile_walkable === null) {
-          // Il map non ha ancora caricato l'array walkable: riprova
-          console.error(`[Entity ${entityUid}] Map walkable array not ready yet (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
-          if (retryCount < maxRetriesPerMethod) {
-            setTimeout(() => tryViaGateway(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
-          } else {
-            // Fallback: prova connessione diretta
-            tryDirectConnection();
-          }
-        } else {
-          console.error(`[Entity ${entityUid}] Invalid response from map: ${JSON.stringify(response)}`);
-          if (retryCount < maxRetriesPerMethod) {
-            setTimeout(() => tryViaGateway(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
-          } else {
-            // Fallback: prova connessione diretta
-            tryDirectConnection();
-          }
+      settleAttempt(() => {
+        if (response.success && Array.isArray(response[responseKey])) {
+          const data = response[responseKey];
+          const dimensions = response.dimensions || { rows: data.length, cols: data[0]?.length || 0 };
+          console.log(`[Entity ${entityUid}] Received ${responseKey}: ${dimensions.rows}x${dimensions.cols}`);
+          finish({ success: true, [responseKey]: data, dimensions });
+          return;
         }
-      }
+
+        if (response.success && response[responseKey] === null) {
+          // Il map non ha ancora caricato i dati: riprova
+          console.error(`[Entity ${entityUid}] Map ${responseKey} not ready yet (attempt ${attemptIndex + 1}/${maxAttempts})`);
+        } else {
+          console.error(`[Entity ${entityUid}] Invalid response from map for ${command}: ${JSON.stringify(response)}`);
+        }
+
+        nextAttempt(transportIndex, attemptIndex);
+      });
     });
 
     ws.on('error', (error) => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        console.log(`[Entity ${entityUid}] ws-gateway error: ${error.message}`);
-        if (retryCount < maxRetriesPerMethod) {
-          setTimeout(() => tryViaGateway(retryCount + 1), 500);
-        } else {
-          // Fallback: prova connessione diretta
-          tryDirectConnection();
-        }
-      }
+      settleAttempt(() => {
+        console.log(`[Entity ${entityUid}] ${transport.label} error: ${error.message}`);
+        nextAttempt(transportIndex, attemptIndex);
+      });
     });
 
     ws.on('close', () => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        tryDirectConnection();
-      }
+      // Connessione chiusa senza una risposta valida: riprova
+      settleAttempt(() => nextAttempt(transportIndex, attemptIndex));
     });
   };
 
-  // Metodo 2: Connessione diretta al map container
-  const tryDirectConnection = (retryCount = 0) => {
-    const directUrl = `ws://${mapDirectHost}:${mapDirectPort}`;
-    console.log(`[Entity ${entityUid}] Trying direct connection: ${directUrl} (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
+  // Inizia con il primo trasporto (ws-gateway)
+  attemptTransport(0, 0);
+}
 
-    const ws = new WebSocket(directUrl);
-    let isResolved = false;
+// Ottiene l'array walkable (flag 0/1 per tile) dal map container via WebSocket
+function getWalkableFromMap(callback) {
+  return requestMapData(MAP_DATA_REQUESTS.walkable, callback);
+}
 
-    const timeout = setTimeout(() => {
-      if (!isResolved) {
-        isResolved = true;
-        ws.close();
-        if (retryCount < maxRetriesPerMethod) {
-          setTimeout(() => tryDirectConnection(retryCount + 1), 500);
-        } else {
-          console.error(`[Entity ${entityUid}] ⛔ All connection methods failed (requestId ${requestId})`);
-          callback({ success: false, error: 'All connection methods failed', request_id: requestId });
-        }
-      }
-    }, WALKABLE_RESPONSE_TIMEOUT_MS);
-
-    ws.on('open', () => {
-      console.log(`[Entity ${entityUid}] Connected directly to map, requesting walkable array...`);
-      ws.send(JSON.stringify({ request_id: requestId, command: 'get_tile_walkable' }));
-    });
-
-    ws.on('message', (data) => {
-      let response;
-      try {
-        response = JSON.parse(data.toString());
-      } catch (error) {
-        // Frame non JSON: non è la risposta che cerchiamo
-        return;
-      }
-
-      // Ignora i messaggi che non sono la risposta alla nostra richiesta
-      // (es. il messaggio di benvenuto del map).
-      if (String(response.request_id || '') !== String(requestId)) {
-        return;
-      }
-
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        ws.close();
-
-        if (response.success && Array.isArray(response.tile_walkable)) {
-          console.log(`[Entity ${entityUid}] Received walkable array: ${response.dimensions.rows}x${response.dimensions.cols}`);
-          callback({ success: true, tile_walkable: response.tile_walkable, dimensions: response.dimensions });
-        } else if (response.success && response.tile_walkable === null) {
-          // Il map non ha ancora caricato l'array walkable: riprova
-          console.error(`[Entity ${entityUid}] Map walkable array not ready yet (attempt ${retryCount + 1}/${maxRetriesPerMethod + 1})`);
-          if (retryCount < maxRetriesPerMethod) {
-            setTimeout(() => tryDirectConnection(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
-          } else {
-            console.error(`[Entity ${entityUid}] ⛔ Map never provided the walkable array (requestId ${requestId})`);
-            callback({ success: false, error: 'Walkable array not available from map', request_id: requestId });
-          }
-        } else {
-          console.error(`[Entity ${entityUid}] Invalid response from map: ${JSON.stringify(response)}`);
-          if (retryCount < maxRetriesPerMethod) {
-            setTimeout(() => tryDirectConnection(retryCount + 1), WALKABLE_RETRY_DELAY_MS);
-          } else {
-            console.error(`[Entity ${entityUid}] ⛔ All connection methods failed (requestId ${requestId})`);
-            callback({ success: false, error: 'All connection methods failed', request_id: requestId });
-          }
-        }
-      }
-    });
-
-    ws.on('error', (error) => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        console.log(`[Entity ${entityUid}] Direct connection error: ${error.message}`);
-        if (retryCount < maxRetriesPerMethod) {
-          setTimeout(() => tryDirectConnection(retryCount + 1), 500);
-        } else {
-          callback({ success: false, error: 'All connection methods failed' });
-        }
-      }
-    });
-
-    ws.on('close', () => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        if (retryCount < maxRetriesPerMethod) {
-          setTimeout(() => tryDirectConnection(retryCount + 1), 500);
-        } else {
-          callback({ success: false, error: 'All connection methods failed' });
-        }
-      }
-    });
-  };
-
-  // Inizia con il primo metodo (ws-gateway)
-  tryViaGateway();
+// Ottiene la matrice delle coordinate (pixel) dei tile dal map container:
+// ha la STESSA forma dell'array walkable ([i][j]) e ogni cella contiene
+// { center, top_left, top_right, bottom_left, bottom_right } oppure null.
+function getTileCoordinatesFromMap(callback) {
+  return requestMapData(MAP_DATA_REQUESTS.coordinates, callback);
 }
 
 // Algoritmo BFS per trovare il percorso più breve tra due punti su una griglia walkable
@@ -966,8 +947,10 @@ function findPathBFS(tileWalkable, startI, startJ, targetI, targetJ) {
   return { success: false, error: 'No path found to target' };
 }
 
-// Funzione per disegnare il path come linea rossa con punti al centro dei tile
-function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
+// Funzione per disegnare il path come linea rossa con punti al centro dei tile.
+// I centri dei tile arrivano dalla matrice tile_coordinates del map container
+// (coordinate pixel reali); se non disponibili si usa la griglia teorica.
+function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ, tileCoordinates) {
   if (!path || path.length === 0) {
     console.log(`[Entity ${entityUid}] No path to draw`);
     return;
@@ -975,45 +958,41 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
 
   const requestId = 'path_' + Date.now();
   lastPathRequestId = requestId; // Salva il requestId per poterlo cancellare dopo
-  const tileSize = 32;
   const pathColor = '0xEF4444'; // Rosso per il path
 
   // Costruisci gli elementi del path da disegnare
   const pathItems = [];
+  // Il path fa parte dello scroll group della mappa: così resta allineato ai tile
+  const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
 
-  // Calcola i centri di tutti i tile (incluso quello iniziale)
-  const centers = [];
+  // Centri (pixel) di tutti i tile del path, incluso quello di partenza:
+  // le coordinate arrivano dalla matrice tile_coordinates del map container
+  const centers = [getTileCenter(currentI, currentJ, tileCoordinates)];
 
-  // Posizione iniziale
-  const startCenterX = currentJ * tileSize + tileSize / 2;
-  const startCenterY = currentI * tileSize + tileSize / 2;
-  centers.push({ x: startCenterX, y: startCenterY });
-
-  // Centri di ogni tile nel path
   path.forEach((step) => {
-    const centerX = step.j * tileSize + tileSize / 2;
-    const centerY = step.i * tileSize + tileSize / 2;
-    centers.push({ x: centerX, y: centerY });
+    centers.push(getTileCenter(step.i, step.j, tileCoordinates));
   });
 
-  // Disegna le linee che collegano i punti
-  for (let i = 0; i < centers.length - 1; i++) {
-    pathItems.push({
-      type: 'draw',
-      object: {
-        uid: `${requestId}_line_${i}`,
-        type: 'line',
-        x1: centers[i].x,
-        y1: centers[i].y,
-        x2: centers[i + 1].x,
-        y2: centers[i + 1].y,
-        color: pathColor,
-        thickness: 3,
-      },
-    });
-  }
+  const withoutCoordinates = centers.filter((center) => !center.fromCoordinates).length;
+  const coordinatesSource = tileCoordinates ? 'tile coordinates' : 'fallback grid';
+  console.log(`[Entity ${entityUid}] Drawing path with ${centers.length} points (${coordinatesSource}, ${withoutCoordinates} without coordinates)`);
 
-  // Disegna i punti (cerchi) al centro di ogni tile
+  // Disegna le linee che collegano i punti: il frontend legge object.points,
+  // quindi si invia un unico multi_line con tutti i centri dei tile
+  pathItems.push({
+    type: 'draw',
+    object: {
+      uid: `${requestId}_line`,
+      type: 'multi_line',
+      points: centers.map((center) => ({ x: center.x, y: center.y })),
+      color: pathColor,
+      thickness: 3,
+      attributes: pathAttributes,
+    },
+  });
+
+  // Disegna i punti (cerchi) al centro di ogni tile, con le coordinate pixel
+  // reali dei tile (center di json_coordinates)
   centers.forEach((center, index) => {
     const isStart = index === 0;
     pathItems.push({
@@ -1025,8 +1004,7 @@ function drawPathViaPusher(path, currentI, currentJ, targetI, targetJ) {
         y: center.y,
         radius: isStart ? 8 : 6,
         color: pathColor,
-        borderColor: pathColor,
-        thickness: isStart ? 3 : 2,
+        attributes: pathAttributes,
       },
     });
   });
@@ -1067,16 +1045,12 @@ function clearPathViaPusher(pathLength) {
   // Costruisci gli elementi da rimuovere (linee e punti)
   const clearItems = [];
 
-  // Cancella le linee (sono pathLength - 1 linee tra pathLength punti)
-  // Ma abbiamo pathLength + 1 punti (incluso start), quindi pathLength linee
-  const totalLines = pathLength;
-  for (let i = 0; i < totalLines; i++) {
-    clearItems.push({
-      type: 'update',
-      uid: `${requestId}_line_${i}`,
-      attributes: { renderable: false },
-    });
-  }
+  // Cancella la linea del path (un unico multi_line con i centri dei tile)
+  clearItems.push({
+    type: 'update',
+    uid: `${requestId}_line`,
+    attributes: { renderable: false },
+  });
 
   // Cancella i punti (pathLength + 1 punti, incluso start)
   const totalDots = pathLength + 1;
@@ -1107,14 +1081,120 @@ function clearPathViaPusher(pathLength) {
     });
 }
 
-// Funzione per muovere l'entity tile per tile con animazione
+// Centro (pixel) del tile (i, j) letto dalla matrice tile_coordinates del map
+// container (json_coordinates.center di BirthRegionDetail).
+// Fallback: griglia teorica (TILE_SIZE / MAP_START_X/Y) quando il tile non ha
+// coordinate salvate, così il movimento dell'entity non si blocca mai.
+function getTileCenter(i, j, tileCoordinates) {
+  const coordinates = (tileCoordinates && tileCoordinates[i]) ? tileCoordinates[i][j] : null;
+  const center = coordinates ? coordinates.center : null;
+
+  if (center && typeof center.x === 'number' && typeof center.y === 'number') {
+    return { x: center.x, y: center.y, fromCoordinates: true };
+  }
+
+  return {
+    x: MAP_START_X + (j * TILE_SIZE) + (TILE_SIZE / 2),
+    y: MAP_START_Y + (i * TILE_SIZE) + (TILE_SIZE / 2),
+    fromCoordinates: false,
+  };
+}
+
+// Codice eseguito nel frontend (item 'code') per spostare l'entityDraw:
+// l'immagine dell'entity ha come uid lo uid dell'entity, mentre tutti gli altri
+// oggetti del disegno (pannello, testi, bottoni, barre) sono elencati in
+// attributes.uids dal backend (EntityDraw::attachUidCollectionAttribute).
+// Il testo "I: x - J: y" viene aggiornato con la posizione del tile raggiunto.
+function buildMoveEntityDrawCode(fromI, fromJ, toI, toJ, tileCoordinates) {
+  const fromCenter = getTileCenter(fromI, fromJ, tileCoordinates);
+  const toCenter = getTileCenter(toI, toJ, tileCoordinates);
+  const deltaX = toCenter.x - fromCenter.x;
+  const deltaY = toCenter.y - fromCenter.y;
+  const positionText = `I: ${toI} - J: ${toJ}`;
+
+  return [
+    '(function () {',
+    `  var rootUid = ${JSON.stringify(entityUid)};`,
+    `  var textUid = ${JSON.stringify(entityUid + '_text_row_2')};`,
+    `  var positionText = ${JSON.stringify(positionText)};`,
+    `  var deltaX = ${deltaX};`,
+    `  var deltaY = ${deltaY};`,
+    '  var rootObject = (typeof objects !== "undefined") ? objects[rootUid] : null;',
+    '  if (!rootObject) { console.warn("[EntityDraw] immagine entity non trovata:", rootUid); return; }',
+    '  var uids = (rootObject.attributes && Array.isArray(rootObject.attributes.uids)) ? rootObject.attributes.uids : [rootUid];',
+    '  uids.forEach(function (uid) {',
+    '    if (uid === rootUid) return; // immagine aggiornata dall\'item update (x/y assoluti)',
+    '    var entityObject = objects[uid];',
+    '    if (!entityObject) return;',
+    '    if (typeof entityObject.x === "number") entityObject.x += deltaX;',
+    '    if (typeof entityObject.y === "number") entityObject.y += deltaY;',
+    '    if (Array.isArray(entityObject.points)) {',
+    '      entityObject.points = entityObject.points.map(function (point) { return { x: point.x + deltaX, y: point.y + deltaY }; });',
+    '    }',
+    '    if (uid === textUid) entityObject.text = positionText;',
+    '    if (typeof redrawShapeFromObject === "function") redrawShapeFromObject(uid);',
+    '  });',
+    '})();',
+  ].join('\n');
+}
+
+// Costruisce gli item 'draw_interface' che, tra un movimento e l'altro, spostano
+// l'entityDraw dal tile (fromI, fromJ) al tile (toI, toJ) e aggiornano il testo
+// "I: x - J: y" con la nuova posizione.
+function buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates) {
+  const toCenter = getTileCenter(toI, toJ, tileCoordinates);
+
+  return [
+    {
+      // Immagine dell'entity: uid uguale allo uid dell'entity (vedi EntityDraw)
+      type: 'update',
+      uid: entityUid,
+      attributes: { x: toCenter.x, y: toCenter.y },
+    },
+    {
+      // Tutti gli altri oggetti dell'entity (pannello, testi, bottoni, barre)
+      type: 'code',
+      code: buildMoveEntityDrawCode(fromI, fromJ, toI, toJ, tileCoordinates),
+    },
+  ];
+}
+
+// Invia al frontend lo spostamento dell'entityDraw e l'aggiornamento del testo
+// con la posizione (I / J) del tile raggiunto.
+function moveEntityDrawBetweenTiles(fromI, fromJ, toI, toJ, tileCoordinates) {
+  const toCenter = getTileCenter(toI, toJ, tileCoordinates);
+
+  const payload = {
+    type: 'draw_interface',
+    request_id: 'entity_move_' + Date.now() + '_' + Math.floor(Math.random() * 100000),
+    player_id: playerId,
+    items: buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates),
+  };
+
+  const channelName = 'player_' + playerId + '_channel';
+  pusher.trigger(channelName, 'draw_interface', payload)
+    .then(() => {
+      console.log(`[Entity ${entityUid}] EntityDraw moved to tile (${toI}, ${toJ}) → pixel (${toCenter.x}, ${toCenter.y})`);
+    })
+    .catch((err) => {
+      console.error(`[Entity ${entityUid}]  EntityDraw move FAILED: ${err.message}`);
+    });
+}
+
+// Funzione per muovere l'entity tile per tile con animazione: sposta l'entityDraw
+// (usando le coordinate pixel dei tile) e aggiorna il testo "I: x - J: y".
 // Invia tutti i dati del movimento in un'unica chiamata Pusher
-function moveEntityAlongPath(path, callback) {
+function moveEntityAlongPath(path, startI, startJ, tileCoordinates, callback) {
   if (!path || path.length === 0) {
     console.log(`[Entity ${entityUid}] No path to move along`);
     if (callback) callback();
     return;
   }
+
+  // Tile di partenza: serve per spostare l'entityDraw e per aggiornare il testo
+  // "I: x - J: y" tra un movimento e l'altro
+  let previousTileI = startI;
+  let previousTileJ = startJ;
 
   const totalSteps = path.length;
   const moveInterval = 400; // 400ms per tile
@@ -1164,6 +1244,13 @@ function moveEntityAlongPath(path, callback) {
     const step = path[currentStep];
     localCurrentTileI = step.i;
     localCurrentTileJ = step.j;
+
+    // Sposta l'entityDraw dal tile precedente a quello appena raggiunto e
+    // aggiorna il testo con la posizione (I: x - J: y)
+    moveEntityDrawBetweenTiles(previousTileI, previousTileJ, step.i, step.j, tileCoordinates);
+    previousTileI = step.i;
+    previousTileJ = step.j;
+
     currentStep++;
 
     setTimeout(updatePosition, moveInterval);
@@ -1316,8 +1403,9 @@ function startMovement(targetI, targetJ, callback) {
     }
   };
 
-  // Funzione per eseguire il movimento una volta ottenuto l'array walkable
-  const executeMovementWithWalkable = (currentI, currentJ, tileWalkable, dimensions) => {
+  // Funzione per eseguire il movimento una volta ottenuti l'array walkable
+  // e le coordinate (pixel) dei tile del birth region
+  const executeMovementWithWalkable = (currentI, currentJ, tileWalkable, dimensions, tileCoordinates) => {
     // Calcola il percorso con BFS
     const pathResult = findPathBFS(tileWalkable, currentI, currentJ, targetI, targetJ);
 
@@ -1337,6 +1425,7 @@ function startMovement(targetI, targetJ, callback) {
       path_found: pathResult.success,
       distance: pathResult.success ? pathResult.distance : null,
       walkable_dimensions: dimensions,
+      tile_coordinates_available: !!(tileCoordinates && tileCoordinates.length),
       error: pathResult.success ? null : pathResult.error
     };
 
@@ -1344,12 +1433,13 @@ function startMovement(targetI, targetJ, callback) {
     console.log(`[Entity ${entityUid}] Movement Result:`);
     console.log(JSON.stringify(movementResult, null, 2));
 
-    // Disegna il path tramite Pusher (linea rossa con punti)
+    // Disegna il path tramite Pusher (linea rossa con punti al centro dei tile)
     if (pathResult.success && pathResult.path.length > 0) {
-      drawPathViaPusher(pathResult.path, currentI, currentJ, targetI, targetJ);
+      drawPathViaPusher(pathResult.path, currentI, currentJ, targetI, targetJ, tileCoordinates);
 
-      // Avvia il movimento dell'entity lungo il path (400ms per tile)
-      moveEntityAlongPath(pathResult.path, () => {
+      // Avvia il movimento dell'entity lungo il path (400ms per tile): ad ogni
+      // step l'entityDraw viene spostato e il testo "I: x - J: y" aggiornato
+      moveEntityAlongPath(pathResult.path, currentI, currentJ, tileCoordinates, () => {
         // Questo viene chiamato quando il movimento è completato
         console.log(`[Entity ${entityUid}] Movement along path completed`);
       });
@@ -1362,7 +1452,8 @@ function startMovement(targetI, targetJ, callback) {
     });
   };
 
-  // Flusso principale: 1) Inizializza posizione -> 2) Ottieni walkable -> 3) Calcola percorso
+  // Flusso principale: 1) Inizializza posizione -> 2) Ottieni walkable ->
+  // 3) Ottieni le coordinate (pixel) dei tile -> 4) Calcola il percorso
   initializePosition((posResult) => {
     if (!posResult.success) {
       callback({ success: false, error: 'Position initialization failed' });
@@ -1379,13 +1470,31 @@ function startMovement(targetI, targetJ, callback) {
         return;
       }
 
-      // Esegui il movimento con l'array walkable ottenuto
-      executeMovementWithWalkable(
-        posResult.tile_i,
-        posResult.tile_j,
-        walkableResult.tile_walkable,
-        walkableResult.dimensions
-      );
+      // Subito dopo il walkable: stessa cosa con le coordinate (pixel) dei tile,
+      // usate per disegnare i punti/linee del path e per spostare l'entityDraw
+      console.log(`[Entity ${entityUid}] Requesting tile coordinates from map container...`);
+
+      getTileCoordinatesFromMap((coordinatesResult) => {
+        let tileCoordinates = null;
+
+        if (coordinatesResult.success) {
+          tileCoordinates = coordinatesResult.tile_coordinates;
+          const dimensions = coordinatesResult.dimensions;
+          console.log(`[Entity ${entityUid}] Received tile coordinates: ${dimensions ? `${dimensions.rows}x${dimensions.cols}` : 'n/a'}`);
+        } else {
+          // Il movimento prosegue comunque: senza coordinate si usa la griglia teorica
+          console.error(`[Entity ${entityUid}] ⚠️ Failed to get tile coordinates: ${coordinatesResult.error}`);
+        }
+
+        // Esegui il movimento con l'array walkable e le coordinate ottenute
+        executeMovementWithWalkable(
+          posResult.tile_i,
+          posResult.tile_j,
+          walkableResult.tile_walkable,
+          walkableResult.dimensions,
+          tileCoordinates
+        );
+      });
     });
   });
 }
@@ -1399,6 +1508,10 @@ if (require.main === module) {
 
 module.exports = {
   getWalkableFromMap,
+  getTileCoordinatesFromMap,
+  getTileCenter,
+  buildEntityDrawMoveItems,
+  moveEntityDrawBetweenTiles,
   findPathBFS,
   performMovement,
   performLogin,
