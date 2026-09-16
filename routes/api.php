@@ -34,6 +34,7 @@ Route::group(['prefix' => 'auth'], function () {
   Route::post('/game/get_tiles_by_birth_region', [App\Http\Controllers\Api\GameController::class, 'getTilesByBirthRegion'])->name('game.get_tiles_by_birth_region');
   Route::post('/game/get_birth_region_details', [App\Http\Controllers\Api\GameController::class, 'getBirthRegionDetails'])->name('game.get_birth_region_details');
   Route::post('/game/get_tile_walkable', [App\Http\Controllers\Api\GameController::class, 'getTileWalkable'])->name('game.get_tile_walkable');
+  Route::post('/game/get_tile_coordinates', [App\Http\Controllers\Api\GameController::class, 'getTileCoordinates'])->name('game.get_tile_coordinates');
   Route::post('/game/calculate_chimical_element', [App\Http\Controllers\Api\GameController::class, 'calculateChimicalElement'])->name('game.calculate_chimical_element');
   Route::post('/game/consume_chimical_element', [App\Http\Controllers\Api\GameController::class, 'consumeChimicalElement'])->name('game.consume_chimical_element');
   Route::post('/game/player_values/reset', [App\Http\Controllers\Api\GameController::class, 'resetPlayerValues'])->name('game.player_values.reset');

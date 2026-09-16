@@ -21,6 +21,7 @@ let xsrfToken = null;
 let latestTilesByBirthRegion = null;
 let latestBirthRegionDetails = null;
 let tileWalkable = null;
+let tileCoordinates = null;
 
 function findTileInCache(tileI, tileJ) {
   if (!latestTilesByBirthRegion || !Array.isArray(latestTilesByBirthRegion.tiles)) {
@@ -53,6 +54,21 @@ function parseTileWalkableFromApiResponse(response) {
   return null;
 }
 
+// L'array di coordinate (pixel) dei tile del birth region arriva dall'API
+// /api/auth/game/get_tile_coordinates e ha la STESSA forma dell'array
+// tile_walkable ([i][j]) così può essere consumato allo stesso modo:
+// ogni cella contiene le coordinate del tile oppure null se non disponibili.
+function parseTileCoordinatesFromApiResponse(response) {
+  // La variabile viene popolata SOLO dalla risposta API
+  if (response && Array.isArray(response.tile_coordinates)) {
+    console.log(`[Map] tileCoordinates received from API: ${response.tile_coordinates.length}x${response.tile_coordinates[0]?.length || 0}`);
+    return response.tile_coordinates;
+  }
+
+  console.log('[Map] parseTileCoordinatesFromApiResponse: no tile_coordinates array in API response');
+  return null;
+}
+
 function handleWebSocketCommand(data, ws) {
   const { command, params } = data || {};
 
@@ -64,6 +80,23 @@ function handleWebSocketCommand(data, ws) {
       command: 'get_tile_walkable',
       tile_walkable: tileWalkable,
       dimensions: tileWalkable ? { rows: tileWalkable.length, cols: tileWalkable[0].length } : null,
+    }));
+    return;
+  }
+
+  // Come get_tile_walkable, ma restituisce le coordinate (pixel) di ogni tile
+  // del birth region invece dei flag 0/1 di percorribilità.
+  if (command === 'get_tile_coordinates') {
+    const requestId = data.request_id ?? params?.request_id ?? null;
+    ws.send(JSON.stringify({
+      success: true,
+      request_id: requestId,
+      command: 'get_tile_coordinates',
+      birth_region_id: birthRegionId,
+      tile_coordinates: tileCoordinates,
+      dimensions: tileCoordinates && tileCoordinates.length
+        ? { rows: tileCoordinates.length, cols: tileCoordinates[0]?.length || 0 }
+        : null,
     }));
     return;
   }
@@ -244,8 +277,13 @@ async function bootstrapAndStartLoop() {
     console.error(`[Map] Initial get_tiles_by_birth_region error: ${error.message}`);
   }
 
-  // Fetch tile walkable once after login
-  fetchTileWalkableOnce();
+  // Fetch walkable finché non è disponibile (retry automatico, si ferma quando
+  // arrivano i dati)
+  fetchTileWalkableUntilAvailable();
+
+  // Fetch coordinate finché non sono disponibili (retry automatico, si ferma
+  // quando arrivano i dati)
+  fetchTileCoordinatesUntilAvailable();
 
   setTimeout(() => {
     callGetBirthRegionDetails()
@@ -345,28 +383,23 @@ function callGetTileWalkable() {
   );
 }
 
+function callGetTileCoordinates() {
+  return callGameApi(
+    '/api/auth/game/get_tile_coordinates',
+    { birth_region_id: birthRegionId },
+    'get_tile_coordinates'
+  );
+}
+
 async function runCycle() {
   const results = await Promise.allSettled([
     callSetElementInMap(),
     callGetTilesByBirthRegion(),
-    callGetTileWalkable(),
   ]);
 
   const getTilesResult = results[1];
   if (getTilesResult && getTilesResult.status === 'fulfilled') {
     latestTilesByBirthRegion = getTilesResult.value;
-  }
-
-  // Mantieni fresco l'array walkable: se la prima fetch fallisce (o il map
-  // parte prima che l'API sia pronta), dai tentativi successivi l'array
-  // verrà comunque popolato → le entity non restano bloccate su
-  // "tile_walkable: null" per sempre.
-  const getWalkableResult = results[2];
-  if (getWalkableResult && getWalkableResult.status === 'fulfilled') {
-    const walkable = parseTileWalkableFromApiResponse(getWalkableResult.value);
-    if (walkable) {
-      tileWalkable = walkable;
-    }
   }
 
   for (const result of results) {
@@ -378,14 +411,50 @@ async function runCycle() {
   scheduleNextCycle();
 }
 
-function fetchTileWalkableOnce() {
+// Intervallo tra un tentativo e l'altro quando i dati non sono ancora disponibili
+const DATA_RETRY_INTERVAL_MS = 2000;
+
+// Ripete la fetch del walkable FINCHÉ l'API non restituisce i dati (array non
+// null e non vuoto); appena arrivano il ciclo di retry si ferma.
+function fetchTileWalkableUntilAvailable() {
   callGetTileWalkable()
     .then((response) => {
-      tileWalkable = parseTileWalkableFromApiResponse(response);
-      console.log(`[Map] tileWalkable loaded once: ${tileWalkable ? `${tileWalkable.length}x${tileWalkable[0]?.length || 0}` : 'null'}`);
+      const walkable = parseTileWalkableFromApiResponse(response);
+
+      if (walkable && walkable.length > 0) {
+        tileWalkable = walkable;
+        console.log(`[Map] tileWalkable loaded: ${walkable.length}x${walkable[0]?.length || 0} (retry stopped)`);
+        return;
+      }
+
+      console.log(`[Map] tileWalkable not available yet, retry in ${DATA_RETRY_INTERVAL_MS}ms...`);
+      setTimeout(fetchTileWalkableUntilAvailable, DATA_RETRY_INTERVAL_MS);
     })
     .catch((error) => {
-      console.error(`[Map] fetchTileWalkableOnce error: ${error.message}`);
+      console.error(`[Map] fetchTileWalkableUntilAvailable error: ${error.message}, retry in ${DATA_RETRY_INTERVAL_MS}ms...`);
+      setTimeout(fetchTileWalkableUntilAvailable, DATA_RETRY_INTERVAL_MS);
+    });
+}
+
+// Stesso comportamento per le coordinate: si ripete la chiamata finché non si
+// hanno i dati, poi si smette.
+function fetchTileCoordinatesUntilAvailable() {
+  callGetTileCoordinates()
+    .then((response) => {
+      const coordinates = parseTileCoordinatesFromApiResponse(response);
+
+      if (coordinates && coordinates.length > 0) {
+        tileCoordinates = coordinates;
+        console.log(`[Map] tileCoordinates loaded: ${coordinates.length}x${coordinates[0]?.length || 0} (retry stopped)`);
+        return;
+      }
+
+      console.log(`[Map] tileCoordinates not available yet, retry in ${DATA_RETRY_INTERVAL_MS}ms...`);
+      setTimeout(fetchTileCoordinatesUntilAvailable, DATA_RETRY_INTERVAL_MS);
+    })
+    .catch((error) => {
+      console.error(`[Map] fetchTileCoordinatesUntilAvailable error: ${error.message}, retry in ${DATA_RETRY_INTERVAL_MS}ms...`);
+      setTimeout(fetchTileCoordinatesUntilAvailable, DATA_RETRY_INTERVAL_MS);
     });
 }
 

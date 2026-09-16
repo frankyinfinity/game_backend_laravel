@@ -840,6 +840,75 @@ class GameController extends Controller
         ]);
     }
 
+    public function getTileCoordinates(Request $request): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+        $birthRegionId = (int) $request->input('birth_region_id');
+        if ($birthRegionId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'birth_region_id obbligatorio',
+            ], 422);
+        }
+
+        $birthRegion = BirthRegion::query()->find($birthRegionId);
+        if ($birthRegion === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Birth region non trovata',
+            ], 404);
+        }
+
+        // Le coordinate (pixel) di ogni tile sono salvate su BirthRegionDetail
+        // (json_coordinates: center / top_left / top_right / bottom_left / bottom_right)
+        $coordinatesByTile = [];
+        $maxI = -1;
+        $maxJ = -1;
+        $details = BirthRegionDetail::query()
+            ->where('birth_region_id', $birthRegionId)
+            ->get();
+
+        foreach ($details as $detail) {
+            $i = (int) $detail->tile_i;
+            $j = (int) $detail->tile_j;
+            if ($i < 0 || $j < 0) {
+                continue;
+            }
+
+            $coordinatesByTile[$i][$j] = $detail->json_coordinates;
+
+            if ($i > $maxI) $maxI = $i;
+            if ($j > $maxJ) $maxJ = $j;
+        }
+
+        // Stessa forma dell'array tile_walkable: matrice [i][j] dove ogni cella
+        // contiene le coordinate del tile, oppure null se non disponibili
+        $tileCoordinates = [];
+        $count = 0;
+        for ($i = 0; $i <= $maxI; $i++) {
+            $row = [];
+            for ($j = 0; $j <= $maxJ; $j++) {
+                $coordinates = $coordinatesByTile[$i][$j] ?? null;
+                if ($coordinates !== null) {
+                    $count++;
+                }
+                $row[] = $coordinates;
+            }
+            $tileCoordinates[] = $row;
+        }
+
+        return response()->json([
+            'success' => true,
+            'birth_region_id' => $birthRegionId,
+            'tile_coordinates' => $tileCoordinates,
+            'count' => $count,
+            'dimensions' => [
+                'rows' => $maxI + 1,
+                'cols' => $maxJ + 1,
+            ],
+        ]);
+    }
+
     public function getBirthRegionDetails(Request $request): \Illuminate\Http\JsonResponse
     {
         ini_set('memory_limit', '-1');

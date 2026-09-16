@@ -1,6 +1,6 @@
 {
   "name": "entity-service",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Entity Docker service with WebSocket",
   "main": "index.js",
   "dependencies": {

@@ -519,6 +519,7 @@
                 'Map': [
                     { cmd: 'get_tile_info',             label: '🗺️ tile',              desc: 'Info tile (i,j)',     more: '{"tile_i":0,"tile_j":0}' },
                     { cmd: 'get_tile_walkable',         label: '🚶 walkable',          desc: 'Array tile percorribili (0/1)' },
+                    { cmd: 'get_tile_coordinates',      label: '🧭 coordinates',       desc: 'Array coordinate tile regione (pixel)' },
                     { cmd: 'get_birth_region_details',  label: '🏞️ region detail',    desc: 'Dettaglio regione',   more: '{"tile_i":0,"tile_j":0}' },
                 ],
                 'ElementHasPosition': [
