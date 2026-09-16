@@ -1362,6 +1362,67 @@ class GameController extends Controller
     }
 
     /**
+     * Aggiorna sul DB la posizione (tile_i, tile_j) di un'entity.
+     *
+     * Usata dal container entity: ad ogni step del movimento le variabili locali
+     * i/j vengono aggiornate e questa API le persiste sul DB.
+     */
+    public function updateEntityPosition(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entityUid = $request->input('entity_uid');
+        $tileI = $request->input('tile_i');
+        $tileJ = $request->input('tile_j');
+
+        if (!$entityUid || $tileI === null || $tileJ === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'entity_uid, tile_i and tile_j are required',
+            ], 400);
+        }
+
+        if (!is_numeric($tileI) || !is_numeric($tileJ)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'tile_i and tile_j must be numeric',
+            ], 400);
+        }
+
+        $tileI = (int) $tileI;
+        $tileJ = (int) $tileJ;
+
+        if ($tileI < 0 || $tileJ < 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'tile_i and tile_j must be positive',
+            ], 400);
+        }
+
+        $entity = Entity::query()->where('uid', $entityUid)->first();
+
+        if (!$entity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity not found',
+            ], 404);
+        }
+
+        $previousTileI = (int) $entity->tile_i;
+        $previousTileJ = (int) $entity->tile_j;
+
+        $entity->update(['tile_i' => $tileI, 'tile_j' => $tileJ]);
+
+        Log::info("updateEntityPosition: entity {$entityUid} moved from ({$previousTileI}, {$previousTileJ}) to ({$tileI}, {$tileJ})");
+
+        return response()->json([
+            'success' => true,
+            'entity_uid' => $entityUid,
+            'tile_i' => $tileI,
+            'tile_j' => $tileJ,
+            'updated' => true,
+        ]);
+    }
+
+    /**
      * Gestisce il movimento di un'entity
      */
     public function movement(Request $request): \Illuminate\Http\JsonResponse

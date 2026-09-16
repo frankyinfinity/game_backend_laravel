@@ -65,6 +65,10 @@ const DEGRADATION_WAIT_SECONDS = 60;
 const WALKABLE_RESPONSE_TIMEOUT_MS = parseInt(process.env.WALKABLE_RESPONSE_TIMEOUT_MS || '5000', 10);
 const WALKABLE_RETRY_DELAY_MS = parseInt(process.env.WALKABLE_RETRY_DELAY_MS || '1000', 10);
 
+// Timeout delle chiamate API al backend: evita che una richiesta bloccata
+// fermi la coda (apiQueue) delle chiamate serializzate.
+const API_REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT_MS || '10000', 10);
+
 // Geometria della mappa e scroll group (allineati a Helper::TILE_SIZE,
 // Helper::MAP_START_X/Y e Helper::MAP_SCROLL_GROUP_MAIN del backend).
 // Servono per posizionare path ed entity quando le coordinate dei tile non sono
@@ -1183,6 +1187,9 @@ function moveEntityDrawBetweenTiles(fromI, fromJ, toI, toJ, tileCoordinates) {
 
 // Funzione per muovere l'entity tile per tile con animazione: sposta l'entityDraw
 // (usando le coordinate pixel dei tile) e aggiorna il testo "I: x - J: y".
+// Al termine del movimento (una sola volta) le variabili locali i/j, che
+// contengono la posizione finale, vengono persistite sul DB tramite l'API
+// update_position.
 // Invia tutti i dati del movimento in un'unica chiamata Pusher
 function moveEntityAlongPath(path, startI, startJ, tileCoordinates, callback) {
   if (!path || path.length === 0) {
@@ -1235,6 +1242,9 @@ function moveEntityAlongPath(path, startI, startJ, tileCoordinates, callback) {
   const updatePosition = () => {
     if (currentStep >= totalSteps) {
       console.log(`[Entity ${entityUid}] Movement completed!`);
+      // Movimento terminato: le variabili locali i/j contengono la posizione
+      // finale, che viene persistita sul DB con UNA SOLA chiamata API
+      updateEntityPositionOnApi(localCurrentTileI, localCurrentTileJ);
       // Cancella il path una volta arrivati alla fine
       clearPathViaPusher(totalSteps);
       if (callback) callback();
@@ -1301,6 +1311,123 @@ function fetchCurrentPositionFromApi(callback) {
   });
 
   req.end();
+}
+
+// Ultima posizione (i, j) scritta con successo sul DB: evita di ripetere la
+// chiamata API quando le variabili locali non sono cambiate
+let lastPersistedTileI = null;
+let lastPersistedTileJ = null;
+
+// Aggiorna sul DB la posizione dell'entity tramite l'API dedicata
+// (POST /api/auth/game/entity/update_position).
+// Viene chiamata una sola volta, al termine del movimento, con le variabili
+// locali i/j aggiornate sull'ultimo tile raggiunto. Le chiamate sono
+// serializzate dalla apiQueue come le altre richieste al backend.
+function updateEntityPositionOnApi(tileI, tileJ, callback) {
+  const finish = (result) => {
+    if (callback) callback(result);
+  };
+
+  const numericI = Number(tileI);
+  const numericJ = Number(tileJ);
+
+  if (!Number.isFinite(numericI) || !Number.isFinite(numericJ)) {
+    console.error(`[Entity ${entityUid}] ⛔ Position update skipped: invalid coordinates (${tileI}, ${tileJ})`);
+    finish({ success: false, error: 'Invalid tile coordinates' });
+    return;
+  }
+
+  if (!sessionCookie) {
+    console.error(`[Entity ${entityUid}] ⛔ Position update skipped: no session cookie`);
+    finish({ success: false, error: 'No session cookie' });
+    return;
+  }
+
+  // Posizione già scritta sul DB: nessuna chiamata necessaria
+  if (lastPersistedTileI === numericI && lastPersistedTileJ === numericJ) {
+    finish({ success: true, tile_i: numericI, tile_j: numericJ, skipped: true });
+    return;
+  }
+
+  const payload = JSON.stringify({
+    entity_uid: entityUid,
+    tile_i: numericI,
+    tile_j: numericJ,
+  });
+
+  enqueueApiCall((done) => {
+    // Guardia contro doppie risoluzioni (es. timeout + errore): la coda viene
+    // sbloccata e il callback chiamato una sola volta
+    let settled = false;
+    const settle = (result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      done();
+      finish(result);
+    };
+
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: '/api/auth/game/entity/update_position',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.success) {
+            lastPersistedTileI = numericI;
+            lastPersistedTileJ = numericJ;
+            console.log(`[Entity ${entityUid}] Position updated on DB: I: ${numericI} - J: ${numericJ}`);
+            settle({ success: true, tile_i: numericI, tile_j: numericJ });
+            return;
+          }
+
+          if (handleAuthFailure(res, 'updateEntityPosition')) {
+            // Sessione scaduta → il re-login è stato avviato: la posizione
+            // non è stata salvata, verrà ritentata al prossimo step
+          } else {
+            console.error(`[Entity ${entityUid}] ⛔ Position update failed (status ${res.statusCode}): ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          if (handleAuthFailure(res, 'updateEntityPosition')) {
+            // re-login avviato
+          } else {
+            console.error(`[Entity ${entityUid}] Error parsing position update response: ${error.message}. Status: ${res.statusCode}`);
+          }
+          data = error.message;
+        }
+
+        settle({ success: false, error: data });
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(`[Entity ${entityUid}] Error updating position on DB: ${error.message}`);
+      settle({ success: false, error: error.message });
+    });
+
+    // Se il backend non risponde, non bloccare la coda delle API
+    req.setTimeout(API_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`timeout after ${API_REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.write(payload);
+    req.end();
+  });
 }
 
 // Funzione per eseguire un movimento specifico
@@ -1512,6 +1639,7 @@ module.exports = {
   getTileCenter,
   buildEntityDrawMoveItems,
   moveEntityDrawBetweenTiles,
+  updateEntityPositionOnApi,
   findPathBFS,
   performMovement,
   performLogin,
