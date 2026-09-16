@@ -23,6 +23,7 @@ use App\Models\Player;
 use App\Models\Tile;
 use App\Models\ElementHasPosition;
 use App\Models\FamilyTile;
+use App\Models\BirthRegionDetail;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Log;
@@ -68,6 +69,47 @@ class GenerateMapJob implements ShouldQueue
 
         $tiles = Helper::getBirthRegionTiles($birthRegion);
         $tilesByCoord = [];
+
+        if (!$birthRegion->get_coordinate) {
+            $tileSize = Helper::TILE_SIZE;
+            $startX = Helper::MAP_START_X;
+            $startY = Helper::MAP_START_Y;
+
+            // Store the coordinates of the 4 corners and of the center of every tile
+            // (map pixel coordinates, same convention used to draw the map below)
+            foreach ($tiles as $tileRow) {
+                $tileI = (int) ($tileRow['i'] ?? $tileRow->i ?? 0);
+                $tileJ = (int) ($tileRow['j'] ?? $tileRow->j ?? 0);
+                $tilePixelX = $startX + $tileJ * $tileSize;
+                $tilePixelY = $startY + $tileI * $tileSize;
+
+                $detail = BirthRegionDetail::firstOrNew([
+                    'birth_region_id' => $birthRegion->id,
+                    'tile_i' => $tileI,
+                    'tile_j' => $tileJ,
+                ]);
+
+                $jsonTile = $tileRow['tile'] ?? $tileRow->tile ?? null;
+                if ($jsonTile !== null && !empty($jsonTile['id'])) {
+                    $detail->json_tile = $jsonTile;
+                }
+
+                $detail->json_coordinates = [
+                    'center' => ['x' => $tilePixelX + $tileSize / 2, 'y' => $tilePixelY + $tileSize / 2],
+                    'top_left' => ['x' => $tilePixelX, 'y' => $tilePixelY],
+                    'top_right' => ['x' => $tilePixelX + $tileSize, 'y' => $tilePixelY],
+                    'bottom_left' => ['x' => $tilePixelX, 'y' => $tilePixelY + $tileSize],
+                    'bottom_right' => ['x' => $tilePixelX + $tileSize, 'y' => $tilePixelY + $tileSize],
+                ];
+
+                $detail->save();
+            }
+
+            if ($tiles->isNotEmpty()) {
+                $birthRegion->update(['get_coordinate' => true]);
+            }
+        }
+
         foreach ($tiles as $tileRow) {
             $tileI = (int) ($tileRow['i'] ?? $tileRow->i ?? 0);
             $tileJ = (int) ($tileRow['j'] ?? $tileRow->j ?? 0);
@@ -76,6 +118,13 @@ class GenerateMapJob implements ShouldQueue
                 $tilesByCoord[$tileI . ':' . $tileJ] = $tileData;
             }
         }
+
+        // The position of every tile used for the drawing below comes from the
+        // coordinates stored on BirthRegionDetail (json_coordinates)
+        $detailsByCoord = BirthRegionDetail::query()
+            ->where('birth_region_id', $birthRegion->id)
+            ->get()
+            ->keyBy(fn (BirthRegionDetail $detail) => $detail->tile_i . ':' . $detail->tile_j);
 
         $entities = Entity::query()
             ->where('birth_region_id', $birthRegion->id)
@@ -146,6 +195,11 @@ class GenerateMapJob implements ShouldQueue
 
         for ($i = 0; $i < $birthRegion->height; $i++) {
             for ($j = 0; $j < $birthRegion->width; $j++) {
+
+                // Top-left corner of the tile, read from the stored coordinates
+                $topLeft = $detailsByCoord->get($i . ':' . $j)?->json_coordinates['top_left'] ?? null;
+                $pixelX = (int) ($topLeft['x'] ?? $startPixelX + $j * $tileSize);
+                $pixelY = (int) ($topLeft['y'] ?? Helper::MAP_START_Y + $i * $tileSize);
 
                 $tile = $birthClimate->default_tile;
                 $searchTile = $tilesByCoord[$i . ':' . $j] ?? null;
@@ -229,11 +283,7 @@ class GenerateMapJob implements ShouldQueue
 
                 }
 
-                $pixelX += $tileSize;
-
             }
-            $pixelX = $startPixelX;
-            $pixelY += $tileSize;
         }
 
         // Draw all existing ElementHasPosition records for this birth_region that are LIFE.

@@ -14,6 +14,7 @@ class BirthRegionDetail extends Model
         'tile_j' => 'integer',
         'json_tile' => 'array',
         'json_generator' => 'array',
+        'json_coordinates' => 'array',
     ];
 
     public function birthRegion()

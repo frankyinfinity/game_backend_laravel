@@ -9,6 +9,10 @@ class BirthRegion extends Model
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    protected $casts = [
+        'get_coordinate' => 'boolean',
+    ];
+
     public function birthPlanet(){
         return $this->belongsTo(BirthPlanet::class);
     }
