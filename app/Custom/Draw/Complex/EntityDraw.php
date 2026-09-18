@@ -238,7 +238,9 @@ class EntityDraw
         if ($showDivision) {
             $jsPathDivision = resource_path('js/function/entity/click_division.blade.php');
             $jsContentDivision = file_get_contents($jsPathDivision);
+            $jsContentDivision = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentDivision);
             $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
+            $jsContentDivision = str_replace('__port__', $wsPort, $jsContentDivision);
 
             $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
             $divisionButton->setSize(220, 40);

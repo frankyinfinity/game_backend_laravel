@@ -548,6 +548,99 @@ function checkEntityDegradation() {
   });
 }
 
+// Invia la richiesta di divisione al backend (POST /api/auth/game/entity/division).
+// Per ora il backend si limita a tracciare la chiamata con Log::info; la risposta
+// viene inoltrata al chiamante WebSocket. La chiamata è serializzata dalla
+// apiQueue come le altre richieste al backend e attende la sessione se manca.
+function triggerDivision(targetEntityUid, callback) {
+  const run = () => {
+    enqueueApiCall((done) => {
+      // Guardia contro doppie risoluzioni (es. timeout + errore): la coda
+      // viene sbloccata e il callback chiamato una sola volta
+      let settled = false;
+      const settle = (result) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        done();
+        if (callback) callback(result);
+      };
+
+      const payload = JSON.stringify({ entity_uid: targetEntityUid });
+
+      const options = {
+        hostname: new URL(backendUrl).hostname,
+        port: new URL(backendUrl).port || 80,
+        path: '/api/auth/game/entity/division',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'Accept': 'application/json',
+          'Cookie': sessionCookie,
+          'X-XSRF-TOKEN': xsrfToken
+        },
+      };
+
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data);
+            if (response.success) {
+              console.log(`[Entity ${entityUid}] Division API ok: ${response.message || 'success'}`);
+              settle({ success: true, entity_uid: targetEntityUid, message: response.message || 'success' });
+            } else if (handleAuthFailure(res, 'triggerDivision')) {
+              // Sessione scaduta → re-login avviato
+              settle({ success: false, error: 'Sessione scaduta, riprovare' });
+            } else {
+              console.error(`[Entity ${entityUid}] Division API failed (status ${res.statusCode}): ${response.message || 'Unknown error'}`);
+              settle({ success: false, error: response.message || 'Division API failed', status: res.statusCode });
+            }
+          } catch (error) {
+            if (handleAuthFailure(res, 'triggerDivision')) {
+              settle({ success: false, error: 'Sessione scaduta, riprovare' });
+            } else {
+              console.error(`[Entity ${entityUid}] Error parsing division response: ${error.message}. Status: ${res.statusCode}`);
+              settle({ success: false, error: error.message });
+            }
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error(`[Entity ${entityUid}] Error calling division API: ${error.message}`);
+        settle({ success: false, error: error.message });
+      });
+
+      // Se il backend non risponde, non bloccare la coda delle API
+      req.setTimeout(API_REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error(`timeout after ${API_REQUEST_TIMEOUT_MS}ms`));
+      });
+
+      req.write(payload);
+      req.end();
+    });
+  };
+
+  if (!sessionCookie) {
+    // Sessione non ancora pronta: aspetta (attivando il login) prima di
+    // rinunciare, stesso pattern di performMovement.
+    ensureSession((ok) => {
+      if (!ok || !sessionCookie) {
+        if (callback) callback({ success: false, error: 'No session cookie (login non riuscito)' });
+        return;
+      }
+      run();
+    }, 10000);
+    return;
+  }
+
+  run();
+}
+
 // Funzione per programmare il prossimo ciclo (solo position)
 function scheduleNextCycle() {
   setTimeout(() => {
@@ -642,6 +735,21 @@ function handleWebSocketCommand(data, ws) {
             error: 'Failed to fetch position from API'
           }));
         }
+      });
+      break;
+
+    case 'division':
+      // Avvia la divisione dell'entity tramite l'API dedicata del backend.
+      // L'entity_uid può essere passato nei params; di default viene usata
+      // l'entity gestita da questo container.
+      const divisionTargetUid = (moveParams && moveParams.entity_uid) ? String(moveParams.entity_uid) : entityUid;
+      if (!divisionTargetUid) {
+        ws.send(JSON.stringify({ success: false, command: 'division', error: 'entity_uid mancante' }));
+        break;
+      }
+      console.log(`[Entity ${entityUid}] Division requested (target: ${divisionTargetUid})`);
+      triggerDivision(divisionTargetUid, (result) => {
+        ws.send(JSON.stringify(Object.assign({ command: 'division' }, result)));
       });
       break;
 
@@ -1640,6 +1748,7 @@ module.exports = {
   buildEntityDrawMoveItems,
   moveEntityDrawBetweenTiles,
   updateEntityPositionOnApi,
+  triggerDivision,
   findPathBFS,
   performMovement,
   performLogin,

@@ -56,26 +56,69 @@
             return;
         }
 
-        $.ajax({
-            url: `${BACK_URL}/api/auth/game/entity/division`,
-            type: 'POST',
-            data: {
-                entity_uid: entityUid
-            },
-            success: function(response) {
-                console.log('Division response:', response);
-                if (response && response.success === false && response.message) {
-                    showBottomRightAlert(response.message);
+        let port = '__port__';
+        if (!port) {
+            console.error('WebSocket port not found for this entity');
+            return;
+        }
+
+        let wsUrl = '__gateway_base__' + port;
+
+        // Cache globale dei WebSocket (stesso pattern di movement_ws)
+        window.gameWebSockets = window.gameWebSockets || {};
+        let ws = window.gameWebSockets[port];
+
+        const sendCommand = () => {
+            ws.send(JSON.stringify({
+                command: 'division',
+                params: {
+                    entity_uid: entityUid
                 }
-            },
-            error: function(err) {
-                console.error('Division API error:', err);
-                const message = err && err.responseJSON && err.responseJSON.message
-                    ? err.responseJSON.message
-                    : 'Divisione non disponibile';
-                showBottomRightAlert(message);
+            }));
+        };
+
+        const onDivisionResponse = function(event) {
+            let response;
+            try {
+                response = JSON.parse(event.data);
+            } catch (e) {
+                return;
             }
-        });
+            if (!response || response.command !== 'division') {
+                return; // ignora benvenuto e risposte di altri comandi
+            }
+            console.log('WS Division response:', response);
+            ws.removeEventListener('message', onDivisionResponse);
+            if (response.success) {
+                showBottomRightAlert('Divisione avviata per ' + entityUid);
+            } else {
+                showBottomRightAlert(response.error || 'Divisione non disponibile');
+            }
+        };
+
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+            ws = new WebSocket(wsUrl);
+            window.gameWebSockets[port] = ws;
+
+            ws.onopen = function() {
+                console.log('WS Connected to ' + wsUrl);
+                sendCommand();
+            };
+
+            ws.onerror = function(error) {
+                console.error('WS Error:', error);
+            };
+        } else {
+             if (ws.readyState === WebSocket.OPEN) {
+                sendCommand();
+             } else if (ws.readyState === WebSocket.CONNECTING) {
+                ws.addEventListener('open', sendCommand, { once: true });
+             }
+        }
+
+        // Listener isolato: non sovrascrive gli onmessage di altri comandi
+        // (es. movimento) eventualmente già registrati sul socket.
+        ws.addEventListener('message', onDivisionResponse);
     }
     window['__name__']();
 </script>

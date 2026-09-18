@@ -2416,7 +2416,31 @@ class GameController extends Controller
         ]);
     }
 
+    /**
+     * Riceve la richiesta di divisione dal container entity (comando WS
+     * 'division'). Per ora si limita a tracciare la chiamata con Log::info:
+     * il workflow completo è preservato in divisionWorkflow() e potrà essere
+     * riattivato sostituendo questo corpo con $this->divisionWorkflow($request).
+     */
     public function division(Request $request)
+    {
+        $entityUid = (string) $request->input('entity_uid');
+
+        Log::info("division: richiesta ricevuta per l'entity {$entityUid}");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Division ricevuta (per ora solo log)',
+            'entity_uid' => $entityUid,
+        ]);
+    }
+
+    /**
+     * Workflow completo della divisione (sospeso): validazioni, clonazione
+     * genome/chimical/details, spawn della nuova entity e creazione container.
+     * Riattivabile chiamando $this->divisionWorkflow($request) da division().
+     */
+    private function divisionWorkflow(Request $request)
     {
         ini_set('memory_limit', '-1');
         $entityUid = (string) $request->input('entity_uid');
