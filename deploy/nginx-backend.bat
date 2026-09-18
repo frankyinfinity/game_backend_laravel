@@ -5,7 +5,8 @@ REM  Rimpiazza "php artisan serve" SULLA STESSA PORTA 8085: il frontend
 REM  (config.js -> http://localhost:8085) e il tunnel SSH di start.bat
 REM  (-R 8085:127.0.0.1:8085) continuano a funzionare senza modifiche.
 REM  Il pool php-cgi su 127.0.0.1:9100 serve PIU' richieste in parallelo.
-REM  Avvia anche: server statico/CORS 8086, Reverb 8081, queue worker.
+REM  Avvia anche: server statico/CORS 8086, Reverb 8081, queue worker
+REM  e tunnel SSH reverse 8085/8086/8081 verso la VM (come start.bat).
 REM
 REM  Uso:
 REM    nginx-backend.bat          -> avvio (default)
@@ -72,52 +73,79 @@ REM --- 1) Pool PHP-CGI: worker concorrenti ---
 set PHP_CGI_RUNNING=
 for /f "skip=3 tokens=1" %%p in ('tasklist /fi "imagename eq php-cgi.exe" 2^>nul') do set PHP_CGI_RUNNING=1
 if defined PHP_CGI_RUNNING (
-    echo [1/4] Pool PHP-CGI gia' attivo, skip
+    echo [1/5] Pool PHP-CGI gia' attivo, skip
 ) else (
     set PHP_FCGI_CHILDREN=%PHP_WORKERS%
     set PHP_FCGI_MAX_REQUESTS=500
     start /b "php-cgi" "%PHP_CGI%" -b 127.0.0.1:%CGI_PORT%
-    echo [1/4] Pool PHP-CGI avviato su 127.0.0.1:%CGI_PORT%, %PHP_WORKERS% worker
+    echo [1/5] Pool PHP-CGI avviato su 127.0.0.1:%CGI_PORT%, %PHP_WORKERS% worker
 )
 
 REM --- 2) Nginx ---
 set NGINX_RUNNING=
 for /f "skip=3 tokens=1" %%p in ('tasklist /fi "imagename eq nginx.exe" 2^>nul') do set NGINX_RUNNING=1
 if defined NGINX_RUNNING (
-    echo [2/4] Nginx gia' attivo, skip
+    echo [2/5] Nginx gia' attivo, skip
 ) else (
     copy /y "%BACKEND_ROOT%\deploy\nginx.conf" "%NGINX_HOME%\conf\nginx.conf" >nul
     pushd %NGINX_HOME%
     start /b "nginx" nginx.exe
     popd
-    echo [2/4] Nginx avviato sulla porta %HTTP_PORT%
+    echo [2/5] Nginx avviato sulla porta %HTTP_PORT%
 )
 
 REM --- 3) Servizi Laravel fuori dal pool FastCGI ---
 set REVERB_RUNNING=
-for /f %%i in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" | Where-Object { $_.CommandLine -match 'reverb:start' }).Count" 2^>nul') do if %%i gtr 0 set REVERB_RUNNING=1
+for /f %%i in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'php.exe' -and $_.CommandLine -match 'reverb:start' }).Count" 2^>nul') do if %%i gtr 0 set REVERB_RUNNING=1
 set QUEUE_RUNNING=
-for /f %%i in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" | Where-Object { $_.CommandLine -match 'queue:listen' }).Count" 2^>nul') do if %%i gtr 0 set QUEUE_RUNNING=1
+for /f %%i in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'php.exe' -and $_.CommandLine -match 'queue:listen' }).Count" 2^>nul') do if %%i gtr 0 set QUEUE_RUNNING=1
 if defined REVERB_RUNNING (
-    echo [3/4] Reverb gia' attivo, skip
+    echo [3/5] Reverb gia' attivo, skip
 ) else (
     start /b "reverb" /min cmd /c "cd /d %BACKEND_ROOT% && php artisan reverb:start"
+    echo [3/5] Reverb avviato sulla 8081
 )
 if defined QUEUE_RUNNING (
-    echo [3/4] Queue worker gia' attivo, skip
+    echo [3/5] Queue worker gia' attivo, skip
 ) else (
     start /b "queue" /min cmd /c "cd /d %BACKEND_ROOT% && php artisan queue:listen --timeout=300"
+    echo [3/5] Queue worker avviato
 )
-echo [3/4] Reverb ^| queue worker: verificati/avviati
+echo [3/5] Reverb ^| queue worker: verificati/avviati
 
 REM --- 4) Server statico/CORS 8086 (usato da STATIC_URL per immagini/tile) ---
 set PORT8086_RUNNING=
 for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8086 " ^| findstr "LISTENING"') do set PORT8086_RUNNING=1
 if defined PORT8086_RUNNING (
-    echo [4/4] Server statico 8086 gia' attivo, skip
+    echo [4/5] Server statico 8086 gia' attivo, skip
 ) else (
     start /b "static8086" /min cmd /c "cd /d %BACKEND_ROOT% && php -S 0.0.0.0:8086 -t public public/server.php"
-    echo [4/4] Server statico/CORS avviato su 8086
+    echo [4/5] Server statico/CORS avviato su 8086
+)
+
+REM --- 5) Tunnel SSH reverse verso la VM (stessa riga di start.bat):
+REM         i container sulla VM parlano con backend/statico/reverb tramite
+REM         127.0.0.1:8085 / 8086 / 8081 solo se questo tunnel e' attivo. ---
+set GCLOUD_ZONE=
+set GCLOUD_INSTANCE=
+set GCLOUD_PROJECT=
+if exist "%BACKEND_ROOT%\.env" (
+    for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b "REMOTE_DOCKER_GCLOUD_ZONE=" "%BACKEND_ROOT%\.env"`) do set GCLOUD_ZONE=%%b
+    for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b "REMOTE_DOCKER_GCLOUD_INSTANCE=" "%BACKEND_ROOT%\.env"`) do set GCLOUD_INSTANCE=%%b
+    for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b "REMOTE_DOCKER_GCLOUD_PROJECT=" "%BACKEND_ROOT%\.env"`) do set GCLOUD_PROJECT=%%b
+)
+if "%GCLOUD_ZONE%"=="" set GCLOUD_ZONE=europe-west12-c
+if "%GCLOUD_INSTANCE%"=="" set GCLOUD_INSTANCE=instance-game
+if "%GCLOUD_PROJECT%"=="" set GCLOUD_PROJECT=game-500515
+
+set TUNNEL_RUNNING=
+for /f %%i in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'gcloud' -and $_.CommandLine -match '8085:127.0.0.1:8085' -and $_.CommandLine -notmatch 'Get-CimInstance' -and $_.ProcessId -ne $PID }).Count" 2^>nul') do if %%i gtr 0 set TUNNEL_RUNNING=1
+if defined TUNNEL_RUNNING (
+    echo [5/5] Tunnel SSH gia' attivo, skip
+) else (
+    if exist "C:\Python314\python.exe" set CLOUDSDK_PYTHON=C:\Python314\python.exe
+    start "tunnel-ssh" /min gcloud compute ssh --zone %GCLOUD_ZONE% %GCLOUD_INSTANCE% --project %GCLOUD_PROJECT% --tunnel-through-iap -- -N -R 8085:127.0.0.1:8085 -R 8086:127.0.0.1:8086 -R 8081:127.0.0.1:8081
+    echo [5/5] Tunnel SSH avviato verso %GCLOUD_INSTANCE% ^(8085, 8086, 8081^)
 )
 
 echo.
@@ -128,8 +156,10 @@ goto :eof
 
 :stop
 echo === Arresto backend Nginx + PHP-CGI ===
-taskkill /f /im nginx.exe >nul 2>&1 && echo [1/2] Nginx arrestato
-taskkill /f /im php-cgi.exe >nul 2>&1 && echo [2/2] Pool PHP-CGI arrestato
+taskkill /f /im nginx.exe >nul 2>&1 && echo [1/3] Nginx arrestato
+taskkill /f /im php-cgi.exe >nul 2>&1 && echo [2/3] Pool PHP-CGI arrestato
+for /f "tokens=*" %%i in ('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'gcloud' -and $_.CommandLine -match '8085:127.0.0.1:8085' -and $_.CommandLine -notmatch 'Get-CimInstance' -and $_.ProcessId -ne $PID } | Select-Object -ExpandProperty ProcessId" 2^>nul') do taskkill /f /pid %%i >nul 2>&1
+echo [3/3] Tunnel SSH arrestato (se era attivo)
 echo Fatto. Reverb e queue worker NON sono toccati: arrestali a mano se serve.
 goto :eof
 
@@ -148,6 +178,9 @@ tasklist /fi "imagename eq php-cgi.exe" 2>nul | find /i "php-cgi.exe" >nul && (e
 netstat -ano | findstr ":%HTTP_PORT% " | findstr LISTENING >nul && (echo porta %HTTP_PORT%   LISTENING) || (echo porta %HTTP_PORT%   NOT listening)
 netstat -ano | findstr ":%CGI_PORT% " | findstr LISTENING >nul && (echo porta %CGI_PORT%   LISTENING) || (echo porta %CGI_PORT%   NOT listening)
 netstat -ano | findstr ":8086 " | findstr LISTENING >nul && (echo porta 8086   LISTENING) || (echo porta 8086   NOT listening)
+set TUNNEL_UP=
+for /f %%i in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'gcloud' -and $_.CommandLine -match '8085:127.0.0.1:8085' -and $_.CommandLine -notmatch 'Get-CimInstance' -and $_.ProcessId -ne $PID }).Count" 2^>nul') do if %%i gtr 0 set TUNNEL_UP=1
+if defined TUNNEL_UP (echo tunnel SSH   RUNNING) else (echo tunnel SSH   stopped)
 echo.
 echo Test rapido:
 curl.exe --max-time 10 -s -o NUL -w "http://127.0.0.1:%HTTP_PORT%/up -> HTTP %%{http_code} in %%{time_total}s\n" http://127.0.0.1:%HTTP_PORT%/up
