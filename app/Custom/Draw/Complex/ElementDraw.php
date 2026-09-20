@@ -216,6 +216,10 @@ class ElementDraw
             }
         }
 
+        // Close Button (dark grey button with a white X) in the top-right corner of the panel
+        // Called last so the final panel size (computed by the helpers above) is known.
+        $closeBtnItems = $this->addCloseButton($panel, $uid);
+
         // Final Draw Items Assembly (Parent before Children)
         $this->drawItems[] = $image->buildJson();
         $this->drawItems[] = $panel->buildJson();
@@ -229,6 +233,11 @@ class ElementDraw
         }
 
         foreach ($attackBtnItems as $item) {
+            $this->drawItems[] = $item->buildJson();
+        }
+
+        // Add close button items to draw items
+        foreach ($closeBtnItems as $item) {
             $this->drawItems[] = $item->buildJson();
         }
 
@@ -448,5 +457,55 @@ class ElementDraw
         }
 
         return $btnItems;
+    }
+
+    /**
+     * Add the close button (dark grey square with a white X) to the top-right corner of the panel
+     *
+     * @return array Array of draw items from the button
+     */
+    private function addCloseButton(Rectangle $panel, $uid): array
+    {
+        $closeSize = 28;
+        $closeMargin = 6;
+        $panelWidth = (float) ($panel->buildJson()['width'] ?? 400);
+
+        $closeX = $panel->getOriginX() + $panelWidth - $closeSize - $closeMargin;
+        $closeY = $panel->getOriginY() + $closeMargin;
+
+        $jsPathClose = resource_path('js/function/element/click_close_element_panel.blade.php');
+        $jsContentClose = file_get_contents($jsPathClose);
+        $jsContentClose = str_replace('__PANEL_UID__', $uid . '_panel', $jsContentClose);
+        $jsContentClose = Helper::setCommonJsCode($jsContentClose, Str::random(20));
+
+        $closeButton = new Rectangle($uid . '_panel_close_button');
+        $closeButton->setOrigin($closeX, $closeY);
+        $closeButton->setSize($closeSize, $closeSize);
+        $closeButton->setColor(Colors::DARK_GRAY);
+        $closeButton->setBorderRadius(6);
+        $closeButton->setRenderable(false);
+        $closeButton->addAttributes('z_index', 10060);
+        $closeButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClose);
+
+        $closeText = new Text($uid . '_panel_close_text');
+        $closeText->setCenterAnchor(true);
+        $closeText->setOrigin(
+            $closeX + (int) floor($closeSize / 2),
+            $closeY + (int) floor($closeSize / 2)
+        );
+        $closeText->setText('X');
+        $closeText->setFontSize(18);
+        $closeText->setColor(Colors::WHITE);
+        $closeText->setRenderable(false);
+        $closeText->addAttributes('z_index', 10061);
+        $closeText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClose);
+
+        $closeItems = [];
+        foreach ([$closeButton, $closeText] as $item) {
+            $panel->addChild($item);
+            $closeItems[] = $item;
+        }
+
+        return $closeItems;
     }
 }

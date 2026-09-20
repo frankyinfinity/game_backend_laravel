@@ -355,6 +355,40 @@ class EntityDraw
             $panelY += 80;
         }
 
+        //Close button (dark grey button with a white X) in the top-right corner of the panel
+        $closeButtonSize = 28;
+        $closeButtonMargin = 6;
+        $panelJson = $panel->buildJson();
+        $closeButtonX = $panel->getOriginX() + ($panelJson['width'] ?? 400) - $closeButtonSize - $closeButtonMargin;
+        $closeButtonY = $panel->getOriginY() + $closeButtonMargin;
+
+        $jsPathClosePanel = resource_path('js/function/entity/click_close_entity_panel.blade.php');
+        $jsContentClosePanel = file_get_contents($jsPathClosePanel);
+        $jsContentClosePanel = str_replace('__PANEL_UID__', $dbEntity->uid . '_panel', $jsContentClosePanel);
+        $jsContentClosePanel = Helper::setCommonJsCode($jsContentClosePanel, Str::random(20));
+
+        $closePanelButton = new Rectangle($dbEntity->uid . '_panel_close_button');
+        $closePanelButton->setOrigin($closeButtonX, $closeButtonY);
+        $closePanelButton->setSize($closeButtonSize, $closeButtonSize);
+        $closePanelButton->setColor(Colors::DARK_GRAY);
+        $closePanelButton->setBorderRadius(6);
+        $closePanelButton->setRenderable(false);
+        $closePanelButton->addAttributes('z_index', 10060);
+        $closePanelButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClosePanel);
+
+        $closePanelText = new Text($dbEntity->uid . '_panel_close_text');
+        $closePanelText->setCenterAnchor(true);
+        $closePanelText->setOrigin(
+            $closeButtonX + (int) floor($closeButtonSize / 2),
+            $closeButtonY + (int) floor($closeButtonSize / 2)
+        );
+        $closePanelText->setText('X');
+        $closePanelText->setFontSize(18);
+        $closePanelText->setColor(Colors::WHITE);
+        $closePanelText->setRenderable(false);
+        $closePanelText->addAttributes('z_index', 10061);
+        $closePanelText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsContentClosePanel);
+
         //Set Children (Panel)
         $entityImage->addChild($panel);
         $panel->addChild($text1);
@@ -376,12 +410,16 @@ class EntityDraw
                 }
             }
         }
+        $panel->addChild($closePanelButton);
+        $panel->addChild($closePanelText);
 
         //Get JSON
         $this->drawItems[] = $entityImage->buildJson();
         $this->drawItems[] = $panel->buildJson();
         $this->drawItems[] = $text1->buildJson();
         $this->drawItems[] = $text2->buildJson();
+        $this->drawItems[] = $closePanelButton->buildJson();
+        $this->drawItems[] = $closePanelText->buildJson();
         foreach ($upButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($leftButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
         foreach ($downButton->getDrawItems() as $item) {$this->drawItems[] = $item->buildJson();}
