@@ -12,21 +12,29 @@
         const entityPanels = Object.entries(objects)
             .filter(([key, _]) => !key.startsWith('element_') && key.endsWith('_panel'))
             .reduce((obj, [key, value]) => { obj[key] = value; return obj; }, {});
+
+        // Nasconde ricorsivamente l'intero sottoalbero di un panel (coerente con la
+        // chiusura via pulsante X, che nasconde tutti i discendenti).
+        const hideEntityPanelTree = function(rootUid) {
+            const rootObject = objects[rootUid];
+            if (!rootObject || !Array.isArray(rootObject['children'])) return;
+            for (const childUid of rootObject['children']) {
+                if (shapes[childUid]) shapes[childUid].renderable = false;
+                if (objects[childUid]) {
+                    objects[childUid].attributes = objects[childUid].attributes || {};
+                    objects[childUid].attributes.renderable = false;
+                }
+                hideEntityPanelTree(childUid);
+            }
+        };
+
         for (const [key, objectPanel] of Object.entries(entityPanels)) {
             if (shapes[key]) shapes[key].renderable = false;
             if (objects[key]) {
                 objects[key].attributes = objects[key].attributes || {};
                 objects[key].attributes.renderable = false;
             }
-            if (objectPanel['children']) {
-                for (const childUid of objectPanel['children']) {
-                    if (shapes[childUid]) shapes[childUid].renderable = false;
-                    if (objects[childUid]) {
-                        objects[childUid].attributes = objects[childUid].attributes || {};
-                        objects[childUid].attributes.renderable = false;
-                    }
-                }
-            }
+            hideEntityPanelTree(key);
             // Clear gene polling for other entities
             const otherUid = key.replace('_panel', '');
             if (window.AppData && window.AppData._genePollingIntervals && window.AppData._genePollingIntervals[otherUid]) {
@@ -160,21 +168,28 @@
             }
         };
 
-        // Figli del pannello entity
-        for (const childUid of objects[panel_uid]['children']) {
-            const childZIndex = (objects[childUid] && objects[childUid].attributes && typeof objects[childUid].attributes.z_index === 'number')
-                ? objects[childUid].attributes.z_index
-                : 10001;
-            if (shapes[childUid]) {
-                shapes[childUid].renderable = show;
-                shapes[childUid].zIndex = childZIndex;
+        // Figli del pannello entity (ricorsivo: ripristina/nasconde l'intero sottoalbero,
+        // così lo stato resta coerente anche dopo la chiusura via pulsante X)
+        const setEntityPanelTreeVisibility = function(rootUid, visible) {
+            const rootObject = objects[rootUid];
+            if (!rootObject || !Array.isArray(rootObject['children'])) return;
+            for (const childUid of rootObject['children']) {
+                const childObject = objects[childUid];
+                const childAttributes = childObject && childObject.attributes ? childObject.attributes : {};
+                const childZIndex = (typeof childAttributes.z_index === 'number') ? childAttributes.z_index : 10001;
+                if (shapes[childUid]) {
+                    shapes[childUid].renderable = visible;
+                    shapes[childUid].zIndex = childZIndex;
+                }
+                if (childObject) {
+                    childObject.attributes = childObject.attributes || {};
+                    childObject.attributes.renderable = visible;
+                    childObject.attributes.z_index = childZIndex;
+                }
+                setEntityPanelTreeVisibility(childUid, visible);
             }
-            if (objects[childUid]) {
-                objects[childUid].attributes = objects[childUid].attributes || {};
-                objects[childUid].attributes.renderable = show;
-                objects[childUid].attributes.z_index = childZIndex;
-            }
-        }
+        };
+        setEntityPanelTreeVisibility(panel_uid, show);
         applyDivisionButtonVisibility();
         applyEvolutionButtonVisibility();
 
