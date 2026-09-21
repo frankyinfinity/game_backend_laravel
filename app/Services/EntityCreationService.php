@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\CreateEntityContainerJob;
 use App\Models\Entity;
 use App\Models\EntityBody;
 use App\Models\EntityBodyZone;
@@ -141,6 +142,7 @@ class EntityCreationService
      *
      * Nota: il service NON crea DrawRequest né richieste di disegno UI.
      * Eventuali draw (es. spawn della nuova entity) restano a carico del chiamante.
+     * Il container viene ora creato in Job separato (CreateEntityContainerJob).
      */
     protected function createEntityByDivision(int $i, int $j, string $entityUid): Entity
     {
@@ -176,11 +178,12 @@ class EntityCreationService
 
             // entities
             $entity = Entity::query()->create([
-                'specie_id' => $sourceEntity->specie_id,
-                'uid'       => uniqid('', true),
-                'tile_i'    => $i,
-                'tile_j'    => $j,
-                'state'     => Entity::STATE_LIFE,
+                'specie_id'       => $sourceEntity->specie_id,
+                'birth_region_id' => $sourceEntity->birth_region_id,
+                'uid'             => uniqid('', true),
+                'tile_i'          => $i,
+                'tile_j'          => $j,
+                'state'           => Entity::STATE_LIFE,
             ]);
 
             // Salva l'immagine con il nuovo entity id e aggiorna il record
@@ -206,18 +209,8 @@ class EntityCreationService
         // di divisione (PlayerValue::KEY_DIVISION_COST) ai lifepoint della sorgente
         $this->applyDivisionCostToSourceEntity($sourceEntity);
 
-        // Crea e avvia il container per la nuova entity
-        $containerService = app(DockerContainerService::class);
-        $container = $containerService->createEntityContainer($entity, $player->id, true);
-
-        Log::info('EntityCreationService: clone entity creato', [
-            'player_id'         => $player->id,
-            'source_entity_uid' => $entityUid,
-            'entity_id'         => $entity->id,
-            'uid'               => $entity->uid,
-            'container_id'      => $container->container_id ?? null,
-            'container_ws_port' => $container->ws_port ?? null,
-        ]);
+        // Crea e avvia il container per la nuova entity tramite job asincrono
+        CreateEntityContainerJob::dispatch($entity, $player);
 
         return $entity;
     }

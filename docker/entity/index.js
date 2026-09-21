@@ -67,7 +67,7 @@ const WALKABLE_RETRY_DELAY_MS = parseInt(process.env.WALKABLE_RETRY_DELAY_MS || 
 
 // Timeout delle chiamate API al backend: evita che una richiesta bloccata
 // fermi la coda (apiQueue) delle chiamate serializzate.
-const API_REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT_MS || '10000', 10);
+const API_REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT_MS || '60000', 10);
 
 // Geometria della mappa e scroll group (allineati a Helper::TILE_SIZE,
 // Helper::MAP_START_X/Y e Helper::MAP_SCROLL_GROUP_MAIN del backend).
@@ -591,7 +591,7 @@ function triggerDivision(targetEntityUid, callback) {
             const response = JSON.parse(data);
             if (response.success) {
               console.log(`[Entity ${entityUid}] Division API ok: ${response.message || 'success'}`);
-              settle({ success: true, entity_uid: targetEntityUid, message: response.message || 'success' });
+              settle({ success: true, entity_uid: targetEntityUid, message: response.message || 'success', items: Array.isArray(response.items) ? response.items : [] });
             } else if (handleAuthFailure(res, 'triggerDivision')) {
               // Sessione scaduta → re-login avviato
               settle({ success: false, error: 'Sessione scaduta, riprovare' });

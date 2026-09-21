@@ -2450,6 +2450,15 @@ class GameController extends Controller
             ], 404);
         }
 
+        // Controllo preliminare: la entity ha abbastanza punti vita per dividere
+        $sufficientLifepoint = $this->entityHasEnoughLifepointToDivide($entity, $player);
+        if (!$sufficientLifepoint) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Punti vita insufficienti per la divisione',
+            ], 422);
+        }
+
         // Cella adiacente libera intorno all'entity originale
         $spawnCell = $this->findFreeAdjacentCell($entity, $player);
         if ($spawnCell === null) {
@@ -2461,7 +2470,8 @@ class GameController extends Controller
 
         try {
             // Richiama il service con $division a true: crea il clone dell'entity
-            // (tutte le tabelle + container) in una nuova posizione accanto all'originale
+            // (tutte le tabelle) in una nuova posizione accanto all'originale.
+            // Il container viene creato in Job separato (CreateEntityContainerJob).
             $entityCreationService = new EntityCreationService($player);
             $newEntity = $entityCreationService->createAllTablesForEntity(
                 $spawnCell['i'],
@@ -2469,6 +2479,10 @@ class GameController extends Controller
                 true,
                 $entityUid
             );
+
+            // Items di draw della nuova entity (EntityDraw): nessun DrawRequest,
+            // vengono restituiti direttamente nella response
+            $items = $this->buildEntityDrawItems($request, $player, $newEntity);
         } catch (\Throwable $e) {
             Log::error('Division failed', [
                 'entity_uid' => $entityUid,
@@ -2491,7 +2505,48 @@ class GameController extends Controller
         return response()->json([
             'success' => true,
             'new_entity_uid' => $newEntity->uid,
+            'items' => $items,
         ]);
+    }
+
+    /**
+     * Verifica se l'entity ha abbastanza punti vita per dividere.
+     *
+     * Il controllo è:
+     *  - il costo di divisione (PlayerValue::KEY_DIVISION_COST), e
+     *  - i punti vita che verranno usati per la nuova entity
+     *    (PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY)
+     * devono essere coperti dal valore corrente del gene lifepoint della entity.
+     */
+    private function entityHasEnoughLifepointToDivide(Entity $entity, Player $player): bool
+    {
+        $lifepointGenome = Genome::query()
+            ->where('entity_id', $entity->id)
+            ->whereHas('gene', fn ($q) => $q->where('key', Gene::KEY_LIFEPOINT))
+            ->first();
+
+        if (!$lifepointGenome) {
+            return false;
+        }
+
+        $lifepointInfo = EntityInformation::query()
+            ->where('genome_id', $lifepointGenome->id)
+            ->first();
+
+        if (!$lifepointInfo) {
+            return false;
+        }
+
+        $currentLife = (int) $lifepointInfo->value;
+        $divisionCost = PlayerValue::getIntegerValue($player->id, PlayerValue::KEY_DIVISION_COST);
+        $newEntityLife = PlayerValue::getIntegerValue(
+            $player->id,
+            PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY
+        );
+
+        $requiredLife = $divisionCost + $newEntityLife;
+
+        return $currentLife >= $requiredLife;
     }
 
     /**
@@ -2804,38 +2859,12 @@ class GameController extends Controller
         }
 
         try {
-            ObjectCache::buffer($sessionId);
-
-            $newEntity = Entity::query()
-                ->where('id', $newEntity->id)
-                ->with(['specie', 'genomes.gene', 'genomes.entityInformations'])
-                ->first();
-
-            if (!$newEntity) {
-                ObjectCache::flush($sessionId);
-                return;
-            }
-
-            $tileSize = Helper::TILE_SIZE;
-            $originX = ($tileSize * (int) $newEntity->tile_j) + Helper::MAP_START_X;
-            $originY = ($tileSize * (int) $newEntity->tile_i) + Helper::MAP_START_Y;
-
-            $square = new Square('square_' . $newEntity->tile_i . '_' . $newEntity->tile_j);
-            $square->setOrigin($originX, $originY);
-            $square->setSize($tileSize);
-
-            $entityDraw = new EntityDraw($newEntity, $square);
-            $drawCommands = [];
-            foreach ($entityDraw->getDrawItems() as $entityDrawItem) {
-                $drawCommands[] = $this->drawMapGroupObject($entityDrawItem, $sessionId);
-            }
+            $drawCommands = $this->buildEntityDrawItems($request, $player, $newEntity);
 
             $refreshPortsCode = $this->buildRefreshRemoteWebSocketsCode($player->id);
             if ($refreshPortsCode !== '') {
                 $drawCommands[] = (new ObjectCode($refreshPortsCode, 1500))->get();
             }
-
-            ObjectCache::flush($sessionId);
 
             if (!empty($drawCommands)) {
                 $requestId = Str::random(20);
@@ -2853,6 +2882,59 @@ class GameController extends Controller
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Costruisce gli items di draw (EntityDraw) per una entity appena creata,
+     * senza creare DrawRequest: gli items vengono restituiti al chiamante.
+     * Usato da division() (ritorno nella response) e da dispatchNewEntitySpawnDraw().
+     */
+    private function buildEntityDrawItems(Request $request, Player $player, Entity $newEntity): array
+    {
+        $sessionId = $this->resolveSessionId($request, $player);
+
+        try {
+            ObjectCache::buffer($sessionId);
+
+            $newEntity = Entity::query()
+                ->where('id', $newEntity->id)
+                ->with(['specie', 'genomes.gene', 'genomes.entityInformations'])
+                ->first();
+
+            if (!$newEntity) {
+                ObjectCache::flush($sessionId);
+
+                return [];
+            }
+
+            $tileSize = Helper::TILE_SIZE;
+            $originX = ($tileSize * (int) $newEntity->tile_j) + Helper::MAP_START_X;
+            $originY = ($tileSize * (int) $newEntity->tile_i) + Helper::MAP_START_Y;
+
+            $square = new Square('square_' . $newEntity->tile_i . '_' . $newEntity->tile_j);
+            $square->setOrigin($originX, $originY);
+            $square->setSize($tileSize);
+
+            $entityDraw = new EntityDraw($newEntity, $square);
+
+            $items = [];
+            foreach ($entityDraw->getDrawItems() as $entityDrawItem) {
+                $items[] = $this->drawMapGroupObject($entityDrawItem, $sessionId);
+            }
+
+            ObjectCache::flush($sessionId);
+
+            return $items;
+        } catch (\Throwable $e) {
+            Log::warning('Unable to build draw items for new spawned entity', [
+                'entity_id' => $newEntity->id ?? null,
+                'player_id' => $player->id,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
         }
     }
 

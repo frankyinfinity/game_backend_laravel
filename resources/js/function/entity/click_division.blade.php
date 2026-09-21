@@ -77,6 +77,44 @@
             }));
         };
 
+        // Risolve il player_id: costante iniettata dal backend (__PLAYER_ID__),
+        // altrimenti playerId globale del frontend → window.playerId → AppData.player_id
+        const resolvePlayerId = function() {
+            if (typeof __PLAYER_ID__ !== 'undefined' && __PLAYER_ID__) {
+                return __PLAYER_ID__;
+            }
+            if (typeof playerId !== 'undefined') {
+                return playerId;
+            }
+            if (typeof window !== 'undefined' && typeof window.playerId !== 'undefined') {
+                return window.playerId;
+            }
+            if (typeof AppData !== 'undefined' && typeof AppData.player_id !== 'undefined') {
+                return AppData.player_id;
+            }
+            return null;
+        };
+
+        // Manda gli items di draw della nuova entity alla pipeline del frontend
+        // (stessa pipeline degli eventi Pusher draw_interface)
+        const sendDivisionItemsToFrontend = function(items) {
+            if (!Array.isArray(items) || items.length === 0) {
+                return;
+            }
+
+            const payload = {
+                request_id: 'division_' + Date.now(),
+                player_id: resolvePlayerId(),
+                items: items
+            };
+
+            if (typeof window.processDrawInterfaceEvent === 'function') {
+                window.processDrawInterfaceEvent(payload);
+            } else {
+                console.warn('Division: processDrawInterfaceEvent non disponibile', payload);
+            }
+        };
+
         const onDivisionResponse = function(event) {
             let response;
             try {
@@ -90,6 +128,9 @@
             console.log('WS Division response:', response);
             ws.removeEventListener('message', onDivisionResponse);
             if (response.success) {
+                // Items di draw restituiti dal backend: nessun DrawRequest,
+                // vengono passati alla pipeline di disegno del frontend
+                sendDivisionItemsToFrontend(response.items);
                 showBottomRightAlert('Divisione avviata per ' + entityUid);
             } else {
                 showBottomRightAlert(response.error || 'Divisione non disponibile');

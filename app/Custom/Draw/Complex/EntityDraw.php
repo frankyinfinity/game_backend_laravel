@@ -241,6 +241,7 @@ class EntityDraw
             $jsContentDivision = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentDivision);
             $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
             $jsContentDivision = str_replace('__port__', $wsPort, $jsContentDivision);
+            $jsContentDivision = str_replace('__PLAYER_ID__', (string) $player_id, $jsContentDivision);
 
             $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
             $divisionButton->setSize(220, 40);

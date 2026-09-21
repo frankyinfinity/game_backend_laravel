@@ -40,7 +40,6 @@ use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
 use App\Models\TargetPlayer;
 use App\Services\DockerContainerService;
-use App\Services\EntityCreationService;
 use App\Jobs\CreatePlayerContainersJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -107,8 +106,14 @@ class PlayerCreatedJob implements ShouldQueue
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
 
-        // Create Docker containers - must be last
-        CreatePlayerContainersJob::dispatch($player);
+        // Crea tutte le tabelle per l'entity del player E avvia i container:
+        // il service accetta in ingresso SOLO $i e $j ed il tutto gira in job.
+        if (!empty($this->registrationData)) {
+            CreatePlayerContainersJob::dispatch($player);
+        }
+
+        // Clone the objective structure for the player
+        $this->cloneObjectiveStructure($player);
     }
 
     /**

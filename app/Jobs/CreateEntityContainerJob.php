@@ -2,22 +2,22 @@
 
 namespace App\Jobs;
 
+use App\Models\Entity;
 use App\Models\Player;
 use App\Services\DockerContainerService;
-use App\Services\EntityCreationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
-class CreatePlayerContainersJob implements ShouldQueue
+class CreateEntityContainerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 600;
-
     public function __construct(
+        public Entity $entity,
         public Player $player
     ) {}
 
@@ -28,12 +28,14 @@ class CreatePlayerContainersJob implements ShouldQueue
 
         /** @var DockerContainerService $containerService */
         $containerService = app(DockerContainerService::class);
-        $containerService->createContainersForPlayer($this->player);
+        $container = $containerService->createEntityContainer($this->entity, $this->player->id, false);
 
-        $this->player->active = true;
-        $this->player->save();
-
-        \Log::info('Player attivato dopo creazione container', ['player_id' => $this->player->id]);
+        Log::info('CreateEntityContainerJob: entity container creato', [
+            'player_id'         => $this->player->id,
+            'entity_id'         => $this->entity->id,
+            'uid'               => $this->entity->uid,
+            'container_id'      => $container->container_id ?? null,
+            'container_ws_port' => $container->ws_port ?? null,
+        ]);
     }
 }
-
