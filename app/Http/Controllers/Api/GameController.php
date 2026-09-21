@@ -35,6 +35,7 @@ use App\Models\ElementHasPositionInformation;
 use App\Models\Entity;
 use App\Models\Container;
 use App\Services\DockerContainerService;
+use App\Services\EntityCreationService;
 use App\Services\BrainFlowRunner;
 use App\Models\Genome;
 use App\Models\EntityInformation;
@@ -2428,10 +2429,68 @@ class GameController extends Controller
 
         Log::info("division: richiesta ricevuta per l'entity {$entityUid}");
 
+        $entity = Entity::query()
+            ->where('uid', $entityUid)
+            ->where('state', Entity::STATE_LIFE)
+            ->with(['specie'])
+            ->first();
+
+        if (!$entity || !$entity->specie) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity non trovata',
+            ], 404);
+        }
+
+        $player = Player::query()->find($entity->specie->player_id);
+        if (!$player || !$player->birthRegion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Player o regione non trovati',
+            ], 404);
+        }
+
+        // Cella adiacente libera intorno all'entity originale
+        $spawnCell = $this->findFreeAdjacentCell($entity, $player);
+        if ($spawnCell === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nessuna cella adiacente libera disponibile',
+            ], 422);
+        }
+
+        try {
+            // Richiama il service con $division a true: crea il clone dell'entity
+            // (tutte le tabelle + container) in una nuova posizione accanto all'originale
+            $entityCreationService = new EntityCreationService($player);
+            $newEntity = $entityCreationService->createAllTablesForEntity(
+                $spawnCell['i'],
+                $spawnCell['j'],
+                true,
+                $entityUid
+            );
+        } catch (\Throwable $e) {
+            Log::error('Division failed', [
+                'entity_uid' => $entityUid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore durante la divisione',
+            ], 500);
+        }
+
+        Log::info('Division completed', [
+            'source_entity_uid' => $entityUid,
+            'new_entity_uid' => $newEntity->uid,
+            'new_entity_tile_i' => $newEntity->tile_i,
+            'new_entity_tile_j' => $newEntity->tile_j,
+        ]);
+
         return response()->json([
             'success' => true,
-            'message' => 'Division ricevuta (per ora solo log)',
-            'entity_uid' => $entityUid,
+            'new_entity_uid' => $newEntity->uid,
         ]);
     }
 

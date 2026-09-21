@@ -15,19 +15,9 @@ use App\Models\BirthRegionLimit;
 use App\Models\BirthRegionLimitDetail;
 use App\Models\ChimicalElement;
 use App\Models\ComplexChimicalElement;
-use App\Models\Entity;
-use App\Models\EntityBody;
-use App\Models\EntityBodyZone;
-use App\Models\EntityChimicalElement;
-use App\Models\EntityComponent;
-use App\Models\EntityDetail;
-use App\Models\EntityDetailData;
-use App\Models\EntityInformation;
 use App\Models\FamilyTile;
 use App\Models\FamilyTileDiffusion;
 use App\Models\FamilyTileLimit;
-use App\Models\Gene;
-use App\Models\Genome;
 use App\Models\Phase;
 use App\Models\PhaseColumn;
 use App\Models\PhaseColumnPlayer;
@@ -50,6 +40,7 @@ use App\Models\TargetLink;
 use App\Models\TargetLinkPlayer;
 use App\Models\TargetPlayer;
 use App\Services\DockerContainerService;
+use App\Services\EntityCreationService;
 use App\Jobs\CreatePlayerContainersJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -103,8 +94,15 @@ class PlayerCreatedJob implements ShouldQueue
         // Clone RuleChimicalElements for the player
         $this->cloneRuleChimicalElements($player);
 
-        // Populate EntityChimicalElement for the player's entities
-        $this->populateEntityChimicalElements($player);
+        // Crea tutte le tabelle per l'entity del player:
+        // il service accetta in ingresso SOLO $i e $j
+        if (!empty($this->registrationData)) {
+            $entityCreationService = new EntityCreationService($player);
+            $entityCreationService->createAllTablesForEntity(
+                (int) ($this->registrationData['tile_i'] ?? 0),
+                (int) ($this->registrationData['tile_j'] ?? 0)
+            );
+        }
 
         // Clone the objective structure for the player
         $this->cloneObjectiveStructure($player);
@@ -229,31 +227,13 @@ class PlayerCreatedJob implements ShouldQueue
             ]);
         }
 
-        // Create Specie
-        $specie = Specie::query()->create([
+        // Create Specie (LUCA) per il player: verrà usata da EntityCreationService
+        // per creare l'entity con tutte le sue tabelle (in handle(), con solo $i e $j)
+        Specie::query()->create([
             'player_id' => $player->id,
             'name' => $data['name_specie'],
             'luca' => true,
         ]);
-
-        // Create Entity
-        $uid = uniqid('', true);
-        $entity = Entity::query()->create([
-            'specie_id' => $specie->id,
-            'birth_region_id' => $searchBirthRegion ? $searchBirthRegion->id : $birthRegionIds[0],
-            'uid' => $uid,
-            'tile_i' => $data['tile_i'],
-            'tile_j' => $data['tile_j'],
-        ]);
-
-        // Populate EntityDetail and EntityDetailData from str_assembler_json
-        $this->populateEntityDetails($player, $entity);
-
-        // Populate Genome and EntityInformation from str_assembler_json genes (summing values per gene)
-        $this->populateEntityInformation($player, $entity);
-
-        // Generate and save entity image from assembler pixels
-        $this->populateEntityImage($player, $entity);
 
         return $birthRegionIds;
 
@@ -624,284 +604,4 @@ class PlayerCreatedJob implements ShouldQueue
         }
     }
 
-    /**
-     * Populate Genome and EntityInformation from str_assembler_json.
-     * Genes appearing in multiple components have their values summed.
-     */
-    protected function populateEntityInformation(Player $player, Entity $entity): void
-    {
-        Log::info('populateEntityInformation called', ['player_id' => $player->id, 'entity_id' => $entity->id]);
-
-        $assemblerJson = $player->str_assembler_json;
-        if (empty($assemblerJson)) {
-            return;
-        }
-
-        $assemblerData = json_decode($assemblerJson, true);
-        $components    = $assemblerData['components'] ?? [];
-        if (empty($components)) {
-            return;
-        }
-
-        // Collect all component IDs and eager-load their genes
-        $componentIds = collect($components)->pluck('id')->filter()->unique()->values()->all();
-
-        $entityComponents = EntityComponent::whereIn('id', $componentIds)
-            ->with('genes.gene')
-            ->get();
-
-        // Sum values per gene_id across all components
-        $geneValueMap = []; // [gene_id => total_value]
-        foreach ($entityComponents as $ec) {
-            foreach ($ec->genes as $geneRel) {
-                if (!$geneRel->gene) {
-                    continue;
-                }
-                $geneId = $geneRel->gene_id;
-                $geneValueMap[$geneId] = ($geneValueMap[$geneId] ?? 0) + (int) $geneRel->value;
-            }
-        }
-
-        if (empty($geneValueMap)) {
-            Log::info('No genes found in components', ['player_id' => $player->id]);
-            return;
-        }
-
-        // Load all needed genes in one query
-        $genes = Gene::whereIn('id', array_keys($geneValueMap))->get()->keyBy('id');
-
-        foreach ($geneValueMap as $geneId => $totalValue) {
-            $gene = $genes->get($geneId);
-            if (!$gene) {
-                Log::warning('Gene not found', ['gene_id' => $geneId]);
-                continue;
-            }
-
-            $genome = Genome::create([
-                'entity_id' => $entity->id,
-                'gene_id'   => $geneId,
-                'min'       => $gene->min ?? 0,
-                'max'       => $gene->max ?? $totalValue,
-            ]);
-
-            EntityInformation::create([
-                'genome_id' => $genome->id,
-                'value'     => $totalValue,
-            ]);
-        }
-
-        Log::info('populateEntityInformation completed', [
-            'player_id'  => $player->id,
-            'entity_id'  => $entity->id,
-            'genes_count' => count($geneValueMap),
-        ]);
-    }
-
-    /**
-     * Populate EntityDetail and EntityDetailData from str_assembler_json components.
-     */
-    protected function populateEntityDetails(Player $player, Entity $entity): void
-    {
-        Log::info('populateEntityDetails called', ['player_id' => $player->id, 'entity_id' => $entity->id]);
-
-        $assemblerJson = $player->str_assembler_json;
-        if (empty($assemblerJson)) {
-            Log::info('No str_assembler_json found for player', ['player_id' => $player->id]);
-            return;
-        }
-
-        $assemblerData = json_decode($assemblerJson, true);
-
-        // --- EntityBody ---
-        $bodyId = $assemblerData['body_selected']['id'] ?? null;
-        if ($bodyId) {
-            $entityBody = EntityBody::with('zones')->find($bodyId);
-            if ($entityBody) {
-                EntityDetail::create([
-                    'entity_id'       => $entity->id,
-                    'detailable_type' => EntityBody::class,
-                    'detailable_id'   => $entityBody->id,
-                ]);
-
-                // --- EntityBodyZone (one EntityDetail + EntityDetailData per zone) ---
-                foreach ($entityBody->zones as $zone) {
-                    $zoneDetail = EntityDetail::create([
-                        'entity_id'       => $entity->id,
-                        'detailable_type' => EntityBodyZone::class,
-                        'detailable_id'   => $zone->id,
-                    ]);
-
-                    $zoneKeyValues = [
-                        'name'  => $zone->name,
-                        'color' => $zone->color,
-                    ];
-
-                    foreach ($zoneKeyValues as $key => $value) {
-                        if ($value === null) {
-                            continue;
-                        }
-
-                        EntityDetailData::create([
-                            'entity_detail_id' => $zoneDetail->id,
-                            'key'              => $key,
-                            'value'            => (string) $value,
-                        ]);
-                    }
-                }
-            } else {
-                Log::warning('EntityBody not found', ['id' => $bodyId]);
-            }
-        }
-
-        // --- EntityComponent ---
-        $components = $assemblerData['components'] ?? [];
-        foreach ($components as $componentData) {
-            $componentId = $componentData['id'] ?? null;
-            if (!$componentId) {
-                continue;
-            }
-
-            $entityComponent = EntityComponent::find($componentId);
-            if (!$entityComponent) {
-                Log::warning('EntityComponent not found', ['id' => $componentId]);
-                continue;
-            }
-
-            $entityDetail = EntityDetail::create([
-                'entity_id'       => $entity->id,
-                'detailable_type' => EntityComponent::class,
-                'detailable_id'   => $entityComponent->id,
-            ]);
-
-            $keyValues = [
-                'name'             => $componentData['name'] ?? $entityComponent->name,
-                'body_anchor'      => $componentData['link_to_body']['body_anchor'] ?? null,
-                'component_anchor' => $componentData['link_to_body']['component_anchor'] ?? null,
-            ];
-
-            foreach ($keyValues as $key => $value) {
-                if ($value === null) {
-                    continue;
-                }
-
-                EntityDetailData::create([
-                    'entity_detail_id' => $entityDetail->id,
-                    'key'              => $key,
-                    'value'            => is_array($value) ? json_encode($value) : (string) $value,
-                ]);
-            }
-        }
-
-        Log::info('populateEntityDetails completed', [
-            'player_id'        => $player->id,
-            'entity_id'        => $entity->id,
-            'components_count' => count($components),
-        ]);
-    }
-
-    /**
-     * Generate a 32x32 PNG from assembler pixels and save it to entity_images disk.
-     * Pixels with rgb "0,0,0" are treated as transparent.
-     */
-    protected function populateEntityImage(Player $player, Entity $entity): void
-    {
-        Log::info('populateEntityImage called', ['player_id' => $player->id, 'entity_id' => $entity->id]);
-
-        $assemblerJson = $player->str_assembler_json;
-        if (empty($assemblerJson)) {
-            Log::info('No str_assembler_json for entity image', ['player_id' => $player->id]);
-            return;
-        }
-
-        $assemblerData = json_decode($assemblerJson, true);
-        $pixels = $assemblerData['pixels'] ?? [];
-
-        if (empty($pixels)) {
-            Log::info('No pixels in assembler json', ['player_id' => $player->id]);
-            return;
-        }
-
-        // Create a 32x32 true-color image with alpha support
-        $img = imagecreatetruecolor(32, 32);
-        imagealphablending($img, false);
-        imagesavealpha($img, true);
-
-        // Fill with fully transparent background
-        $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
-        imagefill($img, 0, 0, $transparent);
-
-        foreach ($pixels as $pixel) {
-            $x   = (int) ($pixel['x'] ?? -1);
-            $y   = (int) ($pixel['y'] ?? -1);
-            $rgb = $pixel['rgb'] ?? '0,0,0';
-
-            if ($x < 0 || $x > 31 || $y < 0 || $y > 31) {
-                continue;
-            }
-
-            $parts = explode(',', $rgb);
-            $r = (int) ($parts[0] ?? 0);
-            $g = (int) ($parts[1] ?? 0);
-            $b = (int) ($parts[2] ?? 0);
-
-            $color = imagecolorallocatealpha($img, $r, $g, $b, 0);
-            imagesetpixel($img, $x, $y, $color);
-        }
-
-        // Capture PNG to buffer
-        ob_start();
-        imagepng($img);
-        $pngData = ob_get_clean();
-        imagedestroy($img);
-
-        $filename = $entity->id . '.png';
-        \Illuminate\Support\Facades\Storage::disk('entity_images')->put($filename, $pngData);
-
-        $entity->update(['image' => $filename]);
-
-        Log::info('populateEntityImage completed', [
-            'player_id' => $player->id,
-            'entity_id' => $entity->id,
-            'filename'  => $filename,
-        ]);
-    }
-
-    /**
-     * Populate EntityChimicalElement for all entities of the player.
-     */
-    protected function populateEntityChimicalElements(Player $player): void
-    {
-        Log::info('populateEntityChimicalElements called', ['player_id' => $player->id]);
-
-        $playerRules = PlayerRuleChimicalElement::where('player_id', $player->id)->get();
-        if ($playerRules->isEmpty()) {
-            Log::info('No PlayerRuleChimicalElement found for player', ['player_id' => $player->id]);
-            return;
-        }
-
-        $entities = Entity::whereHas('specie', function ($q) use ($player) {
-            $q->where('player_id', $player->id);
-        })->get();
-
-        Log::info('Found entities for player', ['player_id' => $player->id, 'count' => $entities->count()]);
-
-        foreach ($entities as $entity) {
-            foreach ($playerRules as $playerRule) {
-                $existing = EntityChimicalElement::where('entity_id', $entity->id)
-                    ->where('player_rule_chimical_element_id', $playerRule->id)
-                    ->first();
-
-                if (!$existing) {
-                    $value = $playerRule->default_value ?? $playerRule->max;
-                    EntityChimicalElement::create([
-                        'entity_id' => $entity->id,
-                        'player_rule_chimical_element_id' => $playerRule->id,
-                        'value' => $value,
-                    ]);
-                }
-            }
-        }
-
-        Log::info('EntityChimicalElement population completed', ['player_id' => $player->id]);
-    }
 }
