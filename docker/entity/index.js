@@ -1253,8 +1253,16 @@ function buildMoveEntityDrawCode(fromI, fromJ, toI, toJ, tileCoordinates) {
 // Costruisce gli item 'draw_interface' che, tra un movimento e l'altro, spostano
 // l'entityDraw dal tile (fromI, fromJ) al tile (toI, toJ) e aggiornano il testo
 // "I: x - J: y" con la nuova posizione.
+// Tra gli items sono inclusi anche gli update dei tile: il tile di partenza
+// (ora libero) riceve gli eventi over (hover), quello di arrivo — occupato
+// dall'entity — li perde. Il frontend gestisce add/remove con l'attributo
+// update 'interactive_events' (stash + rebind dei listener PIXI).
 function buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates) {
   const toCenter = getTileCenter(toI, toJ, tileCoordinates);
+
+  // Uid dei tile quadrati della mappa (vedi GenerateMapJob: 'square_<i>_<j>')
+  const fromTileUid = 'square_' + fromI + '_' + fromJ;
+  const toTileUid = 'square_' + toI + '_' + toJ;
 
   return [
     {
@@ -1262,6 +1270,22 @@ function buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates) {
       type: 'update',
       uid: entityUid,
       attributes: { x: toCenter.x, y: toCenter.y },
+    },
+    {
+      // Tile di partenza: l'entity lo ha lasciato → riaggancia gli eventi over
+      type: 'update',
+      uid: fromTileUid,
+      attributes: {
+        interactive_events: { add: ['pointerover', 'pointerout'] },
+      },
+    },
+    {
+      // Tile di arrivo: ora occupato dall'entity → rimuove gli eventi over
+      type: 'update',
+      uid: toTileUid,
+      attributes: {
+        interactive_events: { remove: ['pointerover', 'pointerout'] },
+      },
     },
     {
       // Tutti gli altri oggetti dell'entity (pannello, testi, bottoni, barre)
