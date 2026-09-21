@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\CreateEntityContainerJob;
 use App\Models\Entity;
 use App\Models\EntityBody;
 use App\Models\EntityBodyZone;
@@ -142,7 +141,8 @@ class EntityCreationService
      *
      * Nota: il service NON crea DrawRequest né richieste di disegno UI.
      * Eventuali draw (es. spawn della nuova entity) restano a carico del chiamante.
-     * Il container viene ora creato in Job separato (CreateEntityContainerJob).
+     * Il container viene creato e avviato in modo SINCRONO dal service: il draw
+     * della nuova entity (division) legge subito la ws_port dalla tabella containers.
      */
     protected function createEntityByDivision(int $i, int $j, string $entityUid): Entity
     {
@@ -209,8 +209,26 @@ class EntityCreationService
         // di divisione (PlayerValue::KEY_DIVISION_COST) ai lifepoint della sorgente
         $this->applyDivisionCostToSourceEntity($sourceEntity);
 
-        // Crea e avvia il container per la nuova entity tramite job asincrono
-        CreateEntityContainerJob::dispatch($entity, $player);
+        // Crea e avvia il container per la nuova entity in modo SINCRONO:
+        // il chiamante (GameController::division) costruisce il draw subito
+        // dopo e legge la ws_port dalla tabella containers. Con la creazione
+        // asincrona via job la porta non esisteva ancora al momento del draw e
+        // i pulsanti movimento/divisione della nuova entity nascevano senza
+        // porta ("WebSocket port not found for entity"). Il container viene
+        // anche AVVIATO (start=true): altrimenti nessuno lo avvierebbe fino al
+        // prossimo login (startContainersForPlayer gira solo al login) e la
+        // ws_port resterebbe irraggiungibile.
+        /** @var DockerContainerService $containerService */
+        $containerService = app(DockerContainerService::class);
+        $container = $containerService->createEntityContainer($entity, $player->id, true);
+
+        Log::info('EntityCreationService: entity container creato e avviato', [
+            'player_id'         => $player->id,
+            'entity_id'         => $entity->id,
+            'uid'               => $entity->uid,
+            'container_id'      => $container->container_id ?? null,
+            'container_ws_port' => $container->ws_port ?? null,
+        ]);
 
         return $entity;
     }
