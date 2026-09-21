@@ -2539,14 +2539,8 @@ class GameController extends Controller
 
         $currentLife = (int) $lifepointInfo->value;
         $divisionCost = PlayerValue::getIntegerValue($player->id, PlayerValue::KEY_DIVISION_COST);
-        $newEntityLife = PlayerValue::getIntegerValue(
-            $player->id,
-            PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY
-        );
 
-        $requiredLife = $divisionCost + $newEntityLife;
-
-        return $currentLife >= $requiredLife;
+        return $currentLife >= $divisionCost;
     }
 
     /**

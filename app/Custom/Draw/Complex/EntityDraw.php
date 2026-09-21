@@ -110,7 +110,9 @@ class EntityDraw
             ->where('parent_type', Container::PARENT_TYPE_ENTITY)
             ->where('parent_id', $dbEntity->id)
             ->first();
+        Log::info('EntityDraw: container', ['container' => $container]);
         $wsPort = $container ? $container->ws_port : null;
+        Log::info($wsPort);
 
         $jsContentClickEntity = str_replace('__player_port__', $playerWsPort, $jsContentClickEntity);
         $jsContentClickEntity = Helper::setCommonJsCode($jsContentClickEntity, Str::random(20));

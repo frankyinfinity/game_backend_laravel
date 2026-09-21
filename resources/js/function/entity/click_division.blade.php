@@ -95,11 +95,9 @@
             return null;
         };
 
-        // Manda gli items di draw della nuova entity alla pipeline del frontend
-        // (stessa pipeline degli eventi Pusher draw_interface)
         const sendDivisionItemsToFrontend = function(items) {
             if (!Array.isArray(items) || items.length === 0) {
-                return;
+                return Promise.resolve();
             }
 
             const payload = {
@@ -109,10 +107,42 @@
             };
 
             if (typeof window.processDrawInterfaceEvent === 'function') {
-                window.processDrawInterfaceEvent(payload);
-            } else {
-                console.warn('Division: processDrawInterfaceEvent non disponibile', payload);
+                return Promise.resolve(window.processDrawInterfaceEvent(payload));
             }
+
+            console.warn('Division: processDrawInterfaceEvent non disponibile', payload);
+            return Promise.resolve();
+        };
+
+        // Dopo il draw degli items: aggiorna window.entityWsPorts con la porta
+        // WebSocket della nuova entity (stessa mappa entity_uid → ws_port
+        // popolata da refresh_websocket_ports via /api/game/websocket_info e
+        // letta da click_tile_ws per risolvere la porta dell'entity).
+        // La risposta WS di divisione non contiene new_entity_uid: uid e porta
+        // vengono letti dall'item image della nuova entity (EntityDraw).
+        const updateEntityWsPorts = function(items) {
+            if (!Array.isArray(items)) {
+                return;
+            }
+
+            window.entityWsPorts = (window.entityWsPorts && typeof window.entityWsPorts === 'object')
+                ? window.entityWsPorts
+                : {};
+
+            items.forEach(function(item) {
+                if (!item || item.type !== 'draw' || !item.object) {
+                    return;
+                }
+
+                const obj = item.object;
+                const newEntityPort = obj.attributes ? obj.attributes.ws_port : null;
+                if (!newEntityPort || !obj.uid) {
+                    return;
+                }
+
+                window.entityWsPorts[obj.uid] = newEntityPort;
+                console.log('Division: entityWsPorts updated for new entity ' + obj.uid + ' → port ' + newEntityPort);
+            });
         };
 
         const onDivisionResponse = function(event) {
@@ -129,8 +159,12 @@
             ws.removeEventListener('message', onDivisionResponse);
             if (response.success) {
                 // Items di draw restituiti dal backend: nessun DrawRequest,
-                // vengono passati alla pipeline di disegno del frontend
-                sendDivisionItemsToFrontend(response.items);
+                // vengono passati alla pipeline di disegno del frontend.
+                // Al termine del draw: aggiorna window.entityWsPorts con la
+                // porta WebSocket della nuova entity appena creata.
+                sendDivisionItemsToFrontend(response.items).then(function() {
+                    updateEntityWsPorts(response.items);
+                });
                 showBottomRightAlert('Divisione avviata per ' + entityUid);
             } else {
                 showBottomRightAlert(response.error || 'Divisione non disponibile');
