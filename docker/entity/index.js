@@ -78,6 +78,10 @@ const MAP_START_X = parseInt(process.env.MAP_START_X || '0', 10);
 const MAP_START_Y = parseInt(process.env.MAP_START_Y || '80', 10);
 const MAP_SCROLL_GROUP = process.env.MAP_SCROLL_GROUP || 'map_main';
 const PATH_Z_INDEX = parseInt(process.env.PATH_Z_INDEX || '9000', 10);
+// L'entity deve stare sopra i tile e il path (PATH_Z_INDEX) ma sotto i bottoni
+// di navigazione mappa (15000) e le modali (20000). Stesso valore usato in
+// EntityDraw (backend Laravel) quando l'entity viene disegnata la prima volta.
+const ENTITY_Z_INDEX = parseInt(process.env.ENTITY_Z_INDEX || '9500', 10);
 
 // Queue per serializzare le chiamate API e evitare socket hang up
 let apiQueue = [];
@@ -1257,6 +1261,26 @@ function buildMoveEntityDrawCode(fromI, fromJ, toI, toJ, tileCoordinates) {
 // (ora libero) riceve gli eventi over (hover), quello di arrivo — occupato
 // dall'entity — li perde. Il frontend gestisce add/remove con l'attributo
 // update 'interactive_events' (stash + rebind dei listener PIXI).
+// Codice eseguito nel frontend (item 'code') per ripristinare il colore
+// originale dei tile di origine e arrivo dopo un movimento: l'hover dei tile
+// (script pointerover generato da GenerateMapJob) cambia solo shape.tint
+// (overlay rosso), mentre objects[uid].color conserva SEMPRE il colore di
+// origine → basta riapplicarlo per "togliere" il colore over rimasto appeso.
+function buildResetTilesOverColorCode(fromTileUid, toTileUid) {
+  return [
+    '(function () {',
+    `  var tileUids = ${JSON.stringify([fromTileUid, toTileUid])};`,
+    '  tileUids.forEach(function (uid) {',
+    '    var shape = (typeof shapes !== "undefined") ? shapes[uid] : null;',
+    '    var object = (typeof objects !== "undefined") ? objects[uid] : null;',
+    '    if (shape && object && object.color !== undefined && object.color !== null) {',
+    '      shape.tint = object.color;',
+    '    }',
+    '  });',
+    '})();',
+  ].join('\n');
+}
+
 function buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates) {
   const toCenter = getTileCenter(toI, toJ, tileCoordinates);
 
@@ -1266,10 +1290,12 @@ function buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates) {
 
   return [
     {
-      // Immagine dell'entity: uid uguale allo uid dell'entity (vedi EntityDraw)
+      // Immagine dell'entity: uid uguale allo uid dell'entity (vedi EntityDraw).
+      // Lo z_index viene ribadito a ogni step per garantire che l'entity resti
+      // sopra il path (PATH_Z_INDEX = 9000) durante il movimento.
       type: 'update',
       uid: entityUid,
-      attributes: { x: toCenter.x, y: toCenter.y },
+      attributes: { x: toCenter.x, y: toCenter.y, z_index: ENTITY_Z_INDEX },
     },
     {
       // Tile di partenza: l'entity lo ha lasciato → riaggancia gli eventi over
@@ -1286,6 +1312,12 @@ function buildEntityDrawMoveItems(fromI, fromJ, toI, toJ, tileCoordinates) {
       attributes: {
         interactive_events: { remove: ['pointerover', 'pointerout'] },
       },
+    },
+    {
+      // Ripristina il colore originale dei tile di origine e arrivo (toglie
+      // l'over-color rosso lasciato da un hover precedente)
+      type: 'code',
+      code: buildResetTilesOverColorCode(fromTileUid, toTileUid),
     },
     {
       // Tutti gli altri oggetti dell'entity (pannello, testi, bottoni, barre)

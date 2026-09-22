@@ -95,6 +95,10 @@ class EntityDraw
         $entityImage->setSize($entitySize, $entitySize);
         $entityImage->setSrc($imageUrl);
         $entityImage->setCenterAnchor(true);
+        // L'entity deve stare sopra i tile e sopra il path disegnato durante il
+        // movimento (PATH_Z_INDEX = 9000 nel container docker/entity), ma sotto
+        // i bottoni di navigazione mappa (15000) e le modali (20000).
+        $entityImage->addAttributes('z_index', 9500);
 
         $jsPathClickEntity = resource_path('js/function/entity/click_entity.blade.php');
         $jsContentClickEntity = file_get_contents($jsPathClickEntity);

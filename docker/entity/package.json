@@ -2,7 +2,7 @@
     "main":  "index.js",
     "description":  "Entity Docker service with WebSocket, path drawing, animated movement via Pusher, DB position persistence and dual movement modes (coordinates + actions)",
     "name":  "entity-service",
-    "version":  "2.12.0",
+    "version":  "2.13.0",
     "dependencies":  {
                          "pusher":  "^5.2.0",
                          "ws":  "^8.16.0"
