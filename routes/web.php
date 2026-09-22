@@ -47,6 +47,10 @@ Route::group(['middleware' => ['auth']], function () {
     //Container
     Route::get('/containers', [App\Http\Controllers\ContainerController::class, 'index'])->name('containers.index');
     Route::post('/containers/list/table', [App\Http\Controllers\ContainerController::class, 'listPlayersDataTable'])->name('containers.players.datatable');
+    Route::post('/containers/bulk-action', [App\Http\Controllers\ContainerController::class, 'bulkAction'])->name('containers.bulk-action');
+    Route::post('/containers/delete', [App\Http\Controllers\ContainerController::class, 'delete'])->name('containers.delete');
+    Route::post('/containers/recreate-all/{player}', [App\Http\Controllers\ContainerController::class, 'recreateAll'])->name('containers.recreate-all')->whereNumber('player');
+    Route::post('/containers/recreate/{container}', [App\Http\Controllers\ContainerController::class, 'recreate'])->name('containers.recreate')->whereNumber('container');
     Route::get('/containers/{player}', [App\Http\Controllers\ContainerController::class, 'show'])->name('containers.show')->whereNumber('player');
     Route::get('/containers/{player}/snapshot', [App\Http\Controllers\ContainerController::class, 'snapshot'])->name('containers.snapshot')->whereNumber('player');
     Route::get('/containers/{player}/volume-snapshot', [App\Http\Controllers\ContainerController::class, 'volumeSnapshot'])->name('containers.volume-snapshot')->whereNumber('player');
@@ -60,8 +64,6 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('/containers/{container}/logs', [App\Http\Controllers\ContainerController::class, 'logs'])->name('containers.logs')->whereNumber('container');
     Route::get('/containers/{container}/inspect', [App\Http\Controllers\ContainerController::class, 'inspect'])->name('containers.inspect')->whereNumber('container');
     Route::post('/containers/{container}/exec', [App\Http\Controllers\ContainerController::class, 'exec'])->name('containers.exec')->whereNumber('container');
-    Route::post('/containers/bulk-action', [App\Http\Controllers\ContainerController::class, 'bulkAction'])->name('containers.bulk-action');
-    Route::post('/containers/delete', [App\Http\Controllers\ContainerController::class, 'delete'])->name('containers.delete');
 
     //User
     Route::resource('users', App\Http\Controllers\UserController::class);

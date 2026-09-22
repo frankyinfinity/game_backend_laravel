@@ -267,6 +267,7 @@
                         <div class="d-flex align-items-center" style="gap:6px; flex-wrap:wrap; margin-bottom:8px;">
                             <button type="button" class="btn btn-success btn-sm" id="ws-c-connect" disabled><i class="fas fa-plug"></i> Connetti</button>
                             <button type="button" class="btn btn-danger btn-sm" id="ws-c-disconnect" disabled><i class="fas fa-unlink"></i> Disconnetti</button>
+                            <button type="button" class="btn btn-warning btn-sm" id="ws-c-recreate" disabled><i class="fas fa-sync-alt"></i> Ricrea container</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="ws-c-clear"><i class="fas fa-trash"></i> Clear</button>
                         </div>
 
@@ -304,6 +305,8 @@
         const DOCKER_HOST = '{{ $dockerHost ?? 'localhost' }}';
         const GATEWAY_PORT = {{ config('remote_docker.websocket_gateway_port') }};
         const SNAPSHOT_URL = '{{ route('containers.snapshot', $player) }}';
+        const RECREATE_URL = '{{ route('containers.recreate', ['_id_']) }}';
+        const CONTAINER_ACTION_URL = '{{ route('game.container.action') }}';
         const CONTAINERS = @json($containers);
         const CONTAINER_IDS = CONTAINERS.map(c => c.id);
 
@@ -566,6 +569,7 @@
             ctSetBadge('disconnected','<i class="fas fa-circle"></i> Disconnesso');
             $ctConn.prop('disabled',false);
             $ctDisc.prop('disabled',true);
+            $('#ws-c-recreate').prop('disabled',false);
             $ctSend.prop('disabled',true);
             $ctCmd.prop('disabled',true);
             ctUpdatePresets();
@@ -663,6 +667,48 @@
             }catch(e){ ctAddLog('error','JSON non valido: '+e.message); }
         }
 
+        function ctRecreate(){
+            if(!selectedContainer || !selectedContainer.id){
+                ctAddLog('error','Nessun container selezionato.');
+                return;
+            }
+            const $btn = $('#ws-c-recreate');
+            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Ricreazione...');
+            ctAddLog('system','Ricreazione container #' + selectedContainer.id + ' (' + (selectedContainer.name || selectedContainer.parent_type) + ') in corso...');
+            $.ajax({
+                url: RECREATE_URL.replace('_id_', selectedContainer.id),
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(res){
+                    const msg = (res && res.message) ? res.message : 'Container ricreato con successo';
+                    ctAddLog('system', msg);
+                    if (res && res.container) {
+                        const idx = containers.findIndex(function(x){ return x.id === selectedContainer.id; });
+                        if (idx >= 0) {
+                            containers[idx] = Object.assign({}, containers[idx], res.container);
+                        }
+                        selectedContainer = Object.assign({}, selectedContainer, res.container);
+                        ctRenderList();
+                        const addr = DOCKER_HOST + ':' + selectedContainer.ws_port;
+                        $ctTitle.text(selectedContainer.name + ' (' + addr + ')');
+                    }
+                    // Ricarica snapshot per aggiornare ws_port / container_id nella lista
+                    if (typeof loadWsSnapshot === 'function') {
+                        loadWsSnapshot();
+                    }
+                },
+                error: function(xhr){
+                    const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Errore durante la ricreazione del container.';
+                    ctAddLog('error', msg);
+                },
+                complete: function(){
+                    $btn.prop('disabled', false).html('<i class="fas fa-sync-alt"></i> Ricrea container');
+                }
+            });
+        }
+
         // Init container list
         if (containers.length > 0) {
             selectedContainer = containers[0];
@@ -676,6 +722,7 @@
         $('#ws-c-search').on('input', ctRenderList);
         $('#ws-c-connect').on('click', ctConnect);
         $('#ws-c-disconnect').on('click', ctDisconnect);
+        $('#ws-c-recreate').on('click', ctRecreate);
         $('#ws-c-send').on('click', function(){ ctSend($ctCmd.val()); });
         $('#ws-c-cmd').on('keydown', function(e){ if(e.key==='Enter') ctSend($ctCmd.val()); });
         $(document).on('click','.js-ct-preset', function(){

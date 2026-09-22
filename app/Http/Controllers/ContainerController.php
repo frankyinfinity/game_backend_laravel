@@ -196,6 +196,56 @@ class ContainerController extends Controller
         ]);
     }
 
+    public function recreate(DockerContainer $container, DockerContainerService $containerService): JsonResponse
+    {
+        set_time_limit(300);
+
+        try {
+            $recreated = $containerService->recreateContainer($container, false);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ricreazione container fallita: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        if (!$recreated) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ricreazione container fallita.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Container ricreato con successo.',
+            'container' => [
+                'id' => $recreated->id,
+                'name' => $recreated->name,
+                'container_id' => $recreated->container_id,
+                'ws_port' => $recreated->ws_port,
+            ],
+        ]);
+    }
+
+    public function recreateAll(Player $player, Request $request, DockerContainerService $containerService): JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+        set_time_limit(300); // 5 minutes timeout
+
+        try {
+            $newContainers = $containerService->recreateAllPlayerContainers($player, true);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Container ricreati con successo',
+                'count' => count($newContainers),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function bulkAction(Request $request, DockerContainerService $containerService): JsonResponse
     {
         set_time_limit(300); // 5 minutes timeout for bulk operations
@@ -216,7 +266,7 @@ class ContainerController extends Controller
                 'start' => $containerService->startContainers($containers->all()),
                 'stop' => $containerService->stopContainers($containers->all()),
                 'restart' => $containerService->restartContainers($containers->all()),
-                'recreate' => $containers->each(fn($c) => $containerService->recreateContainer($c)),
+                'recreate' => $containers->each(fn($c) => $containerService->recreateContainer($c, true)),
                 default => throw new \InvalidArgumentException('Azione bulk non valida'),
             };
         } catch (\Throwable $e) {

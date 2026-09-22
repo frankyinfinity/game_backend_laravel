@@ -757,6 +757,21 @@ function handleWebSocketCommand(data, ws) {
       });
       break;
 
+    case 'attack': {
+      const attackEntityUid = (moveParams && moveParams.entity_uid) ? String(moveParams.entity_uid) : entityUid;
+      const attackElementId = (moveParams && moveParams.element_id !== undefined && moveParams.element_id !== null)
+        ? moveParams.element_id
+        : null;
+      console.log(`[Entity ${entityUid}] Attack requested (entity_uid: ${attackEntityUid}, element_id: ${attackElementId})`);
+      ws.send(JSON.stringify({
+        success: true,
+        command: 'attack',
+        entity_uid: attackEntityUid,
+        element_id: attackElementId,
+      }));
+      break;
+    }
+
     case 'get_genes':
       // Ritorna i geni correnti
       ws.send(JSON.stringify({

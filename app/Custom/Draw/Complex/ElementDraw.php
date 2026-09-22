@@ -438,6 +438,10 @@ class ElementDraw
 
         $jsPathAttack = resource_path('js/function/element/attack.blade.php');
         $jsContentAttack = file_get_contents($jsPathAttack);
+        $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $jsContentAttack = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentAttack);
+        $jsContentAttack = str_replace('__PLAYER_ID__', (string) $this->playerId, $jsContentAttack);
+        $jsContentAttack = str_replace('__element_id__', (string) $this->element->id, $jsContentAttack);
         $jsContentAttack = Helper::setCommonJsCode($jsContentAttack, Str::random(20));
 
         $btn = new ButtonDraw($uid . '_btn_attack');

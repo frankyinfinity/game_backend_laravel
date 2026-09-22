@@ -3026,8 +3026,10 @@ class GameController extends Controller
                     $containerService->startContainerById($dockerId);
                     break;
                 case 'recreate':
-                    // Per ora facciamo restart, la ricreazione totale richiederebbe più logica di config
-                    $containerService->restartContainerById($dockerId);
+                    $recreated = $containerService->recreateContainer($container, false);
+                    if (!$recreated) {
+                        return response()->json(['success' => false, 'message' => 'Ricreazione container fallita'], 500);
+                    }
                     break;
             }
             return response()->json(['success' => true, 'message' => "Azione $action eseguita con successo"]);
@@ -3051,7 +3053,7 @@ class GameController extends Controller
         }
 
         try {
-            $newContainers = $containerService->recreateAllPlayerContainers($player, false);
+            $newContainers = $containerService->recreateAllPlayerContainers($player, true);
             
             return response()->json([
                 'success' => true, 

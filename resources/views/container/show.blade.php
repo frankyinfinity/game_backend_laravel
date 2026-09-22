@@ -567,6 +567,9 @@
                         <button type="button" class="btn btn-info btn-sm js-selected-action flex-grow" data-action="restart" disabled>
                             <i class="fa fa-sync"></i> Restart
                         </button>
+                        <button type="button" class="btn btn-warning btn-sm js-selected-recreate flex-grow" disabled>
+                            <i class="fa fa-redo"></i> Ricrea
+                        </button>
                         <button type="button" class="btn btn-danger btn-sm js-selected-delete flex-grow" disabled>
                             <i class="fa fa-trash"></i> Delete
                         </button>
@@ -767,6 +770,7 @@
             start: "{{ route('containers.start', ['_id_']) }}",
             stop: "{{ route('containers.stop', ['_id_']) }}",
             restart: "{{ route('containers.restart', ['_id_']) }}",
+            recreate: "{{ route('containers.recreate', ['_id_']) }}",
             delete: "{{ route('containers.delete') }}",
             bulk: "{{ route('containers.bulk-action') }}",
         };
@@ -1087,7 +1091,7 @@
                 fields.mem.textContent = '-';
                 fields.net.textContent = '-';
                 fields.pids.textContent = '-';
-                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = true);
+                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-recreate, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = true);
                 return;
             }
 
@@ -1107,7 +1111,7 @@
             fields.net.textContent = stats.net || '-';
             fields.pids.textContent = stats.pids || '-';
 
-            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = false);
+            document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-recreate, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = false);
         }
 
         function updatePlayerVolume(volume) {
@@ -1837,7 +1841,7 @@
                 }
 
                 $.ajax({
-                    url: '{{ route('game.player.recreate_all_containers') }}',
+                    url: '{{ route('containers.recreate-all', $player) }}',
                     type: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -1870,9 +1874,24 @@
             });
         }
 
+        function selectedRecreate() {
+            if (!selectedContainer) return;
+            const containerId = selectedContainer.id;
+            const url = ACTION_URLS.recreate.replace('_id_', containerId);
+            ajaxAction(url, 'Eliminare e ricreare questo container? (non verrà avviato)')
+                .then((ok) => {
+                    if (ok) {
+                        refreshContainers(true);
+                    }
+                });
+        }
+
         function selectedAction(action) {
             if (!selectedContainer) return;
             const containerId = selectedContainer.id;
+            if (action === 'recreate') {
+                return selectedRecreate();
+            }
             let url = ACTION_URLS[action];
             if (action !== 'delete') {
                 url = url.replace('_id_', containerId);
@@ -2268,6 +2287,10 @@
 
             $(document).on('click', '.js-selected-delete', function () {
                 selectedAction('delete');
+            });
+
+            $(document).on('click', '.js-selected-recreate', function () {
+                selectedRecreate();
             });
 
             $(document).on('click', '.js-selected-logs', function () {
