@@ -61,6 +61,7 @@ Route::post('/game/websocket_info', [App\Http\Controllers\Api\GameController::cl
 Route::post('/game/player/container_data', [App\Http\Controllers\Api\GameController::class, 'getPlayerContainerData'])->name('game.player.container_data');
 Route::post('/game/container/action', [App\Http\Controllers\Api\GameController::class, 'containerAction'])->name('game.container.action');
 Route::post('/game/alert', [App\Http\Controllers\Api\GameController::class, 'createAlert'])->name('game.alert');
+Route::post('/game/player/save_items', [App\Http\Controllers\Api\GameController::class, 'savePlayerItems'])->name('game.player.save_items');
 
 
 

@@ -2543,261 +2543,6 @@ class GameController extends Controller
         return $currentLife >= $divisionCost;
     }
 
-    /**
-     * Workflow completo della divisione (sospeso): validazioni, clonazione
-     * genome/chimical/details, spawn della nuova entity e creazione container.
-     * Riattivabile chiamando $this->divisionWorkflow($request) da division().
-     */
-    private function divisionWorkflow(Request $request)
-    {
-        ini_set('memory_limit', '-1');
-        $entityUid = (string) $request->input('entity_uid');
-        if ($entityUid === '') {
-            return response()->json([
-                'success' => false,
-                'message' => 'entity_uid obbligatorio',
-            ], 422);
-        }
-
-        $entity = Entity::query()
-            ->where('uid', $entityUid)
-            ->where('state', Entity::STATE_LIFE)
-            ->with(['specie'])
-            ->first();
-
-        if (!$entity || !$entity->specie) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Entity non trovata',
-            ], 404);
-        }
-
-        $player = Player::query()->find($entity->specie->player_id);
-        if (!$player || !$player->birthRegion) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Player o regione non trovati',
-            ], 404);
-        }
-
-        $divisionCost = PlayerValue::getIntegerValue(
-            $player->id,
-            PlayerValue::KEY_DIVISION_COST
-        );
-        $generatedEntityLifepoint = PlayerValue::getIntegerValue(
-            $player->id,
-            PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY
-        );
-
-        $lifepointGenome = Genome::query()
-            ->where('entity_id', $entity->id)
-            ->whereHas('gene', function ($q) {
-                $q->where('key', Gene::KEY_LIFEPOINT);
-            })
-            ->with(['gene'])
-            ->first();
-
-        if (!$lifepointGenome) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gene lifepoint non trovato',
-            ], 422);
-        }
-
-        $lifepointInfo = EntityInformation::query()->where('genome_id', $lifepointGenome->id)->first();
-        if (!$lifepointInfo) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Valore lifepoint non trovato',
-            ], 422);
-        }
-
-        $currentLife = (int) $lifepointInfo->value;
-        if ($currentLife < $divisionCost) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Punti vita insufficienti per divisione (minimo ' . $divisionCost . ')',
-            ], 422);
-        }
-
-        $spawnCell = $this->findFreeAdjacentCell($entity, $player);
-        if ($spawnCell === null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Nessuna cella adiacente libera disponibile',
-            ], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            // 1) Togli i punti vita richiesti all'entity target
-            $updatedTargetLife = max(0, $currentLife - $divisionCost);
-
-            $updateItems = [
-                [
-                    'id' => $lifepointInfo->id,
-                    'attributes' => [
-                        'value' => $updatedTargetLife,
-                    ]
-                ]
-            ];
-
-            // 2) Crea nuova entity in una cella adiacente con lifepoint configurato
-            // Copia immagine della entity sorgente sul nuovo id
-            $newEntityImage = null;
-            if ($entity->image && \Illuminate\Support\Facades\Storage::disk('entity_images')->exists($entity->image)) {
-                $imageContent = \Illuminate\Support\Facades\Storage::disk('entity_images')->get($entity->image);
-                // Il nome definitivo verrà impostato dopo la creazione (usiamo l'id della nuova entity)
-                $newEntityImage = '__pending__';
-            }
-
-            $newEntity = Entity::query()->create([
-                'specie_id' => $entity->specie_id,
-                'uid' => uniqid('', true),
-                'tile_i' => $spawnCell['i'],
-                'tile_j' => $spawnCell['j'],
-                'state' => Entity::STATE_LIFE,
-            ]);
-
-            // Salva l'immagine con il nuovo entity id e aggiorna il record
-            if ($newEntityImage === '__pending__' && isset($imageContent)) {
-                $newImageFilename = $newEntity->id . '.png';
-                \Illuminate\Support\Facades\Storage::disk('entity_images')->put($newImageFilename, $imageContent);
-                $newEntity->update(['image' => $newImageFilename]);
-            }
-
-            $sourceGenomes = Genome::query()
-                ->where('entity_id', $entity->id)
-                ->with(['gene'])
-                ->get();
-
-            foreach ($sourceGenomes as $sourceGenome) {
-                $newGenome = Genome::query()->create([
-                    'entity_id' => $newEntity->id,
-                    'gene_id' => $sourceGenome->gene_id,
-                    'min' => $sourceGenome->min,
-                    'max' => $sourceGenome->max,
-                ]);
-
-                $sourceInfo = EntityInformation::query()->where('genome_id', $sourceGenome->id)->first();
-                $newValue = $sourceInfo ? (int) $sourceInfo->value : (int) $sourceGenome->min;
-
-                if ($sourceGenome->gene && $sourceGenome->gene->key === Gene::KEY_LIFEPOINT) {
-                    $newValue = $generatedEntityLifepoint;
-                }
-                $newValue = max((int) $sourceGenome->min, min((int) ($sourceGenome->max + ($sourceGenome->modifier ?? 0)), $newValue));
-
-                EntityInformation::query()->create([
-                    'genome_id' => $newGenome->id,
-                    'value' => $newValue,
-                ]);
-            }
-
-            // 3) Clona EntityChimicalElement dalla entity sorgente
-            $sourceChimicalElements = EntityChimicalElement::query()
-                ->where('entity_id', $entity->id)
-                ->get();
-
-            foreach ($sourceChimicalElements as $sourceChimical) {
-                EntityChimicalElement::query()->create([
-                    'entity_id'                       => $newEntity->id,
-                    'player_rule_chimical_element_id' => $sourceChimical->player_rule_chimical_element_id,
-                    'value'                           => $sourceChimical->value,
-                ]);
-            }
-
-            // 4) Clona EntityDetail e EntityDetailData dalla entity sorgente
-            $sourceDetails = \App\Models\EntityDetail::query()
-                ->where('entity_id', $entity->id)
-                ->with('entityDetailData')
-                ->get();
-
-            foreach ($sourceDetails as $sourceDetail) {
-                $newDetail = \App\Models\EntityDetail::query()->create([
-                    'entity_id'       => $newEntity->id,
-                    'detailable_type' => $sourceDetail->detailable_type,
-                    'detailable_id'   => $sourceDetail->detailable_id,
-                ]);
-
-                foreach ($sourceDetail->entityDetailData as $sourceData) {
-                    \App\Models\EntityDetailData::query()->create([
-                        'entity_detail_id' => $newDetail->id,
-                        'key'              => $sourceData->key,
-                        'value'            => $sourceData->value,
-                    ]);
-                }
-            }
-
-            // 5) Crea e avvia container per la nuova entity
-            /** @var DockerContainerService $containerService */
-            $containerService = app(DockerContainerService::class);            
-            $container = $containerService->createEntityContainer($newEntity, $player->id, true);
-
-            DB::commit();
-
-            Log::info('Division completed', [
-                'source_entity_uid' => $entityUid,
-                'new_entity_uid' => $newEntity->uid,
-                'new_entity_tile_i' => $newEntity->tile_i,
-                'new_entity_tile_j' => $newEntity->tile_j,
-                'container_id' => $container->container_id ?? null,
-                'container_ws_port' => $container->ws_port ?? null,
-            ]);
-
-            // Aggiorna progressbar lifepoint dell'entity target in UI
-            // Disegna subito la nuova entity spawnata
-            $this->dispatchNewEntitySpawnDraw($request, $player, $newEntity);
-
-            // === UPDATE ENTITY INFORMATION VIA API ===
-            if (!empty($updateItems)) {
-                $updateEntityCode = $this->buildUpdateEntityInfoCode($updateItems);
-                if (!empty($updateEntityCode)) {
-                    DrawRequest::query()->create([
-                        'session_id' => $player->actual_session_id,
-                        'request_id' => Str::random(20),
-                        'player_id' => $player->id,
-                        'items' => json_encode([(new ObjectCode($updateEntityCode, 500))->get()]),
-                    ]);
-                }
-            }
-
-            try {
-                $entityContainer = Container::query()
-                    ->where('parent_type', Container::PARENT_TYPE_ENTITY)
-                    ->where('parent_id', $entity->id)
-                    ->first();
-
-                if ($entityContainer) {
-                    $payload = [
-                        'event' => 'division',
-                        'entity_uid' => $entityUid,
-                        'new_entity_uid' => $newEntity->uid,
-                    ];
-                    app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
-                }
-            } catch (\Throwable $e) {
-                \Log::error("Errore notifica WS division entity {$entityUid}: " . $e->getMessage());
-            }
-
-            return response()->json([
-                'success' => true,
-                'new_entity_uid' => $newEntity->uid,
-            ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Log::error('Division failed', [
-                'entity_uid' => $entityUid,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Errore durante la divisione',
-            ], 500);
-        }
-
-    }
-
     private function findFreeAdjacentCell(Entity $entity, Player $player): ?array
     {
         $birthRegion = $player->birthRegion;
@@ -3350,6 +3095,74 @@ class GameController extends Controller
             return response()->json(['success' => true, 'message' => 'Object cache synced to volume']);
         } catch (\Throwable $e) {
             \Log::error('ObjectCache sync failed', [
+                'player_id' => $player->id,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Autosave del frontend: riceve player_id + session_id + items e li salva
+     * nello STESSO file usato da syncObjectCache
+     * (object-cache/object_cache_player_{id}.json), sia su disk locale
+     * che nel volume Docker del player.
+     * Chiamata dal timer del frontend ogni 10s quando l'utente è loggato.
+     */
+    public function savePlayerItems(Request $request, DockerContainerService $containerService): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+
+        Log::info('[savePlayerItems] richiesta ricevuta', [
+            'ip' => $request->ip(),
+            'player_id' => $request->input('player_id'),
+            'session_id' => $request->input('session_id'),
+            'items_count' => is_array($request->input('items')) ? count($request->input('items')) : null,
+            'content_length' => $request->server('CONTENT_LENGTH'),
+        ]);
+
+        $validated = $request->validate([
+            'player_id' => ['required', 'integer', 'exists:players,id'],
+            'session_id' => ['required', 'string'],
+            'items' => ['required', 'array'],
+        ]);
+
+        $player = Player::find($validated['player_id']);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        $sessionId = $validated['session_id'];
+
+        try {
+            // Stesso formato di ObjectCache::all(): mappa uid => object.
+            $map = [];
+            foreach ($validated['items'] as $item) {
+                if (is_array($item) && isset($item['uid']) && is_string($item['uid']) && $item['uid'] !== '') {
+                    $map[$item['uid']] = $item;
+                }
+            }
+
+            $content = json_encode($map, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+            // 1. Stesso file su disk locale letto da syncObjectCache.
+            $diskFileName = 'object_cache_player_' . $player->id . '.json';
+            Storage::disk('object_cache')->put($diskFileName, $content);
+
+            // 2. Stesso file nel volume Docker del player.
+            $fileName = ObjectCache::volumeCachePath($sessionId);
+            $containerService->writePlayerVolumeFile($player, $fileName, $content);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Items salvati nello stesso file di cache nel volume Docker',
+                'player_id' => $player->id,
+                'path' => $fileName,
+                'items_count' => count($map),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Autosave items su volume fallito', [
                 'player_id' => $player->id,
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
