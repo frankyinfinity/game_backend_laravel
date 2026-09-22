@@ -34,13 +34,30 @@
         }
         console.log('Element ID (Target):', element_id);
 
-        let playerId = '__PLAYER_ID__';
-        let ports = (window.entityWsPorts && typeof window.entityWsPorts === 'object')
-            ? window.entityWsPorts
-            : {};
-        window.entityWsPorts = ports;
-        window.entityPortsPlayerId = window.entityPortsPlayerId || playerId;
-        let port = ports[entity_uid];
+        // Try to get port directly from entity attributes first
+        let port = null;
+        try {
+            if (typeof objects !== 'undefined' && objects[entity_uid] && objects[entity_uid].attributes) {
+                port = objects[entity_uid].attributes.ws_port;
+            }
+        } catch (e) {}
+
+        // Fallback to cache if not found in attributes
+        if (!port) {
+            let ports = (window.entityWsPorts && typeof window.entityWsPorts === 'object')
+                ? window.entityWsPorts
+                : null;
+            
+            if (!ports) {
+                try {
+                    ports = JSON.parse('__ports__');
+                } catch (e) {
+                    ports = {};
+                }
+            }
+            window.entityWsPorts = ports;
+            port = ports[entity_uid];
+        }
 
         const sendAttackCommand = (ws) => {
             ws.send(JSON.stringify({
@@ -65,11 +82,12 @@
             console.log('WS Attack response:', response);
         };
 
-        const connectAndSend = (resolvedPort) => {
-            let wsUrl = '__gateway_base__' + resolvedPort;
+        const connectAndSend = (resolvedPort, gatewayUrl = null) => {
+            let wsUrl = gatewayUrl ? gatewayUrl : ('__gateway_base__' + resolvedPort);
+            let wsKey = resolvedPort;
 
             window.gameWebSockets = window.gameWebSockets || {};
-            let ws = window.gameWebSockets[resolvedPort];
+            let ws = window.gameWebSockets[wsKey];
 
             // Listener isolato: non sovrascrive gli onmessage di altri comandi
             const attachListener = (socket) => {
@@ -100,8 +118,8 @@
         };
 
         if (!port) {
-            if (typeof window.refreshEntityWebSocketPorts === 'function' && window.entityPortsPlayerId) {
-                window.refreshEntityWebSocketPorts(window.entityPortsPlayerId)
+            if (typeof window.refreshEntityWebSocketPorts === 'function') {
+                window.refreshEntityWebSocketPorts()
                     .then(function (refreshedPorts) {
                         const resolvedPorts = (refreshedPorts && typeof refreshedPorts === 'object')
                             ? refreshedPorts
@@ -116,6 +134,29 @@
                     .catch(function (error) {
                         console.error('Failed to refresh websocket ports:', error);
                     });
+                return;
+            }
+
+            // Fallback: fetch ports via AJAX if refresh function not available
+            if (typeof $ !== 'undefined' && typeof BACK_URL !== 'undefined') {
+                $.ajax({
+                    url: BACK_URL + '/api/game/websocket_info',
+                    type: 'POST',
+                    data: {}
+                }).then(function (response) {
+                    if (!response || !response.success || !response.containers) return;
+                    response.containers.forEach(function (c) {
+                        if (c.uid && c.ws_gateway_url) {
+                            window.entityWsPorts = window.entityWsPorts || {};
+                            window.entityWsPorts[c.uid] = c.ws_gateway_url;
+                            if (c.uid === entity_uid) {
+                                connectAndSend(c.ws_gateway_url, c.ws_gateway_url);
+                            }
+                        }
+                    });
+                }).catch(function (error) {
+                    console.error('Failed to fetch websocket_info:', error);
+                });
                 return;
             }
 
