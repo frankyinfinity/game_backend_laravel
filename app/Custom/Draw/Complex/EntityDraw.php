@@ -261,9 +261,9 @@ class EntityDraw
             $divisionButton->build();
         }
 
-        // Evolution button (visible only when player_values.evolution is true, or forced)
+        // Evolution button (visible only when player_values.evolution is true)
         $evolutionButton = null;
-        $showEvolution = !$this->checkDrawButton || PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_EVOLUTION]);
+        $showEvolution = PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_EVOLUTION]);
         $isBlockEvolution = PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_BLOCK_EVOLUTION]);
         if ($showEvolution) {
             $jsPathEvolution = resource_path('js/function/entity/click_evolution.blade.php');

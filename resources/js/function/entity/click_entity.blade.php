@@ -141,8 +141,7 @@
         };
 
         const applyEvolutionButtonVisibility = () => {
-            const forceDrawButtons = objects[panel_uid] && objects[panel_uid].attributes && objects[panel_uid].attributes.force_draw_buttons;
-            const evolutionEnabled = forceDrawButtons ? true : resolveEvolutionEnabled();
+            const evolutionEnabled = resolveEvolutionEnabled();
             const blockEvolution = resolveBlockEvolutionEnabled();
             const evolutionButtonRectUid = object_uid + '_button_evolution_rect';
             const evolutionButtonTextUid = object_uid + '_button_evolution_text';
