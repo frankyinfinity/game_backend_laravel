@@ -1829,18 +1829,22 @@ function moveEntityAlongPath(path, startI, startJ, tileCoordinates, callback) {
 
 // Funzione per ottenere la posizione attuale dal backend (solo la prima volta)
 function fetchCurrentPositionFromApi(callback) {
-  const options = {
-    hostname: new URL(backendUrl).hostname,
-    port: new URL(backendUrl).port || 80,
-    path: `/api/auth/game/entity/get_position?entity_uid=${encodeURIComponent(entityUid)}`,
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cookie': sessionCookie,
-      'X-XSRF-TOKEN': xsrfToken
-    },
-  };
+    const path = '/api/auth/game/entity/get_position';
+    const postData = JSON.stringify({ entity_uid: entityUid });
+
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
 
   const req = http.request(options, (res) => {
     let data = '';
