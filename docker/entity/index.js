@@ -652,6 +652,383 @@ function scheduleNextCycle() {
   }, POSITION_WAIT_SECONDS * 1000);
 }
 
+// Funzione per eseguire l'attacco a un elemento
+// Costruisce l'array items e lo invia tramite pusher
+// Flusso: 1) movement verso tile accanto al target, 2) objectcode con API call, 3) movement ritorno
+function performAttack(entityUid, elementUid, callback) {
+  if (!sessionCookie) {
+    ensureSession((ok) => {
+      if (!ok || !sessionCookie) {
+        if (callback) callback({ success: false, error: 'No session cookie' });
+        return;
+      }
+      performAttack(entityUid, elementUid, callback);
+    }, 10000);
+    return;
+  }
+
+  // Prima ottieni la posizione corrente dell'entity
+  const getCurrentPos = () => {
+    if (isPositionInitialized && localCurrentTileI !== null && localCurrentTileJ !== null) {
+      return { i: localCurrentTileI, j: localCurrentTileJ };
+    }
+    return null;
+  };
+
+  const startPos = getCurrentPos();
+  if (!startPos) {
+    fetchCurrentPositionFromApi((result) => {
+      if (result.success) {
+        localCurrentTileI = result.tile_i;
+        localCurrentTileJ = result.tile_j;
+        isPositionInitialized = true;
+        buildAttackItems(result.tile_i, result.tile_j, elementUid, callback);
+      } else {
+        callback({ success: false, error: 'Failed to get current position' });
+      }
+    });
+    return;
+  }
+
+  buildAttackItems(startPos.i, startPos.j, elementUid, callback);
+}
+
+function buildAttackItems(startI, startJ, elementUid, callback) {
+  console.log(`[Entity ${entityUid}] Building attack items from (${startI}, ${startJ}) to element ${elementUid}`);
+
+  // Chiama l'API getPosition per ottenere la posizione dell'elemento
+  fetchElementPositionFromApi(elementUid, (positionResult) => {
+    if (!positionResult.success) {
+      callback({ success: false, error: 'Failed to get element position' });
+      return;
+    }
+
+    const elementTileI = positionResult.tile_i;
+    const elementTileJ = positionResult.tile_j;
+
+    console.log(`[Entity ${entityUid}] Element position: (${elementTileI}, ${elementTileJ})`);
+
+    // Ottieni walkable e tile coordinates
+    getWalkableFromMap((walkableResult) => {
+      if (!walkableResult.success) {
+        callback({ success: false, error: 'Failed to get walkable array' });
+        return;
+      }
+
+      getTileCoordinatesFromMap((coordinatesResult) => {
+        let tileCoordinates = null;
+        if (coordinatesResult.success) {
+          tileCoordinates = coordinatesResult.tile_coordinates;
+        }
+
+        // Trova un tile adiacente all'elemento che è walkable
+        const directions = [
+          { di: -1, dj: 0 },
+          { di: 1, dj: 0 },
+          { di: 0, dj: -1 },
+          { di: 0, dj: 1 },
+        ];
+
+        let targetI = startI;
+        let targetJ = startJ;
+
+        for (const dir of directions) {
+          const newI = elementTileI + dir.di;
+          const newJ = elementTileJ + dir.dj;
+          
+          if (newI >= 0 && newI < walkableResult.dimensions.rows &&
+              newJ >= 0 && newJ < walkableResult.dimensions.cols &&
+              walkableResult.tile_walkable[newI][newJ]) {
+            targetI = newI;
+            targetJ = newJ;
+            break;
+          }
+        }
+
+        if (targetI === startI && targetJ === startJ) {
+          callback({ success: false, error: 'No adjacent walkable tile found near element' });
+          return;
+        }
+
+        console.log(`[Entity ${entityUid}] Attack target tile: (${targetI}, ${targetJ})`);
+
+        // Calcola il path verso il tile adiacente all'elemento
+        const pathResult = findPathBFS(walkableResult.tile_walkable, startI, startJ, targetI, targetJ);
+        
+        if (!pathResult.success) {
+          callback({ success: false, error: 'No path to target tile' });
+          return;
+        }
+
+        // Calcola il path di ritorno
+        const returnPathResult = findPathBFS(walkableResult.tile_walkable, targetI, targetJ, startI, startJ);
+        
+        if (!returnPathResult.success) {
+          callback({ success: false, error: 'No return path' });
+          return;
+        }
+
+        // Chiama l'API attack per ottenere la risposta con gli items di cancellazione
+        callAttackApi(entityUid, elementUid, (attackResult) => {
+          const items = [];
+          const requestId = 'attack_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
+          // 1. Disegna il path verso il target
+          const pathItems = [];
+          const pathColor = '0xFF0000'; // Rosso per attack
+          const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
+
+          const centers = [getTileCenter(startI, startJ, tileCoordinates)];
+          pathResult.path.forEach((step) => {
+            centers.push(getTileCenter(step.i, step.j, tileCoordinates));
+          });
+
+          // Linea del path
+          pathItems.push({
+            type: 'draw',
+            object: {
+              uid: `${requestId}_line`,
+              type: 'multi_line',
+              points: centers.map((center) => ({ x: center.x, y: center.y })),
+              color: pathColor,
+              thickness: 3,
+              attributes: pathAttributes,
+            },
+          });
+
+          // Punti del path
+          centers.forEach((center, index) => {
+            const isStart = index === 0;
+            pathItems.push({
+              type: 'draw',
+              object: {
+                uid: `${requestId}_dot_${index}`,
+                type: 'circle',
+                x: center.x,
+                y: center.y,
+                radius: isStart ? 8 : 6,
+                color: pathColor,
+                attributes: pathAttributes,
+              },
+            });
+          });
+
+          items.push(...pathItems);
+
+          // 2. Movement verso il target usando items per ogni step
+          let currentFromI = startI;
+          let currentFromJ = startJ;
+          let currentDelay = 0;
+
+          pathResult.path.forEach((step, index) => {
+            const moveItems = buildEntityDrawMoveItems(currentFromI, currentFromJ, step.i, step.j, tileCoordinates);
+            moveItems.forEach(item => {
+              item.sleep = currentDelay;
+              items.push(item);
+            });
+            currentFromI = step.i;
+            currentFromJ = step.j;
+            currentDelay += 400;
+          });
+
+          // 3. Aggiungi gli items di cancellazione se l'elemento è morto
+          if (attackResult.element_died && attackResult.items && attackResult.items.length > 0) {
+            attackResult.items.forEach(item => {
+              item.sleep = currentDelay + 500;
+              items.push(item);
+            });
+            currentDelay += 500;
+          }
+
+          // 4. Movement di ritorno usando items per ogni step
+          returnPathResult.path.forEach((step, index) => {
+            const moveItems = buildEntityDrawMoveItems(currentFromI, currentFromJ, step.i, step.j, tileCoordinates);
+            moveItems.forEach(item => {
+              item.sleep = currentDelay;
+              items.push(item);
+            });
+            currentFromI = step.i;
+            currentFromJ = step.j;
+            currentDelay += 400;
+          });
+
+          // 5. Cancella il path dopo il ritorno (immediato, senza sleep)
+          const clearItems = [];
+          clearItems.push({
+            type: 'update',
+            uid: `${requestId}_line`,
+            attributes: { renderable: false },
+          });
+
+          const totalDots = pathResult.path.length + 1;
+          for (let i = 0; i < totalDots; i++) {
+            clearItems.push({
+              type: 'update',
+              uid: `${requestId}_dot_${i}`,
+              attributes: { renderable: false },
+            });
+          }
+
+          items.push(...clearItems);
+
+          // Invia tutto tramite Pusher
+          const drawPayload = {
+            type: 'draw_interface',
+            request_id: requestId,
+            player_id: playerId,
+            items: items,
+          };
+
+          const channelName = 'player_' + playerId + '_channel';
+          console.log(`[Entity ${entityUid}] Sending attack items via Pusher on channel: ${channelName}`);
+
+          pusher.trigger(channelName, 'draw_interface', drawPayload)
+            .then(() => {
+              console.log(`[Entity ${entityUid}] Attack items sent successfully via Pusher`);
+              callback({
+                success: true,
+                entity_uid: entityUid,
+                element_uid: elementUid,
+                target_tile: { i: targetI, j: targetJ },
+                path_length: pathResult.path.length,
+                attack_result: attackResult,
+              });
+            })
+            .catch((err) => {
+              console.error(`[Entity ${entityUid}] ⛔ Pusher attack items FAILED: ${err.message}`);
+              callback({ success: false, error: 'Pusher failed: ' + err.message });
+            });
+        });
+      });
+    });
+  });
+}
+
+function fetchElementPositionFromApi(elementUid, callback) {
+  enqueueApiCall((done) => {
+    const path = '/api/auth/game/entity/get_position';
+    const postData = JSON.stringify({ element_uid: elementUid });
+
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.success) {
+            console.log(`[Entity ${entityUid}] Element position API success: (${response.tile_i}, ${response.tile_j})`);
+            callback({ success: true, ...response });
+          } else if (handleAuthFailure(res, 'fetchElementPositionFromApi')) {
+            callback({ success: false, error: 'Session expired' });
+          } else {
+            console.error(`[Entity ${entityUid}] Element position API failed: ${response.message}`);
+            callback({ success: false, error: response.message });
+          }
+        } catch (error) {
+          if (handleAuthFailure(res, 'fetchElementPositionFromApi')) {
+            callback({ success: false, error: 'Session expired' });
+          } else {
+            console.error(`[Entity ${entityUid}] Error parsing element position response: ${error.message}`);
+            callback({ success: false, error: error.message });
+          }
+        }
+        done();
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(`[Entity ${entityUid}] Error calling element position API: ${error.message}`);
+      callback({ success: false, error: error.message });
+      done();
+    });
+
+    req.setTimeout(API_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`timeout after ${API_REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+function callAttackApi(entityUid, elementUid, callback) {
+  enqueueApiCall((done) => {
+    const path = '/api/auth/game/entity/attack_element';
+    const postData = JSON.stringify({ 
+      entity_uid: entityUid,
+      element_uid: elementUid
+    });
+
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.success) {
+            console.log(`[Entity ${entityUid}] Attack API success: damage=${response.damage}, new_health=${response.new_health}`);
+            callback({ success: true, ...response });
+          } else if (handleAuthFailure(res, 'callAttackApi')) {
+            callback({ success: false, error: 'Session expired' });
+          } else {
+            console.error(`[Entity ${entityUid}] Attack API failed: ${response.message}`);
+            callback({ success: false, error: response.message });
+          }
+        } catch (error) {
+          if (handleAuthFailure(res, 'callAttackApi')) {
+            callback({ success: false, error: 'Session expired' });
+          } else {
+            console.error(`[Entity ${entityUid}] Error parsing attack response: ${error.message}`);
+            callback({ success: false, error: error.message });
+          }
+        }
+        done();
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(`[Entity ${entityUid}] Error calling attack API: ${error.message}`);
+      callback({ success: false, error: error.message });
+      done();
+    });
+
+    req.setTimeout(API_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`timeout after ${API_REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
 // ========== WebSocket Server ==========
 const wss = new WebSocket.Server({ port: wsPort, host: '0.0.0.0' });
 
@@ -759,16 +1136,17 @@ function handleWebSocketCommand(data, ws) {
 
     case 'attack': {
       const attackEntityUid = (moveParams && moveParams.entity_uid) ? String(moveParams.entity_uid) : entityUid;
-      const attackElementId = (moveParams && moveParams.element_id !== undefined && moveParams.element_id !== null)
-        ? moveParams.element_id
-        : null;
-      console.log(`[Entity ${entityUid}] Attack requested (entity_uid: ${attackEntityUid}, element_id: ${attackElementId})`);
-      ws.send(JSON.stringify({
-        success: true,
-        command: 'attack',
-        entity_uid: attackEntityUid,
-        element_id: attackElementId,
-      }));
+      const attackElementUid = (moveParams && moveParams.element_uid) ? String(moveParams.element_uid) : null;
+      console.log(`[Entity ${entityUid}] Attack requested (entity_uid: ${attackEntityUid}, element_uid: ${attackElementUid})`);
+      performAttack(attackEntityUid, attackElementUid, (result) => {
+        ws.send(JSON.stringify({
+          success: result.success,
+          command: 'attack',
+          entity_uid: attackEntityUid,
+          element_uid: attackElementUid,
+          message: result.message || result.error || '',
+        }));
+      });
       break;
     }
 

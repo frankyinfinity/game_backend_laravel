@@ -1336,15 +1336,44 @@ class GameController extends Controller
      */
     public function getPosition(Request $request): \Illuminate\Http\JsonResponse
     {
-        $entityUid = $request->query('entity_uid');
+        $entityUid = $request->input('entity_uid');
+        $elementUid = $request->input('element_uid');
 
-        if (!$entityUid) {
+        Log::info("getPosition: richiesta ricevuta", [
+            'entity_uid' => $entityUid,
+            'element_uid' => $elementUid
+        ]);
+
+        if (!$entityUid && !$elementUid) {
             return response()->json([
                 'success' => false,
-                'message' => 'entity_uid is required',
+                'message' => 'entity_uid or element_uid is required',
             ], 400);
         }
 
+        // Se è richiesto element_uid, restituisci la posizione dell'elemento
+        if ($elementUid) {
+            $elementPosition = ElementHasPosition::query()
+                ->where('uid', $elementUid)
+                ->where('state', ElementHasPosition::STATE_LIFE)
+                ->first();
+
+            if (!$elementPosition) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Element not found or dead',
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'element_uid' => $elementUid,
+                'tile_i' => (int) $elementPosition->tile_i,
+                'tile_j' => (int) $elementPosition->tile_j,
+            ]);
+        }
+
+        // Altrimenti restituisci la posizione dell'entity (comportamento originale)
         $entity = Entity::query()->where('uid', $entityUid)->first();
 
         if (!$entity) {
@@ -1946,476 +1975,6 @@ class GameController extends Controller
         return response()->json($result['body'], $result['status']);
     }
 
-    public function attack(Request $request)
-    {
-        ini_set('memory_limit', '-1');
-        $entityUid = $request->entity_uid;
-        $elementUid = $request->element_uid;
-
-        Log::info("Starting attack process for Entity: {$entityUid} on Element: {$elementUid}");
-
-        $entity = Entity::query()->where('uid', $entityUid)->with(['specie'])->first();
-        if (!$entity)
-            return response()->json(['success' => false, 'message' => 'Entity not found']);
-
-        $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
-        if (!$elementPosition)
-            return response()->json(['success' => false, 'message' => 'Element not found']);
-
-        $player = Player::find($entity->specie->player_id);
-        $player_id = $player->id;
-        PlayerValue::setFlag($player_id, PlayerValue::KEY_ATTACK, true);
-
-        // Store original position
-        $originalTileI = $entity->tile_i;
-        $originalTileJ = $entity->tile_j;
-
-        $currentTileI = $entity->tile_i;
-        $currentTileJ = $entity->tile_j;
-        $targetTileI = $elementPosition->tile_i;
-        $targetTileJ = $elementPosition->tile_j;
-
-        // Get Tile Info for Pathfinding
-        $birthRegion = $player->birthRegion;
-        $tiles = Helper::getBirthRegionTiles($birthRegion);
-        $targetTile = $tiles->where('i', $targetTileI)->where('j', $targetTileJ)->first();
-        if (!is_array($targetTile) || ($targetTile['tile']['type'] ?? null) !== 1) {
-            return response()->json(['success' => false, 'message' => 'Target tile not valid']);
-        }
-        $mapSolidTiles = Helper::getMapSolidTiles($tiles, $birthRegion);
-
-        $mapSolidTiles[$currentTileI][$currentTileJ] = 'A';
-        $mapSolidTiles[$targetTileI][$targetTileJ] = 'B';
-        $pathFinding = Helper::calculatePathFinding($mapSolidTiles);
-
-        if ($pathFinding === null) {
-            Log::error("Pathfinding failed - no path found");
-            return response()->json(['success' => false, 'message' => 'Path not found']);
-        }
-
-        Log::info("Pathfinding for attack found " . count($pathFinding) . " steps.");
-
-        if (count($pathFinding) <= 1 && ($currentTileI != $targetTileI || $currentTileJ != $targetTileJ)) {
-            return response()->json(['success' => false, 'message' => 'Path not found']);
-        }
-
-        $updateCommands = [];
-        $idsToClear = [];
-        $drawCommands = [];
-        ObjectCache::buffer($player->actual_session_id);
-
-        $firstPathIds = []; // Track first path IDs to clear before return
-        $secondPathIds = []; // Track second path IDs to clear at the end
-        $updateCommands = []; // Not used anymore, kept for compatibility
-
-        // === PHASE 1: DRAW FIRST PATH INDICATORS ===
-        foreach ($pathFinding as $key => $path) {
-            $pathNodeI = $path[0];
-            $pathNodeJ = $path[1];
-
-            $tileSize = Helper::TILE_SIZE;
-
-            $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
-            $originY = ($tileSize * $pathNodeI) + Helper::MAP_START_Y;
-
-            $startSquare = new Square();
-            $startSquare->setOrigin($originX, $originY);
-            $startSquare->setSize($tileSize);
-            $startCenterSquare = $startSquare->getCenter();
-            $xStart = $startCenterSquare['x'];
-            $yStart = $startCenterSquare['y'];
-
-            // Draw circle
-            $circleName = 'circle_' . Str::random(20);
-            $firstPathIds[] = $circleName;
-
-            $circle = new Circle($circleName);
-            $circle->setOrigin($xStart, $yStart);
-            $circle->setRadius($tileSize / 6);
-            $circle->setColor('#FF0000'); // Red path for attack
-
-            $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
-
-            if ((sizeof($pathFinding) - 1) !== $key) {
-                $nextPathNodeI = $pathFinding[$key + 1][0];
-                $nextPathNodeJ = $pathFinding[$key + 1][1];
-
-                $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
-
-                $endSquare = new Square();
-                $endSquare->setSize($tileSize);
-                $endSquare->setOrigin($originX, $originY);
-                $endCenterSquare = $endSquare->getCenter();
-                $xEnd = $endCenterSquare['x'];
-                $yEnd = $endCenterSquare['y'];
-
-                // Draw path line
-                $multilineName = 'multiline_' . Str::random(20);
-                $firstPathIds[] = $multilineName;
-
-                $linePath = new MultiLine($multilineName);
-                $linePath->setPoint($xStart, $yStart);
-                $linePath->setPoint($xEnd, $yEnd);
-                $linePath->setColor('#FF0000'); // Red path for attack
-                $linePath->setThickness(2);
-
-                $drawCommands[] = $this->drawMapGroupObject($linePath, $player->actual_session_id);
-            }
-        }
-
-        // === PHASE 2: MAKE MOVEMENTS FOR FIRST PATH ===
-        foreach ($pathFinding as $key => $path) {
-            $pathNodeI = $path[0];
-            $pathNodeJ = $path[1];
-
-            $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
-
-            $tileSize = Helper::TILE_SIZE;
-
-            if ((sizeof($pathFinding) - 1) !== $key) {
-                $nextPathNodeI = $pathFinding[$key + 1][0];
-                $nextPathNodeJ = $pathFinding[$key + 1][1];
-
-                $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
-
-                $endSquare = new Square();
-                $endSquare->setSize($tileSize);
-                $endSquare->setOrigin($originX, $originY);
-                $endCenterSquare = $endSquare->getCenter();
-                $xEnd = $endCenterSquare['x'];
-                $yEnd = $endCenterSquare['y'];
-
-                // Update Entity
-                $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
-                $updateObject->setAttributes('x', $xEnd);
-                $updateObject->setAttributes('y', $yEnd);
-                $updateObject->setAttributes('zIndex', 100);
-                foreach ($updateObject->get() as $data)
-                    $drawCommands[] = $data;
-                $drawCommands = array_merge(
-                    $drawCommands,
-                    $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
-                );
-
-            }
-        }
-
-        // === PHASE 3: CLEAR FIRST PATH ===
-        foreach ($firstPathIds as $idToClear) {
-            $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
-            $drawCommands[] = $clearObject->get();
-            ObjectCache::forget($player->actual_session_id, $idToClear);
-        }
-
-        // === APPLY DAMAGE TO ELEMENT ===
-
-        $updateItems = [];
-
-        // Get entity attack from gene
-        $attackGenome = Genome::query()
-            ->where('entity_id', $entity->id)
-            ->whereHas('gene', function ($q) {
-                $q->where('key', Gene::KEY_ATTACK);
-            })
-            ->with(['gene'])
-            ->first();
-
-        $damage = 0;
-        if ($attackGenome) {
-            $attackInfo = EntityInformation::query()->where('genome_id', $attackGenome->id)->first();
-            if ($attackInfo) {
-                $damage = (int) $attackInfo->value;
-            }
-        }
-
-        Log::info("Entity {$entityUid} attack damage: {$damage}");
-
-        // Get element health
-        $elementLifeInfo = ElementHasPositionInformation::query()
-            ->where('element_has_position_id', $elementPosition->id)
-            ->whereHas('gene', function ($q) {
-                $q->where('key', Gene::KEY_LIFEPOINT);
-            })
-            ->with(['gene', 'elementHasPosition'])
-            ->first();
-
-        Log::info("Element {$elementUid} lifepoint info: " . ($elementLifeInfo ? "found, value={$elementLifeInfo->value}" : "NOT FOUND"));
-
-        $elementDied = false;
-        if ($elementLifeInfo && $damage > 0) {
-            $newHealth = $elementLifeInfo->value - $damage;
-
-            $updateItems[] = [
-                'id' => $elementLifeInfo->id,
-                'type' => 'element',
-                'attributes' => [
-                    'value' => $newHealth,
-                ]
-            ];
-
-            Log::info("Element {$elementUid} health: {$elementLifeInfo->value} -> {$newHealth}");
-
-            if ($newHealth <= 0) {
-                $elementDied = true;
-                Log::info("Element {$elementUid} died!");
-
-                // Clear all gene progress bars for this element (fallback only).
-                $fallbackElementUids = [
-                    $elementUid,
-                    $elementUid . '_panel',
-                    $elementUid . '_text_name',
-                    $elementUid . '_btn_attack',
-                    $elementUid . '_btn_attack_rect',
-                    $elementUid . '_btn_attack_text',
-                    $elementUid . '_btn_consume',
-                    $elementUid . '_btn_consume_rect',
-                    $elementUid . '_btn_consume_text',
-                ];
-
-                $elementHasPositionInformations = ElementHasPositionInformation::query()
-                    ->where('element_has_position_id', $elementPosition->id)
-                    ->with(['gene'])
-                    ->get();
-
-                foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
-                    $gene = $elementHasPositionInformation->gene;
-                    $progressBarUid = 'gene_progress_' . $gene->key . '_element_' . $elementUid;
-
-                    // Clear all progress bar components
-                    $fallbackElementUids[] = $progressBarUid . '_border';
-                    $fallbackElementUids[] = $progressBarUid . '_bar';
-                    $fallbackElementUids[] = $progressBarUid . '_text';
-                    $fallbackElementUids[] = $progressBarUid . '_range';
-                }
-
-                $idsToClear = array_merge($idsToClear, $this->resolveDrawUidsForObject(
-                    $player->actual_session_id,
-                    $elementUid,
-                    $fallbackElementUids
-                ));
-
-                // Delete from DB
-                // === AWARD SCORES FOR KILLING ELEMENT (from ElementHasPositionScore) ===
-                $elementHasPositionScores = ElementHasPositionScore::query()
-                    ->where('element_has_position_id', $elementPosition->id)
-                    ->with(['score'])
-                    ->get();
-
-                // Set state to death after getting scores
-                $elementPosition->update(['state' => ElementHasPosition::STATE_DEATH]);
-
-                foreach ($elementHasPositionScores as $elementHasPositionScore) {
-                    $score = $elementHasPositionScore->score;
-                    $amount = $elementHasPositionScore->amount;
-
-                    // Find or create player's score record
-                    $playerHasScore = PlayerHasScore::query()
-                        ->where('player_id', $player->id)
-                        ->where('score_id', $score->id)
-                        ->first();
-
-                    if ($playerHasScore) {
-                        $playerHasScore->increment('value', $amount);
-                        $newValue = $playerHasScore->value;
-                    } else {
-                        $playerHasScore = PlayerHasScore::create([
-                            'player_id' => $player->id,
-                            'score_id' => $score->id,
-                            'value' => $amount
-                        ]);
-                        $newValue = $amount;
-                    }
-
-                    Log::info("Awarded {$amount} {$score->name} to player {$player->id} for killing element at position");
-
-                    // Update score text in UI
-                    $scoreTextUid = 'player_' . $player->id . '_score_' . $score->id . '_text';
-                    $objectUpdate = new ObjectUpdate($scoreTextUid, $player->actual_session_id);
-                    $objectUpdate->setAttribute('text', (string) $newValue);
-                    $drawCommands = array_merge($drawCommands, $objectUpdate->get());
-
-                }
-            }
-        } else {
-            Log::info("Damage NOT applied - elementLifeInfo: " . ($elementLifeInfo ? 'yes' : 'no') . ", damage: {$damage}");
-        }
-
-        // === UPDATE ELEMENT INFORMATION VIA API ===
-        if (!empty($updateItems)) {
-            $updateElementCode = $this->buildUpdateElementCode($updateItems);
-            if (!empty($updateElementCode)) {
-                $drawCommands[] = (new ObjectCode($updateElementCode, 100))->get();
-            }
-        }
-
-        // === CLEAR ELEMENT FROM UI AND DB BEFORE SECOND PATH ===
-        if ($elementDied) {
-            foreach ($idsToClear as $idToClear) {
-                $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
-                $drawCommands[] = $clearObject->get();
-                ObjectCache::forget($player->actual_session_id, $idToClear);
-            }
-            // Clear the idsToClear array since we've already processed them
-            $idsToClear = [];
-        }
-
-        // === RETURN TO ORIGINAL POSITION ===
-        if ($originalTileI != $targetTileI || $originalTileJ != $targetTileJ) {
-            // Calculate path back
-            $mapSolidTiles[$targetTileI][$targetTileJ] = 'A';
-            $mapSolidTiles[$originalTileI][$originalTileJ] = 'B';
-            $pathBack = Helper::calculatePathFinding($mapSolidTiles);
-
-            // === PHASE 4: DRAW SECOND PATH INDICATORS ===
-            foreach ($pathBack as $key => $path) {
-                $pathNodeI = $path[0];
-                $pathNodeJ = $path[1];
-
-                $tileSize = Helper::TILE_SIZE;
-
-                $originX = ($tileSize * $pathNodeJ) + Helper::MAP_START_X;
-                $originY = ($tileSize * $pathNodeI) + Helper::MAP_START_Y;
-
-                $startSquare = new Square();
-                $startSquare->setOrigin($originX, $originY);
-                $startSquare->setSize($tileSize);
-                $startCenterSquare = $startSquare->getCenter();
-                $xStart = $startCenterSquare['x'];
-                $yStart = $startCenterSquare['y'];
-
-                // Draw circle for return path (same style as first path)
-                $circleName = 'circle_' . Str::random(20);
-                $secondPathIds[] = $circleName;
-
-                $circle = new Circle($circleName);
-                $circle->setOrigin($xStart, $yStart);
-                $circle->setRadius($tileSize / 6);
-                $circle->setColor('#FF0000'); // Red path for return (same as attack)
-
-                $drawCommands[] = $this->drawMapGroupObject($circle, $player->actual_session_id);
-
-                if ((sizeof($pathBack) - 1) !== $key) {
-                    $nextPathNodeI = $pathBack[$key + 1][0];
-                    $nextPathNodeJ = $pathBack[$key + 1][1];
-
-                    $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
-                    $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
-
-                    $endSquare = new Square();
-                    $endSquare->setSize($tileSize);
-                    $endSquare->setOrigin($originX, $originY);
-                    $endCenterSquare = $endSquare->getCenter();
-                    $xEnd = $endCenterSquare['x'];
-                    $yEnd = $endCenterSquare['y'];
-
-                    // Draw path line
-                    $multilineName = 'multiline_' . Str::random(20);
-                    $secondPathIds[] = $multilineName;
-
-                    $linePath = new MultiLine($multilineName);
-                    $linePath->setPoint($xStart, $yStart);
-                    $linePath->setPoint($xEnd, $yEnd);
-                    $linePath->setColor('#FF0000'); // Red path for return (same as attack)
-                    $linePath->setThickness(2);
-
-                    $drawCommands[] = $this->drawMapGroupObject($linePath, $player->actual_session_id);
-                }
-            }
-
-            // === PHASE 5: MAKE MOVEMENTS FOR SECOND PATH ===
-            foreach ($pathBack as $key => $path) {
-                $pathNodeI = $path[0];
-                $pathNodeJ = $path[1];
-
-                $entity->update(['tile_i' => $pathNodeI, 'tile_j' => $pathNodeJ]);
-
-                $tileSize = Helper::TILE_SIZE;
-
-                if ((sizeof($pathBack) - 1) !== $key) {
-                    $nextPathNodeI = $pathBack[$key + 1][0];
-                    $nextPathNodeJ = $pathBack[$key + 1][1];
-
-                    $originX = ($tileSize * $nextPathNodeJ) + Helper::MAP_START_X;
-                    $originY = ($tileSize * $nextPathNodeI) + Helper::MAP_START_Y;
-
-                    $endSquare = new Square();
-                    $endSquare->setSize($tileSize);
-                    $endSquare->setOrigin($originX, $originY);
-                    $endCenterSquare = $endSquare->getCenter();
-                    $xEnd = $endCenterSquare['x'];
-                    $yEnd = $endCenterSquare['y'];
-
-                    // Update Entity
-                    $updateObject = new ObjectUpdate($entityUid, $player->actual_session_id, 250);
-                    $updateObject->setAttributes('x', $xEnd);
-                    $updateObject->setAttributes('y', $yEnd);
-                    $updateObject->setAttributes('zIndex', 100);
-                    foreach ($updateObject->get() as $data)
-                        $drawCommands[] = $data;
-                    $drawCommands = array_merge(
-                        $drawCommands,
-                        $this->buildEntityCoordinatesTextUpdate($entityUid, $player->actual_session_id, (int) $nextPathNodeI, (int) $nextPathNodeJ, 250)
-                    );
-
-                }
-            }
-
-            // === PHASE 6: CLEAR SECOND PATH ===
-            foreach ($secondPathIds as $idToClear) {
-                $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
-                $drawCommands[] = $clearObject->get();
-                ObjectCache::forget($player->actual_session_id, $idToClear);
-            }
-        }
-
-        // Clear element-related IDs (if element died)
-        foreach ($idsToClear as $idToClear) {
-            $clearObject = new ObjectClear($idToClear, $player->actual_session_id);
-            $drawCommands[] = $clearObject->get();
-            ObjectCache::forget($player->actual_session_id, $idToClear);
-        }
-        $drawCommands[] = (new ObjectCode($this->buildPlayerValuesResetCode($player_id, PlayerValue::KEY_ATTACK), 1000))->get();
-
-        ObjectCache::flush($player->actual_session_id);
-
-        $request_id = Str::random(20);
-        DrawRequest::query()->create([
-            'session_id' => $player->actual_session_id,
-            'request_id' => $request_id,
-            'player_id' => $player_id,
-            'items' => json_encode($drawCommands),
-        ]);
-
-        Log::info("Attack process COMPLETED for Entity: {$entityUid} on Element: {$elementUid}. Element died: " . ($elementDied ? 'YES' : 'NO'));
-
-        try {
-            $entityContainer = Container::query()
-                ->where('parent_type', Container::PARENT_TYPE_ENTITY)
-                ->where('parent_id', $entity->id)
-                ->first();
-
-            if ($entityContainer) {
-                $payload = [
-                    'event' => 'attack',
-                    'entity_uid' => $entityUid,
-                    'element_uid' => $elementUid,
-                    'damage' => $damage,
-                    'element_died' => $elementDied
-                ];
-                app(DockerContainerService::class)->sendMessageToContainer($entityContainer, $payload);
-            }
-        } catch (\Throwable $e) {
-            \Log::error("Errore notifica WS attack entity {$entityUid}: " . $e->getMessage());
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => $elementDied ? 'Attacco completato - nemico sconfitto!' : 'Attacco completato!',
-            'element_died' => $elementDied
-        ]);
-    }
 
     /**
      * Riceve la richiesta di divisione dal container entity (comando WS
@@ -2589,6 +2148,186 @@ class GameController extends Controller
         return $candidates[0];
     }
 
+
+    /**
+     * API per attaccare un elemento: toglie punti vita e lo elimina se arriva a zero
+     * Chiamata dal container entity durante l'attacco
+     */
+    public function attackElement(Request $request)
+    {
+        $entityUid = (string) $request->input('entity_uid');
+        $elementUid = (string) $request->input('element_uid');
+
+        Log::info("attackElement: richiesta ricevuta", [
+            'entity_uid' => $entityUid,
+            'element_uid' => $elementUid
+        ]);
+
+        $entity = Entity::query()
+            ->where('uid', $entityUid)
+            ->where('state', Entity::STATE_LIFE)
+            ->first();
+
+        if (!$entity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Entity non trovata o non in vita',
+            ], 404);
+        }
+
+        $player = Player::query()->find($entity->specie->player_id ?? null);
+        if (!$player) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Player non trovato',
+            ], 404);
+        }
+
+        // Trova l'elemento target
+        $elementPosition = ElementHasPosition::query()
+            ->where('uid', $elementUid)
+            ->where('state', ElementHasPosition::STATE_LIFE)
+            ->first();
+
+        if (!$elementPosition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Elemento non trovato o già morto',
+            ], 404);
+        }
+
+        // Calcola il danno dell'entity (dal gene attack)
+        $attackGenome = Genome::query()
+            ->where('entity_id', $entity->id)
+            ->whereHas('gene', fn ($q) => $q->where('key', Gene::KEY_ATTACK))
+            ->first();
+
+        $damage = 0;
+        if ($attackGenome) {
+            $attackInfo = EntityInformation::query()
+                ->where('genome_id', $attackGenome->id)
+                ->first();
+            $damage = $attackInfo ? (int) $attackInfo->value : 0;
+        }
+
+        Log::info("Entity {$entityUid} attack damage: {$damage}");
+
+        // Get element health
+        $elementLifeInfo = ElementHasPositionInformation::query()
+            ->where('element_has_position_id', $elementPosition->id)
+            ->whereHas('gene', function ($q) {
+                $q->where('key', Gene::KEY_LIFEPOINT);
+            })
+            ->with(['gene', 'elementHasPosition'])
+            ->first();
+
+        if (!$elementLifeInfo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Elemento non ha punti vita',
+            ], 422);
+        }
+
+        $newHealth = max(0, $elementLifeInfo->value - $damage);
+        $elementLifeInfo->update(['value' => $newHealth]);
+
+        Log::info("Element {$elementPosition->uid} health: {$elementLifeInfo->value} -> {$newHealth}");
+
+        $elementDied = false;
+        $items = [];
+
+        if ($newHealth <= 0) {
+            $elementDied = true;
+            Log::info("Element {$elementPosition->uid} died!");
+
+            // Set state to death
+            $elementPosition->update(['state' => ElementHasPosition::STATE_DEATH]);
+
+            // Award scores
+            $elementHasPositionScores = ElementHasPositionScore::query()
+                ->where('element_has_position_id', $elementPosition->id)
+                ->with(['score'])
+                ->get();
+
+            foreach ($elementHasPositionScores as $elementHasPositionScore) {
+                $score = $elementHasPositionScore->score;
+                $amount = $elementHasPositionScore->amount;
+
+                $playerHasScore = PlayerHasScore::query()
+                    ->where('player_id', $player->id)
+                    ->where('score_id', $score->id)
+                    ->first();
+
+                if ($playerHasScore) {
+                    $playerHasScore->increment('value', $amount);
+                } else {
+                    PlayerHasScore::create([
+                        'player_id' => $player->id,
+                        'score_id' => $score->id,
+                        'value' => $amount
+                    ]);
+                }
+            }
+
+            // Stop container if exists
+            try {
+                app(DockerContainerService::class)->stopElementHasPositionContainers([$elementPosition->id]);
+            } catch (\Throwable $e) {
+                Log::error("Error stopping element container: " . $e->getMessage());
+            }
+
+            // Add items to clear element from interface
+            $sessionId = $player->actual_session_id;
+            $fallbackElementUids = [
+                $elementPosition->uid,
+                $elementPosition->uid . '_panel',
+                $elementPosition->uid . '_text_name',
+                $elementPosition->uid . '_btn_attack',
+                $elementPosition->uid . '_btn_attack_rect',
+                $elementPosition->uid . '_btn_attack_text',
+                $elementPosition->uid . '_btn_consume',
+                $elementPosition->uid . '_btn_consume_rect',
+                $elementPosition->uid . '_btn_consume_text',
+            ];
+
+            // Clear all gene progress bars for this element
+            $elementHasPositionInformations = ElementHasPositionInformation::query()
+                ->where('element_has_position_id', $elementPosition->id)
+                ->with(['gene'])
+                ->get();
+
+            foreach ($elementHasPositionInformations as $elementHasPositionInformation) {
+                $gene = $elementHasPositionInformation->gene;
+                $progressBarUid = 'gene_progress_' . $gene->key . '_element_' . $elementPosition->uid;
+
+                $fallbackElementUids[] = $progressBarUid . '_border';
+                $fallbackElementUids[] = $progressBarUid . '_bar';
+                $fallbackElementUids[] = $progressBarUid . '_text';
+                $fallbackElementUids[] = $progressBarUid . '_range';
+            }
+
+            $idsToClear = $this->resolveDrawUidsForObject(
+                $sessionId,
+                $elementPosition->uid,
+                $fallbackElementUids
+            );
+
+            foreach ($idsToClear as $uid) {
+                $items[] = (new ObjectClear($uid, $sessionId))->get();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'damage' => $damage,
+            'new_health' => $newHealth,
+            'element_died' => $elementDied,
+            'element_uid' => $elementPosition->uid,
+            'element_tile_i' => $elementPosition->tile_i,
+            'element_tile_j' => $elementPosition->tile_j,
+            'items' => $items,
+        ]);
+    }
 
     private function dispatchNewEntitySpawnDraw(Request $request, Player $player, Entity $newEntity): void
     {
@@ -3053,11 +2792,11 @@ class GameController extends Controller
         }
 
         try {
-            $newContainers = $containerService->recreateAllPlayerContainers($player, true);
+            $newContainers = $containerService->recreateAllPlayerContainers($player, false);
             
             return response()->json([
                 'success' => true, 
-                'message' => 'Container ricreati con successo',
+                'message' => 'Container ricreati con successo (non avviati)',
                 'count' => count($newContainers)
             ]);
         } catch (\Throwable $e) {

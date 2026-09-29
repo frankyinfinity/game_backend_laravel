@@ -64,7 +64,7 @@
                 command: 'attack',
                 params: {
                     entity_uid: entity_uid,
-                    element_id: element_id
+                    element_uid: element_uid
                 }
             }));
         };
