@@ -5,6 +5,16 @@ const WebSocket = require('ws');
 const Pusher = require('pusher');
 const fs = require('fs');
 
+// Global error handler to prevent container crash
+process.on('uncaughtException', (error) => {
+  console.error(`[Entity ${entityUid || 'unknown'}] UNCAUGHT EXCEPTION: ${error.message}`);
+  console.error(error.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error(`[Entity ${entityUid || 'unknown'}] UNHANDLED REJECTION: ${reason}`);
+});
+
 // Leggi i parametri dalle variabili d'ambiente
 const entityUid = process.env.ENTITY_UID;
 const entityTileI = process.env.ENTITY_TILE_I;
@@ -379,6 +389,71 @@ function fetchCurrentPosition() {
   });
 }
 
+function fetchCurrentPositionFromApi(callback) {
+  console.log(`[Entity ${entityUid}] fetchCurrentPositionFromApi called`);
+  enqueueApiCall((done) => {
+    const path = '/api/auth/game/entity/get_position';
+    const postData = JSON.stringify({ entity_uid: entityUid });
+
+    console.log(`[Entity ${entityUid}] Fetching position from ${path} with data: ${postData}`);
+
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Accept': 'application/json',
+        'Cookie': sessionCookie,
+        'X-XSRF-TOKEN': xsrfToken
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        console.log(`[Entity ${entityUid}] Position API response status: ${res.statusCode}`);
+        let response = null;
+        let success = false;
+        try {
+          response = JSON.parse(data);
+          if (response && response.success) {
+            currentTileI = response.tile_i;
+            currentTileJ = response.tile_j;
+            success = true;
+            console.log(`[Entity ${entityUid}] Position fetched: (${currentTileI}, ${currentTileJ})`);
+          } else {
+            console.error(`[Entity ${entityUid}] Position API failed: ${response ? response.message : 'Unknown error'}`);
+          }
+        } catch (error) {
+          if (handleAuthFailure(res, 'fetchCurrentPositionFromApi')) {
+            // Sessione scaduta → il re-login è stato avviato
+          } else {
+            console.error(`[Entity ${entityUid}] Error parsing response: ${error.message}. Status: ${res.statusCode}`);
+          }
+        }
+        callback({ success: success, tile_i: currentTileI, tile_j: currentTileJ });
+        done();
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(`[Entity ${entityUid}] Error fetching position: ${error.message}`);
+      callback({ success: false, error: error.message });
+      done();
+    });
+
+    req.setTimeout(API_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`timeout after ${API_REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
 
 function fetchCurrentGenes() {
   if (!sessionCookie) return;
@@ -656,12 +731,17 @@ function scheduleNextCycle() {
 // Costruisce l'array items e lo invia tramite pusher
 // Flusso: 1) movement verso tile accanto al target, 2) objectcode con API call, 3) movement ritorno
 function performAttack(entityUid, elementUid, callback) {
+  console.log(`[Entity ${entityUid}] performAttack called with elementUid: ${elementUid}, sessionCookie: ${!!sessionCookie}`);
+  
   if (!sessionCookie) {
+    console.log(`[Entity ${entityUid}] No session cookie, ensuring session...`);
     ensureSession((ok) => {
       if (!ok || !sessionCookie) {
+        console.error(`[Entity ${entityUid}] Session ensure failed`);
         if (callback) callback({ success: false, error: 'No session cookie' });
         return;
       }
+      console.log(`[Entity ${entityUid}] Session ensured, retrying performAttack`);
       performAttack(entityUid, elementUid, callback);
     }, 10000);
     return;
@@ -676,14 +756,19 @@ function performAttack(entityUid, elementUid, callback) {
   };
 
   const startPos = getCurrentPos();
+  console.log(`[Entity ${entityUid}] Current position: ${startPos ? `(${startPos.i}, ${startPos.j})` : 'null'}, isPositionInitialized: ${isPositionInitialized}`);
+  
   if (!startPos) {
+    console.log(`[Entity ${entityUid}] Fetching current position from API...`);
     fetchCurrentPositionFromApi((result) => {
       if (result.success) {
         localCurrentTileI = result.tile_i;
         localCurrentTileJ = result.tile_j;
         isPositionInitialized = true;
+        console.log(`[Entity ${entityUid}] Position fetched: (${result.tile_i}, ${result.tile_j})`);
         buildAttackItems(result.tile_i, result.tile_j, elementUid, callback);
       } else {
+        console.error(`[Entity ${entityUid}] Failed to get current position: ${result.error}`);
         callback({ success: false, error: 'Failed to get current position' });
       }
     });
@@ -694,99 +779,102 @@ function performAttack(entityUid, elementUid, callback) {
 }
 
 function buildAttackItems(startI, startJ, elementUid, callback) {
-  console.log(`[Entity ${entityUid}] Building attack items from (${startI}, ${startJ}) to element ${elementUid}`);
+  console.log(`[Entity ${entityUid}] buildAttackItems called from (${startI}, ${startJ}) to element ${elementUid}`);
 
-  // Chiama l'API getPosition per ottenere la posizione dell'elemento
-  fetchElementPositionFromApi(elementUid, (positionResult) => {
-    if (!positionResult.success) {
-      callback({ success: false, error: 'Failed to get element position' });
-      return;
-    }
-
-    const elementTileI = positionResult.tile_i;
-    const elementTileJ = positionResult.tile_j;
-
-    console.log(`[Entity ${entityUid}] Element position: (${elementTileI}, ${elementTileJ})`);
-
-    // Ottieni walkable e tile coordinates
-    getWalkableFromMap((walkableResult) => {
-      if (!walkableResult.success) {
-        callback({ success: false, error: 'Failed to get walkable array' });
+  try {
+    // Chiama l'API getPosition per ottenere la posizione dell'elemento
+    fetchElementPositionFromApi(elementUid, (positionResult) => {
+      if (!positionResult.success) {
+        console.error(`[Entity ${entityUid}] fetchElementPositionFromApi failed: ${positionResult.error}`);
+        callback({ success: false, error: 'Failed to get element position' });
         return;
       }
 
-      getTileCoordinatesFromMap((coordinatesResult) => {
-        let tileCoordinates = null;
-        if (coordinatesResult.success) {
-          tileCoordinates = coordinatesResult.tile_coordinates;
+      const elementTileI = positionResult.tile_i;
+      const elementTileJ = positionResult.tile_j;
+
+      console.log(`[Entity ${entityUid}] Element position: (${elementTileI}, ${elementTileJ})`);
+
+      // Ottieni walkable e tile coordinates
+      getWalkableFromMap((walkableResult) => {
+        if (!walkableResult.success) {
+          console.error(`[Entity ${entityUid}] getWalkableFromMap failed: ${walkableResult.error}`);
+          callback({ success: false, error: 'Failed to get walkable array' });
+          return;
         }
 
-        // Trova un tile adiacente all'elemento che è walkable
-        const directions = [
-          { di: -1, dj: 0 },
-          { di: 1, dj: 0 },
-          { di: 0, dj: -1 },
-          { di: 0, dj: 1 },
-        ];
-
-        let targetI = startI;
-        let targetJ = startJ;
-
-        for (const dir of directions) {
-          const newI = elementTileI + dir.di;
-          const newJ = elementTileJ + dir.dj;
-          
-          if (newI >= 0 && newI < walkableResult.dimensions.rows &&
-              newJ >= 0 && newJ < walkableResult.dimensions.cols &&
-              walkableResult.tile_walkable[newI][newJ]) {
-            targetI = newI;
-            targetJ = newJ;
-            break;
+        getTileCoordinatesFromMap((coordinatesResult) => {
+          let tileCoordinates = null;
+          if (coordinatesResult.success) {
+            tileCoordinates = coordinatesResult.tile_coordinates;
           }
-        }
 
-        if (targetI === startI && targetJ === startJ) {
-          callback({ success: false, error: 'No adjacent walkable tile found near element' });
-          return;
-        }
+          // Trova un tile adiacente all'elemento che è walkable
+          const directions = [
+            { di: -1, dj: 0 },
+            { di: 1, dj: 0 },
+            { di: 0, dj: -1 },
+            { di: 0, dj: 1 },
+          ];
 
-        console.log(`[Entity ${entityUid}] Attack target tile: (${targetI}, ${targetJ})`);
+          let targetI = startI;
+          let targetJ = startJ;
 
-        // Calcola il path verso il tile adiacente all'elemento
-        const pathResult = findPathBFS(walkableResult.tile_walkable, startI, startJ, targetI, targetJ);
-        
-        if (!pathResult.success) {
-          callback({ success: false, error: 'No path to target tile' });
-          return;
-        }
+          for (const dir of directions) {
+            const newI = elementTileI + dir.di;
+            const newJ = elementTileJ + dir.dj;
+            
+            if (newI >= 0 && newI < walkableResult.dimensions.rows &&
+                newJ >= 0 && newJ < walkableResult.dimensions.cols &&
+                walkableResult.tile_walkable[newI][newJ]) {
+              targetI = newI;
+              targetJ = newJ;
+              break;
+            }
+          }
 
-        // Calcola il path di ritorno
-        const returnPathResult = findPathBFS(walkableResult.tile_walkable, targetI, targetJ, startI, startJ);
-        
-        if (!returnPathResult.success) {
-          callback({ success: false, error: 'No return path' });
-          return;
-        }
+          if (targetI === startI && targetJ === startJ) {
+            callback({ success: false, error: 'No adjacent walkable tile found near element' });
+            return;
+          }
 
-        // Chiama l'API attack per ottenere la risposta con gli items di cancellazione
-        callAttackApi(entityUid, elementUid, (attackResult) => {
-          const items = [];
-          const requestId = 'attack_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+          console.log(`[Entity ${entityUid}] Attack target tile: (${targetI}, ${targetJ})`);
 
-          // 1. Disegna il path verso il target
-          const pathItems = [];
-          const pathColor = '0xFF0000'; // Rosso per attack
-          const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
+          // Calcola il path verso il tile adiacente all'elemento
+          const pathResult = findPathBFS(walkableResult.tile_walkable, startI, startJ, targetI, targetJ);
+          
+          if (!pathResult.success) {
+            callback({ success: false, error: 'No path to target tile' });
+            return;
+          }
 
-          const centers = [getTileCenter(startI, startJ, tileCoordinates)];
-          pathResult.path.forEach((step) => {
-            centers.push(getTileCenter(step.i, step.j, tileCoordinates));
-          });
+          // Calcola il path di ritorno
+          const returnPathResult = findPathBFS(walkableResult.tile_walkable, targetI, targetJ, startI, startJ);
+          
+          if (!returnPathResult.success) {
+            callback({ success: false, error: 'No return path' });
+            return;
+          }
 
-          // Linea del path
-          pathItems.push({
-            type: 'draw',
-            object: {
+          // Chiama l'API attack per ottenere la risposta con gli items di cancellazione
+          callAttackApi(entityUid, elementUid, (attackResult) => {
+            const items = [];
+            const requestId = 'attack_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
+            // 1. Disegna il path verso il target
+            const pathItems = [];
+            const pathColor = '0xFF0000'; // Rosso per attack
+            const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
+
+            const centers = [getTileCenter(startI, startJ, tileCoordinates)];
+            pathResult.path.forEach((step) => {
+              centers.push(getTileCenter(step.i, step.j, tileCoordinates));
+            });
+
+            // Linea del path
+            pathItems.push({
+              type: 'draw',
+              object: {
               uid: `${requestId}_line`,
               type: 'multi_line',
               points: centers.map((center) => ({ x: center.x, y: center.y })),
@@ -898,16 +986,22 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
               console.error(`[Entity ${entityUid}] ⛔ Pusher attack items FAILED: ${err.message}`);
               callback({ success: false, error: 'Pusher failed: ' + err.message });
             });
+          });
         });
       });
     });
-  });
+  } catch (error) {
+    console.error(`[Entity ${entityUid}] buildAttackItems error: ${error.message}`);
+    callback({ success: false, error: error.message });
+  }
 }
 
 function fetchElementPositionFromApi(elementUid, callback) {
   enqueueApiCall((done) => {
     const path = '/api/auth/game/entity/get_position';
     const postData = JSON.stringify({ element_uid: elementUid });
+
+    console.log(`[Entity ${entityUid}] Fetching element position for ${elementUid} from ${path}`);
 
     const options = {
       hostname: new URL(backendUrl).hostname,
@@ -927,22 +1021,24 @@ function fetchElementPositionFromApi(elementUid, callback) {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
+        console.log(`[Entity ${entityUid}] Element position API response status: ${res.statusCode}`);
+        let response = null;
         try {
-          const response = JSON.parse(data);
-          if (response.success) {
+          response = JSON.parse(data);
+          if (response && response.success) {
             console.log(`[Entity ${entityUid}] Element position API success: (${response.tile_i}, ${response.tile_j})`);
             callback({ success: true, ...response });
           } else if (handleAuthFailure(res, 'fetchElementPositionFromApi')) {
             callback({ success: false, error: 'Session expired' });
           } else {
-            console.error(`[Entity ${entityUid}] Element position API failed: ${response.message}`);
-            callback({ success: false, error: response.message });
+            console.error(`[Entity ${entityUid}] Element position API failed: ${response ? response.message : 'Unknown error'}`);
+            callback({ success: false, error: response ? response.message : 'Unknown error' });
           }
         } catch (error) {
           if (handleAuthFailure(res, 'fetchElementPositionFromApi')) {
             callback({ success: false, error: 'Session expired' });
           } else {
-            console.error(`[Entity ${entityUid}] Error parsing element position response: ${error.message}`);
+            console.error(`[Entity ${entityUid}] Error parsing element position response: ${error.message}. Raw data: ${data}`);
             callback({ success: false, error: error.message });
           }
         }
@@ -1825,53 +1921,6 @@ function moveEntityAlongPath(path, startI, startJ, tileCoordinates, callback) {
 
   // Inizia l'aggiornamento della posizione locale
   setTimeout(updatePosition, moveInterval);
-}
-
-// Funzione per ottenere la posizione attuale dal backend (solo la prima volta)
-function fetchCurrentPositionFromApi(callback) {
-    const path = '/api/auth/game/entity/get_position';
-    const postData = JSON.stringify({ entity_uid: entityUid });
-
-    const options = {
-      hostname: new URL(backendUrl).hostname,
-      port: new URL(backendUrl).port || 80,
-      path: path,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-        'Accept': 'application/json',
-        'Cookie': sessionCookie,
-        'X-XSRF-TOKEN': xsrfToken
-      },
-    };
-
-  const req = http.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => { data += chunk; });
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        if (response.success && response.tile_i !== undefined && response.tile_j !== undefined) {
-          callback({
-            success: true,
-            tile_i: Number(response.tile_i),
-            tile_j: Number(response.tile_j)
-          });
-        } else {
-          callback({ success: false, error: 'Position not found in response' });
-        }
-      } catch (error) {
-        callback({ success: false, error: `Parse error: ${error.message}` });
-      }
-    });
-  });
-
-  req.on('error', (error) => {
-    callback({ success: false, error: error.message });
-  });
-
-  req.end();
 }
 
 // Ultima posizione (i, j) scritta con successo sul DB: evita di ripetere la

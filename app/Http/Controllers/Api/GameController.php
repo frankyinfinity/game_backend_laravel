@@ -1341,10 +1341,17 @@ class GameController extends Controller
 
         Log::info("getPosition: richiesta ricevuta", [
             'entity_uid' => $entityUid,
-            'element_uid' => $elementUid
+            'element_uid' => $elementUid,
+            'all_input' => $request->all(),
+            'content_type' => $request->header('Content-Type'),
+            'method' => $request->method(),
         ]);
 
         if (!$entityUid && !$elementUid) {
+            Log::warning("getPosition: nessun ID fornito", [
+                'entity_uid' => $entityUid,
+                'element_uid' => $elementUid,
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'entity_uid or element_uid is required',
@@ -1353,17 +1360,28 @@ class GameController extends Controller
 
         // Se è richiesto element_uid, restituisci la posizione dell'elemento
         if ($elementUid) {
+            Log::info("getPosition: cercando elemento", ['element_uid' => $elementUid]);
             $elementPosition = ElementHasPosition::query()
                 ->where('uid', $elementUid)
                 ->where('state', ElementHasPosition::STATE_LIFE)
                 ->first();
 
             if (!$elementPosition) {
+                Log::warning("getPosition: elemento non trovato o morto", [
+                    'element_uid' => $elementUid,
+                    'state' => ElementHasPosition::STATE_LIFE,
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Element not found or dead',
                 ], 404);
             }
+
+            Log::info("getPosition: posizione elemento trovata", [
+                'element_uid' => $elementUid,
+                'tile_i' => $elementPosition->tile_i,
+                'tile_j' => $elementPosition->tile_j,
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -1374,14 +1392,22 @@ class GameController extends Controller
         }
 
         // Altrimenti restituisci la posizione dell'entity (comportamento originale)
+        Log::info("getPosition: cercando entity", ['entity_uid' => $entityUid]);
         $entity = Entity::query()->where('uid', $entityUid)->first();
 
         if (!$entity) {
+            Log::warning("getPosition: entity non trovata", ['entity_uid' => $entityUid]);
             return response()->json([
                 'success' => false,
                 'message' => 'Entity not found',
             ], 404);
         }
+
+        Log::info("getPosition: posizione entity trovata", [
+            'entity_uid' => $entityUid,
+            'tile_i' => $entity->tile_i,
+            'tile_j' => $entity->tile_j,
+        ]);
 
         return response()->json([
             'success' => true,
