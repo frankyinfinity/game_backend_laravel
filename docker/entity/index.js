@@ -1276,6 +1276,15 @@ function handleWebSocketCommand(data, ws) {
       break;
     }
 
+    case 'consume': {
+      const consumeEntityUid = (moveParams && moveParams.entity_uid) ? String(moveParams.entity_uid) : entityUid;
+      const consumeElementUid = (moveParams && moveParams.element_uid) ? String(moveParams.element_uid) : null;
+      console.log(`[Entity ${entityUid}] Consume requested (entity_uid: ${consumeEntityUid}, element_uid: ${consumeElementUid})`);
+      // Per ora il comando esegue solo il console.log; la logica di consumo
+      // verra aggiunta in seguito.
+      break;
+    }
+
     case 'get_genes':
       // Ritorna i geni correnti
       ws.send(JSON.stringify({

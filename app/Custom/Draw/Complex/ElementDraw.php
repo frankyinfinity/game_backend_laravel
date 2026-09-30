@@ -401,6 +401,8 @@ class ElementDraw
 
         $jsPathConsume = resource_path('js/function/element/consume.blade.php');
         $jsContentConsume = file_get_contents($jsPathConsume);
+        $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $jsContentConsume = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentConsume);
         $jsContentConsume = Helper::setCommonJsCode($jsContentConsume, Str::random(20));
 
         $btn = new ButtonDraw($uid . '_btn_consume');
