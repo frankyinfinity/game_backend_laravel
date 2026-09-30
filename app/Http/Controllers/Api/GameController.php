@@ -3335,6 +3335,7 @@ class GameController extends Controller
         $existing = \App\Models\ElementHasPosition::query()
             ->where('player_id', $playerId)
             ->where('element_id', $elementId)
+            ->where('state', \App\Models\ElementHasPosition::STATE_LIFE)
             ->where('tile_i', $tileI)
             ->where('tile_j', $tileJ)
             ->first();

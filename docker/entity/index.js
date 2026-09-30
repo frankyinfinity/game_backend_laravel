@@ -76,7 +76,7 @@ const WALKABLE_RESPONSE_TIMEOUT_MS = parseInt(process.env.WALKABLE_RESPONSE_TIME
 const WALKABLE_RETRY_DELAY_MS = parseInt(process.env.WALKABLE_RETRY_DELAY_MS || '1000', 10);
 
 // Timeout delle chiamate API al backend: evita che una richiesta bloccata
-// fermi la coda (apiQueue) delle chiamate serializzate.
+// fermi la coda FIFO (per nome) su cui e instradata la chiamata.
 const API_REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT_MS || '60000', 10);
 
 // Geometria della mappa e scroll group (allineati a Helper::TILE_SIZE,
@@ -94,26 +94,54 @@ const PATH_Z_INDEX = parseInt(process.env.PATH_Z_INDEX || '9000', 10);
 const ENTITY_Z_INDEX = parseInt(process.env.ENTITY_Z_INDEX || '9500', 10);
 
 // Queue per serializzare le chiamate API e evitare socket hang up
-let apiQueue = [];
-let isApiCallInProgress = false;
+const apiQueues = {}; // { [queueName]: { queue: Array, inProgress: boolean } }
+const DEFAULT_QUEUE = 'default';
+const ATTACK_QUEUE = 'attack';
+const MOVEMENT_QUEUE = 'movement';
 
-function processApiQueue() {
-  if (isApiCallInProgress || apiQueue.length === 0) return;
+// ensureApiQueue crea su richiesta una coda FIFO single-flight, identificata
+// per nome. Ogni coda ha il suo proprio flag in-flight, quindi le chiamate
+// di una coda non bloccano mai quelle di un'altra: le richieste periodiche
+// di background (coda 'default') non attendono piu le chiamate di attacco
+// (coda 'attack') o la persistenza della posizione di movimento (coda
+// 'movement'). Questo rimuove il collo di bottiglia per cui attacco e
+// movimento venivano bloccati dalle chiamate periodiche.
+function ensureApiQueue(queueName) {
+  if (!apiQueues[queueName]) {
+    apiQueues[queueName] = { queue: [], inProgress: false };
+  }
+  return apiQueues[queueName];
+}
 
-  const nextCall = apiQueue.shift();
-  isApiCallInProgress = true;
+// processApiQueue scorre la coda NOMINATA: le chiamate della stessa coda
+// sono serializzate (evita socket hang up), ma le code sono indipendenti.
+function processApiQueue(queueName = DEFAULT_QUEUE) {
+  const q = apiQueues[queueName];
+  if (!q || q.inProgress || q.queue.length === 0) return;
+
+  const nextCall = q.queue.shift();
+  q.inProgress = true;
 
   const callback = nextCall.callback;
   nextCall.fn(() => {
-    isApiCallInProgress = false;
+    q.inProgress = false;
     if (callback) callback();
-    processApiQueue();
+    processApiQueue(queueName);
   });
 }
 
+// enqueueApiCallToQueue instrada una chiamata API verso una coda NOMINATA.
+function enqueueApiCallToQueue(queueName, fn, callback) {
+  const q = ensureApiQueue(queueName);
+  q.queue.push({ fn, callback });
+  processApiQueue(queueName);
+}
+
+// Stile legacy (nessun nome di coda) -> coda 'default'. Tutti i chiamatori
+// esistenti (polling periodico, login, divisione, persistenza posizione)
+// continuano a usare enqueueApiCall e vengono instradati alla coda 'default'.
 function enqueueApiCall(fn, callback) {
-  apiQueue.push({ fn, callback });
-  processApiQueue();
+  enqueueApiCallToQueue(DEFAULT_QUEUE, fn, callback);
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -630,7 +658,7 @@ function checkEntityDegradation() {
 // Invia la richiesta di divisione al backend (POST /api/auth/game/entity/division).
 // Per ora il backend si limita a tracciare la chiamata con Log::info; la risposta
 // viene inoltrata al chiamante WebSocket. La chiamata è serializzata dalla
-// apiQueue come le altre richieste al backend e attende la sessione se manca.
+// coda 'default' (come le altre richieste di background) e attende la sessione se manca.
 function triggerDivision(targetEntityUid, callback) {
   const run = () => {
     enqueueApiCall((done) => {
@@ -999,7 +1027,7 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
 }
 
 function fetchElementPositionFromApi(elementUid, callback) {
-  enqueueApiCall((done) => {
+  enqueueApiCallToQueue(ATTACK_QUEUE, (done) => {
     const path = '/api/auth/game/entity/get_position';
     const postData = JSON.stringify({ element_uid: elementUid });
 
@@ -1064,7 +1092,7 @@ function fetchElementPositionFromApi(elementUid, callback) {
 }
 
 function callAttackApi(entityUid, elementUid, callback) {
-  enqueueApiCall((done) => {
+  enqueueApiCallToQueue(ATTACK_QUEUE, (done) => {
     const path = '/api/auth/game/entity/attack_element';
     const postData = JSON.stringify({ 
       entity_uid: entityUid,
@@ -1934,7 +1962,7 @@ let lastPersistedTileJ = null;
 // (POST /api/auth/game/entity/update_position).
 // Viene chiamata una sola volta, al termine del movimento, con le variabili
 // locali i/j aggiornate sull'ultimo tile raggiunto. Le chiamate sono
-// serializzate dalla apiQueue come le altre richieste al backend.
+// instradate nella coda 'movement', indipendente dalle richieste di background.
 function updateEntityPositionOnApi(tileI, tileJ, callback) {
   const finish = (result) => {
     if (callback) callback(result);
@@ -1967,7 +1995,7 @@ function updateEntityPositionOnApi(tileI, tileJ, callback) {
     tile_j: numericJ,
   });
 
-  enqueueApiCall((done) => {
+  enqueueApiCallToQueue(MOVEMENT_QUEUE, (done) => {
     // Guardia contro doppie risoluzioni (es. timeout + errore): la coda viene
     // sbloccata e il callback chiamato una sola volta
     let settled = false;
