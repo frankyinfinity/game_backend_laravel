@@ -77,6 +77,7 @@ use Illuminate\Support\Facades\DB;
 use App\Helper\Helper;
 use function GuzzleHttp\json_encode;
 use App\Jobs\GenerateMapJob;
+use App\Jobs\StopElementHasPositionContainersJob;
 use App\Jobs\StopPlayerContainersJob;
 use App\Custom\Draw\Complex\EntityDraw;
 use App\Services\BrainScheduleService;
@@ -2295,12 +2296,8 @@ class GameController extends Controller
                 }
             }
 
-            // Stop container if exists
-            try {
-                app(DockerContainerService::class)->stopElementHasPositionContainers([$elementPosition->id]);
-            } catch (\Throwable $e) {
-                Log::error("Error stopping element container: " . $e->getMessage());
-            }
+            // Stop & remove containers asynchronously via job
+            StopElementHasPositionContainersJob::dispatch($elementPosition->id);
 
             // Add items to clear element from interface
             $sessionId = $player->actual_session_id;

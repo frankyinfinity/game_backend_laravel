@@ -111,6 +111,33 @@ class DockerContainerService
         }
     }
 
+    /**
+     * Deletes (docker rm -f) every container linked to the given ElementHasPosition
+     * IDs and removes the corresponding DB records.
+     */
+    public function deleteElementHasPositionContainers(array $elementHasPositionIds): void
+    {
+        if (empty($elementHasPositionIds)) {
+            return;
+        }
+
+        $containers = Container::query()
+            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
+            ->whereIn('parent_id', array_map('strval', $elementHasPositionIds))
+            ->get();
+
+        foreach ($containers as $containerRecord) {
+            try {
+                $this->deleteContainer($containerRecord, true);
+                // Remove the DB record after successful docker rm
+                $containerRecord->delete();
+                \Log::info("Container {$containerRecord->container_id} rimosso per ElementHasPosition {$containerRecord->parent_id}");
+            } catch (\Throwable $e) {
+                \Log::error("Errore nella rimozione del container {$containerRecord->container_id}: " . $e->getMessage());
+            }
+        }
+    }
+
     public function createEntityContainer(Entity $entity, int $playerId, bool $start = false, ?int $mapWsPort = null): Container
     {
         $imageName = 'entity:latest';
