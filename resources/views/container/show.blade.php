@@ -349,20 +349,51 @@
     .container-actions-bar {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
-        padding: 12px;
+        padding: 14px 16px;
         border-bottom: 1px solid #e5e7eb;
-        background: #ffffff;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     }
 
     .container-actions-bar .form-control,
     .container-actions-bar .custom-select {
         min-width: 160px;
+        border-radius: 8px;
+        border-color: #cbd5e1;
+        font-size: 13px;
+    }
+
+    .container-actions-bar .form-control:focus,
+    .container-actions-bar .custom-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     .container-actions-bar .btn {
         white-space: nowrap;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 8px 14px;
+        transition: all 0.15s ease;
+    }
+
+    .container-actions-bar .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .container-actions-bar .btn-group .btn {
+        border-radius: 0;
+    }
+
+    .container-actions-bar .btn-group .btn:first-child {
+        border-radius: 8px 0 0 8px;
+    }
+
+    .container-actions-bar .btn-group .btn:last-child {
+        border-radius: 0 8px 8px 0;
     }
 
     .container-issue-toggle {
@@ -659,13 +690,13 @@
                     <button type="button" class="btn btn-info" id="bulk-restart-visible">
                         <i class="fa fa-sync"></i> Restart visibili
                     </button>
+                    <button type="button" class="btn btn-primary" id="bulk-recreate-visible">
+                        <i class="fa fa-redo"></i> Ricrea i visibili
+                    </button>
                     <button type="button" class="btn btn-danger" id="bulk-delete-visible">
                         <i class="fa fa-trash"></i> Delete visibili
                     </button>
                 </div>
-                <button type="button" class="btn btn-primary btn-sm ml-2" id="bulk-recreate-all">
-                    <i class="fa fa-sync"></i> Ricrea tutti
-                </button>
                 <button type="button" class="btn btn-success btn-sm ml-2" id="btn-add-element" data-toggle="modal" data-target="#addElementModal">
                     <i class="fa fa-plus"></i> Nuovo Elemento Interattivo
                 </button>
@@ -1504,6 +1535,7 @@
             }
 
             refreshInFlight = true;
+            console.log('Loading containers from:', SNAPSHOT_URL);
             return $.ajax({
                 url: SNAPSHOT_URL,
                 type: 'GET',
@@ -1511,13 +1543,18 @@
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
                 success: function (response) {
+                    console.log('Container response:', response);
                     if (response && response.success) {
+                        console.log('Containers loaded:', response.containers?.length || 0);
                         refreshCards(response.containers || []);
                         updatePlayerVolume(response.volume || playerVolumeState);
                         setLastUpdated(response.updated_at ? ('Aggiornato: ' + response.updated_at) : 'Aggiornato');
+                    } else {
+                        console.error('Invalid response:', response);
                     }
                 },
-                error: function () {
+                error: function (xhr, status, error) {
+                    console.error('Error loading containers:', status, error, xhr.responseText);
                     if (!silent) {
                         Swal.fire({
                             title: 'Ops!',
@@ -1745,7 +1782,7 @@
             const ids = visibleContainers.map(function (item) { return item.id; });
             const confirmText = action === 'delete'
                 ? 'Eliminare tutti i container visibili?'
-                : (action === 'start' ? 'Avviare tutti i container visibili?' : action === 'stop' ? 'Fermare tutti i container visibili?' : 'Riavviare tutti i container visibili?');
+                : (action === 'start' ? 'Avviare tutti i container visibili?' : action === 'stop' ? 'Fermare tutti i container visibili?' : action === 'recreate' ? 'Ricreare tutti i container visibili?' : 'Riavviare tutti i container visibili?');
 
             Swal.fire({
                 title: 'Attenzione',
@@ -1753,7 +1790,7 @@
                 type: 'warning',
                 showCancelButton: true,
                 buttonsStyling: false,
-                confirmButtonClass: action === 'delete' ? 'btn btn-danger' : 'btn btn-primary',
+                confirmButtonClass: action === 'delete' || action === 'recreate' ? 'btn btn-danger' : 'btn btn-primary',
                 cancelButtonClass: 'btn btn-default',
                 confirmButtonText: 'Conferma',
                 cancelButtonText: 'Annulla'
@@ -1787,6 +1824,47 @@
                     return;
                 }
 
+                if (action === 'recreate') {
+                    let completed = 0;
+                    let failed = 0;
+                    
+                    visibleContainers.forEach(function (container) {
+                        const url = ACTION_URLS.recreate.replace('_id_', container.id);
+                        $.ajax({
+                            url: url,
+                            type: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            success: function (response) {
+                                completed++;
+                                if (completed + failed === ids.length) {
+                                    refreshContainers(true);
+                                    Swal.fire({
+                                        title: 'Completato',
+                                        text: 'Ricreati ' + completed + ' container su ' + ids.length + (failed > 0 ? ' (' + failed + ' falliti)' : ''),
+                                        type: completed === ids.length ? 'success' : 'warning',
+                                        confirmButtonClass: 'btn btn-info'
+                                    });
+                                }
+                            },
+                            error: function () {
+                                failed++;
+                                if (completed + failed === ids.length) {
+                                    refreshContainers(true);
+                                    Swal.fire({
+                                        title: 'Completato',
+                                        text: 'Ricreati ' + completed + ' container su ' + ids.length + (failed > 0 ? ' (' + failed + ' falliti)' : ''),
+                                        type: completed === ids.length ? 'success' : 'warning',
+                                        confirmButtonClass: 'btn btn-info'
+                                    });
+                                }
+                            }
+                        });
+                    });
+                    return;
+                }
+
                 $.ajax({
                     url: ACTION_URLS.bulk,
                     type: 'POST',
@@ -1803,66 +1881,14 @@
                         } else {
                             Swal.fire({
                                 title: 'Ops!',
-                                text: 'L’operazione bulk non è andata a buon fine.',
+                                text: "L'operazione bulk non è andata a buon fine.",
                                 type: 'danger',
                                 confirmButtonClass: 'btn btn-info'
                             });
                         }
                     },
                     error: function (xhr) {
-                        const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'L’operazione bulk non è andata a buon fine.';
-                        Swal.fire({
-                            title: 'Ops!',
-                            text: message,
-                            type: 'danger',
-                            confirmButtonClass: 'btn btn-info'
-                        });
-                    }
-                });
-            });
-        }
-
-        function bulkRecreateAll() {
-            const confirmText = 'Vuoi davvero eliminare e ricreare TUTTI i container di questo player?';
-            
-            Swal.fire({
-                title: 'Attenzione',
-                text: confirmText,
-                type: 'warning',
-                showCancelButton: true,
-                buttonsStyling: false,
-                confirmButtonClass: 'btn btn-danger',
-                cancelButtonClass: 'btn btn-default',
-                confirmButtonText: 'Conferma',
-                cancelButtonText: 'Annulla'
-            }).then(function (result) {
-                if (!result.value) {
-                    return;
-                }
-
-                $.ajax({
-                    url: '{{ route('containers.recreate-all', $player) }}',
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: {
-                        player_id: {{ $player->id }}
-                    },
-                    success: function (response) {
-                        if (response && response.success) {
-                            refreshContainers(true);
-                            Swal.fire({
-                                title: 'Successo',
-                                text: 'Tutti i container sono stati ricreati (' + (response.count || 0) + ' container).',
-                                type: 'success',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
-                        }
-                    },
-                    error: function (xhr) {
-                        const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Errore durante la ricreazione dei container.';
+                        const message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : "L'operazione bulk non è andata a buon fine.";
                         Swal.fire({
                             title: 'Ops!',
                             text: message,
@@ -2219,8 +2245,8 @@
             document.getElementById('bulk-start-visible').addEventListener('click', function () { bulkOperateVisible('start'); });
             document.getElementById('bulk-stop-visible').addEventListener('click', function () { bulkOperateVisible('stop'); });
             document.getElementById('bulk-restart-visible').addEventListener('click', function () { bulkOperateVisible('restart'); });
+            document.getElementById('bulk-recreate-visible').addEventListener('click', function () { bulkOperateVisible('recreate'); });
             document.getElementById('bulk-delete-visible').addEventListener('click', function () { bulkOperateVisible('delete'); });
-            document.getElementById('bulk-recreate-all').addEventListener('click', function () { bulkRecreateAll(); });
 
             document.getElementById('refresh-pixi').addEventListener('click', function () {
                 refreshContainers();
