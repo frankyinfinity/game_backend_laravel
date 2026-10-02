@@ -3080,6 +3080,63 @@ class GameController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Elimina dal DB l'ElementHasPosition indicato da uid (o element_has_position_uid).
+     *
+     * Utilizzata dal flusso consume del container entity DOPO che la ricompensa
+     * e' stata applicata con apply_gene_effects: l'elemento non esiste piu', quindi
+     * non va solo segnato come morto (state = DEATH) ma rimosso.
+     *
+     * Tutte le tabelle figlie (information, scores, rewards, brains, chimical
+     * elements, neuron circuits, details, body, components, brain_schedules)
+     * hanno onDelete('cascade') su element_has_position_id, quindi la delete
+     * del record porta via anche i dati collegati.
+     *
+     * Nessuna operazione Docker: la gestione dei container resta a carico del
+     * chiamante (cfr. StopElementHasPositionContainersJob usato da attackElement).
+     */
+    public function deleteElementHasPosition(Request $request): \Illuminate\Http\JsonResponse
+    {
+        ini_set('memory_limit', '-1');
+
+        $elementUid = $request->input('element_has_position_uid') ?: $request->input('element_uid');
+
+        if (!$elementUid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'element_has_position_uid is required',
+            ], 422);
+        }
+
+        $elementPosition = ElementHasPosition::query()->where('uid', $elementUid)->first();
+
+        if (!$elementPosition) {
+            Log::warning("deleteElementHasPosition: elemento non trovato", ['element_uid' => $elementUid]);
+
+            // Idempotente: l'elemento e' gia' stato eliminato.
+            return response()->json([
+                'success' => true,
+                'message' => 'Elemento gia\' eliminato',
+                'element_uid' => $elementUid,
+                'deleted' => false,
+            ]);
+        }
+
+        $elementPositionId = $elementPosition->id;
+
+        $elementPosition->delete();
+
+        Log::info("ElementHasPosition {$elementUid} (id {$elementPositionId}) eliminato dal DB");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Elemento eliminato',
+            'element_uid' => $elementUid,
+            'element_has_position_id' => $elementPositionId,
+            'deleted' => true,
+        ]);
+    }
+
     public function applyElementGeneEffects(Request $request): \Illuminate\Http\JsonResponse
     {
         ini_set('memory_limit', '-1');

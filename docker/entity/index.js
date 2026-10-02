@@ -1155,6 +1155,327 @@ function callAttackApi(entityUid, elementUid, callback) {
   });
 }
 
+// ========== CONSUME ==========
+
+// Colore del path del consume: stesso rosso usato dall'attack (0xFF0000).
+const CONSUME_PATH_COLOR = '0xFF0000';
+
+// Ritardo (ms) prima di eseguire l'objectcode che applica la ricompensa:
+// dà tempo alla cancellazione dell'elemento di essere stata processata.
+const CONSUME_REWARD_CODE_SLEEP_MS = 100;
+
+// Uid dei sotto-oggetti che il backend disegna per ogni elemento (immagine,
+// pannello, testo, pulsante X di chiusura, bottoni attack/consume). Sono gli
+// stessi uid usati come fallback in GameController::consume() e
+// GameController::attackElement(): la lista completa arriva da ObjectCache lato
+// backend, qui si replica la convenzione di naming (vedi ElementDraw:
+// addCloseButton() usa '<uid>_panel_close_button' e '<uid>_panel_close_text')
+// per cancellare l'elemento dall'interfaccia.
+function buildElementInterfaceUids(elementUid) {
+  return [
+    elementUid,
+    `${elementUid}_panel`,
+    `${elementUid}_text_name`,
+    `${elementUid}_panel_close_button`,
+    `${elementUid}_panel_close_text`,
+    `${elementUid}_btn_attack`,
+    `${elementUid}_btn_attack_rect`,
+    `${elementUid}_btn_attack_text`,
+    `${elementUid}_btn_consume`,
+    `${elementUid}_btn_consume_rect`,
+    `${elementUid}_btn_consume_text`,
+  ];
+}
+
+// Uid delle barre di progresso dei geni disegnate sopra l'elemento bersaglio.
+// Il backend le crea come 'gene_progress_<geneKey>_element_<elementUid>' con i
+// suffissi _border/_bar/_text/_range (vedi GameController::attackElement).
+// Le chiavi dei geni sono già in currentGenes (fetch aggiornato ogni 30s).
+function buildElementGeneProgressUids(elementUid) {
+  const uids = [];
+  const genes = Array.isArray(currentGenes) ? currentGenes : [];
+
+  genes.forEach((gene) => {
+    if (!gene || !gene.key) return;
+    const base = `gene_progress_${gene.key}_element_${elementUid}`;
+    uids.push(`${base}_border`, `${base}_bar`, `${base}_text`, `${base}_range`);
+  });
+
+  return uids;
+}
+
+// Codice eseguito nel frontend (item 'code'): applica all'entity di partenza la
+// ricompensa indicata sull'elemento bersaglio e POI elimina l'element_has_position
+// dal DB.
+//
+// Ordine importante: apply_gene_effects legge $elementHasPosition->rewards, quindi
+// l'elemento deve ancora esistere quando viene applicata la ricompensa. La delete
+// parte solo nella callback di successo della prima chiamata.
+//
+// Stessa logica di ricompensa di resources/js/function/entity/apply_gene_effects.blade.php
+// (GameController::applyGeneEffects legge le rewards e somma ogni effect al gene
+// corrispondente dell'entity, rispettando min/max del genome).
+function buildApplyGeneEffectsCode(targetEntityUid, elementUid) {
+  return [
+    '(function () {',
+    "  var backUrl = (typeof window.BACK_URL !== 'undefined') ? window.BACK_URL : '';",
+    "  if (typeof $ === 'undefined') { console.warn('[Consume] jQuery non disponibile, ricompensa non applicata'); return; }",
+    '  $.ajax({',
+    "    url: backUrl + '/api/auth/game/entity/apply_gene_effects',",
+    "    type: 'POST',",
+    '    data: {',
+    `      entity_uid: ${JSON.stringify(targetEntityUid)},`,
+    `      element_has_position_uid: ${JSON.stringify(elementUid)}`,
+    '    }',
+    '  }).done(function () {',
+    '    // Ricompensa applicata: ora l elemento puo\' essere rimosso dal DB.',
+    '    $.ajax({',
+    "      url: backUrl + '/api/auth/game/element/delete_element_has_position',",
+    "      type: 'POST',",
+    '      data: {',
+    `        element_has_position_uid: ${JSON.stringify(elementUid)}`,
+    '      }',
+    '    }).fail(function (error) {',
+    "      console.error('[Consume] delete_element_has_position fallito:', error);",
+    '    });',
+    '  }).fail(function (error) {',
+    "    console.error('[Consume] apply_gene_effects fallito:', error);",
+    '  });',
+    '})();',
+  ].join('\n');
+}
+
+// Cancella il path del consume (linea + punti) disegnato con lo stesso requestId.
+function clearConsumePathViaPusher(channelName, requestId, pathLength) {
+  const clearItems = [];
+
+  clearItems.push({
+    type: 'update',
+    uid: `${requestId}_line`,
+    attributes: { renderable: false },
+  });
+
+  const totalDots = pathLength + 1;
+  for (let i = 0; i < totalDots; i++) {
+    clearItems.push({
+      type: 'update',
+      uid: `${requestId}_dot_${i}`,
+      attributes: { renderable: false },
+    });
+  }
+
+  pusher.trigger(channelName, 'draw_interface', {
+    type: 'draw_interface',
+    request_id: requestId + '_clear',
+    player_id: playerId,
+    items: clearItems,
+  })
+    .then(() => {
+      console.log(`[Entity ${entityUid}] Consume path cleared successfully via Pusher`);
+    })
+    .catch((err) => {
+      console.error(`[Entity ${entityUid}] Consume path clear FAILED: ${err.message}`);
+    });
+}
+
+// Funzione per eseguire il consumo di un elemento.
+// Costruisce l'array items e lo invia tramite pusher (come performAttack).
+// Flusso: 1) path verso l'elemento, 2) cancellazione dell'elemento dall'interfaccia,
+//         3) objectcode che applica la ricompensa dell'elemento all'entity.
+function performConsume(targetEntityUid, elementUid, callback) {
+  console.log(`[Entity ${entityUid}] performConsume called with entityUid: ${targetEntityUid}, elementUid: ${elementUid}, sessionCookie: ${!!sessionCookie}`);
+
+  if (!sessionCookie) {
+    console.log(`[Entity ${entityUid}] No session cookie, ensuring session...`);
+    ensureSession((ok) => {
+      if (!ok || !sessionCookie) {
+        console.error(`[Entity ${entityUid}] Session ensure failed`);
+        if (callback) callback({ success: false, error: 'No session cookie' });
+        return;
+      }
+      console.log(`[Entity ${entityUid}] Session ensured, retrying performConsume`);
+      performConsume(targetEntityUid, elementUid, callback);
+    }, 10000);
+    return;
+  }
+
+  // Prima ottieni la posizione corrente dell'entity
+  let startPos = null;
+  if (isPositionInitialized && localCurrentTileI !== null && localCurrentTileJ !== null) {
+    startPos = { i: localCurrentTileI, j: localCurrentTileJ };
+  }
+
+  if (!startPos) {
+    console.log(`[Entity ${entityUid}] Fetching current position from API...`);
+    fetchCurrentPositionFromApi((result) => {
+      if (result.success) {
+        localCurrentTileI = result.tile_i;
+        localCurrentTileJ = result.tile_j;
+        isPositionInitialized = true;
+        console.log(`[Entity ${entityUid}] Position fetched: (${result.tile_i}, ${result.tile_j})`);
+        buildConsumeItems(result.tile_i, result.tile_j, targetEntityUid, elementUid, callback);
+      } else {
+        console.error(`[Entity ${entityUid}] Failed to get current position: ${result.error}`);
+        if (callback) callback({ success: false, error: 'Failed to get current position' });
+      }
+    });
+    return;
+  }
+
+  console.log(`[Entity ${entityUid}] Current position: (${startPos.i}, ${startPos.j})`);
+  buildConsumeItems(startPos.i, startPos.j, targetEntityUid, elementUid, callback);
+}
+
+function buildConsumeItems(startI, startJ, targetEntityUid, elementUid, callback) {
+  console.log(`[Entity ${entityUid}] buildConsumeItems called from (${startI}, ${startJ}) to element ${elementUid}`);
+
+  try {
+    // API getPosition per ottenere il tile su cui si trova l'elemento bersaglio
+    fetchElementPositionFromApi(elementUid, (positionResult) => {
+      if (!positionResult.success) {
+        console.error(`[Entity ${entityUid}] fetchElementPositionFromApi failed: ${positionResult.error}`);
+        callback({ success: false, error: 'Failed to get element position' });
+        return;
+      }
+
+      const elementTileI = positionResult.tile_i;
+      const elementTileJ = positionResult.tile_j;
+
+      console.log(`[Entity ${entityUid}] Consume target element position: (${elementTileI}, ${elementTileJ})`);
+
+      getWalkableFromMap((walkableResult) => {
+        if (!walkableResult.success) {
+          console.error(`[Entity ${entityUid}] getWalkableFromMap failed: ${walkableResult.error}`);
+          callback({ success: false, error: 'Failed to get walkable array' });
+          return;
+        }
+
+        getTileCoordinatesFromMap((coordinatesResult) => {
+          let tileCoordinates = null;
+          if (coordinatesResult.success) {
+            tileCoordinates = coordinatesResult.tile_coordinates;
+          }
+
+          // Nel consume l'entity sale SOPRA l'elemento (a differenza dell'attack,
+          // che si ferma sul tile adiacente): il path termina sul tile dell'elemento.
+          const targetI = elementTileI;
+          const targetJ = elementTileJ;
+
+          const pathResult = findPathBFS(walkableResult.tile_walkable, startI, startJ, targetI, targetJ);
+
+          if (!pathResult.success) {
+            console.error(`[Entity ${entityUid}] No path to target element: ${pathResult.error}`);
+            callback({ success: false, error: 'No path to target element' });
+            return;
+          }
+
+          const requestId = 'consume_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+          const channelName = 'player_' + playerId + '_channel';
+          const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
+
+          // ---- 1) Path verso l'elemento bersaglio ----
+          const centers = [getTileCenter(startI, startJ, tileCoordinates)];
+          pathResult.path.forEach((step) => {
+            centers.push(getTileCenter(step.i, step.j, tileCoordinates));
+          });
+
+          const pathItems = [];
+
+          pathItems.push({
+            type: 'draw',
+            object: {
+              uid: `${requestId}_line`,
+              type: 'multi_line',
+              points: centers.map((center) => ({ x: center.x, y: center.y })),
+              color: CONSUME_PATH_COLOR,
+              thickness: 3,
+              attributes: pathAttributes,
+            },
+          });
+
+          centers.forEach((center, index) => {
+            pathItems.push({
+              type: 'draw',
+              object: {
+                uid: `${requestId}_dot_${index}`,
+                type: 'circle',
+                x: center.x,
+                y: center.y,
+                radius: index === 0 ? 8 : 6,
+                color: CONSUME_PATH_COLOR,
+                attributes: pathAttributes,
+              },
+            });
+          });
+
+          // ---- 2) + 3) Cancellazione dell'elemento e objectcode con la ricompensa ----
+          // Rimuove dall'interfaccia tutto il disegno dell'elemento, poi esegue
+          // l'objectcode che applica all'entity di partenza la ricompensa
+          // indicata sull'elemento bersaglio.
+          const uidsToClear = buildElementInterfaceUids(elementUid)
+            .concat(buildElementGeneProgressUids(elementUid));
+
+          const consumeItems = uidsToClear.map((uid) => ({ type: 'clear', uid: uid }));
+
+          consumeItems.push({
+            type: 'code',
+            code: buildApplyGeneEffectsCode(targetEntityUid, elementUid),
+            sleep: CONSUME_REWARD_CODE_SLEEP_MS,
+          });
+
+          console.log(`[Entity ${entityUid}] Sending consume path via Pusher on channel: ${channelName} (${pathItems.length} path items, ${consumeItems.length} consume items)`);
+
+          pusher.trigger(channelName, 'draw_interface', {
+            type: 'draw_interface',
+            request_id: requestId,
+            player_id: playerId,
+            items: pathItems,
+          })
+            .then(() => {
+              console.log(`[Entity ${entityUid}] Consume path sent successfully via Pusher`);
+            })
+            .catch((err) => {
+              console.error(`[Entity ${entityUid}] Consume path FAILED: ${err.message}`);
+            });
+
+          // Movimento dell'entity verso l'elemento (stessa logica del movimento normale)
+          moveEntityAlongPath(pathResult.path, startI, startJ, tileCoordinates, () => {
+            console.log(`[Entity ${entityUid}] Consume movement onto the element completed`);
+
+            // Arrivata sull'elemento: invia cancellazione + objectcode ricompensa
+            pusher.trigger(channelName, 'draw_interface', {
+              type: 'draw_interface',
+              request_id: requestId + '_consume',
+              player_id: playerId,
+              items: consumeItems,
+            })
+              .then(() => {
+                console.log(`[Entity ${entityUid}] Consume delete/reward items sent successfully via Pusher`);
+                clearConsumePathViaPusher(channelName, requestId, pathResult.path.length);
+                callback({
+                  success: true,
+                  entity_uid: targetEntityUid,
+                  element_uid: elementUid,
+                  target_tile: { i: targetI, j: targetJ },
+                  path_length: pathResult.path.length,
+                  cleared_uids: uidsToClear,
+                });
+              })
+              .catch((err) => {
+                console.error(`[Entity ${entityUid}] Consume delete/reward FAILED: ${err.message}`);
+                clearConsumePathViaPusher(channelName, requestId, pathResult.path.length);
+                callback({ success: false, error: 'Pusher failed: ' + err.message });
+              });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error(`[Entity ${entityUid}] buildConsumeItems error: ${error.message}`);
+    callback({ success: false, error: error.message });
+  }
+}
+
 // ========== WebSocket Server ==========
 const wss = new WebSocket.Server({ port: wsPort, host: '0.0.0.0' });
 
@@ -1277,11 +1598,25 @@ function handleWebSocketCommand(data, ws) {
     }
 
     case 'consume': {
+      // Consumo di un elemento: costruisce l'array items (path verso l'elemento,
+      // cancellazione dell'elemento dall'interfaccia, objectcode con la
+      // ricompensa per l'entity di partenza) e lo invia tramite Pusher.
       const consumeEntityUid = (moveParams && moveParams.entity_uid) ? String(moveParams.entity_uid) : entityUid;
       const consumeElementUid = (moveParams && moveParams.element_uid) ? String(moveParams.element_uid) : null;
+      if (!consumeElementUid) {
+        ws.send(JSON.stringify({ success: false, command: 'consume', error: 'element_uid mancante' }));
+        break;
+      }
       console.log(`[Entity ${entityUid}] Consume requested (entity_uid: ${consumeEntityUid}, element_uid: ${consumeElementUid})`);
-      // Per ora il comando esegue solo il console.log; la logica di consumo
-      // verra aggiunta in seguito.
+      performConsume(consumeEntityUid, consumeElementUid, (result) => {
+        ws.send(JSON.stringify({
+          success: result.success,
+          command: 'consume',
+          entity_uid: consumeEntityUid,
+          element_uid: consumeElementUid,
+          message: result.message || result.error || '',
+        }));
+      });
       break;
     }
 
