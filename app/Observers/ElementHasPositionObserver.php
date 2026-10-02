@@ -41,7 +41,6 @@ class ElementHasPositionObserver
         $linkMap = [];
         if ($element->isInteractive()) {
             $this->initializeInformation($elementHasPosition);
-            $this->initializeScore($elementHasPosition);
             $maps = $this->initializeChemicalRules($elementHasPosition);
             $neuronMap = $this->initializeBrain($elementHasPosition, $maps['ruleMap'], $maps['detailMap']);
             $circuitMap = $this->initializeCircuits($elementHasPosition, $neuronMap);
@@ -67,6 +66,10 @@ class ElementHasPositionObserver
         //Consumable
         if ($element->isConsumable()) {
             $this->initializeRewards($elementHasPosition);
+            // Gli score sono la ricompensa accreditata al player quando l'elemento
+            // viene consumato (GameController::applyConsumeEffects), quindi valgono
+            // solo per gli elementi consumabili.
+            $this->initializeScore($elementHasPosition);
         }
 
         // Clone ElementDetail, ElementBody and ElementComponent data into ElementHasPosition tables

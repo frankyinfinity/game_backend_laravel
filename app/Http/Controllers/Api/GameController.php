@@ -1940,7 +1940,7 @@ class GameController extends Controller
         $elementPosition->update(['state' => ElementHasPosition::STATE_DEATH]);
 
         // --- APPLY GENE EFFECTS (via JS) ---
-        $drawCommands[] = (new ObjectCode($this->buildApplyGeneEffectsCode($entityUid, $elementHasPositionUid, $elementId), 100))->get();
+        $drawCommands[] = (new ObjectCode($this->buildApplyConsumeEffectsCode($entityUid, $elementHasPositionUid, $elementId), 100))->get();
         // -------------------------------------
 
         foreach ($updateCommands as $update)
@@ -2617,14 +2617,18 @@ class GameController extends Controller
         return '';
     }
 
-    public function buildApplyGeneEffectsCode(string $entityUid, string $elementHasPositionUid, int $elementId): string
+    /**
+     * Genera l'objectcode che applica gli effetti del consumo di un elemento da
+     * parte di un'entity: rewards sui geni dell'entity + scores al player.
+     */
+    public function buildApplyConsumeEffectsCode(string $entityUid, string $elementHasPositionUid, int $elementId): string
     {
         ini_set('memory_limit', '-1');
-        $jsContent = File::get(resource_path('js/function/entity/apply_gene_effects.blade.php'));
+        $jsContent = File::get(resource_path('js/function/entity/apply_consume_effects.blade.php'));
         $jsContent = str_replace('__ENTITY_UID__', $entityUid, $jsContent);
         $jsContent = str_replace('__ELEMENT_HAS_POSITION_UID__', $elementHasPositionUid, $jsContent);
         $jsContent = str_replace('__ELEMENT_ID__', (string) $elementId, $jsContent);
-        $jsContent = Helper::setCommonJsCode($jsContent, 'applyGeneEffects_' . Str::random(20));
+        $jsContent = Helper::setCommonJsCode($jsContent, 'applyConsumeEffects_' . Str::random(20));
 
         return $jsContent;
     }
@@ -3031,7 +3035,19 @@ class GameController extends Controller
         return response()->json(['success' => true, 'message' => 'Element degradation check completed']);
     }
 
-    public function applyGeneEffects(Request $request): \Illuminate\Http\JsonResponse
+    /**
+     * Effetti del consumo di un elemento da parte di un'entity (flusso container
+     * entity: comando 'consume' -> objectcode -> questo endpoint).
+     *
+     * 1) applica ai geni dell'entity i rewards dell'elemento consumato;
+     * 2) ASSEGNA al player proprietario dell'entity i scores dell'elemento
+     *    (ElementHasPositionScore -> PlayerHasScore), con lo stesso meccanismo
+     *    usato da attackElement() quando un elemento muore.
+     *
+     * Va chiamata PRIMA che l'elemento venga eliminato dal DB: i rewards e gli
+     * scores sono letti dall'elemento, che deve quindi esistere ancora.
+     */
+    public function applyConsumeEffects(Request $request): \Illuminate\Http\JsonResponse
     {
         ini_set('memory_limit', '-1');
         $entityUid = $request->entity_uid;
@@ -3043,12 +3059,19 @@ class GameController extends Controller
 
         $elementHasPositionUid = $request->element_has_position_uid;
         $elementHasPosition = ElementHasPosition::where('uid', $elementHasPositionUid)->first();
-        $elementEffects = $elementHasPosition ? $elementHasPosition->rewards->map(function ($r) {
+
+        if (!$elementHasPosition) {
+            Log::warning("applyConsumeEffects: elemento non trovato", ['element_uid' => $elementHasPositionUid]);
+            return response()->json(['success' => false, 'message' => 'Element not found']);
+        }
+
+        // --- 1) Effetti sui geni dell'entity ---
+        $elementEffects = $elementHasPosition->rewards->map(function ($r) {
             return (object) [
                 'gene_id' => $r->gene_id,
                 'effect' => $r->effect
             ];
-        }) : [];
+        });
 
         foreach ($elementEffects as $effect) {
             $gene = Gene::find($effect->gene_id);
@@ -3077,7 +3100,57 @@ class GameController extends Controller
             }
         }
 
-        return response()->json(['success' => true]);
+        // --- 2) Ricompensa (scores) al player proprietario dell'entity ---
+        // Il player si risolve come in attackElement(): tramite la specie dell'entity.
+        $player = Player::query()->find($entity->specie->player_id ?? null);
+        $playerId = $player ? (int) $player->id : null;
+        $awardedScores = [];
+
+        if ($playerId !== null) {
+            $elementScores = ElementHasPositionScore::query()
+                ->where('element_has_position_id', $elementHasPosition->id)
+                ->with(['score'])
+                ->get();
+
+            foreach ($elementScores as $elementScore) {
+                $score = $elementScore->score;
+                if (!$score)
+                    continue;
+
+                $amount = $elementScore->amount;
+
+                $playerHasScore = PlayerHasScore::query()
+                    ->where('player_id', $playerId)
+                    ->where('score_id', $score->id)
+                    ->first();
+
+                if ($playerHasScore) {
+                    $playerHasScore->increment('value', $amount);
+                } else {
+                    PlayerHasScore::create([
+                        'player_id' => $playerId,
+                        'score_id' => $score->id,
+                        'value' => $amount
+                    ]);
+                }
+
+                $awardedScores[] = [
+                    'score_id' => $score->id,
+                    'amount' => $amount,
+                ];
+            }
+        }
+
+        Log::info("applyConsumeEffects: entity {$entityUid} ha consumato {$elementHasPositionUid}", [
+            'player_id' => $playerId,
+            'awarded_scores' => $awardedScores,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'player_id' => $playerId,
+            'awarded_scores' => $awardedScores,
+        ]);
     }
 
     /**

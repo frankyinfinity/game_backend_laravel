@@ -1,8 +1,9 @@
 <script>
     window['__name__'] = function () {
-        // APPLY GENE EFFECTS - called from consume()
+        // APPLY CONSUME EFFECTS - applica i rewards del bersaglio ai geni dell'entity e
+        // assegna al player proprietario dell'entity i scores del bersaglio.
         $.ajax({
-            url: window.BACK_URL + '/api/auth/game/entity/apply_gene_effects',
+            url: window.BACK_URL + '/api/auth/game/entity/apply_consume_effects',
             type: 'POST',
             data: {
                 entity_uid: '__ENTITY_UID__',

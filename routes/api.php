@@ -51,7 +51,7 @@ Route::group(['prefix' => 'auth'], function () {
   Route::post('/game/sync_object_cache', [App\Http\Controllers\Api\GameController::class, 'syncObjectCache'])->name('game.sync_object_cache');
   Route::post('/game/entity/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkEntityDegradation'])->name('game.entity.check_degradation');
   Route::post('/game/element/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkElementDegradation'])->name('game.element.check_degradation');
-  Route::post('/game/entity/apply_gene_effects', [App\Http\Controllers\Api\GameController::class, 'applyGeneEffects'])->name('game.entity.apply_gene_effects');
+  Route::post('/game/entity/apply_consume_effects', [App\Http\Controllers\Api\GameController::class, 'applyConsumeEffects'])->name('game.entity.apply_consume_effects');
     Route::post('/game/element/delete_element_has_position', [App\Http\Controllers\Api\GameController::class, 'deleteElementHasPosition'])->name('game.element.delete_element_has_position');
   Route::post('/game/element/apply_gene_effects', [App\Http\Controllers\Api\GameController::class, 'applyElementGeneEffects'])->name('game.element.apply_gene_effects');
   Route::post('/game/information/update', [App\Http\Controllers\Api\GameController::class, 'updateInformation'])->name('game.information.update');

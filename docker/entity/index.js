@@ -1205,23 +1205,21 @@ function buildElementGeneProgressUids(elementUid) {
 }
 
 // Codice eseguito nel frontend (item 'code'): applica all'entity di partenza la
-// ricompensa indicata sull'elemento bersaglio e POI elimina l'element_has_position
-// dal DB.
+// ricompensa dell'elemento bersaglio e POI elimina l'element_has_position dal DB.
 //
-// Ordine importante: apply_gene_effects legge $elementHasPosition->rewards, quindi
-// l'elemento deve ancora esistere quando viene applicata la ricompensa. La delete
-// parte solo nella callback di successo della prima chiamata.
+// apply_consume_effects fa due cose: applica i rewards del bersaglio ai geni
+// dell'entity E assegna al player proprietario dell'entity i scores del bersaglio
+// (GameController::applyConsumeEffects legge rewards e scores dall'elemento).
 //
-// Stessa logica di ricompensa di resources/js/function/entity/apply_gene_effects.blade.php
-// (GameController::applyGeneEffects legge le rewards e somma ogni effect al gene
-// corrispondente dell'entity, rispettando min/max del genome).
+// Ordine importante: l'elemento deve ancora esistere quando viene applicata la
+// ricompensa, quindi la delete parte solo nella callback di successo.
 function buildApplyGeneEffectsCode(targetEntityUid, elementUid) {
   return [
     '(function () {',
     "  var backUrl = (typeof window.BACK_URL !== 'undefined') ? window.BACK_URL : '';",
     "  if (typeof $ === 'undefined') { console.warn('[Consume] jQuery non disponibile, ricompensa non applicata'); return; }",
     '  $.ajax({',
-    "    url: backUrl + '/api/auth/game/entity/apply_gene_effects',",
+    "    url: backUrl + '/api/auth/game/entity/apply_consume_effects',",
     "    type: 'POST',",
     '    data: {',
     `      entity_uid: ${JSON.stringify(targetEntityUid)},`,
