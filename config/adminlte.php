@@ -514,15 +514,22 @@ return [
             'header' => 'GENERALE',
         ],
         [
+            'text'    => 'Punteggi',
+            'icon'    => 'fas fa-star',
+            'icon_color' => 'yellow',
+            'submenu' => [
+                [
+                    'text' => 'Punteggio',
+                    'url'  => '/scores',
+                    'icon' => 'fas fa-trophy',
+                ]
+            ]
+        ],
+        [
             'text'    => 'Obiettivi',
             'icon'    => 'fas fa-trophy',
             'icon_color' => 'yellow',
             'submenu' => [
-                [
-                    'text' => 'Punteggi',
-                    'url'  => '/scores',
-                    'icon' => 'fas fa-list',
-                ],
                 [
                     'text' => 'Ere',
                     'url'  => '/ages',

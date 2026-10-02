@@ -29,7 +29,6 @@ Route::group(['prefix' => 'auth'], function () {
   Route::post('/game/entity/movement', [App\Http\Controllers\Api\GameController::class, 'movement'])->name('game.entity.movement');
   Route::post('/game/entity/get_position', [App\Http\Controllers\Api\GameController::class, 'getPosition'])->name('game.entity.get_position');
   Route::post('/game/entity/update_position', [App\Http\Controllers\Api\GameController::class, 'updateEntityPosition'])->name('game.entity.update_position');
-  Route::post('/game/entity/consume', [App\Http\Controllers\Api\GameController::class, 'consume'])->name('game.entity.consume');
   Route::post('/game/entity/attack_element', [App\Http\Controllers\Api\GameController::class, 'attackElement'])->name('game.entity.attack_element');
   Route::post('/game/entity/division', [App\Http\Controllers\Api\GameController::class, 'division'])->name('game.entity.division');
   Route::post('/game/get_tiles_by_birth_region', [App\Http\Controllers\Api\GameController::class, 'getTilesByBirthRegion'])->name('game.get_tiles_by_birth_region');
