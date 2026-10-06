@@ -2062,6 +2062,8 @@ class GameController extends Controller
             $elementDied = true;
             Log::info("Element {$elementPosition->uid} died!");
 
+            $startTime = microtime(true);
+
             // Set state to death
             $elementPosition->update(['state' => ElementHasPosition::STATE_DEATH]);
 
@@ -2098,15 +2100,21 @@ class GameController extends Controller
                 $fallbackElementUids[] = $progressBarUid . '_range';
             }
 
+            $resolveStart = microtime(true);
             $idsToClear = $this->resolveDrawUidsForObject(
                 $sessionId,
                 $elementPosition->uid,
                 $fallbackElementUids
             );
+            $resolveTime = (microtime(true) - $resolveStart) * 1000;
+            Log::info("resolveDrawUidsForObject took {$resolveTime}ms, found " . count($idsToClear) . " UIDs");
 
             foreach ($idsToClear as $uid) {
                 $items[] = (new ObjectClear($uid, $sessionId))->get();
             }
+
+            $totalTime = (microtime(true) - $startTime) * 1000;
+            Log::info("attackElement death cleanup took {$totalTime}ms total");
         }
 
         return response()->json([
