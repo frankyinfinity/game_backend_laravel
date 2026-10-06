@@ -950,10 +950,14 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
 
             // 3. Chiama l'API attack per ottenere la risposta con gli items di cancellazione
             //    (dopo il primo path, come richiesto: primo path → API → secondo path)
+            const attackApiStart = Date.now();
             callAttackApi(entityUid, elementUid, (attackResult) => {
+              const attackApiTime = Date.now() - attackApiStart;
+              console.log(`[Entity ${entityUid}] Attack API response received in ${attackApiTime}ms`);
 
               // 4. Aggiungi gli items di cancellazione se l'elemento è morto
               if (attackResult.element_died && attackResult.items && attackResult.items.length > 0) {
+                const deleteStart = Date.now();
                 const deletePayload = {
                   type: 'draw_interface',
                   request_id: requestId + '_delete',
@@ -961,9 +965,12 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
                   items: attackResult.items,
                 };
 
+                console.log(`[Entity ${entityUid}] Sending ${attackResult.items.length} delete items via Pusher`);
+
                 pusher.trigger(channelName, 'draw_interface', deletePayload)
                   .then(() => {
-                    console.log(`[Entity ${entityUid}] Delete items sent successfully via Pusher`);
+                    const deleteTime = Date.now() - deleteStart;
+                    console.log(`[Entity ${entityUid}] Delete items sent successfully via Pusher in ${deleteTime}ms`);
                   })
                   .catch((err) => {
                     console.error(`[Entity ${entityUid}] Delete items FAILED: ${err.message}`);
