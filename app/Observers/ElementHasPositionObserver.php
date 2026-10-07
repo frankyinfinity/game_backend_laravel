@@ -121,7 +121,6 @@ class ElementHasPositionObserver
         }
     }
 
-
     private function initializeBrain(ElementHasPosition $elementHasPosition, array $ruleMap, array $detailMap): array
     {
         $element = $elementHasPosition->element;
@@ -379,7 +378,7 @@ class ElementHasPositionObserver
     public function updated(ElementHasPosition $elementHasPosition): void
     {
         if ($elementHasPosition->wasChanged('state') && $elementHasPosition->state === ElementHasPosition::STATE_DEATH) {
-            $this->cleanupContainer($elementHasPosition);
+            \App\Jobs\StopElementHasPositionContainersJob::dispatch($elementHasPosition->id);
         }
     }
 
@@ -611,45 +610,6 @@ class ElementHasPositionObserver
                 ]);
             }
         }
-    }
-
-    private function cleanupContainer(ElementHasPosition $elementHasPosition): void
-    {
-        $container = Container::query()
-            ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
-            ->where('parent_id', $elementHasPosition->id)
-            ->orderByDesc('id')
-            ->first();
-
-        if ($container === null) {
-            Log::info('No container found for element_has_position', [
-                'element_has_position_id' => $elementHasPosition->id,
-                'element_has_position_uid' => $elementHasPosition->uid,
-            ]);
-            return;
-        }
-
-        try {
-            app(DockerContainerService::class)->stopContainer($container);
-        } catch (\Throwable $e) {
-            Log::warning('Unable to stop element container', [
-                'element_has_position_id' => $elementHasPosition->id,
-                'container_id' => $container->container_id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        try {
-            app(DockerContainerService::class)->deleteContainer($container, true);
-        } catch (\Throwable $e) {
-            Log::warning('Unable to delete element container', [
-                'element_has_position_id' => $elementHasPosition->id,
-                'container_id' => $container->container_id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        $container->delete();
     }
 
 }
