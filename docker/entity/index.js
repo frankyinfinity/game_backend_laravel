@@ -885,18 +885,17 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
           }
 
           const requestId = 'attack_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-
-          // 1. Primo path: disegna il path verso il tile adiacente al target
-          const pathItems = [];
+          const channelName = 'player_' + playerId + '_channel';
           const pathColor = '0xFF0000'; // Rosso per attack
           const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
 
+          // 1. Path di andata
           const centers = [getTileCenter(startI, startJ, tileCoordinates)];
           pathResult.path.forEach((step) => {
             centers.push(getTileCenter(step.i, step.j, tileCoordinates));
           });
 
-          // Linea del path
+          const pathItems = [];
           pathItems.push({
             type: 'draw',
             object: {
@@ -909,7 +908,6 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
             },
           });
 
-          // Punti del path
           centers.forEach((center, index) => {
             const isStart = index === 0;
             pathItems.push({
@@ -926,7 +924,7 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
             });
           });
 
-          // Invia il path via Pusher
+          // Invia il path di andata via Pusher
           const drawPathPayload = {
             type: 'draw_interface',
             request_id: requestId,
@@ -934,30 +932,60 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
             items: pathItems,
           };
 
-          const channelName = 'player_' + playerId + '_channel';
-          console.log(`[Entity ${entityUid}] Sending attack path via Pusher on channel: ${channelName}`);
-
+          console.log(`[Entity ${entityUid}] Sending attack path via Pusher`);
           pusher.trigger(channelName, 'draw_interface', drawPathPayload)
             .then(() => {
-              console.log(`[Entity ${entityUid}] Attack path sent successfully via Pusher`);
+              console.log(`[Entity ${entityUid}] Attack path sent successfully`);
             })
             .catch((err) => {
               console.error(`[Entity ${entityUid}] Attack path FAILED: ${err.message}`);
             });
-          // 2. Movement verso il target usando moveEntityAlongPath (stessa logica del movimento normale)
+
+          // 2. Movement verso il target usando moveEntityAlongPath
           moveEntityAlongPath(pathResult.path, startI, startJ, tileCoordinates, () => {
             console.log(`[Entity ${entityUid}] Attack movement to target completed`);
 
+            // Cancella il path di andata
+            const clearPathItems = [];
+            clearPathItems.push({
+              type: 'update',
+              uid: `${requestId}_line`,
+              attributes: { renderable: false },
+            });
+
+            const totalDots = pathResult.path.length + 1;
+            for (let i = 0; i < totalDots; i++) {
+              clearPathItems.push({
+                type: 'update',
+                uid: `${requestId}_dot_${i}`,
+                attributes: { renderable: false },
+              });
+            }
+
+            const clearPathPayload = {
+              type: 'draw_interface',
+              request_id: requestId + '_clear_path',
+              player_id: playerId,
+              items: clearPathItems,
+            };
+
+            pusher.trigger(channelName, 'draw_interface', clearPathPayload)
+              .then(() => {
+                console.log(`[Entity ${entityUid}] Attack path cleared`);
+              })
+              .catch((err) => {
+                console.error(`[Entity ${entityUid}] Attack path clear FAILED: ${err.message}`);
+              });
+
             // 3. Chiama l'API attack per ottenere la risposta con gli items di cancellazione
-            //    (dopo il primo path, come richiesto: primo path → API → secondo path)
             const attackApiStart = Date.now();
             callAttackApi(entityUid, elementUid, (attackResult) => {
               const attackApiTime = Date.now() - attackApiStart;
               console.log(`[Entity ${entityUid}] Attack API response received in ${attackApiTime}ms`);
 
-              // 4. Aggiungi gli items di cancellazione se l'elemento è morto
+              // 4. Invia gli items di cancellazione se l'elemento è morto
               if (attackResult.element_died && attackResult.items && attackResult.items.length > 0) {
-                const deleteStart = Date.now();
+                console.log(`[Entity ${entityUid}] Sending ${attackResult.items.length} delete items via Pusher`);
                 const deletePayload = {
                   type: 'draw_interface',
                   request_id: requestId + '_delete',
@@ -965,49 +993,99 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
                   items: attackResult.items,
                 };
 
-                console.log(`[Entity ${entityUid}] Sending ${attackResult.items.length} delete items via Pusher`);
-
                 pusher.trigger(channelName, 'draw_interface', deletePayload)
                   .then(() => {
-                    const deleteTime = Date.now() - deleteStart;
-                    console.log(`[Entity ${entityUid}] Delete items sent successfully via Pusher in ${deleteTime}ms`);
+                    console.log(`[Entity ${entityUid}] Delete items sent successfully`);
                   })
                   .catch((err) => {
                     console.error(`[Entity ${entityUid}] Delete items FAILED: ${err.message}`);
                 });
               }
 
-              // 5. Movement di ritorno usando moveEntityAlongPath (seconda tempistica, identica al movimento normale)
+              // 5. Path di ritorno (stesso path di andata ma al contrario)
+              const returnCenters = [];
+              returnPathResult.path.forEach((step) => {
+                returnCenters.push(getTileCenter(step.i, step.j, tileCoordinates));
+              });
+              returnCenters.push(getTileCenter(startI, startJ, tileCoordinates));
+
+              const returnPathItems = [];
+              returnPathItems.push({
+                type: 'draw',
+                object: {
+                  uid: `${requestId}_return_line`,
+                  type: 'multi_line',
+                  points: returnCenters.map((center) => ({ x: center.x, y: center.y })),
+                  color: pathColor,
+                  thickness: 3,
+                  attributes: pathAttributes,
+                },
+              });
+
+              returnCenters.forEach((center, index) => {
+                const isLast = index === returnCenters.length - 1;
+                returnPathItems.push({
+                  type: 'draw',
+                  object: {
+                    uid: `${requestId}_return_dot_${index}`,
+                    type: 'circle',
+                    x: center.x,
+                    y: center.y,
+                    radius: isLast ? 8 : 6,
+                    color: pathColor,
+                    attributes: pathAttributes,
+                  },
+                });
+              });
+
+              // Invia il path di ritorno via Pusher
+              const drawReturnPathPayload = {
+                type: 'draw_interface',
+                request_id: requestId + '_return',
+                player_id: playerId,
+                items: returnPathItems,
+              };
+
+              console.log(`[Entity ${entityUid}] Sending return path via Pusher`);
+              pusher.trigger(channelName, 'draw_interface', drawReturnPathPayload)
+                .then(() => {
+                  console.log(`[Entity ${entityUid}] Return path sent successfully`);
+                })
+                .catch((err) => {
+                  console.error(`[Entity ${entityUid}] Return path FAILED: ${err.message}`);
+                });
+
+              // 6. Movement di ritorno
               moveEntityAlongPath(returnPathResult.path, targetI, targetJ, tileCoordinates, () => {
                 console.log(`[Entity ${entityUid}] Attack return movement completed`);
 
-                // 6. Cancella il path dopo il ritorno
-                const clearItems = [];
-                clearItems.push({
+                // 7. Cancella il path di ritorno
+                const clearReturnPathItems = [];
+                clearReturnPathItems.push({
                   type: 'update',
-                  uid: `${requestId}_line`,
+                  uid: `${requestId}_return_line`,
                   attributes: { renderable: false },
                 });
 
-                const totalDots = pathResult.path.length + 1;
-                for (let i = 0; i < totalDots; i++) {
-                  clearItems.push({
+                const totalReturnDots = returnPathResult.path.length + 1;
+                for (let i = 0; i < totalReturnDots; i++) {
+                  clearReturnPathItems.push({
                     type: 'update',
-                    uid: `${requestId}_dot_${i}`,
+                    uid: `${requestId}_return_dot_${i}`,
                     attributes: { renderable: false },
                   });
                 }
 
-                const clearPayload = {
+                const clearReturnPathPayload = {
                   type: 'draw_interface',
-                  request_id: requestId + '_clear',
+                  request_id: requestId + '_clear_return',
                   player_id: playerId,
-                  items: clearItems,
+                  items: clearReturnPathItems,
                 };
 
-                pusher.trigger(channelName, 'draw_interface', clearPayload)
+                pusher.trigger(channelName, 'draw_interface', clearReturnPathPayload)
                   .then(() => {
-                    console.log(`[Entity ${entityUid}] Path cleared successfully via Pusher`);
+                    console.log(`[Entity ${entityUid}] Return path cleared successfully`);
                     callback({
                       success: true,
                       entity_uid: entityUid,
@@ -1018,7 +1096,7 @@ function buildAttackItems(startI, startJ, elementUid, callback) {
                     });
                   })
                   .catch((err) => {
-                    console.error(`[Entity ${entityUid}] Path clear FAILED: ${err.message}`);
+                    console.error(`[Entity ${entityUid}] Return path clear FAILED: ${err.message}`);
                     callback({ success: false, error: 'Pusher failed: ' + err.message });
                 });
               });
