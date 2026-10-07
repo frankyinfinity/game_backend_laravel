@@ -112,9 +112,7 @@ class PlayerCreatedJob implements ShouldQueue
         if (!empty($this->registrationData)) {
             CreatePlayerContainersJob::dispatch($player);
         }
-
-        // Clone the objective structure for the player
-        $this->cloneObjectiveStructure($player);
+        
     }
 
     /**
