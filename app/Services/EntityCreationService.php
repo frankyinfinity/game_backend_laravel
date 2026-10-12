@@ -73,6 +73,21 @@ class EntityCreationService
             return $this->createEntityByDivision($i, $j, $entityUid);
         }
 
+        return $this->createEntityByRegister($i, $j);
+    }
+
+    /**
+     * Register mode ($division = false): crea una nuova entity del player
+     * usando la specie LUCA, la birth region e lo str_assembler_json del player.
+     * Crea tutte le tabelle necessarie: entities, entity_details + entity_detail_data,
+     * genomes + entity_information, entity_chimical_elements e l'immagine dell'entity.
+     *
+     * @param int $i coordinata tile I
+     * @param int $j coordinata tile J
+     * @return Entity l'entity creata
+     */
+    protected function createEntityByRegister(int $i, int $j): Entity
+    {
         $player = $this->player;
 
         // La specie LUCA del player deve esistere (creata durante il register)
