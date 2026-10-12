@@ -253,9 +253,9 @@ class EntityCreationService
 
             if ($currentEvolutionStep && !empty($currentEvolutionStep->imagename)) {
                 // Usa l'immagine definita nello step di evoluzione
-                $stepImagePath = 'evolution_steps/' . $currentEvolutionStep->imagename;
-                if (Storage::disk('evolution_images')->exists($stepImagePath)) {
-                    $imageContent = Storage::disk('evolution_images')->get($stepImagePath);
+                $stepImagePath = $currentEvolutionStep->imagename;
+                if (Storage::disk('evolution_steps')->exists($stepImagePath)) {
+                    $imageContent = Storage::disk('evolution_steps')->get($stepImagePath);
                 }
             }
 
@@ -295,6 +295,44 @@ class EntityCreationService
             // Se non c'è un path attivo, l'entity sta solo seguendo lo stesso step della sorgente senza avanzare
             if ($currentEvolutionStep && $evolutionPath) {
                 $this->applyEvolutionStepModifications($entity, $currentEvolutionStep);
+
+                // Incrementa la population di EvolutionStep e EvolutionPath
+                $currentEvolutionStep->increment('population');
+                $currentEvolutionStep->refresh();
+
+                $evolutionPath->increment('population');
+                $evolutionPath->refresh();
+
+                // Se è la prima popolazione, cambia stato a IN_PROGRESS
+                if ($currentEvolutionStep->population === 1 && $currentEvolutionStep->state === EvolutionStep::STATE_CREATED) {
+                    $currentEvolutionStep->update(['state' => EvolutionStep::STATE_IN_PROGRESS]);
+                    Log::info('EntityCreationService: EvolutionStep passato a IN_PROGRESS', [
+                        'entity_id' => $entity->id,
+                        'evolution_step_id' => $currentEvolutionStep->id,
+                    ]);
+                }
+
+                // Se raggiunge la popolazione totale (5), cambia stato a COMPLETED
+                if ($currentEvolutionStep->population >= self::EVOLUTION_STEP_POPULATION_THRESHOLD && $currentEvolutionStep->state === EvolutionStep::STATE_IN_PROGRESS) {
+                    $currentEvolutionStep->update(['state' => EvolutionStep::STATE_COMPLETED]);
+                    Log::info('EntityCreationService: EvolutionStep completato', [
+                        'entity_id' => $entity->id,
+                        'evolution_step_id' => $currentEvolutionStep->id,
+                        'population' => $currentEvolutionStep->population,
+                    ]);
+
+                    // Avanza al prossimo step se esiste
+                    $this->advanceToNextEvolutionStep($evolutionPath, $currentEvolutionStep);
+                }
+
+                Log::info('EntityCreationService: population incrementata per nuova entity', [
+                    'entity_id' => $entity->id,
+                    'evolution_step_id' => $currentEvolutionStep->id,
+                    'evolution_path_id' => $evolutionPath->id,
+                    'step_population' => $currentEvolutionStep->population,
+                    'step_state' => $currentEvolutionStep->state,
+                    'path_population' => $evolutionPath->population,
+                ]);
             }
 
             return $entity;
@@ -399,10 +437,8 @@ class EntityCreationService
             ->first();
 
         if ($nextStep) {
-            // Setta il prossimo step come IN_PROGRESS
-            $nextStep->update(['state' => EvolutionStep::STATE_IN_PROGRESS]);
-
-            Log::info('EntityCreationService: avanzato al prossimo step di evoluzione', [
+            // Il prossimo step rimane in CREATED e passerà a IN_PROGRESS solo quando avrà la prima popolazione
+            Log::info('EntityCreationService: prossimo step di evoluzione disponibile', [
                 'evolution_path_id' => $evolutionPath->id,
                 'completed_step_id' => $completedStep->id,
                 'next_step_id' => $nextStep->id,
@@ -425,58 +461,89 @@ class EntityCreationService
 
     /**
      * Applica le modifiche definite in EvolutionStepDetail alla nuova entity.
-     * Le modifiche possono includere cambiamenti ai geni, elementi chimici, ecc.
+     * I dettagli sono salvati in sequenza: zone_id, r, g, b per ogni zona.
      */
     protected function applyEvolutionStepModifications(Entity $entity, EvolutionStep $step): void
     {
         $details = EvolutionStepDetail::query()
             ->where('evolution_step_id', $step->id)
+            ->orderBy('id')
             ->get();
 
-        foreach ($details as $detail) {
-            $key = $detail->key;
-            $value = $detail->value;
+        $i = 0;
+        while ($i < count($details)) {
+            $detail = $details[$i];
 
-            // Applica le modifiche in base alla chiave
-            switch ($key) {
-                case 'gene_modification':
-                    // Formato atteso: gene_key:new_value
-                    $parts = explode(':', $value);
-                    if (count($parts) === 2) {
-                        $geneKey = $parts[0];
-                        $newValue = (int) $parts[1];
-                        $this->modifyEntityGene($entity, $geneKey, $newValue);
-                    }
-                    break;
+            if ($detail->key === 'zone_id') {
+                $zoneId = (int) $detail->value;
 
-                case 'chemical_element_modification':
-                    // Formato atteso: chemical_element_id:new_value
-                    $parts = explode(':', $value);
-                    if (count($parts) === 2) {
-                        $chemicalElementId = (int) $parts[0];
-                        $newValue = (int) $parts[1];
-                        $this->modifyEntityChemicalElement($entity, $chemicalElementId, $newValue);
-                    }
-                    break;
+                // Le 3 righe successive contengono R, G, B
+                if ($i + 3 < count($details)) {
+                    $r = (int) $details[$i + 1]->value;
+                    $g = (int) $details[$i + 2]->value;
+                    $b = (int) $details[$i + 3]->value;
 
-                // Aggiungere altri casi secondo necessità
-                default:
-                    Log::warning('EntityCreationService: tipo di modifica evoluzione non supportato', [
-                        'entity_id' => $entity->id,
-                        'step_id' => $step->id,
-                        'key' => $key,
-                        'value' => $value,
-                    ]);
-                    break;
+                    $this->modifyEntityZoneColor($entity, $zoneId, $r, $g, $b);
+                    $i += 4;
+                    continue;
+                }
             }
 
-            Log::info('EntityCreationService: applicata modifica evoluzione', [
+            Log::warning('EntityCreationService: formato dettagli evoluzione non valido', [
                 'entity_id' => $entity->id,
                 'step_id' => $step->id,
-                'key' => $key,
-                'value' => $value,
+                'detail_index' => $i,
+                'key' => $detail->key,
             ]);
+            $i++;
         }
+    }
+
+    /**
+     * Modifica il colore di una zona dell'entity.
+     */
+    protected function modifyEntityZoneColor(Entity $entity, int $zoneId, int $r, int $g, int $b): void
+    {
+        $zone = EntityBodyZone::query()->find($zoneId);
+        if (!$zone) {
+            Log::warning('EntityCreationService: zona non trovata per modifica colore', [
+                'entity_id' => $entity->id,
+                'zone_id' => $zoneId,
+            ]);
+            return;
+        }
+
+        // Verifica che la zona appartenga all'entity
+        $entityDetail = EntityDetail::query()
+            ->where('entity_id', $entity->id)
+            ->where('detailable_type', EntityBody::class)
+            ->first();
+
+        if (!$entityDetail) {
+            Log::warning('EntityCreationService: entity body non trovato', [
+                'entity_id' => $entity->id,
+            ]);
+            return;
+        }
+
+        if ($zone->entity_body_id !== $entityDetail->detailable_id) {
+            Log::warning('EntityCreationService: zona non appartiene all\'entity', [
+                'entity_id' => $entity->id,
+                'zone_id' => $zoneId,
+                'entity_body_id' => $zone->entity_body_id,
+            ]);
+            return;
+        }
+
+        // Aggiorna il colore della zona
+        $color = ($r << 16) | ($g << 8) | $b;
+        $zone->update(['color' => $color]);
+
+        Log::info('EntityCreationService: modificato colore zona', [
+            'entity_id' => $entity->id,
+            'zone_id' => $zoneId,
+            'color' => $color,
+        ]);
     }
 
     /**
