@@ -14,6 +14,7 @@ class Entity extends Model
         "tile_j",
         "state",
         "image",
+        "evolution_step_id",
     ];
 
     const STATE_LIFE = 0;
