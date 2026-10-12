@@ -237,57 +237,46 @@ class EntityDraw
         $rightButton->setRenderable(false);
         $rightButton->build();
 
-        // Division button (visible only when player_values.division is true, or forced)
+        // Division button (sempre disegnato, visibilità gestita da polling PlayerValue)
         $divisionButton = null;
         $divisionButtonY = $panelY + $sizeButton + 15;
-        $showDivision = !$this->checkDrawButton || PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_DIVISION]);
-        if ($showDivision) {
-            $jsPathDivision = resource_path('js/function/entity/click_division.blade.php');
-            $jsContentDivision = file_get_contents($jsPathDivision);
-            $jsContentDivision = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentDivision);
-            $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
-            $jsContentDivision = str_replace('__port__', $wsPort, $jsContentDivision);
-            $jsContentDivision = str_replace('__PLAYER_ID__', (string) $player_id, $jsContentDivision);
 
-            $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
-            $divisionButton->setSize(220, 40);
-            $divisionButton->setOrigin($movementButtonsStartX, $divisionButtonY);
-            $divisionButton->setString('Divisione');
-            $divisionButton->setColorButton(0x0000FF);
-            $divisionButton->setColorString($colorString);
-            $divisionButton->setTextFontSize(20);
-            $divisionButton->setOnClick($jsContentDivision);
-            $divisionButton->setRenderable(false);
-            $divisionButton->build();
-        }
+        $jsPathDivision = resource_path('js/function/entity/click_division.blade.php');
+        $jsContentDivision = file_get_contents($jsPathDivision);
+        $jsContentDivision = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentDivision);
+        $jsContentDivision = Helper::setCommonJsCode($jsContentDivision, Str::random(20));
+        $jsContentDivision = str_replace('__port__', $wsPort, $jsContentDivision);
+        $jsContentDivision = str_replace('__PLAYER_ID__', (string) $player_id, $jsContentDivision);
 
-        // Evolution button (visible only when player_values.evolution is true)
+        $divisionButton = new ButtonDraw($dbEntity->uid.'_button_division');
+        $divisionButton->setSize(220, 40);
+        $divisionButton->setOrigin($movementButtonsStartX, $divisionButtonY);
+        $divisionButton->setString('Divisione');
+        $divisionButton->setColorButton(0x0000FF);
+        $divisionButton->setColorString($colorString);
+        $divisionButton->setTextFontSize(20);
+        $divisionButton->setOnClick($jsContentDivision);
+        $divisionButton->setRenderable(false);
+        $divisionButton->build();
+
+        // Evolution button (sempre disegnato, visibilità e blocco gestiti da polling PlayerValue)
         $evolutionButton = null;
-        $showEvolution = PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_EVOLUTION]);
-        $isBlockEvolution = PlayerValue::hasAnyActive($player_id, [PlayerValue::KEY_BLOCK_EVOLUTION]);
-        if ($showEvolution) {
-            $jsPathEvolution = resource_path('js/function/entity/click_evolution.blade.php');
-            $jsContentEvolution = file_get_contents($jsPathEvolution);
-            $jsContentEvolution = Helper::setCommonJsCode($jsContentEvolution, Str::random(20));
 
-            $evolutionButtonY = ($divisionButton !== null ? $divisionButtonY : $divisionButtonY) + 40 + 15;
-            $evolutionButton = new ButtonDraw($dbEntity->uid.'_button_evolution');
-            $evolutionButton->setSize(220, 40);
-            $evolutionButton->setOrigin($movementButtonsStartX, $evolutionButtonY);
-            $evolutionButton->setString('Evoluzione');
-            // Se BLOCK_EVOLUTION è true, il pulsante è grigio e non cliccabile
-            if ($isBlockEvolution) {
-                $evolutionButton->setColorButton(0x404040);
-                $evolutionButton->setOnClick(null);
-            } else {
-                $evolutionButton->setColorButton(0x800080);
-                $evolutionButton->setOnClick($jsContentEvolution);
-            }
-            $evolutionButton->setColorString($colorString);
-            $evolutionButton->setTextFontSize(20);
-            $evolutionButton->setRenderable(false);
-            $evolutionButton->build();
-        }
+        $jsPathEvolution = resource_path('js/function/entity/click_evolution.blade.php');
+        $jsContentEvolution = file_get_contents($jsPathEvolution);
+        $jsContentEvolution = Helper::setCommonJsCode($jsContentEvolution, Str::random(20));
+
+        $evolutionButtonY = $divisionButtonY + 40 + 15;
+        $evolutionButton = new ButtonDraw($dbEntity->uid.'_button_evolution');
+        $evolutionButton->setSize(220, 40);
+        $evolutionButton->setOrigin($movementButtonsStartX, $evolutionButtonY);
+        $evolutionButton->setString('Evoluzione');
+        $evolutionButton->setColorButton(0x800080);
+        $evolutionButton->setColorString($colorString);
+        $evolutionButton->setTextFontSize(20);
+        $evolutionButton->setOnClick($jsContentEvolution);
+        $evolutionButton->setRenderable(false);
+        $evolutionButton->build();
 
         //Progress Bar
         $itemBars = [];
@@ -444,8 +433,8 @@ class EntityDraw
         foreach ($evolutionDraw->getDrawItems() as $item) {
             $this->drawItems[] = $item->buildJson();
         }
-        // Inietta initJs nell'evoluzione button (solo se NON è bloccato)
-        if ($evolutionButton !== null && $evolutionDraw->getInitJs() !== '' && !$isBlockEvolution) {
+        // Inietta initJs nell'evoluzione button
+        if ($evolutionButton !== null && $evolutionDraw->getInitJs() !== '') {
             $jsWithInit = $evolutionDraw->getInitJs() . "\n" . $jsContentEvolution;
             foreach ($this->drawItems as &$di) {
                 $uid = $di['uid'] ?? '';

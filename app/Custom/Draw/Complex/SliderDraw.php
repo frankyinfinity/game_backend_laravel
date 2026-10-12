@@ -104,7 +104,8 @@ class SliderDraw
         $range = $this->max - $this->min;
         $ratio = $range > 0 ? ($this->value - $this->min) / $range : 0;
         $knobX = $trackX + (int) floor($ratio * $trackWidth);
-        $knobY = $trackY + (int) floor($trackHeight / 2);
+        // Il knob è un Circle con origine al centro, quindi Y deve essere centro della track
+        $knobY = $trackY + 4;
 
         // Title above bar (left aligned)
         if ($this->title !== '') {

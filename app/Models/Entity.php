@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Observers\EntityObserver;
 use Illuminate\Database\Eloquent\Model;
 
 class Entity extends Model
@@ -19,6 +20,13 @@ class Entity extends Model
 
     const STATE_LIFE = 0;
     const STATE_DEATH = 1;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::observe(EntityObserver::class);
+    }
 
     public function getFieldAttributes(): array
     {
@@ -46,5 +54,10 @@ class Entity extends Model
     public function entityDetails()
     {
         return $this->hasMany(EntityDetail::class);
+    }
+
+    public function evolutionStep()
+    {
+        return $this->belongsTo(EvolutionStep::class);
     }
 }

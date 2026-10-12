@@ -10,6 +10,9 @@ use App\Models\EntityComponent;
 use App\Models\EntityDetail;
 use App\Models\EntityDetailData;
 use App\Models\EntityInformation;
+use App\Models\EvolutionPath;
+use App\Models\EvolutionStep;
+use App\Models\EvolutionStepDetail;
 use App\Models\Gene;
 use App\Models\Genome;
 use App\Models\Player;
@@ -45,6 +48,8 @@ use RuntimeException;
  */
 class EntityCreationService
 {
+    const EVOLUTION_STEP_POPULATION_THRESHOLD = 5;
+
     public function __construct(private Player $player)
     {
     }
@@ -154,6 +159,11 @@ class EntityCreationService
      * KEY_LIFEPOINT_GENERATE_NEW_ENTITY), entity_chimical_elements,
      * entity_details + entity_detail_data e crea il container della nuova entity.
      *
+     * Se esiste un EvolutionPath attivo per la specie, segue l'evoluzione:
+     * - La popolazione dello step corrente viene incrementata
+     * - Quando la popolazione raggiunge 5, si avanza al prossimo step
+     * - La nuova entity viene assegnata allo step corrente
+     *
      * Nota: il service NON crea DrawRequest né richieste di disegno UI.
      * Eventuali draw (es. spawn della nuova entity) restano a carico del chiamante.
      * Il container viene creato e avviato in modo SINCRONO dal service: il draw
@@ -177,17 +187,80 @@ class EntityCreationService
             PlayerValue::KEY_LIFEPOINT_GENERATE_NEW_ENTITY
         );
 
+        // Controlla se esiste un EvolutionPath attivo per la specie
+        $evolutionPath = EvolutionPath::query()
+            ->where('specie_id', $sourceEntity->specie_id)
+            ->where('state', EvolutionPath::STATE_READY)
+            ->first();
+
+        $currentEvolutionStep = null;
+
+        if ($evolutionPath) {
+            // Trova lo step corrente (quello con population < threshold e stato CREATED o IN_PROGRESS)
+            $currentEvolutionStep = EvolutionStep::query()
+                ->where('evolution_path_id', $evolutionPath->id)
+                ->where('state', EvolutionStep::STATE_IN_PROGRESS)
+                ->first();
+
+            if (!$currentEvolutionStep) {
+                // Se non c'è uno step in progress, prendi il primo step CREATED
+                $currentEvolutionStep = EvolutionStep::query()
+                    ->where('evolution_path_id', $evolutionPath->id)
+                    ->where('state', EvolutionStep::STATE_CREATED)
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            if ($currentEvolutionStep) {
+                // Verifica che l'entity sorgente appartenga allo step corrente
+                // Solo le entity dello step corrente contano per la popolazione
+                if ($sourceEntity->evolution_step_id === $currentEvolutionStep->id) {
+                    // Incrementa la popolazione dello step corrente
+                    $currentEvolutionStep->increment('population');
+                    $currentEvolutionStep->refresh();
+
+                    // Setta come IN_PROGRESS se era CREATED
+                    if ($currentEvolutionStep->state === EvolutionStep::STATE_CREATED) {
+                        $currentEvolutionStep->update(['state' => EvolutionStep::STATE_IN_PROGRESS]);
+                    }
+
+                    // Se la popolazione raggiunge il threshold, marca come completato e avanza al prossimo step
+                    if ($currentEvolutionStep->population >= self::EVOLUTION_STEP_POPULATION_THRESHOLD) {
+                        $currentEvolutionStep->update(['state' => EvolutionStep::STATE_COMPLETED]);
+                        $this->advanceToNextEvolutionStep($evolutionPath, $currentEvolutionStep);
+                    }
+                }
+            }
+        } else {
+            // Se non c'è un EvolutionPath attivo, copia l'evolution_step_id dalla sorgente
+            if ($sourceEntity->evolution_step_id) {
+                $currentEvolutionStep = EvolutionStep::query()->find($sourceEntity->evolution_step_id);
+            }
+        }
+
         Log::info('EntityCreationService: division entity', [
             'player_id'         => $player->id,
             'source_entity_uid' => $entityUid,
             'tile_i'            => $i,
             'tile_j'            => $j,
+            'evolution_path_id' => $evolutionPath?->id,
+            'evolution_step_id' => $currentEvolutionStep?->id,
         ]);
 
-        $entity = DB::transaction(function () use ($player, $sourceEntity, $i, $j, $generatedEntityLifepoint) {
-            // Copia immagine della entity sorgente sul nuovo id
+        $entity = DB::transaction(function () use ($player, $sourceEntity, $i, $j, $generatedEntityLifepoint, $currentEvolutionStep, $evolutionPath) {
+            // Determina l'immagine da usare: priorità step image, altrimenti copia dalla sorgente
             $imageContent = null;
-            if ($sourceEntity->image && Storage::disk('entity_images')->exists($sourceEntity->image)) {
+
+            if ($currentEvolutionStep && !empty($currentEvolutionStep->imagename)) {
+                // Usa l'immagine definita nello step di evoluzione
+                $stepImagePath = 'evolution_steps/' . $currentEvolutionStep->imagename;
+                if (Storage::disk('evolution_images')->exists($stepImagePath)) {
+                    $imageContent = Storage::disk('evolution_images')->get($stepImagePath);
+                }
+            }
+
+            // Fallback: copia immagine dalla entity sorgente
+            if ($imageContent === null && $sourceEntity->image && Storage::disk('entity_images')->exists($sourceEntity->image)) {
                 $imageContent = Storage::disk('entity_images')->get($sourceEntity->image);
             }
 
@@ -199,6 +272,7 @@ class EntityCreationService
                 'tile_i'          => $i,
                 'tile_j'          => $j,
                 'state'           => Entity::STATE_LIFE,
+                'evolution_step_id' => $currentEvolutionStep?->id,
             ]);
 
             // Salva l'immagine con il nuovo entity id e aggiorna il record
@@ -216,6 +290,12 @@ class EntityCreationService
 
             // entity_details + entity_detail_data (clonati)
             $this->cloneEntityDetailTablesFromEntity($sourceEntity, $entity);
+
+            // Applica le modifiche definite nello step di evoluzione solo se c'è un EvolutionPath attivo
+            // Se non c'è un path attivo, l'entity sta solo seguendo lo stesso step della sorgente senza avanzare
+            if ($currentEvolutionStep && $evolutionPath) {
+                $this->applyEvolutionStepModifications($entity, $currentEvolutionStep);
+            }
 
             return $entity;
         });
@@ -300,6 +380,165 @@ class EntityCreationService
             'lifepoint_before'  => $currentLife,
             'lifepoint_after'   => $updatedLife,
         ]);
+    }
+
+    /**
+     * Avanza al prossimo step di evoluzione dopo che lo step corrente ha raggiunto
+     * la popolazione target (EVOLUTION_STEP_POPULATION_THRESHOLD).
+     * Non modifica la entity corrente - le future entity verranno assegnate al nuovo step.
+     * Se non ci sono più step, marca il percorso come COMPLETED.
+     */
+    protected function advanceToNextEvolutionStep(EvolutionPath $evolutionPath, EvolutionStep $completedStep): void
+    {
+        // Trova il prossimo step CREATED dopo quello completato (in ordine di id)
+        $nextStep = EvolutionStep::query()
+            ->where('evolution_path_id', $evolutionPath->id)
+            ->where('state', EvolutionStep::STATE_CREATED)
+            ->where('id', '>', $completedStep->id)
+            ->orderBy('id')
+            ->first();
+
+        if ($nextStep) {
+            // Setta il prossimo step come IN_PROGRESS
+            $nextStep->update(['state' => EvolutionStep::STATE_IN_PROGRESS]);
+
+            Log::info('EntityCreationService: avanzato al prossimo step di evoluzione', [
+                'evolution_path_id' => $evolutionPath->id,
+                'completed_step_id' => $completedStep->id,
+                'next_step_id' => $nextStep->id,
+            ]);
+        } else {
+            // Non ci sono più step: marca il percorso come completato
+            // Questo accade quando l'ultimo step raggiunge il threshold di popolazione
+            $evolutionPath->update(['state' => EvolutionPath::STATE_COMPLETED]);
+
+            // Sblocca l'evoluzione per il player
+            PlayerValue::setIntegerValue($player->id, 'block_evolution', false);
+
+            Log::info('EntityCreationService: percorso di evoluzione completato (ultimo step raggiunto)', [
+                'evolution_path_id' => $evolutionPath->id,
+                'last_completed_step_id' => $completedStep->id,
+                'population' => $completedStep->population,
+            ]);
+        }
+    }
+
+    /**
+     * Applica le modifiche definite in EvolutionStepDetail alla nuova entity.
+     * Le modifiche possono includere cambiamenti ai geni, elementi chimici, ecc.
+     */
+    protected function applyEvolutionStepModifications(Entity $entity, EvolutionStep $step): void
+    {
+        $details = EvolutionStepDetail::query()
+            ->where('evolution_step_id', $step->id)
+            ->get();
+
+        foreach ($details as $detail) {
+            $key = $detail->key;
+            $value = $detail->value;
+
+            // Applica le modifiche in base alla chiave
+            switch ($key) {
+                case 'gene_modification':
+                    // Formato atteso: gene_key:new_value
+                    $parts = explode(':', $value);
+                    if (count($parts) === 2) {
+                        $geneKey = $parts[0];
+                        $newValue = (int) $parts[1];
+                        $this->modifyEntityGene($entity, $geneKey, $newValue);
+                    }
+                    break;
+
+                case 'chemical_element_modification':
+                    // Formato atteso: chemical_element_id:new_value
+                    $parts = explode(':', $value);
+                    if (count($parts) === 2) {
+                        $chemicalElementId = (int) $parts[0];
+                        $newValue = (int) $parts[1];
+                        $this->modifyEntityChemicalElement($entity, $chemicalElementId, $newValue);
+                    }
+                    break;
+
+                // Aggiungere altri casi secondo necessità
+                default:
+                    Log::warning('EntityCreationService: tipo di modifica evoluzione non supportato', [
+                        'entity_id' => $entity->id,
+                        'step_id' => $step->id,
+                        'key' => $key,
+                        'value' => $value,
+                    ]);
+                    break;
+            }
+
+            Log::info('EntityCreationService: applicata modifica evoluzione', [
+                'entity_id' => $entity->id,
+                'step_id' => $step->id,
+                'key' => $key,
+                'value' => $value,
+            ]);
+        }
+    }
+
+    /**
+     * Modifica il valore di un gene dell'entity.
+     */
+    protected function modifyEntityGene(Entity $entity, string $geneKey, int $newValue): void
+    {
+        $gene = Gene::query()->where('key', $geneKey)->first();
+        if (!$gene) {
+            Log::warning('EntityCreationService: gene non trovato per modifica', [
+                'entity_id' => $entity->id,
+                'gene_key' => $geneKey,
+            ]);
+            return;
+        }
+
+        $genome = Genome::query()
+            ->where('entity_id', $entity->id)
+            ->where('gene_id', $gene->id)
+            ->first();
+
+        if ($genome) {
+            $genomeInfo = EntityInformation::query()->where('genome_id', $genome->id)->first();
+            if ($genomeInfo) {
+                // Clamp il valore tra min e max
+                $clampedValue = max($genome->min, min($genome->max, $newValue));
+                $genomeInfo->update(['value' => $clampedValue]);
+
+                Log::info('EntityCreationService: gene modificato', [
+                    'entity_id' => $entity->id,
+                    'gene_key' => $geneKey,
+                    'old_value' => $genomeInfo->value,
+                    'new_value' => $clampedValue,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Modifica il valore di un elemento chimico dell'entity.
+     */
+    protected function modifyEntityChemicalElement(Entity $entity, int $chemicalElementId, int $newValue): void
+    {
+        $chemicalElement = EntityChimicalElement::query()
+            ->where('entity_id', $entity->id)
+            ->where('id', $chemicalElementId)
+            ->first();
+
+        if ($chemicalElement) {
+            $chemicalElement->update(['value' => $newValue]);
+
+            Log::info('EntityCreationService: elemento chimico modificato', [
+                'entity_id' => $entity->id,
+                'chemical_element_id' => $chemicalElementId,
+                'new_value' => $newValue,
+            ]);
+        } else {
+            Log::warning('EntityCreationService: elemento chimico non trovato per modifica', [
+                'entity_id' => $entity->id,
+                'chemical_element_id' => $chemicalElementId,
+            ]);
+        }
     }
 
     /**

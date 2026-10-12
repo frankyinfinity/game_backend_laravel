@@ -24,6 +24,14 @@ class Helper
     public const MAP_START_Y = 80;
     public const MAP_SCROLL_GROUP_MAIN = 'map_main';
 
+    /**
+     * Di quanto si sposta il colore ad ogni passo di evoluzione.
+     * I canali e le zone avanzano IN SEQUENZA (prima il canale R di una zona,
+     * poi il G, poi il B, poi si passa alla zona successiva): ad ogni passo
+     * si muove un solo canale di una sola zona.
+     */
+    public const EVOLUTION_COLOR_STEP = 10;
+
     const DRAW_REQUEST_TYPE_DRAW = 'draw';
     const DRAW_REQUEST_TYPE_UPDATE = 'update';
     const DRAW_REQUEST_TYPE_CLEAR = 'clear';

@@ -47,6 +47,11 @@
                 delete window.AppData._chimicalPollingIntervals[otherUid];
                 console.log('[Chimical Polling] Stopped for other entity:', otherUid);
             }
+            if (window.AppData && window.AppData._playerValuePollingIntervals && window.AppData._playerValuePollingIntervals[otherUid]) {
+                clearInterval(window.AppData._playerValuePollingIntervals[otherUid]);
+                delete window.AppData._playerValuePollingIntervals[otherUid];
+                console.log('[PlayerValue Polling] Stopped for other entity:', otherUid);
+            }
         }
 
         // Toggle Entity Panel
@@ -72,6 +77,13 @@
         if (AppData._chimicalPollingIntervals[object_uid]) {
             clearInterval(AppData._chimicalPollingIntervals[object_uid]);
             delete AppData._chimicalPollingIntervals[object_uid];
+        }
+
+        // --- PlayerValue Polling Management ---
+        AppData._playerValuePollingIntervals = AppData._playerValuePollingIntervals || {};
+        if (AppData._playerValuePollingIntervals[object_uid]) {
+            clearInterval(AppData._playerValuePollingIntervals[object_uid]);
+            delete AppData._playerValuePollingIntervals[object_uid];
         }
 
         // --- Gene Polling Management is moved to the end of the function ---
@@ -113,8 +125,7 @@
         };
 
         const applyDivisionButtonVisibility = () => {
-            const forceDrawButtons = objects[panel_uid] && objects[panel_uid].attributes && objects[panel_uid].attributes.force_draw_buttons;
-            const divisionEnabled = forceDrawButtons ? true : resolveDivisionEnabled();
+            const divisionEnabled = resolveDivisionEnabled();
             const divisionButtonUids = [object_uid + '_button_division_rect', object_uid + '_button_division_text'];
             divisionButtonUids.forEach((uid) => {
                 if (shapes[uid]) {
@@ -201,9 +212,11 @@
             let ws = window.gameWebSockets[wsKey];
 
             const requestPlayerValues = () => {
-                ws.send(JSON.stringify({
-                    command: 'get_player_values'
-                }));
+                if (ws && ws.readyState === 1) {
+                    ws.send(JSON.stringify({
+                        command: 'get_player_values'
+                    }));
+                }
             };
 
             const bindPlayerMessageHandler = () => {
@@ -223,13 +236,21 @@
                 };
             };
 
+            const startPlayerValuePolling = (ws) => {
+                console.log('[PlayerValue Polling] Starting cycle for:', object_uid);
+                // Richiesta immediata
+                setTimeout(() => requestPlayerValues(), 50);
+                // Polling ogni 2 secondi
+                AppData._playerValuePollingIntervals[object_uid] = setInterval(() => requestPlayerValues(), 2000);
+            };
+
             if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
                 ws = new WebSocket(wsUrl);
                 window.gameWebSockets[wsKey] = ws;
 
                 ws.onopen = function() {
                     bindPlayerMessageHandler();
-                    requestPlayerValues();
+                    startPlayerValuePolling(ws);
                 };
 
                 ws.onerror = function(error) {
@@ -237,11 +258,11 @@
                 };
             } else if (ws.readyState === WebSocket.OPEN) {
                 bindPlayerMessageHandler();
-                requestPlayerValues();
+                startPlayerValuePolling(ws);
             } else if (ws.readyState === WebSocket.CONNECTING) {
                 ws.addEventListener('open', function() {
                     bindPlayerMessageHandler();
-                    requestPlayerValues();
+                    startPlayerValuePolling(ws);
                 }, { once: true });
             }
         }

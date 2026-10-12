@@ -150,12 +150,12 @@ class EntityEvolutionDraw
 
         // Modal positions
         $sw=1280;$sh=720;$mw=960;$mh=680;
-        $mx=(int)floor(($sw-$mw)/2);
-        $my=(int)floor(($sh-$mh)/2);
+        $mx=(int)floor(($sw-$mw)/2) + 50;
+        $my=(int)floor(($sh-$mh)/2) + 75;
         $cx=$mx+16;$cy=$my+60+16;
 
         $modal = new ModalDraw($modalUid);
-        $modal->setTitle('Evoluzione - '.$entity->uid);
+        $modal->setTitle('Evoluzione - '.$entity->uid.' - Step: 0');
         $modal->setSize($mw,$mh);
         $modal->setOrigin($mx,$my);
         $modal->setRenderable(false);
@@ -220,7 +220,7 @@ class EntityEvolutionDraw
         $gsJs.="window['resetEntityBodyGrid_{$modalUid}']=function(){window['showGrid_{$modalUid}'](false);};";
 
         // ===== ZONE PANEL =====
-        $pw=320;$ph=240;
+        $pw=320;$ph=280;
         $px=$gx+$gtw+20;$py=$gy;
 
         $zp=new Rectangle($modalUid.'_zone_panel');
@@ -285,6 +285,8 @@ class EntityEvolutionDraw
             $inline.="if(!window['_evoModifiedZones_{$modalUid}'])window['_evoModifiedZones_{$modalUid}']={};";
             $inline.="window['_evoModifiedZones_{$modalUid}'][zid]=pc;";
             $inline.="}";
+            // Calcola e aggiorna il numero di step
+            $inline.="window['_updateStepsCount_{$modalUid}']();";
             $inline.="})();";
             $sl=new SliderDraw($modalUid.'_'.$sc['s']);
             $sl->setOrigin($px+10,$py+50+$si*55);
@@ -368,6 +370,7 @@ class EntityEvolutionDraw
         $js.="var nm=objects['{$modalUid}_zone_name_text'];if(nm){nm.text=found.name;if(shapes['{$modalUid}_zone_name_text'])shapes['{$modalUid}_zone_name_text'].text=found.name;}";
         $js.="var cr=(zc>>16)&255,cg=(zc>>8)&255,cb=zc&255;";
         $js.="window['_setSliderVal_{$modalUid}'](cr,cg,cb);";
+        $js.="window['_updateStepsCount_{$modalUid}']();";
         $js.="};";
         // _setSliderVal
         $trackXNum = $px + 10;
@@ -398,6 +401,32 @@ class EntityEvolutionDraw
         $js.="suids.forEach(function(u){if(shapes[u])shapes[u].renderable=false;if(objects[u]&&objects[u].attributes)objects[u].attributes.renderable=false;});";
         $js.="uids.forEach(function(u){if(shapes[u])shapes[u].renderable=false;if(objects[u]&&objects[u].attributes)objects[u].attributes.renderable=false;});";
         $js.="window['_curZoneId_{$modalUid}']=null;};";
+
+        // _updateStepsCount - calcola il numero di step che verranno creati
+        $js.="window['_updateStepsCount_{$modalUid}']=function(){";
+        $js.="var COLOR_STEP=".Helper::EVOLUTION_COLOR_STEP.";";
+        $js.="var px=window['_evoPixels_{$modalUid}'];";
+        $js.="var modified=window['_evoModifiedZones_{$modalUid}']||{};";
+        $js.="var totalSteps=0;";
+        $js.="var zoneColors={};";
+        $js.="for(var i=0;i<px.length;i++){";
+        $js.="var p=px[i];";
+        $js.="if(!zoneColors[p.zone_id]){zoneColors[p.zone_id]=p.color;}";
+        $js.="}";
+        $js.="for(var zoneId in zoneColors){";
+        $js.="var targetColor=modified[zoneId];";
+        $js.="if(targetColor!==undefined){";
+        $js.="var currentColor=zoneColors[zoneId];";
+        $js.="var cr=(currentColor>>16)&255,cg=(currentColor>>8)&255,cb=currentColor&255;";
+        $js.="var tr=(targetColor>>16)&255,tg=(targetColor>>8)&255,tb=targetColor&255;";
+        $js.="var dr=Math.abs(tr-cr),dg=Math.abs(tg-cg),db=Math.abs(tb-cb);";
+        $js.="var stepsR=Math.ceil(dr/COLOR_STEP),stepsG=Math.ceil(dg/COLOR_STEP),stepsB=Math.ceil(db/COLOR_STEP);";
+        $js.="totalSteps+=stepsR+stepsG+stepsB;";
+        $js.="}";
+        $js.="}";
+        $js.="var titleObj=objects['{$modalUid}_title'];";
+        $js.="if(titleObj){titleObj.text='Evoluzione - {$entity->uid} - Step: '+totalSteps;if(shapes['{$modalUid}_title'])shapes['{$modalUid}_title'].text='Evoluzione - {$entity->uid} - Step: '+totalSteps;}";
+        $js.="};";
 
         $this->initJs.=$gsJs.$js;
 

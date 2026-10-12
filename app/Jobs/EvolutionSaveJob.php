@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\EntityBody;
 use App\Models\EntityBodyZone;
@@ -49,7 +50,7 @@ class EvolutionSaveJob implements ShouldQueue
      * un solo canale di una sola zona. Es. con 1, una zona da R 120 verso
      * R 150 genera 30 EvolutionStep (R 121, R 122, ... fino a R 150).
      */
-    private const COLOR_STEP = 1;
+    private const COLOR_STEP = Helper::EVOLUTION_COLOR_STEP;
 
     /**
      * @param int   $playerId ID del player proprietario del container Evolution
@@ -576,7 +577,7 @@ class EvolutionSaveJob implements ShouldQueue
      * zona, poi quelli del canale G, poi del B, poi la zona successiva),
      * quindi il totale e' la SOMMA dei passi di ogni canale di ogni zona
      * (arrotondati per eccesso rispetto a COLOR_STEP).
-     * Es. con COLOR_STEP = 1 e R da 120 a 150 => 30 passaggi.
+     * Es. con COLOR_STEP = 10 e R=30 => ceil(30/10) = 3 passaggi.
      *
      * @param array<int, array{r: int, g: int, b: int}> $currentColors
      * @param array<int, array{r: int, g: int, b: int}> $zoneColors
