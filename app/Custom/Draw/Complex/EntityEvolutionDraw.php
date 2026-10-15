@@ -221,6 +221,7 @@ class EntityEvolutionDraw
 
         // ===== ZONE PANEL =====
         $pw=320;$ph=280;
+        // Posizione relativa alla griglia (segue lo scroll)
         $px=$gx+$gtw+20;$py=$gy;
 
         $zp=new Rectangle($modalUid.'_zone_panel');
@@ -268,6 +269,10 @@ class EntityEvolutionDraw
             ['s'=>'slider_blue','c'=>0x0000FF,'t'=>'Blu'],
         ];
         $slUids=[];
+        // Posizione fissa rispetto allo schermo (non alla griglia che scorre)
+        // Il zone panel è a $px, $py, quindi gli slider sono relativi a quello
+        $slBaseX = $px + 10;
+        $slBaseY = $py + 50;
         foreach($slCfgs as $si=>$sc){
             $inline="(function(){";
             $inline.="var r=0,g=0,b=0;";
@@ -289,7 +294,7 @@ class EntityEvolutionDraw
             $inline.="window['_updateStepsCount_{$modalUid}']();";
             $inline.="})();";
             $sl=new SliderDraw($modalUid.'_'.$sc['s']);
-            $sl->setOrigin($px+10,$py+50+$si*55);
+            $sl->setOrigin($slBaseX,$slBaseY+$si*55);
             $sl->setWidth($pw-20);$sl->setMin(0);$sl->setMax(255);$sl->setValue(0);
             $sl->setColor($sc['c']);$sl->setTitle($sc['t']);
             $sl->setOnChange($inline);
@@ -373,25 +378,22 @@ class EntityEvolutionDraw
         $js.="window['_updateStepsCount_{$modalUid}']();";
         $js.="};";
         // _setSliderVal
-        $trackXNum = $px + 10;
-        $trackWNum = $pw - 20;
         $js.="window['_setSliderVal_{$modalUid}']=function(r,g,b){";
-        $js.="var trackX={$trackXNum},trackW={$trackWNum};";
         $js.="if(typeof window['_sliderFill_{$modalUid}']!=='function'){";
         $js.="window['_sliderFill_{$modalUid}']=function(trackUid,fillUid,val,color){";
         $js.="var tk=shapes[trackUid];var f=shapes[fillUid];if(!tk||!f)return;";
-        $js.="var w=Math.max(1,Math.round((val/255)*trackW));";
+        $js.="var w=Math.max(1,Math.round((val/255)*tk.width));";
         $js.="f.clear();f.beginFill(color);f.drawRect(0,0,w,8);f.endFill();";
         $js.="f.x=tk.x;f.y=tk.y;";
         $js.="};}";
-        $js.="var kr=shapes['{$modalUid}_slider_red_knob'];";
-        $js.="if(kr)kr.x=trackX+(r/255)*trackW;";
+        $js.="var tr=shapes['{$modalUid}_slider_red_track_bg'];var kr=shapes['{$modalUid}_slider_red_knob'];";
+        $js.="if(tr&&kr){kr.x=tr.x+(r/255)*tr.width;kr.y=tr.y+4;}";
         $js.="window['_sliderFill_{$modalUid}']('{$modalUid}_slider_red_track_bg','{$modalUid}_slider_red_track_fill',r,0xFF0000);";
-        $js.="var kg=shapes['{$modalUid}_slider_green_knob'];";
-        $js.="if(kg)kg.x=trackX+(g/255)*trackW;";
+        $js.="var tg=shapes['{$modalUid}_slider_green_track_bg'];var kg=shapes['{$modalUid}_slider_green_knob'];";
+        $js.="if(tg&&kg){kg.x=tg.x+(g/255)*tg.width;kg.y=tg.y+4;}";
         $js.="window['_sliderFill_{$modalUid}']('{$modalUid}_slider_green_track_bg','{$modalUid}_slider_green_track_fill',g,0x00FF00);";
-        $js.="var kb=shapes['{$modalUid}_slider_blue_knob'];";
-        $js.="if(kb)kb.x=trackX+(b/255)*trackW;";
+        $js.="var tb=shapes['{$modalUid}_slider_blue_track_bg'];var kb=shapes['{$modalUid}_slider_blue_knob'];";
+        $js.="if(tb&&kb){kb.x=tb.x+(b/255)*tb.width;kb.y=tb.y+4;}";
         $js.="window['_sliderFill_{$modalUid}']('{$modalUid}_slider_blue_track_bg','{$modalUid}_slider_blue_track_fill',b,0x0000FF);";
         $js.="};";
         // closeZonePanel
