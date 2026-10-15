@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Alert;
 use App\Models\Entity;
 use App\Models\EntityBody;
 use App\Models\EntityBodyZone;
@@ -48,7 +49,7 @@ use RuntimeException;
  */
 class EntityCreationService
 {
-    const EVOLUTION_STEP_POPULATION_THRESHOLD = 5;
+    const EVOLUTION_STEP_POPULATION_THRESHOLD = 2;
 
     public function __construct(private Player $player)
     {
@@ -215,10 +216,6 @@ class EntityCreationService
                 // Verifica che l'entity sorgente appartenga allo step corrente
                 // Solo le entity dello step corrente contano per la popolazione
                 if ($sourceEntity->evolution_step_id === $currentEvolutionStep->id) {
-                    // Incrementa la popolazione dello step corrente
-                    $currentEvolutionStep->increment('population');
-                    $currentEvolutionStep->refresh();
-
                     // Setta come IN_PROGRESS se era CREATED
                     if ($currentEvolutionStep->state === EvolutionStep::STATE_CREATED) {
                         $currentEvolutionStep->update(['state' => EvolutionStep::STATE_IN_PROGRESS]);
@@ -448,8 +445,19 @@ class EntityCreationService
             // Questo accade quando l'ultimo step raggiunge il threshold di popolazione
             $evolutionPath->update(['state' => EvolutionPath::STATE_COMPLETED]);
 
+            // Recupera il player dall'EvolutionPath
+            $playerId = $evolutionPath->specie->player_id;
+
             // Sblocca l'evoluzione per il player
-            PlayerValue::setIntegerValue($player->id, 'block_evolution', false);
+            PlayerValue::setFlag($playerId, PlayerValue::KEY_BLOCK_EVOLUTION, false);
+
+            // Crea un alert per il player
+            Alert::query()->create([
+                'player_id' => $playerId,
+                'title' => 'Evoluzione Completata',
+                'body' => 'Il percorso di evoluzione è stato completato con successo.',
+                'type' => Alert::TYPE_SUCCESS,
+            ]);
 
             Log::info('EntityCreationService: percorso di evoluzione completato (ultimo step raggiunto)', [
                 'evolution_path_id' => $evolutionPath->id,
@@ -474,7 +482,7 @@ class EntityCreationService
         while ($i < count($details)) {
             $detail = $details[$i];
 
-            if ($detail->key === 'zone_id') {
+            if (strtoupper($detail->key) === 'ZONE_ID') {
                 $zoneId = (int) $detail->value;
 
                 // Le 3 righe successive contengono R, G, B
