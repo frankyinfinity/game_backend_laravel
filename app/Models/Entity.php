@@ -33,6 +33,7 @@ class Entity extends Model
         return [
             "tile_i" => $this->tile_i,
             "tile_j" => $this->tile_j,
+            "evolution_step_id" => $this->evolution_step_id,
         ];
     }
 

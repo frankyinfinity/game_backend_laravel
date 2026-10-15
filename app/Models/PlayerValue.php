@@ -23,6 +23,7 @@ class PlayerValue extends Model
     public const KEY_CHIMICAL_ELEMENT = 'chimical_element';
     public const KEY_CHIMICAL_ELEMENT_CONSUME = 'chimical_element_consume';
     public const KEY_CHIMICAL_ELEMENT_CONSUME_PER_TICK = 'chimical_element_consume_per_tick';
+    public const KEY_LAST_EVOLUTION_STEP_ID = 'last_evolution_step_id';
 
     public const BOOLEAN_KEYS = [
         self::KEY_MOVEMENT,
@@ -39,6 +40,10 @@ class PlayerValue extends Model
         self::KEY_DIVISION_COST => 50,
         self::KEY_LIFEPOINT_GENERATE_NEW_ENTITY => 40,
         self::KEY_CHIMICAL_ELEMENT_CONSUME_PER_TICK => 4,
+    ];
+
+    public const STRING_KEYS = [
+        self::KEY_LAST_EVOLUTION_STEP_ID => 'null',
     ];
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
@@ -66,6 +71,16 @@ class PlayerValue extends Model
                 [
                     'data_type' => self::TYPE_INTEGER,
                     'value' => (string) $integerValue,
+                ]
+            );
+        }
+
+        foreach (self::STRING_KEYS as $key => $stringValue) {
+            self::query()->updateOrCreate(
+                ['player_id' => $playerId, 'key' => $key],
+                [
+                    'data_type' => self::TYPE_STRING,
+                    'value' => $stringValue,
                 ]
             );
         }

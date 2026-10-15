@@ -49,7 +49,7 @@ use RuntimeException;
  */
 class EntityCreationService
 {
-    const EVOLUTION_STEP_POPULATION_THRESHOLD = 2;
+    const EVOLUTION_STEP_POPULATION_THRESHOLD = 3;
 
     public function __construct(private Player $player)
     {

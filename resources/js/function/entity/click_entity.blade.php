@@ -107,6 +107,31 @@
             return false;
         };
 
+        const resolveLastEvolutionStepId = () => {
+            const wsResponse = (typeof AppData !== 'undefined') ? AppData.player_values_ws_response : null;
+            if (!wsResponse || typeof wsResponse !== 'object') return 'null';
+
+            const valuesFromDocker = wsResponse.data && wsResponse.data.values;
+            if (valuesFromDocker && typeof valuesFromDocker === 'object') {
+                return valuesFromDocker.last_evolution_step_id || 'null';
+            }
+
+            const directValues = wsResponse.values;
+            if (directValues && typeof directValues === 'object') {
+                return directValues.last_evolution_step_id || 'null';
+            }
+
+            return 'null';
+        };
+
+        const resolveEntityEvolutionStepId = () => {
+            // Recupera l'evolution_step_id dell'entity cliccata dall'oggetto
+            if (object && object.attributes && object.attributes.evolution_step_id !== undefined) {
+                return String(object.attributes.evolution_step_id);
+            }
+            return 'null';
+        };
+
         const resolveEvolutionEnabled = () => {
             const wsResponse = (typeof AppData !== 'undefined') ? AppData.player_values_ws_response : null;
             if (!wsResponse || typeof wsResponse !== 'object') return false;
@@ -126,12 +151,35 @@
 
         const applyDivisionButtonVisibility = () => {
             const divisionEnabled = resolveDivisionEnabled();
-            const divisionButtonUids = [object_uid + '_button_division_rect', object_uid + '_button_division_text'];
-            divisionButtonUids.forEach((uid) => {
+            const lastEvolutionStepId = resolveLastEvolutionStepId();
+            const entityEvolutionStepId = resolveEntityEvolutionStepId();
+
+            // Regola: divisione cliccabile solo se last_evolution_step_id == entity evolution_step_id
+            const stepMatch = lastEvolutionStepId === entityEvolutionStepId;
+            const shouldEnable = divisionEnabled && stepMatch;
+
+            const divisionButtonRectUid = object_uid + '_button_division_rect';
+            const divisionButtonTextUid = object_uid + '_button_division_text';
+
+            // Gestisci la visibilità del pulsante
+            [divisionButtonRectUid, divisionButtonTextUid].forEach((uid) => {
                 if (shapes[uid]) {
                     shapes[uid].renderable = !!(show && divisionEnabled);
                 }
             });
+
+            // Se la regola non è soddisfatta, rendi nero solo il rect (non il testo) e rimuovi il pointer
+            if (shapes[divisionButtonRectUid]) {
+                if (!shouldEnable && divisionEnabled) {
+                    shapes[divisionButtonRectUid].tint = 0x000000;
+                    shapes[divisionButtonRectUid].interactive = false;
+                    shapes[divisionButtonRectUid].buttonMode = false;
+                } else {
+                    shapes[divisionButtonRectUid].tint = 0xFFFFFF;
+                    shapes[divisionButtonRectUid].interactive = true;
+                    shapes[divisionButtonRectUid].buttonMode = true;
+                }
+            }
         };
 
         const resolveBlockEvolutionEnabled = () => {

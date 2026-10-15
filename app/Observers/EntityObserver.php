@@ -4,10 +4,35 @@ namespace App\Observers;
 
 use App\Models\Entity;
 use App\Models\EvolutionStep;
+use App\Models\PlayerValue;
 use Illuminate\Support\Facades\Log;
 
 class EntityObserver
 {
+    /**
+     * Handle the Entity "created" event.
+     */
+    public function created(Entity $entity): void
+    {
+        // Se l'entity ha un evolution_step_id, salvalo in PlayerValue
+        if ($entity->evolution_step_id) {
+            $playerId = $entity->specie->player_id;
+            PlayerValue::setValue(
+                $playerId,
+                PlayerValue::KEY_LAST_EVOLUTION_STEP_ID,
+                (string) $entity->evolution_step_id,
+                PlayerValue::TYPE_STRING
+            );
+
+            Log::info('EntityObserver: LAST_EVOLUTION_STEP_ID salvato', [
+                'entity_id' => $entity->id,
+                'entity_uid' => $entity->uid,
+                'evolution_step_id' => $entity->evolution_step_id,
+                'player_id' => $playerId,
+            ]);
+        }
+    }
+
     /**
      * Handle the Entity "updated" event.
      */
