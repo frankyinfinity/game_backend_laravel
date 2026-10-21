@@ -2,6 +2,59 @@
 
 window['__name__'] = function() {
     const modalUid = '__MODAL_UID__';
+
+    // Close sidebar first if this is the objectives modal
+    if (typeof modalUid === 'string' && modalUid.startsWith('objective_modal_')) {
+        let resolvedPlayerId = null;
+        if (typeof playerId !== 'undefined') {
+            resolvedPlayerId = playerId;
+        } else if (typeof window !== 'undefined' && typeof window.playerId !== 'undefined') {
+            resolvedPlayerId = window.playerId;
+        } else if (typeof AppData !== 'undefined' && typeof AppData.player_id !== 'undefined') {
+            resolvedPlayerId = AppData.player_id;
+        }
+
+        if (resolvedPlayerId) {
+            const sidebarBackgroundUid = 'appbar_' + resolvedPlayerId + '_sidebar_background';
+            const sidebarButtonUids = [
+                'appbar_' + resolvedPlayerId + '_sidebar_objectives_button_rect',
+                'appbar_' + resolvedPlayerId + '_sidebar_objectives_button_text',
+                'appbar_' + resolvedPlayerId + '_sidebar_logout_button_rect',
+                'appbar_' + resolvedPlayerId + '_sidebar_logout_button_text'
+            ];
+
+            const sidebarBackground = shapes[sidebarBackgroundUid];
+            if (sidebarBackground && sidebarBackground.renderable) {
+                const targetX = -300;
+                const startX = sidebarBackground.x;
+                const duration = 300;
+                const startTime = performance.now();
+
+                const animateSidebar = (currentTime) => {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const easeProgress = 1 - Math.pow(1 - progress, 3);
+                    const currentX = startX + (targetX - startX) * easeProgress;
+                    sidebarBackground.x = currentX;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animateSidebar);
+                    } else {
+                        sidebarBackground.renderable = false;
+                        sidebarButtonUids.forEach(uid => {
+                            if (shapes[uid]) {
+                                shapes[uid].renderable = false;
+                            }
+                        });
+                        sidebarBackground.x = targetX;
+                    }
+                };
+
+                requestAnimationFrame(animateSidebar);
+            }
+        }
+    }
+
     if (typeof AppData !== 'undefined') {
         if (!AppData.open_modals || typeof AppData.open_modals !== 'object') {
             AppData.open_modals = {};

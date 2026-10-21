@@ -175,6 +175,21 @@ class GenerateMapJob implements ShouldQueue
             $drawItems[] = $objectDraw->get();
         }
 
+        // Draw Sidebar (separate from appbar)
+        $sidebar = $appbar->getSidebar();
+        if ($sidebar) {
+            \Log::info('Adding sidebar draw items to drawItems array');
+            $sidebarDrawItems = $sidebar->getDrawItems();
+            \Log::info('Sidebar draw items count: ' . count($sidebarDrawItems));
+            foreach ($sidebarDrawItems as $item) {
+                \Log::info('Processing sidebar item: ' . ($item['uid'] ?? 'no uid'));
+                $objectDraw = new ObjectDraw($item, $player->actual_session_id);
+                $drawItems[] = $objectDraw->get();
+            }
+        } else {
+            \Log::warning('Sidebar is null');
+        }
+
         // Start score websocket polling for real-time score updates
         $scorePollScriptPath = resource_path('js/function/score/score_update_poll.blade.php');
         $scorePollScript = file_get_contents($scorePollScriptPath);

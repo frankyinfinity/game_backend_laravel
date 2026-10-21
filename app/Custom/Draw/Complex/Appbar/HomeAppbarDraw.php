@@ -7,6 +7,7 @@ use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Custom\Draw\Complex\ScoreDraw;
+use App\Custom\Draw\Complex\SidebarDraw;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Colors;
 use App\Helper\Helper;
@@ -23,30 +24,30 @@ class HomeAppbarDraw extends AppbarDraw
     {
         // Player name text (centered vertically)
         $playerName = new Text($this->getUid() . '_player_name');
-        $playerName->setOrigin(20, 20); // Left padding, vertically centered
+        $playerName->setOrigin(120, 20); // Shifted right to avoid menu button
         $playerName->setFontSize(24);
         $playerName->setFontFamily('Outfit');
         $playerName->setColor(Colors::WHITE);
-        
+
         $displayName = 'Giocatore';
         if ($this->player) {
             $displayName = $this->player->name ?? ($this->player->user->name ?? 'Giocatore');
         }
         $playerName->setText($displayName);
-        
+
         // Location text (planet - region) (centered vertically)
         $locationText = new Text($this->getUid() . '_location');
-        $locationText->setOrigin(20, 45); // Left padding, vertically centered
+        $locationText->setOrigin(120, 45); // Shifted right to avoid menu button
         $locationText->setFontSize(18);
         $locationText->setFontFamily('Outfit');
         $locationText->setColor(0xCCCCCC); // Light gray
-        
+
         $locationString = '(Nessun pianeta selezionato)';
         if ($this->player && $this->player->birthPlanet && $this->player->birthRegion) {
             $locationString = "({$this->player->birthPlanet->name} - {$this->player->birthRegion->name})";
         }
         $locationText->setText($locationString);
-        
+
         // Add elements using addLeftElement()
         $this->addLeftElement($playerName);
         $this->addLeftElement($locationText);
@@ -54,40 +55,60 @@ class HomeAppbarDraw extends AppbarDraw
 
     /**
      * Add elements to the right section of the appbar
-     * Uses addRightElement() to add logout button
+     * Uses addRightElement() to add menu button
      */
     protected function addRightSection(): void
     {
         \Log::info('HomeAppbarDraw::addRightSection() called');
-        
-        // Logout button
-        $logoutButton = new ButtonDraw($this->getUid() . '_logout_button');
-        $logoutButton->setOrigin(1400, 25); // Right aligned, vertically centered
-        $logoutButton->setSize(80, 30);
-        $logoutButton->setString('Logout');
-        $logoutButton->setColorButton(Colors::RED);
-        $logoutButton->setColorString(Colors::WHITE);
-        $logoutButton->setTextFontSize(14);
-        
-        // Set onClick function
-        $jsPathOnClickLogout = resource_path('js/function/appbar/on_click_logout.blade.php');
-        $jsContentOnClickLogout = file_get_contents($jsPathOnClickLogout);
-        $jsContentOnClickLogout = Helper::setCommonJsCode($jsContentOnClickLogout, Str::random(20));
 
-        $logoutButton->setOnClick($jsContentOnClickLogout);
-        $logoutButton->build();
-        
+        // Menu button
+        $menuButton = new ButtonDraw($this->getUid() . '_menu_button');
+        $menuButton->setOrigin(20, 25); // Left side of appbar
+        $menuButton->setSize(80, 30);
+        $menuButton->setString('Menu');
+        $menuButton->setColorButton(Colors::BLUE);
+        $menuButton->setColorString(Colors::WHITE);
+        $menuButton->setTextFontSize(14);
+
+        // Set onClick function to toggle sidebar
+        $jsPathOnClickMenu = resource_path('js/function/appbar/on_click_menu.blade.php');
+        $jsContentOnClickMenu = file_get_contents($jsPathOnClickMenu);
+        $jsContentOnClickMenu = Helper::setCommonJsCode($jsContentOnClickMenu, Str::random(20));
+
+        $menuButton->setOnClick($jsContentOnClickMenu);
+        $menuButton->build();
+
         // Add button elements using addRightElement()
-        $drawItems = $logoutButton->getDrawItems();
-        
-        // Debug: Log the draw items
-        \Log::info('Logout button draw items count: ' . count($drawItems));
-        
+        $drawItems = $menuButton->getDrawItems();
+
+        \Log::info('Menu button draw items count: ' . count($drawItems));
+
         if (!empty($drawItems)) {
             foreach ($drawItems as $item) {
                 $this->addRightElement($item);
             }
         }
+
+        // Add sidebar
+        $this->addSidebar();
+    }
+
+    private function addSidebar(): void
+    {
+        if (!$this->player) {
+            return;
+        }
+
+        $sidebar = new SidebarDraw($this->getUid() . '_sidebar', $this->player->id);
+        $sidebar->build();
+
+        // Store sidebar for later use in GenerateMapJob
+        $this->sidebar = $sidebar;
+    }
+
+    public function getSidebar(): ?SidebarDraw
+    {
+        return $this->sidebar ?? null;
     }
 
     /**
@@ -160,27 +181,8 @@ class HomeAppbarDraw extends AppbarDraw
             }
         }
 
-        // Objectives button in center section, positioned left of Logout.
-        $objectivesButton = new ButtonDraw($this->getUid() . '_objectives_button');
-        $objectivesButton->setOrigin(1290, 25);
-        $objectivesButton->setSize(100, 30);
-        $objectivesButton->setString('Obiettivi');
-        $objectivesButton->setColorButton(Colors::BLUE);
-        $objectivesButton->setColorString(Colors::WHITE);
-        $objectivesButton->setTextFontSize(14);
-
+        // Add objectives modal (button is now in sidebar)
         $modalUid = 'objective_modal_' . $this->player->id;
-        $jsPathOnClickObjectives = resource_path('js/function/modal/click_open_modal.blade.php');
-        $jsContentOnClickObjectives = file_get_contents($jsPathOnClickObjectives);
-        $jsContentOnClickObjectives = str_replace('__MODAL_UID__', $modalUid, $jsContentOnClickObjectives);
-        $jsContentOnClickObjectives = Helper::setCommonJsCode($jsContentOnClickObjectives, Str::random(20));
-        $objectivesButton->setOnClick($jsContentOnClickObjectives);
-        $objectivesButton->build();
-
-        foreach ($objectivesButton->getDrawItems() as $drawItem) {
-            $this->addCenterElement($drawItem);
-        }
-
         $this->addObjectiveModal($modalUid);
     }
 
