@@ -209,7 +209,7 @@ class EntityObserver
     }
 
     /**
-     * Incrementa population_death su TimelineEvolutionDetail quando un entity muore.
+     * Incrementa population_death e decrementa population_life su TimelineEvolutionDetail quando un entity muore.
      * Non tocca TimelineEvolutionDetailEntity.
      */
     protected function decrementTimelineEvolutionDetail(Entity $entity): void
@@ -234,9 +234,10 @@ class EntityObserver
         }
 
         $timelineEvolutionDetail->increment('population_death');
+        $timelineEvolutionDetail->decrement('population_life');
         $timelineEvolutionDetail->refresh();
 
-        Log::info('EntityObserver: population_death incrementata su TimelineEvolutionDetail per morte entity', [
+        Log::info('EntityObserver: population_death incrementata e population_life decrementata su TimelineEvolutionDetail per morte entity', [
             'entity_id' => $entity->id,
             'entity_uid' => $entity->uid,
             'timeline_evolution_detail_id' => $timelineEvolutionDetail->id,
