@@ -34,10 +34,13 @@ class ScoreDraw {
     private $scoreName;
     private $backgroundColor;
     private $borderColor;
+    private $borderWidth;
     private $textColor;
     private $borderRadius;
     private string $textFontFamily;
     private int $textFontSize;
+    private bool $transparentBackground = false;
+    private ?int $imageSize = null;
 
     public function setSize($width, $height): void
     {
@@ -76,6 +79,11 @@ class ScoreDraw {
         $this->borderColor = $color;
     }
 
+    public function setBorderWidth($width): void
+    {
+        $this->borderWidth = $width;
+    }
+
     public function setTextColor($color): void
     {
         $this->textColor = $color;
@@ -94,6 +102,16 @@ class ScoreDraw {
     public function setTextFontFamily(string $value): void
     {
         $this->textFontFamily = $value;
+    }
+
+    public function setTransparentBackground(bool $value): void
+    {
+        $this->transparentBackground = $value;
+    }
+
+    public function setImageSize(?int $size): void
+    {
+        $this->imageSize = $size;
     }
 
     private $renderable;
@@ -115,13 +133,11 @@ class ScoreDraw {
         $textColor = $this->textColor;
         $borderRadius = $this->borderRadius ?? 10;
 
-        // Rounded Rectangle as background
+        // Background rectangle (transparent or colored)
         $rect = new Primitive\Rectangle($uid . '_rect');
         $rect->setSize($width, $height);
         $rect->setOrigin($x, $y);
         $rect->setColor($backgroundColor);
-        $rect->setBorderColor($borderColor);
-        $rect->setBorderRadius($borderRadius);
         $rect->setRenderable($this->renderable);
 
         // Tooltip: just the score name
@@ -131,9 +147,44 @@ class ScoreDraw {
 
         $this->drawItems[] = $rect;
 
+        // Border using 4 separate rectangles (top, bottom, left, right)
+        $borderThickness = $this->borderWidth ?? 1;
+
+        // Top border
+        $borderTop = new Primitive\Rectangle($uid . '_border_top');
+        $borderTop->setOrigin($x, $y);
+        $borderTop->setSize($width, $borderThickness);
+        $borderTop->setColor($borderColor);
+        $borderTop->setRenderable($this->renderable);
+        $this->drawItems[] = $borderTop;
+
+        // Bottom border
+        $borderBottom = new Primitive\Rectangle($uid . '_border_bottom');
+        $borderBottom->setOrigin($x, $y + $height - $borderThickness);
+        $borderBottom->setSize($width, $borderThickness);
+        $borderBottom->setColor($borderColor);
+        $borderBottom->setRenderable($this->renderable);
+        $this->drawItems[] = $borderBottom;
+
+        // Left border
+        $borderLeft = new Primitive\Rectangle($uid . '_border_left');
+        $borderLeft->setOrigin($x, $y);
+        $borderLeft->setSize($borderThickness, $height);
+        $borderLeft->setColor($borderColor);
+        $borderLeft->setRenderable($this->renderable);
+        $this->drawItems[] = $borderLeft;
+
+        // Right border
+        $borderRight = new Primitive\Rectangle($uid . '_border_right');
+        $borderRight->setOrigin($x + $width - $borderThickness, $y);
+        $borderRight->setSize($borderThickness, $height);
+        $borderRight->setColor($borderColor);
+        $borderRight->setRenderable($this->renderable);
+        $this->drawItems[] = $borderRight;
+
         // Calculate horizontal layout: image on left, text on right
         $padding = 10;
-        $imageSize = min($height - ($padding * 2), 40);
+        $imageSize = $this->imageSize ?? min($height - ($padding * 2), 40);
         $textHeight = $this->textFontSize;
 
         // Image

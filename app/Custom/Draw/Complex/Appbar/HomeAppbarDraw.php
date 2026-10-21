@@ -152,21 +152,23 @@ class HomeAppbarDraw extends AppbarDraw
                 $scoreDraw = new ScoreDraw('player_'.$playerScore->player_id.'_score_' . $playerScore->score_id);
                 $scoreDraw->setOrigin($x, $centerY);
                 $scoreDraw->setSize($scoreWidth, $scoreHeight);
-                $scoreDraw->setBackgroundColor('#4169E1');
-                $scoreDraw->setBorderColor('#5B7FE8');
+                $scoreDraw->setBackgroundColor(0x00000000); // Transparent background
+                $scoreDraw->setBorderColor('#5B7FE8'); // Blue border
+                $scoreDraw->setBorderWidth(3); // Thicker border for visibility
                 $scoreDraw->setBorderRadius(10);
-                
+                $scoreDraw->setImageSize(35); // Slightly smaller image
+
                 // Get image path for this score
                 $imagePath = '/storage/scores/' . $score->id . '.png';
                 $scoreDraw->setScoreImage($imagePath);
-                
+
                 // Use the value from player_score table if available, else 0
                 $scoreValue = $playerScore->value ?? 0;
                 $scoreDraw->setScoreValue((string) $scoreValue);
-                
+
                 // Score name for tooltip
                 $scoreDraw->setScoreName($score->name ?? 'Score ' . $score->id);
-                
+
                 // White text
                 $scoreDraw->setTextColor('#FFFFFF');
                 $scoreDraw->setTextFontSize(16);
