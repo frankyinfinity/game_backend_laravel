@@ -171,6 +171,14 @@ return [
             'throw' => false,
         ],
 
+        'time_evolution_details' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/time_evolution_details'),
+            'url' => env('STATIC_URL', env('APP_URL')).'/storage/time_evolution_details',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
