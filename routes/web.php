@@ -27,6 +27,10 @@ Route::get('/test', [App\Http\Controllers\TestController::class, 'index'])->name
 Route::post('/test/action', [App\Http\Controllers\TestController::class, 'action'])->name('test.action');
 Route::get('/test/console', [App\Http\Controllers\TestController::class, 'console'])->name('test.console');
 Route::post('/test/console/exec', [App\Http\Controllers\TestController::class, 'consoleExec'])->name('test.console.exec');
+Route::post('/test/{player}/trigger-draw', [App\Http\Controllers\TestController::class, 'triggerDraw'])->name('test.trigger-draw')->whereNumber('player');
+Route::get('/test/{player}/containers', [App\Http\Controllers\TestController::class, 'getPlayerContainers'])->name('test.containers')->whereNumber('player');
+Route::post('/test/{player}/favorite', [App\Http\Controllers\TestController::class, 'setFavoritePlayer'])->name('test.set-favorite')->whereNumber('player');
+Route::post('/test/unset-favorite', [App\Http\Controllers\TestController::class, 'unsetFavoritePlayer'])->name('test.unset-favorite');
 
 Route::group(['middleware' => ['auth']], function () {
 

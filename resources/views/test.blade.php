@@ -7,17 +7,72 @@
 @stop
 
 @section('content')
-<div id="display_container" style="width: 100%; height: 80vh; background: #fff; position: relative;">
-    {{-- <div id="map_direction_pad" class="map-direction-pad">
-        <button type="button" class="map-dir-btn map-dir-up" data-dir="up"><i class="fa fa-chevron-up"></i></button>
-        <button type="button" class="map-dir-btn map-dir-left" data-dir="left"><i
-                class="fa fa-chevron-left"></i></button>
-        <button type="button" class="map-dir-btn map-dir-right" data-dir="right"><i
-                class="fa fa-chevron-right"></i></button>
-        <button type="button" class="map-dir-btn map-dir-down" data-dir="down"><i
-                class="fa fa-chevron-down"></i></button>
-    </div> --}}
+<div class="row">
+    <div class="col-md-3">
+        <div class="card card-outline card-primary">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-user"></i> Seleziona Player</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="playerSelect">Player</label>
+                    <select class="form-control" id="playerSelect">
+                        <option value="">-- Seleziona un player --</option>
+                        @foreach($players as $player)
+                            <option value="{{ $player->id }}" data-channel="player_{{ $player->id }}_channel" @if($favoritePlayerId == $player->id) selected @endif>
+                                {{ $favoritePlayerId == $player->id ? '⭐ ' : '' }}Player #{{ $player->id }} - {{ $player->user?->name ?? 'N/A' }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div id="favoriteButtonContainer" style="display:none; margin-top: 10px;">
+                    <button type="button" class="btn btn-warning btn-sm btn-block" id="btnToggleFavorite">
+                        <i class="fas fa-star"></i> Imposta come preferito
+                    </button>
+                </div>
+                <div id="playerInfo" style="display:none; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                    <small class="text-muted">
+                        <strong>Canale Pusher:</strong> <code id="channelName">-</code><br>
+                        <strong>Utente:</strong> <span id="userName">-</span><br>
+                        <strong>Regione:</strong> <span id="regionName">-</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-outline card-success" id="drawCard" style="display:none; margin-top: 15px;">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-pencil-alt"></i> Test Draw</h5>
+            </div>
+            <div class="card-body">
+                <button type="button" class="btn btn-success btn-block" id="btnTriggerDraw">
+                    <i class="fas fa-play"></i> Esegui test:draw
+                </button>
+                <div id="drawStatus" style="margin-top: 10px; font-size: 12px;"></div>
+            </div>
+        </div>
+
+        <div class="card card-outline card-info" id="containersCard" style="display:none; margin-top: 15px;">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-cubes"></i> Container</h5>
+                <span class="badge badge-secondary" id="containerCount">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div id="containersList" style="max-height: 400px; overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-spinner fa-spin"></i> Caricamento...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        <div id="display_container" style="width: 100%; height: 80vh; background: #fff; position: relative; border-radius: 8px; border: 1px solid #e2e8f0;">
+        </div>
+    </div>
 </div>
+
 <div class="status-msg"
     style="position: absolute; bottom: 10px; right: 10px; opacity: 0.5; background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 5px; font-size: 0.8rem; color: white;">
     Test Page - Inizializzazione...</div>
@@ -81,6 +136,66 @@
         grid-column: 2;
         grid-row: 3;
     }
+
+    .container-item {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    .container-item:hover {
+        background: #f8fafc;
+    }
+
+    .container-item:last-child {
+        border-bottom: none;
+    }
+
+    .container-name {
+        font-weight: 600;
+        font-size: 13px;
+        color: #1e293b;
+    }
+
+    .container-type {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .container-status {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+
+    .container-status.running {
+        background: #22c55e;
+    }
+
+    .container-status.exited {
+        background: #ef4444;
+    }
+
+    .container-status.unknown {
+        background: #94a3b8;
+    }
+
+    #containersList::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    #containersList::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+
+    #containersList::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
 </style>
 @stop
 
@@ -99,10 +214,13 @@
         DRAW_WS_URL: 'ws://localhost:8080',
         DEBUG_MODE: true
     };
-    const testPlayerId = 1; // Use player 1 to match TestDrawCommand
-    window.playerId = 1;
+    let testPlayerId = null; // Will be set from player selection
+    window.playerId = null;
     const sessionId = 'test_session_fixed';
     const hostname = new URL(BACK_URL).hostname;
+    let currentPusher = null;
+    let currentChannel = null;
+    const favoritePlayerId = {{ $favoritePlayerId ?? 'null' }};
 
     window.AppData = {
         actual_focus_uid_entity: null
@@ -852,32 +970,18 @@
         d.render(app);
     }
 
-    $(document).ready(function () {
-        initPixi();
-        status('PixiJS Avviato - Connessione a Reverb...');
+    function connectToPlayerChannel(playerId) {
+        if (currentPusher) {
+            currentPusher.disconnect();
+            currentPusher = null;
+        }
 
-        $(document).on('mousedown touchstart', '.map-dir-btn', function (e) {
-            e.preventDefault();
-            const direction = $(this).data('dir');
-            startDirectionHold(direction);
-        });
-
-        $(document).on('mouseup mouseleave touchend touchcancel', '.map-dir-btn', function () {
-            stopDirectionHold();
-        });
-
-        $(window).on('mouseup touchend touchcancel blur', function () {
-            stopDirectionHold();
-        });
-
-        const channelName = 'player_' + testPlayerId + '_channel';
+        const channelName = 'player_' + playerId + '_channel';
         if (config.DEBUG_MODE) {
             Pusher.logToConsole = true;
         }
 
-        initDrawItemsSocket();
-
-        const pusher = new Pusher(config.REVERB_APP_KEY, {
+        currentPusher = new Pusher(config.REVERB_APP_KEY, {
             cluster: config.REVERB_CLUSTER,
             wsHost: config.REVERB_HOST,
             wsPort: config.REVERB_PORT,
@@ -887,34 +991,34 @@
             disableStats: true
         });
 
-        pusher.connection.bind('connected', function () {
+        currentPusher.connection.bind('connected', function () {
             status('Connesso a Reverb - Sottoscrizione canale...');
             console.log('Reverb connected');
         });
 
-        pusher.connection.bind('disconnected', function () {
+        currentPusher.connection.bind('disconnected', function () {
             status('Disconnesso da Reverb');
             console.log('Reverb disconnected');
         });
 
-        pusher.connection.bind('error', function (error) {
+        currentPusher.connection.bind('error', function (error) {
             status('Errore connessione Reverb');
             console.error('Reverb connection error:', error);
         });
 
-        const channel = pusher.subscribe(channelName);
-        channel.bind('pusher:subscription_succeeded', function () {
+        currentChannel = currentPusher.subscribe(channelName);
+        currentChannel.bind('pusher:subscription_succeeded', function () {
             status('Connesso a Reverb - In attesa di eventi di disegno...');
             console.log('Test player channel subscribed:', channelName);
         });
 
-        channel.bind('pusher:subscription_error', function (data) {
+        currentChannel.bind('pusher:subscription_error', function (data) {
             status('Errore sottoscrizione canale: ' + (data?.error || 'unknown'));
             console.error('Subscription error:', data);
         });
 
         // Listen for draw_interface events
-        channel.bind('draw_interface', function (data) {
+        currentChannel.bind('draw_interface', function (data) {
             console.log('Draw interface event received:', data);
             status('Evento di disegno ricevuto...');
 
@@ -1014,6 +1118,268 @@
                 app.stage.sortChildren();
                 status('Disegno completato');
             }
+        });
+    }
+
+    function loadPlayerContainers(playerId) {
+        const url = `/test/${playerId}/containers`;
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        $.get(url, function(response) {
+            if (response.success) {
+                renderContainers(response.containers);
+            } else {
+                const errorMsg = response.message || 'Errore caricamento container';
+                $('#containersList').html('<div class="text-center text-danger py-3"><small>' + errorMsg + '</small></div>');
+                console.error('Container loading error:', response);
+            }
+        }).fail(function(xhr) {
+            const errorMsg = xhr.responseJSON?.message || 'Errore caricamento container';
+            $('#containersList').html('<div class="text-center text-danger py-3"><small>' + errorMsg + '</small></div>');
+            console.error('Container loading failed:', xhr);
+        });
+    }
+
+    function renderContainers(containers) {
+        if (!containers || containers.length === 0) {
+            $('#containersList').html('<div class="text-center text-muted py-3">Nessun container trovato</div>');
+            $('#containerCount').text('0');
+            return;
+        }
+
+        $('#containerCount').text(containers.length);
+
+        let html = '';
+        containers.forEach(function(container) {
+            const statusClass = container.status || 'unknown';
+            const isRunning = statusClass === 'running';
+            html += `
+                <div class="container-item" data-id="${container.id}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="container-name">
+                                <span class="container-status ${statusClass}"></span>
+                                ${container.name}
+                            </div>
+                            <div class="container-type">
+                                ${container.type_label || container.parent_type} | ${container.status_label || 'Unknown'}
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            ${isRunning ?
+                                `<button type="button" class="btn btn-danger btn-xs" onclick="stopContainer(${container.id})">
+                                    <i class="fas fa-stop"></i>
+                                </button>` :
+                                `<button type="button" class="btn btn-success btn-xs" onclick="startContainer(${container.id})">
+                                    <i class="fas fa-play"></i>
+                                </button>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        $('#containersList').html(html);
+    }
+
+    function startContainer(containerId) {
+        const btn = $(`button[onclick="startContainer(${containerId})"]`);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        $.post(`/containers/${containerId}/start`, function(response) {
+            if (response.success) {
+                if (testPlayerId) {
+                    loadPlayerContainers(testPlayerId);
+                }
+            } else {
+                alert('Errore avvio container');
+                btn.prop('disabled', false).html('<i class="fas fa-play"></i>');
+            }
+        }).fail(function() {
+            alert('Errore avvio container');
+            btn.prop('disabled', false).html('<i class="fas fa-play"></i>');
+        });
+    }
+
+    function stopContainer(containerId) {
+        const btn = $(`button[onclick="stopContainer(${containerId})"]`);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        $.post(`/containers/${containerId}/stop`, function(response) {
+            if (response.success) {
+                if (testPlayerId) {
+                    loadPlayerContainers(testPlayerId);
+                }
+            } else {
+                alert('Errore stop container');
+                btn.prop('disabled', false).html('<i class="fas fa-stop"></i>');
+            }
+        }).fail(function() {
+            alert('Errore stop container');
+            btn.prop('disabled', false).html('<i class="fas fa-stop"></i>');
+        });
+    }
+
+    function toggleFavorite() {
+        if (!testPlayerId) return;
+
+        const btn = $('#btnToggleFavorite');
+        const isFavorite = btn.hasClass('btn-warning');
+
+        btn.prop('disabled', true);
+
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        if (isFavorite) {
+            // Unset favorite
+            $.post('/test/unset-favorite', function(response) {
+                if (response.success) {
+                    btn.removeClass('btn-warning').addClass('btn-outline-warning').html('<i class="far fa-star"></i> Imposta come preferito');
+                    $('#playerSelect option:selected').text(function(i, text) {
+                        return text.replace('⭐ ', '');
+                    });
+                } else {
+                    alert(response.message);
+                }
+            }).fail(function() {
+                alert('Errore rimozione preferito');
+            }).always(function() {
+                btn.prop('disabled', false);
+            });
+        } else {
+            // Set favorite
+            $.post(`/test/${testPlayerId}/favorite`, function(response) {
+                if (response.success) {
+                    btn.removeClass('btn-outline-warning').addClass('btn-warning').html('<i class="fas fa-star"></i> Rimuovi preferito');
+                    $('#playerSelect option:selected').prepend('⭐ ');
+                } else {
+                    alert(response.message);
+                }
+            }).fail(function() {
+                alert('Errore impostazione preferito');
+            }).always(function() {
+                btn.prop('disabled', false);
+            });
+        }
+    }
+
+    function updateFavoriteButton(playerId) {
+        const btn = $('#btnToggleFavorite');
+        if (playerId === favoritePlayerId) {
+            btn.removeClass('btn-outline-warning').addClass('btn-warning').html('<i class="fas fa-star"></i> Rimuovi preferito');
+        } else {
+            btn.removeClass('btn-warning').addClass('btn-outline-warning').html('<i class="far fa-star"></i> Imposta come preferito');
+        }
+    }
+
+    $(document).ready(function () {
+        initPixi();
+        status('PixiJS Avviato - Seleziona un player');
+
+        initDrawItemsSocket();
+
+        // Player selection handler
+        $('#playerSelect').on('change', function() {
+            const playerId = $(this).val();
+            const selectedOption = $(this).find('option:selected');
+            const channelName = selectedOption.data('channel');
+
+            if (!playerId) {
+                $('#playerInfo').hide();
+                $('#drawCard').hide();
+                $('#containersCard').hide();
+                testPlayerId = null;
+                window.playerId = null;
+                if (currentPusher) {
+                    currentPusher.disconnect();
+                    currentPusher = null;
+                }
+                return;
+            }
+
+            // Update player info
+            testPlayerId = parseInt(playerId);
+            window.playerId = parseInt(playerId);
+            $('#channelName').text(channelName);
+            $('#userName').text(selectedOption.text().split(' - ')[1] || 'N/A');
+            $('#regionName').text('-');
+            $('#playerInfo').show();
+
+            // Show draw button and containers card
+            $('#drawCard').show();
+            $('#containersCard').show();
+            $('#favoriteButtonContainer').show();
+
+            // Update favorite button state
+            updateFavoriteButton(playerId);
+
+            // Connect to Pusher channel
+            connectToPlayerChannel(playerId);
+
+            // Load containers
+            loadPlayerContainers(playerId);
+
+            status('Player selezionato: #' + playerId);
+        });
+
+        // Favorite button handler
+        $('#btnToggleFavorite').on('click', toggleFavorite);
+
+        // Auto-select favorite player on page load
+        if (favoritePlayerId) {
+            $('#playerSelect').val(favoritePlayerId).trigger('change');
+        }
+
+        // Trigger draw button handler
+        $('#btnTriggerDraw').on('click', function() {
+            if (!testPlayerId) {
+                alert('Seleziona prima un player');
+                return;
+            }
+
+            const btn = $(this);
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Esecuzione...');
+
+            const url = `/test/${testPlayerId}/trigger-draw`;
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+            });
+
+            $.post(url, function(response) {
+                if (response.success) {
+                    $('#drawStatus').html('<span class="text-success"><i class="fas fa-check"></i> ' + response.message + '</span>');
+                } else {
+                    $('#drawStatus').html('<span class="text-danger"><i class="fas fa-times"></i> ' + response.message + '</span>');
+                }
+            }).fail(function(xhr) {
+                const msg = xhr.responseJSON?.message || 'Errore durante l\'esecuzione';
+                $('#drawStatus').html('<span class="text-danger"><i class="fas fa-times"></i> ' + msg + '</span>');
+            }).always(function() {
+                btn.prop('disabled', false).html('<i class="fas fa-play"></i> Esegui test:draw');
+            });
         });
 
         // Function to manually trigger test drawing

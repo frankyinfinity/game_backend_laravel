@@ -3,7 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Custom\Draw\Complex\EntityDraw;
+use App\Custom\Draw\Primitive\Circle;
+use App\Custom\Draw\Primitive\MultiLine;
+use App\Custom\Draw\Primitive\Rectangle;
 use App\Custom\Draw\Primitive\Square;
+use App\Custom\Draw\Primitive\Text;
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
 use App\Custom\Manipulation\ObjectDraw;
@@ -19,7 +23,7 @@ class TestDrawCommand extends Command
      *
      * @var string
      */
-    protected $signature = "test:draw";
+    protected $signature = "test:draw {--player-id=1 : Player ID to send draw events to}";
 
     /**
      * The console command description.
@@ -36,7 +40,7 @@ class TestDrawCommand extends Command
         $requestId = Str::uuid()->toString();
         $sessionId = "test_session_fixed";
 
-        $eventPlayerId = 1;
+        $eventPlayerId = (int) $this->option('player-id');
 
         ObjectCache::buffer($sessionId);
 
@@ -51,24 +55,65 @@ class TestDrawCommand extends Command
 
         ObjectCache::clear($sessionId);
 
-        // Prende l'ultimo entity dal DB
-        $entity = Entity::query()->latest()->first();
+        // Disegna una varietà di forme per testare tutti i tipi
+        $this->info("Generating test draw items with multiple shape types...");
 
-        if ($entity !== null) {
-            $square = new Square('entity_square');
-            $square->setOrigin(100, 100);
-            $square->setSize(32);
-
-            $entityDraw = new EntityDraw($entity, $square, true);
-
-            foreach ($entityDraw->getDrawItems() as $item) {
-                $drawItems[] = (new ObjectDraw($item, $sessionId))->get();
-            }
-
-            $this->info("EntityDraw for entity (uid: {$entity->uid}) added with forced division/evolution buttons.");
-        } else {
-            $this->warn("No entity found in DB.");
+        // Quadrati
+        for ($i = 0; $i < 5; $i++) {
+            $square = new Square('square_' . $i);
+            $square->setOrigin(100 + ($i * 80), 100);
+            $square->setSize(40 + ($i * 10));
+            $square->setColor(0x3b82f6 + ($i * 0x100000));
+            $drawItems[] = (new ObjectDraw($square->buildJson(), $sessionId))->get();
         }
+
+        // Cerchi
+        for ($i = 0; $i < 5; $i++) {
+            $circle = new Circle('circle_' . $i);
+            $circle->setOrigin(100 + ($i * 80), 200);
+            $circle->setRadius(25 + ($i * 5));
+            $circle->setColor(0x22c55e + ($i * 0x100000));
+            $drawItems[] = (new ObjectDraw($circle->buildJson(), $sessionId))->get();
+        }
+
+        // Rettangoli
+        for ($i = 0; $i < 5; $i++) {
+            $rect = new Rectangle('rect_' . $i);
+            $rect->setOrigin(100 + ($i * 80), 300);
+            $rect->setSize(60 + ($i * 10), 40 + ($i * 5));
+            $rect->setColor(0xf97316 + ($i * 0x100000));
+            $drawItems[] = (new ObjectDraw($rect->buildJson(), $sessionId))->get();
+        }
+
+        // Testo
+        for ($i = 0; $i < 5; $i++) {
+            $text = new Text('text_' . $i);
+            $text->setOrigin(100 + ($i * 80), 380);
+            $text->setText("Test " . ($i + 1));
+            $text->setColor(0x000000);
+            $text->setFontSize(16);
+            $drawItems[] = (new ObjectDraw($text->buildJson(), $sessionId))->get();
+        }
+
+        // Linee
+        $line = new MultiLine('line_test');
+        for ($i = 0; $i < 6; $i++) {
+            $line->setPoint(100 + ($i * 80), 450);
+        }
+        $line->setColor(0xa855f7);
+        $line->setThickness(3);
+        $drawItems[] = (new ObjectDraw($line->buildJson(), $sessionId))->get();
+
+        // Seconda linea ondeggiante
+        $waveLine = new MultiLine('wave_line');
+        for ($i = 0; $i < 10; $i++) {
+            $waveLine->setPoint(100 + ($i * 40), 500 + sin($i) * 30);
+        }
+        $waveLine->setColor(0xef4444);
+        $waveLine->setThickness(2);
+        $drawItems[] = (new ObjectDraw($waveLine->buildJson(), $sessionId))->get();
+
+        $this->info("Generated " . count($drawItems) . " test draw items (squares, circles, rectangles, text, lines).");
 
         ObjectCache::flush($sessionId);
 

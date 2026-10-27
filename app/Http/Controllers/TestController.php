@@ -2,14 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Container as DockerContainer;
+use App\Models\Player;
+use App\Services\DockerContainerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Process\Process;
 
 class TestController extends Controller
 {
     public function index()
     {
-        return view('test');
+        $players = Player::with(['user', 'birthRegion'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $favoritePlayerId = null;
+        $user = auth()->user();
+        if ($user) {
+            $favoritePlayerId = $user->favorite_player_id;
+        }
+
+        return view('test', compact('players', 'favoritePlayerId'));
     }
 
     public function action(Request $request)
@@ -70,5 +84,70 @@ class TestController extends Controller
                 'exit_code' => -1,
             ]);
         }
+    }
+
+    public function triggerDraw(Request $request, Player $player)
+    {
+        try {
+            Artisan::call('test:draw', [
+                '--player-id' => $player->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Comando test:draw eseguito per il player #' . $player->id,
+                'output' => Artisan::output(),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore durante l\'esecuzione del comando: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getPlayerContainers(Player $player, DockerContainerService $containerService)
+    {
+        try {
+            $containerController = new ContainerController();
+            $payload = $containerController->buildContainerPayloads($player, $containerService);
+
+            return response()->json([
+                'success' => true,
+                'containers' => $payload,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
+        }
+    }
+
+    public function setFavoritePlayer(Request $request, Player $player)
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Utente non autenticato'], 401);
+        }
+
+        $user->favorite_player_id = $player->id;
+        $user->save();
+
+        return response()->json(['success' => true, 'message' => 'Player preferito impostato']);
+    }
+
+    public function unsetFavoritePlayer(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Utente non autenticato'], 401);
+        }
+
+        $user->favorite_player_id = null;
+        $user->save();
+
+        return response()->json(['success' => true, 'message' => 'Player preferito rimosso']);
     }
 }

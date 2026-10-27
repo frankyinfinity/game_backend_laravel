@@ -307,7 +307,7 @@ class ContainerController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function buildContainerPayloads(Player $player, ?DockerContainerService $containerService = null)
+    public function buildContainerPayloads(Player $player, ?DockerContainerService $containerService = null)
     {
         $containers = $this->playerContainersQuery($player)
             ->with('image')
