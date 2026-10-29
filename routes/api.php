@@ -62,6 +62,7 @@ Route::post('/game/player/container_data', [App\Http\Controllers\Api\GameControl
 Route::post('/game/container/action', [App\Http\Controllers\Api\GameController::class, 'containerAction'])->name('game.container.action');
 Route::post('/game/alert', [App\Http\Controllers\Api\GameController::class, 'createAlert'])->name('game.alert');
 Route::post('/game/player/save_items', [App\Http\Controllers\Api\GameController::class, 'savePlayerItems'])->name('game.player.save_items');
+Route::get('/containers/evolution-port/{playerId}', [App\Http\Controllers\ContainerController::class, 'getEvolutionPort'])->name('containers.evolution_port');
 
 
 

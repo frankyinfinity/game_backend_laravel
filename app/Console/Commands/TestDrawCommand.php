@@ -105,170 +105,135 @@ class TestDrawCommand extends Command
         $addElementsButton->setTextFontSize(16);
         $addElementsButton->setTextFontFamily(Helper::DEFAULT_FONT_FAMILY);
 
-        // JavaScript to add random elements for scroll testing
+        // JavaScript to add random elements via websocket evolution container
         $jsAddElements = "
             const modalUid = '{$modalUid}';
-            const viewportUid = modalUid + '_content_viewport';
+            const playerId = {$eventPlayerId};
             
             console.log('Button clicked');
             console.log('modalUid:', modalUid);
-            console.log('viewportUid:', viewportUid);
-            console.log('viewportObject:', objects[viewportUid]);
-            console.log('mainLayer:', mainLayer);
+            console.log('playerId:', playerId);
+            console.log('window.evolutionWsPort:', window.evolutionWsPort);
             
-            const viewportObject = objects[viewportUid];
+            // Get evolution container port via API if not already set
+            const fetchEvolutionPort = function(callback) {
+                const portKey = 'evolution_port_' + modalUid;
+                console.log('portKey:', portKey);
+                console.log('window[portKey]:', window[portKey]);
+                
+                if (window.evolutionWsPort) {
+                    console.log('Using cached window.evolutionWsPort:', window.evolutionWsPort);
+                    callback(window.evolutionWsPort);
+                    return;
+                }
+                
+                if (window[portKey]) {
+                    console.log('Using cached window[portKey]:', window[portKey]);
+                    callback(window[portKey]);
+                    return;
+                }
+                
+                console.log('Fetching evolution port from API...');
+                console.log('API URL:', window.BACK_URL + '/api/containers/evolution-port/' + playerId);
+                
+                $.ajax({
+                    url: window.BACK_URL + '/api/containers/evolution-port/' + playerId,
+                    method: 'GET',
+                    success: function(response) {
+                        console.log('API response:', response);
+                        if (response.success && response.port) {
+                            window[portKey] = response.port;
+                            console.log('Port set to:', response.port);
+                            callback(response.port);
+                        } else {
+                            console.error('Failed to get evolution port:', response.message);
+                            callback(null);
+                        }
+                    },
+                    error: function(error) {
+                        console.error('Error fetching evolution port:', error);
+                        callback(null);
+                    }
+                });
+            };
             
-            if (!viewportObject) {
-                console.error('Viewport object not found!');
-                alert('Viewport not found!');
-            } else {
-                const contentX = viewportObject.attributes.scroll_viewport_left || 0;
-                const contentY = viewportObject.attributes.scroll_viewport_top || 0;
-                const contentWidth = viewportObject.width || 0;
-                const contentHeight = viewportObject.height || 0;
+            fetchEvolutionPort(function(evolutionPort) {
+                console.log('fetchEvolutionPort callback called with:', evolutionPort);
                 
-                console.log('Content bounds:', { contentX, contentY, contentWidth, contentHeight });
-                
-                // Initialize scroll attributes if needed
-                if (!viewportObject.attributes.scroll_child_uids) {
-                    viewportObject.attributes.scroll_child_uids = [];
-                }
-                if (!viewportObject.attributes.scroll_base_positions_x) {
-                    viewportObject.attributes.scroll_base_positions_x = {};
-                }
-                if (!viewportObject.attributes.scroll_base_positions_y) {
-                    viewportObject.attributes.scroll_base_positions_y = {};
-                }
-                if (!viewportObject.attributes.scroll_item_widths) {
-                    viewportObject.attributes.scroll_item_widths = {};
-                }
-                if (!viewportObject.attributes.scroll_item_heights) {
-                    viewportObject.attributes.scroll_item_heights = {};
-                }
-                if (!viewportObject.attributes.scroll_initial_renderables) {
-                    viewportObject.attributes.scroll_initial_renderables = {};
+                if (!evolutionPort) {
+                    console.error('Evolution container port not found');
+                    return;
                 }
                 
-                // Generate 20 random elements distributed to test scroll in all directions
-                const numElements = 20;
-                for (let i = 0; i < numElements; i++) {
-                    const type = Math.floor(Math.random() * 4); // 0: square, 1: circle, 2: text, 3: rectangle
-                    const uid = modalUid + '_random_' + Date.now() + '_' + i;
+                console.log('Evolution port:', evolutionPort);
+                
+                const gatewayBaseUrl = window.gatewayBaseUrl || 'ws://localhost:9001/?port=';
+                const wsUrl = gatewayBaseUrl + evolutionPort;
+                
+                console.log('WS URL:', wsUrl);
+                
+                // Use cached websocket or create new one
+                window.gameWebSockets = window.gameWebSockets || {};
+                let ws = window.gameWebSockets[evolutionPort];
+                
+                const sendCommand = function() {
+                    ws.send(JSON.stringify({ command: 'get_timeline' }));
+                };
+                
+                const onMessage = function(event) {
+                    let response;
+                    try {
+                        response = JSON.parse(event.data);
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                    }
                     
-                    // Distribute elements beyond viewport to test scrolling
-                    const offsetX = (Math.random() - 0.5) * contentWidth * 2;
-                    const offsetY = (Math.random() - 0.5) * contentHeight * 2;
-                    const x = contentX + contentWidth / 2 + offsetX;
-                    const y = contentY + contentHeight / 2 + offsetY;
-                    const color = Math.floor(Math.random() * 0xFFFFFF);
+                    console.log('Timeline response:', response);
                     
-                    let shape;
-                    let itemWidth, itemHeight;
-                    let drawItem;
+                    // Ignore connection messages, only process get_timeline responses
+                    if (!response.command || response.command !== 'get_timeline') {
+                        console.log('Ignoring non-timeline message:', response);
+                        return;
+                    }
                     
-                    if (type === 0) {
-                        const size = 30 + Math.random() * 50;
-                        shape = new PIXI.Sprite(PIXI.Texture.WHITE);
-                        shape.width = size;
-                        shape.height = size;
-                        shape.tint = color;
-                        shape.x = x;
-                        shape.y = y;
-                        itemWidth = size;
-                        itemHeight = size;
-                        drawItem = { type: 'square', size: size };
-                    } else if (type === 1) {
-                        const radius = 15 + Math.random() * 35;
-                        shape = new PIXI.Graphics();
-                        shape.beginFill(color);
-                        shape.drawCircle(0, 0, radius);
-                        shape.endFill();
-                        shape.x = x;
-                        shape.y = y;
-                        itemWidth = radius * 2;
-                        itemHeight = radius * 2;
-                        drawItem = { type: 'circle', radius: radius };
-                    } else if (type === 2) {
-                        const texts = ['Ciao', 'Test', 'Scroll', 'Elemento', 'PixiJS', 'Modal', 'Test', 'Random'];
-                        const text = texts[Math.floor(Math.random() * texts.length)];
-                        const fontSize = 14 + Math.random() * 20;
-                        shape = new PIXI.Text(text, {
-                            fontFamily: 'Arial',
-                            fontSize: fontSize,
-                            fill: '#' + color.toString(16).padStart(6, '0')
-                        });
-                        shape.x = x;
-                        shape.y = y;
-                        itemWidth = 80;
-                        itemHeight = 30;
-                        drawItem = { type: 'text', text: text, fontSize: fontSize, fontFamily: 'Arial' };
+                    if (response.success && response.elements) {
+                        console.log('Calling addElementsToModal with', response.elements.length, 'elements');
+                        
+                        // Call the reusable function to add elements
+                        if (typeof window.addElementsToModal === 'function') {
+                            window.addElementsToModal(modalUid, response.elements);
+                        } else {
+                            console.error('addElementsToModal function not found');
+                        }
                     } else {
-                        const width = 40 + Math.random() * 60;
-                        const height = 30 + Math.random() * 50;
-                        shape = new PIXI.Graphics();
-                        shape.beginFill(color);
-                        shape.drawRect(0, 0, width, height);
-                        shape.endFill();
-                        shape.x = x;
-                        shape.y = y;
-                        itemWidth = width;
-                        itemHeight = height;
-                        drawItem = { type: 'rectangle', width: width, height: height };
+                        console.error('Invalid response:', response);
                     }
+                };
+                
+                if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+                    ws = new WebSocket(wsUrl);
+                    window.gameWebSockets[evolutionPort] = ws;
                     
-                    shape.renderable = true;
-                    shape.zIndex = 20020;
-                    
-                    if (mainLayer) {
-                        mainLayer.addChild(shape);
-                        shapes[uid] = shape;
-                        objects[uid] = {
-                            uid: uid,
-                            type: drawItem.type,
-                            x: x,
-                            y: y,
-                            color: color,
-                            ...drawItem,
-                            attributes: { renderable: true, z_index: 20020 }
-                        };
-                        
-                        // Add to scroll_child_uids
-                        viewportObject.attributes.scroll_child_uids.push(uid);
-                        viewportObject.attributes.scroll_base_positions_x[uid] = x;
-                        viewportObject.attributes.scroll_base_positions_y[uid] = y;
-                        viewportObject.attributes.scroll_item_widths[uid] = itemWidth;
-                        viewportObject.attributes.scroll_item_heights[uid] = itemHeight;
-                        viewportObject.attributes.scroll_initial_renderables[uid] = true;
-                        
-                        // Update content bounds
-                        const itemLeft = x;
-                        const itemRight = x + itemWidth;
-                        const itemTop = y;
-                        const itemBottom = y + itemHeight;
-                        
-                        if (viewportObject.attributes.scroll_content_left === undefined || itemLeft < viewportObject.attributes.scroll_content_left) {
-                            viewportObject.attributes.scroll_content_left = itemLeft;
-                        }
-                        if (viewportObject.attributes.scroll_content_right === undefined || itemRight > viewportObject.attributes.scroll_content_right) {
-                            viewportObject.attributes.scroll_content_right = itemRight;
-                        }
-                        if (viewportObject.attributes.scroll_content_top === undefined || itemTop < viewportObject.attributes.scroll_content_top) {
-                            viewportObject.attributes.scroll_content_top = itemTop;
-                        }
-                        if (viewportObject.attributes.scroll_content_bottom === undefined || itemBottom > viewportObject.attributes.scroll_content_bottom) {
-                            viewportObject.attributes.scroll_content_bottom = itemBottom;
-                        }
+                    ws.onopen = function() {
+                        console.log('WS Connected to ' + wsUrl);
+                        sendCommand();
+                    };
+                    ws.onmessage = function(event) {
+                        onMessage(event);
+                    };
+                    ws.onerror = function(error) {
+                        console.error('WS Error:', error);
+                    };
+                } else {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        sendCommand();
+                    } else if (ws.readyState === WebSocket.CONNECTING) {
+                        ws.addEventListener('open', sendCommand, { once: true });
                     }
+                    // Use { once: true } to automatically remove listener after first message
+                    ws.addEventListener('message', onMessage, { once: true });
                 }
-                
-                // Refresh modal viewport masks
-                if (typeof window.refreshAllModalViewportMasks === 'function') {
-                    window.refreshAllModalViewportMasks();
-                }
-                
-                console.log('Added ' + numElements + ' random elements for scroll testing');
-                alert('Aggiunti ' + numElements + ' elementi casuali per testare lo scroll');
-            }
+            });
         ";
         $jsAddElements = Helper::setCommonJsCode($jsAddElements, Str::random(20));
         $addElementsButton->setOnClick($jsAddElements);

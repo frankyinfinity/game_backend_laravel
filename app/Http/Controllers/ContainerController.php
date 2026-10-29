@@ -16,6 +16,11 @@ use Illuminate\Http\JsonResponse;
 
 class ContainerController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth')->except(['getEvolutionPort']);
+    }
+
     public function index()
     {
         return view('container.index');
@@ -500,5 +505,29 @@ class ContainerController extends Controller
             'dead' => '#475569',
             default => '#64748b',
         };
+    }
+
+    public function getEvolutionPort(int $playerId): JsonResponse
+    {
+        $player = Player::find($playerId);
+        if (!$player) {
+            return response()->json(['success' => false, 'message' => 'Player not found'], 404);
+        }
+
+        $containers = $this->buildContainerPayloads($player);
+        $evolutionPort = null;
+
+        foreach ($containers as $container) {
+            if (isset($container['parent_type']) && $container['parent_type'] === 'Evolution' && isset($container['ws_port'])) {
+                $evolutionPort = $container['ws_port'];
+                break;
+            }
+        }
+
+        if ($evolutionPort) {
+            return response()->json(['success' => true, 'port' => $evolutionPort]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Evolution container not found']);
     }
 }

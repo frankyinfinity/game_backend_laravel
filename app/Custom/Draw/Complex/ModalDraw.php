@@ -25,6 +25,8 @@ class ModalDraw
     private bool $autoCenter = true;
     private bool $renderable = true;
 
+    private ?int $playerId = null;
+
     private string $title = 'Modal';
     private int $titleFontSize = 24;
 
@@ -39,9 +41,15 @@ class ModalDraw
     private int $closeTextColor = Colors::WHITE;
     private int $contentColor = 0xF4F4F4;
 
-    public function __construct(string $uid)
+    public function __construct(string $uid, ?int $playerId = null)
     {
         $this->uid = $uid;
+        $this->playerId = $playerId;
+    }
+
+    public function setPlayerId(int $playerId): void
+    {
+        $this->playerId = $playerId;
     }
 
     public function setOrigin(int $x, int $y): void

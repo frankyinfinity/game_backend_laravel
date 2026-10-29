@@ -187,6 +187,13 @@ function startWebSocketServer() {
                 });
               break;
             }
+            case 'get_timeline': {
+              // Ritorna elementi casuali PIXI per la timeline
+              const timeline = require('./timeline.js');
+              const elements = timeline.generateRandomElements();
+              ws.send(JSON.stringify({ success: true, command: 'get_timeline', elements }));
+              break;
+            }
             default:
               ws.send(JSON.stringify({
                 success: false,

@@ -199,6 +199,21 @@
         background: #cbd5e1;
         border-radius: 3px;
     }
+
+    #containersList {
+        max-height: none !important;
+    }
+
+    body {
+        overflow-y: auto !important;
+    }
+
+    .container-item {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
 </style>
 @stop
 
@@ -207,11 +222,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 
 <script>
-{!! file_get_contents(resource_path('js/function/modal/add_elements_to_modal.blade.php')) !!}
-
-<script>
     const BACK_URL = '{{ url('/') }}';
     window.BACK_URL = BACK_URL;
+    
+    // Evolution container port will be set from containers list
+    window.evolutionWsPort = null;
+    window.gatewayBaseUrl = 'ws://{{ config('remote_docker.docker_host_ip') }}:{{ config('remote_docker.websocket_gateway_port', 9001) }}/?port=';
+    
     const config = {
         REVERB_APP_KEY: '{{ config('broadcasting.connections.reverb.key') }}',
         REVERB_HOST: '{{ config('broadcasting.connections.reverb.options.host') }}',

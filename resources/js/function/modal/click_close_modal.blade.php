@@ -42,6 +42,18 @@ window['__name__'] = function() {
         viewportObject.attributes.scroll_content_bottom = viewportObject.attributes.scroll_viewport_top;
     }
 
+    // Destroy dynamically added elements tracked in modalDynamicElements array
+    if (window.modalDynamicElements && window.modalDynamicElements[modalUid]) {
+        window.modalDynamicElements[modalUid].forEach(function(uid) {
+            if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
+                shapes[uid].destroy();
+            }
+            delete shapes[uid];
+            delete objects[uid];
+        });
+        window.modalDynamicElements[modalUid] = [];
+    }
+
     // Hide the modal itself
     idsToHide.forEach(function(uid) {
         if (shapes[uid]) {

@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copia i file nella directory di lavoro del container
 COPY index.js .
+COPY timeline.js .
 COPY package*.json ./
 RUN npm install
 
