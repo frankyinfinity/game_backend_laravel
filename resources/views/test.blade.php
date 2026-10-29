@@ -838,6 +838,11 @@
         }
     }
 
+    // Espone le classi globalmente per il riutilizzo (es. addElementsToModal in click_open_modal.blade.php)
+    window.Circle = Circle;
+    window.Rectangle = Rectangle;
+    window.Square = Square;
+
     class Text extends BasicDraw {
         constructor(object) {
             super(object);
@@ -879,6 +884,8 @@
             }
         }
     }
+
+    window.Text = Text;
 
     class ImageSprite extends BasicDraw {
         constructor(object) {

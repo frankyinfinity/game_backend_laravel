@@ -80,13 +80,11 @@ window['__name__'] = function() {
                     };
                     itemWidth = size;
                     itemHeight = size;
-                    
-                    shape = new PIXI.Sprite(PIXI.Texture.WHITE);
-                    shape.width = size;
-                    shape.height = size;
-                    shape.tint = color;
-                    shape.x = x;
-                    shape.y = y;
+
+                    const square = new Square(drawItem);
+                    square.build();
+                    square.render(app);
+                    shape = square.shape;
                 } else if (element.type === 'circle') {
                     const radius = element.radius || 20;
                     drawItem = {
@@ -100,13 +98,11 @@ window['__name__'] = function() {
                     };
                     itemWidth = radius * 2;
                     itemHeight = radius * 2;
-                    
-                    shape = new PIXI.Graphics();
-                    shape.beginFill(color);
-                    shape.drawCircle(0, 0, radius);
-                    shape.endFill();
-                    shape.x = x;
-                    shape.y = y;
+
+                    const circle = new Circle(drawItem);
+                    circle.build();
+                    circle.render(app);
+                    shape = circle.shape;
                 } else if (element.type === 'text') {
                     const text = element.text || 'Test';
                     const fontSize = element.fontSize || 16;
@@ -124,14 +120,11 @@ window['__name__'] = function() {
                     };
                     itemWidth = 80;
                     itemHeight = 30;
-                    
-                    shape = new PIXI.Text(text, {
-                        fontFamily: fontFamily,
-                        fontSize: fontSize,
-                        fill: '#' + color.toString(16).padStart(6, '0')
-                    });
-                    shape.x = x;
-                    shape.y = y;
+
+                    const textObj = new Text(drawItem);
+                    textObj.build();
+                    textObj.render(app);
+                    shape = textObj.shape;
                 } else if (element.type === 'rectangle') {
                     const width = element.width || 60;
                     const height = element.height || 40;
@@ -147,13 +140,11 @@ window['__name__'] = function() {
                     };
                     itemWidth = width;
                     itemHeight = height;
-                    
-                    shape = new PIXI.Graphics();
-                    shape.beginFill(color);
-                    shape.drawRect(0, 0, width, height);
-                    shape.endFill();
-                    shape.x = x;
-                    shape.y = y;
+
+                    const rect = new Rectangle(drawItem);
+                    rect.build();
+                    rect.render(app);
+                    shape = rect.shape;
                 } else {
                     console.warn('Unknown element type:', element.type);
                     return;
