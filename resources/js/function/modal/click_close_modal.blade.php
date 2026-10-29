@@ -19,11 +19,30 @@ window['__name__'] = function() {
 
     const viewportObject = objects[modalUid + '_content_viewport'];
     if (viewportObject && viewportObject.attributes && Array.isArray(viewportObject.attributes.scroll_child_uids)) {
+        // Destroy all child elements to completely clear the modal content
         viewportObject.attributes.scroll_child_uids.forEach(function(uid) {
-            idsToHide.push(uid);
+            if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
+                shapes[uid].destroy();
+            }
+            delete shapes[uid];
+            delete objects[uid];
         });
+
+        // Reset scroll attributes
+        viewportObject.attributes.scroll_child_uids = [];
+        viewportObject.attributes.scroll_base_positions_x = {};
+        viewportObject.attributes.scroll_base_positions_y = {};
+        viewportObject.attributes.scroll_item_widths = {};
+        viewportObject.attributes.scroll_item_heights = {};
+        viewportObject.attributes.scroll_base_points = {};
+        viewportObject.attributes.scroll_initial_renderables = {};
+        viewportObject.attributes.scroll_content_left = viewportObject.attributes.scroll_viewport_left;
+        viewportObject.attributes.scroll_content_right = viewportObject.attributes.scroll_viewport_left;
+        viewportObject.attributes.scroll_content_top = viewportObject.attributes.scroll_viewport_top;
+        viewportObject.attributes.scroll_content_bottom = viewportObject.attributes.scroll_viewport_top;
     }
 
+    // Hide the modal itself
     idsToHide.forEach(function(uid) {
         if (shapes[uid]) {
             shapes[uid].renderable = false;

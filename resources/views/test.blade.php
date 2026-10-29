@@ -48,6 +48,9 @@
                 <button type="button" class="btn btn-success btn-block" id="btnTriggerDraw">
                     <i class="fas fa-play"></i> Esegui test:draw
                 </button>
+                <button type="button" class="btn btn-danger btn-block" id="btnClearDraw" style="margin-top: 10px;">
+                    <i class="fas fa-trash"></i> Pulisci Tutto
+                </button>
                 <div id="drawStatus" style="margin-top: 10px; font-size: 12px;"></div>
             </div>
         </div>
@@ -202,6 +205,10 @@
 @section('js')
 <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+
+<script>
+{!! file_get_contents(resource_path('js/function/modal/add_elements_to_modal.blade.php')) !!}
+
 <script>
     const BACK_URL = '{{ url('/') }}';
     window.BACK_URL = BACK_URL;
@@ -1380,6 +1387,61 @@
             }).always(function() {
                 btn.prop('disabled', false).html('<i class="fas fa-play"></i> Esegui test:draw');
             });
+        });
+
+        // Clear draw button handler
+        $('#btnClearDraw').on('click', function() {
+            if (!testPlayerId) {
+                alert('Seleziona prima un player');
+                return;
+            }
+
+            const btn = $(this);
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Pulizia...');
+
+            // Destroy all shapes to free memory
+            Object.keys(shapes).forEach(function(uid) {
+                if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
+                    shapes[uid].destroy();
+                }
+            });
+
+            // Clear only children from layers, not the layers themselves
+            if (mainLayer) {
+                mainLayer.removeChildren();
+            }
+            if (worldLayer) {
+                worldLayer.removeChildren();
+                // Re-add mainLayer to worldLayer
+                if (mainLayer) {
+                    worldLayer.addChild(mainLayer);
+                }
+            }
+
+            // Clear objects and shapes arrays
+            shapes = {};
+            objects = {};
+
+            // Clear viewport masks
+            Object.keys(modalViewportMasks).forEach(function(uid) {
+                if (modalViewportMasks[uid] && typeof modalViewportMasks[uid].destroy === 'function') {
+                    modalViewportMasks[uid].destroy();
+                }
+            });
+            modalViewportMasks = {};
+
+            // Reset global pan
+            globalPan = { x: 0, y: 0 };
+            applyGlobalPan();
+
+            // Clear any tooltips
+            const tooltips = document.querySelectorAll('[id^="tooltip_"]');
+            tooltips.forEach(function(el) {
+                el.remove();
+            });
+
+            $('#drawStatus').html('<span class="text-success"><i class="fas fa-check"></i> Disegno cancellato</span>');
+            btn.prop('disabled', false).html('<i class="fas fa-trash"></i> Pulisci Tutto');
         });
 
         // Function to manually trigger test drawing
