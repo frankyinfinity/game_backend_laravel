@@ -172,9 +172,10 @@ class TestDrawCommand extends Command
                 
                 console.log('WS URL:', wsUrl);
                 
-                // Use cached websocket or create new one
+                // Use cached websocket or create new one - unique per modal
                 window.gameWebSockets = window.gameWebSockets || {};
-                let ws = window.gameWebSockets[evolutionPort];
+                const wsKey = evolutionPort + '_' + modalUid;
+                let ws = window.gameWebSockets[wsKey];
                 
                 const sendCommand = function() {
                     ws.send(JSON.stringify({ command: 'get_timeline' }));
@@ -242,6 +243,193 @@ class TestDrawCommand extends Command
 
         foreach ($addElementsButton->getDrawItems() as $addElementsButtonItem) {
             $drawItems[] = (new ObjectDraw($addElementsButtonItem->buildJson(), $sessionId))->get();
+        }
+
+        // Create second ModalDraw
+        $modalUid2 = 'objective_modal_test2';
+        $modal2 = new ModalDraw($modalUid2);
+        $modal2->setTitle('Test Modal 2');
+        $modal2->setScreenSize(1280, 720);
+        $modal2->setSize(600, 400);
+        $modal2->setOrigin(220, 500); // Even further below the first modal
+        $modal2->setRenderable(false); // Initially hidden
+        $modal2->build();
+
+        foreach ($modal2->getDrawItems() as $modalItem2) {
+            $drawItems[] = (new ObjectDraw($modalItem2->buildJson(), $sessionId))->get();
+        }
+
+        // Create button to open second modal
+        $buttonUid2 = 'open_modal_button_2';
+        $button2 = new ButtonDraw($buttonUid2);
+        $button2->setOrigin(50, 150); // Below the first open button
+        $button2->setSize(150, 40);
+        $button2->setString('Apri Modal 2');
+        $button2->setColorButton(0x3b82f6);
+        $button2->setColorString(0xffffff);
+        $button2->setTextFontSize(16);
+        $button2->setTextFontFamily(Helper::DEFAULT_FONT_FAMILY);
+
+        // JavaScript to open second modal
+        $jsOpenModal2 = file_get_contents(resource_path('js/function/modal/click_open_modal.blade.php'));
+        $jsOpenModal2 = str_replace('__MODAL_UID__', $modalUid2, $jsOpenModal2);
+        $jsOpenModal2 = Helper::setCommonJsCode($jsOpenModal2, Str::random(20));
+        $button2->setOnClick($jsOpenModal2);
+        $button2->build();
+
+        foreach ($button2->getDrawItems() as $buttonItem2) {
+            $drawItems[] = (new ObjectDraw($buttonItem2->buildJson(), $sessionId))->get();
+        }
+
+        // Create button to add random elements to second modal
+        $addElementsButtonUid2 = 'add_elements_button_2';
+        $addElementsButton2 = new ButtonDraw($addElementsButtonUid2);
+        $addElementsButton2->setOrigin(50, 200); // Below the second open button
+        $addElementsButton2->setSize(180, 40);
+        $addElementsButton2->setString('Aggiungi Casuali 2');
+        $addElementsButton2->setColorButton(0x22c55e);
+        $addElementsButton2->setColorString(0xffffff);
+        $addElementsButton2->setTextFontSize(16);
+        $addElementsButton2->setTextFontFamily(Helper::DEFAULT_FONT_FAMILY);
+
+        // JavaScript to add random elements to second modal
+        $jsAddElements2 = "
+            const modalUid = '{$modalUid2}';
+            const playerId = {$eventPlayerId};
+            
+            console.log('Button clicked');
+            console.log('modalUid:', modalUid);
+            console.log('playerId:', playerId);
+            console.log('window.evolutionWsPort:', window.evolutionWsPort);
+            
+            // Get evolution container port via API if not already set
+            const fetchEvolutionPort = function(callback) {
+                const portKey = 'evolution_port_' + modalUid;
+                console.log('portKey:', portKey);
+                console.log('window[portKey]:', window[portKey]);
+                
+                if (window.evolutionWsPort) {
+                    console.log('Using cached window.evolutionWsPort:', window.evolutionWsPort);
+                    callback(window.evolutionWsPort);
+                    return;
+                }
+                
+                if (window[portKey]) {
+                    console.log('Using cached window[portKey]:', window[portKey]);
+                    callback(window[portKey]);
+                    return;
+                }
+                
+                console.log('Fetching evolution port from API...');
+                console.log('API URL:', window.BACK_URL + '/api/containers/evolution-port/' + playerId);
+                
+                $.ajax({
+                    url: window.BACK_URL + '/api/containers/evolution-port/' + playerId,
+                    method: 'GET',
+                    success: function(response) {
+                        console.log('API response:', response);
+                        if (response.success && response.port) {
+                            window[portKey] = response.port;
+                            console.log('Port set to:', response.port);
+                            callback(response.port);
+                        } else {
+                            console.error('Failed to get evolution port:', response.message);
+                            callback(null);
+                        }
+                    },
+                    error: function(error) {
+                        console.error('Error fetching evolution port:', error);
+                        callback(null);
+                    }
+                });
+            };
+            
+            fetchEvolutionPort(function(evolutionPort) {
+                console.log('fetchEvolutionPort callback called with:', evolutionPort);
+                
+                if (!evolutionPort) {
+                    console.error('Evolution container port not found');
+                    return;
+                }
+                
+                console.log('Evolution port:', evolutionPort);
+                
+                const gatewayBaseUrl = window.gatewayBaseUrl || 'ws://localhost:9001/?port=';
+                const wsUrl = gatewayBaseUrl + evolutionPort;
+                
+                console.log('WS URL:', wsUrl);
+                
+                // Use cached websocket or create new one - unique per modal
+                window.gameWebSockets = window.gameWebSockets || {};
+                const wsKey = evolutionPort + '_' + modalUid;
+                let ws = window.gameWebSockets[wsKey];
+                
+                const sendCommand = function() {
+                    ws.send(JSON.stringify({ command: 'get_timeline' }));
+                };
+                
+                const onMessage = function(event) {
+                    let response;
+                    try {
+                        response = JSON.parse(event.data);
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                    }
+                    
+                    console.log('Timeline response:', response);
+                    
+                    // Ignore connection messages, only process get_timeline responses
+                    if (!response.command || response.command !== 'get_timeline') {
+                        console.log('Ignoring non-timeline message:', response);
+                        return;
+                    }
+                    
+                    if (response.success && response.elements) {
+                        console.log('Calling addElementsToModal with', response.elements.length, 'elements');
+                        
+                        // Call the modal-specific function to add elements
+                        const functionName = 'addElementsToModal_' + modalUid;
+                        if (typeof window[functionName] === 'function') {
+                            window[functionName](response.elements);
+                        } else {
+                            console.error('addElementsToModal function not found for modal:', modalUid);
+                        }
+                    } else {
+                        console.error('Invalid response:', response);
+                    }
+                };
+                
+                if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+                    ws = new WebSocket(wsUrl);
+                    window.gameWebSockets[evolutionPort] = ws;
+                    
+                    ws.onopen = function() {
+                        console.log('WS Connected to ' + wsUrl);
+                        sendCommand();
+                    };
+                    ws.onmessage = function(event) {
+                        onMessage(event);
+                    };
+                    ws.onerror = function(error) {
+                        console.error('WS Error:', error);
+                    };
+                } else {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        sendCommand();
+                    } else if (ws.readyState === WebSocket.CONNECTING) {
+                        ws.addEventListener('open', sendCommand, { once: true });
+                    }
+                    // Use { once: true } to automatically remove listener after first message
+                    ws.addEventListener('message', onMessage, { once: true });
+                }
+            });
+        ";
+        $jsAddElements2 = Helper::setCommonJsCode($jsAddElements2, Str::random(20));
+        $addElementsButton2->setOnClick($jsAddElements2);
+        $addElementsButton2->build();
+
+        foreach ($addElementsButton2->getDrawItems() as $addElementsButtonItem2) {
+            $drawItems[] = (new ObjectDraw($addElementsButtonItem2->buildJson(), $sessionId))->get();
         }
 
         $this->info("Generated " . count($drawItems) . " test draw items (modal and buttons).");
