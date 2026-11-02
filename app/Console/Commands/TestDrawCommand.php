@@ -199,11 +199,12 @@ class TestDrawCommand extends Command
                     if (response.success && response.elements) {
                         console.log('Calling addElementsToModal with', response.elements.length, 'elements');
                         
-                        // Call the reusable function to add elements
-                        if (typeof window.addElementsToModal === 'function') {
-                            window.addElementsToModal(modalUid, response.elements);
+                        // Call the modal-specific function to add elements
+                        const functionName = 'addElementsToModal_' + modalUid;
+                        if (typeof window[functionName] === 'function') {
+                            window[functionName](response.elements);
                         } else {
-                            console.error('addElementsToModal function not found');
+                            console.error('addElementsToModal function not found for modal:', modalUid);
                         }
                     } else {
                         console.error('Invalid response:', response);

@@ -3,9 +3,9 @@
 window['__name__'] = function() {
     const modalUid = '__MODAL_UID__';
 
-    // Define addElementsToModal function globally if not already defined
-    if (typeof window.addElementsToModal !== 'function') {
-        window.addElementsToModal = function(modalUid, elements) {
+    // Define addElementsToModal function specifically for this modal
+    const functionName = 'addElementsToModal_' + modalUid;
+    window[functionName] = function(elements) {
             console.log('add_elements_to_modal called with:', { modalUid, elements });
             
             const viewportUid = modalUid + '_content_viewport';
@@ -201,7 +201,6 @@ window['__name__'] = function() {
             
             console.log('Done adding elements to modal');
         };
-    }
     
     // Initialize array for this modal
     if (!window.modalDynamicElements) {
