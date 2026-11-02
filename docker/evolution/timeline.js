@@ -4,7 +4,7 @@
 function generateTimelineCards(timelineData, modalUid) {
   const elements = [];
   const details = timelineData.details || [];
-  
+
   if (!details || details.length === 0) {
     console.log('[Timeline] No timeline details found');
     return elements;
