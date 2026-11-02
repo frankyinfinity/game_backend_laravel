@@ -149,6 +149,50 @@ function callEvolutionSave(payload) {
   });
 }
 
+// Chiama l'API per ottenere i dati della timeline del player
+function callTimelineApi(playerId, modalUid) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: new URL(backendUrl).hostname,
+      port: new URL(backendUrl).port || 80,
+      path: `/api/timeline-evolution/${playerId}`,
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          const response = data ? JSON.parse(data) : {};
+          console.log(`[Evolution] timeline-evolution response:`, response);
+          
+          if (response.success && response.data) {
+            const timeline = require('./timeline.js');
+            const elements = timeline.generateTimelineCards(response.data, modalUid);
+            resolve(elements);
+          } else {
+            reject(new Error(response.message || 'Failed to get timeline data'));
+          }
+        } catch (error) {
+          reject(new Error(`timeline-evolution invalid JSON: ${error.message}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(new Error(`timeline-evolution request error: ${error.message}`));
+    });
+
+    req.end();
+  });
+}
+
 function startWebSocketServer() {
   if (wsPort > 0) {
     wss = new WebSocket.Server({ port: wsPort });
@@ -188,10 +232,16 @@ function startWebSocketServer() {
               break;
             }
             case 'get_timeline': {
-              // Ritorna elementi casuali PIXI per la timeline
-              const timeline = require('./timeline.js');
-              const elements = timeline.generateRandomElements();
-              ws.send(JSON.stringify({ success: true, command: 'get_timeline', elements }));
+              // Chiama l'API per ottenere i dati della timeline del player
+              const modalUid = data.modalUid || 'default';
+              callTimelineApi(playerId, modalUid)
+                .then((elements) => {
+                  ws.send(JSON.stringify({ success: true, command: 'get_timeline', elements }));
+                })
+                .catch((error) => {
+                  console.error(`[Evolution] get_timeline error: ${error.message}`);
+                  ws.send(JSON.stringify({ success: false, command: 'get_timeline', error: error.message }));
+                });
               break;
             }
             default:

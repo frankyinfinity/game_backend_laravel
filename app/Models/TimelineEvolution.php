@@ -22,6 +22,6 @@ class TimelineEvolution extends Model
 
     public function timelineEvolutionDetails(): HasMany
     {
-        return $this->hasMany(TimeEvolutionDetail::class, 'timeline_evolution_id');
+        return $this->hasMany(TimelineEvolutionDetail::class, 'timeline_evolution_id');
     }
 }

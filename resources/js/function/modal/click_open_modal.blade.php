@@ -145,6 +145,127 @@ window['__name__'] = function() {
                     rect.build();
                     rect.render(app);
                     shape = rect.shape;
+                } else if (element.type === 'rounded_rectangle') {
+                    const width = element.width || 60;
+                    const height = element.height || 40;
+                    const borderRadius = element.border_radius || 10;
+                    drawItem = {
+                        uid: uid,
+                        type: 'rounded_rectangle',
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        color: color,
+                        border_radius: borderRadius,
+                        attributes: { renderable: true, z_index: 20020 }
+                    };
+                    itemWidth = width;
+                    itemHeight = height;
+
+                    // Create rounded rectangle using PIXI.Graphics
+                    const roundedRect = new PIXI.Graphics();
+                    roundedRect.beginFill(color);
+                    roundedRect.drawRoundedRect(x, y, width, height, borderRadius);
+                    roundedRect.endFill();
+                    roundedRect.renderable = true;
+                    roundedRect.zIndex = 20020;
+                    mainLayer.addChild(roundedRect);
+                    shape = roundedRect;
+                } else if (element.type === 'rounded_rectangle_outline') {
+                    const width = element.width || 60;
+                    const height = element.height || 40;
+                    const borderRadius = element.border_radius || 10;
+                    const borderWidth = element.border_width || 2;
+                    drawItem = {
+                        uid: uid,
+                        type: 'rounded_rectangle_outline',
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        color: color,
+                        border_radius: borderRadius,
+                        border_width: borderWidth,
+                        attributes: { renderable: true, z_index: 20020 }
+                    };
+                    itemWidth = width;
+                    itemHeight = height;
+
+                    // Create rounded rectangle outline using PIXI.Graphics (transparent background)
+                    const roundedRectOutline = new PIXI.Graphics();
+                    roundedRectOutline.lineStyle(borderWidth, color);
+                    roundedRectOutline.drawRoundedRect(x, y, width, height, borderRadius);
+                    roundedRectOutline.renderable = true;
+                    roundedRectOutline.zIndex = 20020;
+                    mainLayer.addChild(roundedRectOutline);
+                    shape = roundedRectOutline;
+                } else if (element.type === 'sprite') {
+                    const width = element.width || 100;
+                    const height = element.height || 100;
+                    const imageUrl = element.image_url || '';
+                    
+                    drawItem = {
+                        uid: uid,
+                        type: 'sprite',
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        image_url: imageUrl,
+                        attributes: { renderable: true, z_index: 20020 }
+                    };
+                    itemWidth = width;
+                    itemHeight = height;
+
+                    // Load texture from URL and create sprite
+                    if (imageUrl) {
+                        PIXI.Assets.load(imageUrl).then(function(texture) {
+                            const sprite = new PIXI.Sprite(texture);
+                            sprite.x = x;
+                            sprite.y = y;
+                            sprite.width = width;
+                            sprite.height = height;
+                            sprite.renderable = true;
+                            sprite.zIndex = 20020;
+                            mainLayer.addChild(sprite);
+                            shapes[uid] = sprite;
+                            
+                            // Add to modal dynamic elements array for tracking
+                            if (window.modalDynamicElements && window.modalDynamicElements[modalUid]) {
+                                window.modalDynamicElements[modalUid].push(uid);
+                            }
+                        }).catch(function(error) {
+                            console.error('Error loading image:', imageUrl, error);
+                            // Fallback to rectangle if image fails to load
+                            const fallbackRect = new PIXI.Graphics();
+                            fallbackRect.beginFill(0xE0E0E0);
+                            fallbackRect.drawRect(x, y, width, height);
+                            fallbackRect.endFill();
+                            fallbackRect.renderable = true;
+                            fallbackRect.zIndex = 20020;
+                            mainLayer.addChild(fallbackRect);
+                            shapes[uid] = fallbackRect;
+                            
+                            // Add to modal dynamic elements array for tracking
+                            if (window.modalDynamicElements && window.modalDynamicElements[modalUid]) {
+                                window.modalDynamicElements[modalUid].push(uid);
+                            }
+                        });
+                        
+                        // Skip the rest of the processing for sprite as it's async
+                        return;
+                    } else {
+                        // No URL, use placeholder rectangle
+                        const placeholderRect = new PIXI.Graphics();
+                        placeholderRect.beginFill(0xE0E0E0);
+                        placeholderRect.drawRect(x, y, width, height);
+                        placeholderRect.endFill();
+                        placeholderRect.renderable = true;
+                        placeholderRect.zIndex = 20020;
+                        mainLayer.addChild(placeholderRect);
+                        shape = placeholderRect;
+                    }
                 } else {
                     console.warn('Unknown element type:', element.type);
                     return;

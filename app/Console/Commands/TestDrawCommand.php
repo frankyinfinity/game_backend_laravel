@@ -178,7 +178,7 @@ class TestDrawCommand extends Command
                 let ws = window.gameWebSockets[wsKey];
                 
                 const sendCommand = function() {
-                    ws.send(JSON.stringify({ command: 'get_timeline' }));
+                    ws.send(JSON.stringify({ command: 'get_timeline', modalUid: modalUid }));
                 };
                 
                 const onMessage = function(event) {
@@ -365,7 +365,7 @@ class TestDrawCommand extends Command
                 let ws = window.gameWebSockets[wsKey];
                 
                 const sendCommand = function() {
-                    ws.send(JSON.stringify({ command: 'get_timeline' }));
+                    ws.send(JSON.stringify({ command: 'get_timeline', modalUid: modalUid }));
                 };
                 
                 const onMessage = function(event) {
