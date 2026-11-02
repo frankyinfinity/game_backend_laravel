@@ -10,6 +10,8 @@ window['__name__'] = function() {
 
     const attrs = viewportObject.attributes;
     const childUids = Array.isArray(attrs.scroll_child_uids) ? attrs.scroll_child_uids : [];
+    console.log('childUids');
+    console.log(childUids);
     const basePointsMap = (attrs.scroll_base_points && typeof attrs.scroll_base_points === 'object') ? attrs.scroll_base_points : {};
     const initialRenderables = (attrs.scroll_initial_renderables && typeof attrs.scroll_initial_renderables === 'object') ? attrs.scroll_initial_renderables : {};
     if (childUids.length === 0) {
