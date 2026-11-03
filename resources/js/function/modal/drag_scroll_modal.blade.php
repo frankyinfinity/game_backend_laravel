@@ -149,17 +149,17 @@ window['__name__'] = function() {
             const minDeltaX = state.viewportRight - state.contentRight;
             const maxDeltaX = state.viewportLeft - state.contentLeft;
             appliedDeltaX = Math.max(minDeltaX, Math.min(maxDeltaX, deltaX));
-        } else {
+        }/* else {
             appliedDeltaX = 0;
-        }
+        }*/
 
         if (contentSpan > viewportSpan) {
             const minDeltaY = state.viewportBottom - state.contentBottom;
             const maxDeltaY = state.viewportTop - state.contentTop;
             appliedDeltaY = Math.max(minDeltaY, Math.min(maxDeltaY, deltaY));
-        } else {
+        }/* else {
             appliedDeltaY = 0;
-        }
+        }*/
 
         childUids.forEach(function(uid) {
             const baseX = state.basePositionsX[uid];
