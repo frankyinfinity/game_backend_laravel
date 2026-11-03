@@ -38,35 +38,32 @@ function generateTimelineCards(timelineData, modalUid) {
   details.forEach((detail, index) => {
     const cardX = startX + index * (cardWidth + cardSpacing);
     const cardY = startY;
-    const borderRadius = 10; // Rounded corners
 
-    // Card background (rectangle with rounded corners)
+    // Card border (rectangle slightly larger, behind background)
+    const cardBorder = {
+      uid: `timeline_card_border_${modalUid}_${index}`,
+      type: 'rectangle',
+      x: cardX - 3,
+      y: cardY - 3,
+      width: cardWidth + 6,
+      height: cardHeight + 6,
+      color: 0xCCCCCC, // Gray border
+      attributes: { renderable: true, z_index: 20020 }
+    };
+    elements.push(cardBorder);
+
+    // Card background (simple rectangle)
     const cardBackground = {
       uid: `timeline_card_bg_${modalUid}_${index}`,
-      type: 'rounded_rectangle',
+      type: 'rectangle',
       x: cardX,
       y: cardY,
       width: cardWidth,
       height: cardHeight,
       color: 0xE8E8E8, // Gray background
-      border_radius: borderRadius,
-      attributes: { renderable: true, z_index: 20020 }
-    };
-    elements.push(cardBackground);
-
-    // Card border (rounded rectangle outline) - gray
-    const cardBorder = {
-      uid: `timeline_card_border_${modalUid}_${index}`,
-      type: 'rounded_rectangle',
-      x: cardX,
-      y: cardY,
-      width: cardWidth,
-      height: cardHeight,
-      color: 0xCCCCCC, // Gray border
-      border_radius: borderRadius,
       attributes: { renderable: true, z_index: 20021 }
     };
-    elements.push(cardBorder);
+    elements.push(cardBackground);
 
     // Image (using sprite with URL)
     const imageHeight = 120;
@@ -74,31 +71,28 @@ function generateTimelineCards(timelineData, modalUid) {
     const imageY = cardY + 5;
     const imageWidth = cardWidth - 10;
 
-    // Image border (black outline only, transparent background)
+    // Image border (black rectangle slightly larger behind image)
     const imageBorder = {
       uid: `timeline_card_image_border_${modalUid}_${index}`,
-      type: 'rounded_rectangle_outline',
-      x: imageX,
-      y: imageY,
-      width: imageWidth,
-      height: imageHeight,
+      type: 'rectangle',
+      x: imageX - 1,
+      y: imageY - 1,
+      width: imageWidth + 2,
+      height: imageHeight + 2,
       color: 0x000000, // Black border
-      border_radius: 5,
-      border_width: 2,
       attributes: { renderable: true, z_index: 20022 }
     };
     elements.push(imageBorder);
 
-    // Image placeholder (gray rectangle) - no sprite loading
+    // Image placeholder (gray rectangle)
     const imagePlaceholder = {
       uid: `timeline_card_image_${modalUid}_${index}`,
-      type: 'rounded_rectangle',
-      x: imageX + 2,
-      y: imageY + 2,
-      width: imageWidth - 4,
-      height: imageHeight - 4,
+      type: 'rectangle',
+      x: imageX,
+      y: imageY,
+      width: imageWidth,
+      height: imageHeight,
       color: 0xD0D0D0, // Light gray
-      border_radius: 5,
       attributes: { renderable: true, z_index: 20023 }
     };
     elements.push(imagePlaceholder);
