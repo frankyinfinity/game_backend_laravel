@@ -1,6 +1,6 @@
 {
   "name": "evolution-service",
-  "version": "1.9.0",
+  "version": "2.2.0",
   "description": "Evolution Docker service with websocket for saving evolution data to the backend",
   "main": "index.js",
   "dependencies": {

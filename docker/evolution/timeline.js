@@ -15,12 +15,12 @@ function generateTimelineCards(timelineData, modalUid) {
   const cardSpacing = 50;
   const startX = 50;
   const startY = 50;
-  const lineHeight = 2; // Red line height
-  const lineY = startY + cardHeight / 2; // Line in the middle of cards
+  const lineHeight = 2;
+  const lineY = startY + cardHeight / 2;
+  const pixelSize = 4;
 
   console.log(`[Timeline] Generating ${details.length} timeline cards`);
 
-  // Draw horizontal red line first (behind cards)
   const totalWidth = details.length * cardWidth + (details.length - 1) * cardSpacing;
   const lineElement = {
     uid: `timeline_line_${modalUid}`,
@@ -29,17 +29,15 @@ function generateTimelineCards(timelineData, modalUid) {
     y: lineY,
     width: totalWidth,
     height: lineHeight,
-    color: 0xFF0000, // Red
+    color: 0xFF0000,
     attributes: { renderable: true, z_index: 20015 }
   };
   elements.push(lineElement);
 
-  // Generate cards for each timeline detail
   details.forEach((detail, index) => {
     const cardX = startX + index * (cardWidth + cardSpacing);
     const cardY = startY;
 
-    // Card border (rectangle slightly larger, behind background)
     const cardBorder = {
       uid: `timeline_card_border_${modalUid}_${index}`,
       type: 'rectangle',
@@ -47,12 +45,11 @@ function generateTimelineCards(timelineData, modalUid) {
       y: cardY - 3,
       width: cardWidth + 6,
       height: cardHeight + 6,
-      color: 0xCCCCCC, // Gray border
+      color: 0xCCCCCC,
       attributes: { renderable: true, z_index: 20020 }
     };
     elements.push(cardBorder);
 
-    // Card background (simple rectangle)
     const cardBackground = {
       uid: `timeline_card_bg_${modalUid}_${index}`,
       type: 'rectangle',
@@ -60,18 +57,16 @@ function generateTimelineCards(timelineData, modalUid) {
       y: cardY,
       width: cardWidth,
       height: cardHeight,
-      color: 0xE8E8E8, // Gray background
+      color: 0xE8E8E8,
       attributes: { renderable: true, z_index: 20021 }
     };
     elements.push(cardBackground);
 
-    // Image (using sprite with URL)
     const imageHeight = 120;
     const imageX = cardX + 5;
     const imageY = cardY + 5;
     const imageWidth = cardWidth - 10;
 
-    // Image border (black rectangle slightly larger behind image)
     const imageBorder = {
       uid: `timeline_card_image_border_${modalUid}_${index}`,
       type: 'rectangle',
@@ -79,12 +74,11 @@ function generateTimelineCards(timelineData, modalUid) {
       y: imageY - 1,
       width: imageWidth + 2,
       height: imageHeight + 2,
-      color: 0x000000, // Black border
+      color: 0x000000,
       attributes: { renderable: true, z_index: 20022 }
     };
     elements.push(imageBorder);
 
-    // Image placeholder (gray rectangle)
     const imagePlaceholder = {
       uid: `timeline_card_image_${modalUid}_${index}`,
       type: 'rectangle',
@@ -92,12 +86,31 @@ function generateTimelineCards(timelineData, modalUid) {
       y: imageY,
       width: imageWidth,
       height: imageHeight,
-      color: 0xD0D0D0, // Light gray
+      color: 0xD0D0D0,
       attributes: { renderable: true, z_index: 20023 }
     };
     elements.push(imagePlaceholder);
 
-    // Creation date text
+    const imagePixels = detail.pixels || [];
+    console.log(`[Timeline] Card ${index}: ${imagePixels.length} pixels to draw`);
+    imagePixels.forEach((pixel, pIdx) => {
+      const px = imageX + (pixel.x * pixelSize);
+      const py = imageY + (pixel.y * pixelSize);
+      if (px >= imageX && py >= imageY && px + pixelSize <= imageX + imageWidth && py + pixelSize <= imageY + imageHeight) {
+        // `pixel.color` è un intero 0xRRGGBB restituito dal controller PHP
+        const colorValue = (pixel.color && !isNaN(pixel.color)) ? pixel.color : 0x000000;
+        elements.push({
+          uid: `timeline_card_pixel_${modalUid}_${index}_${pIdx}`,
+          type: 'square',
+          x: px,
+          y: py,
+          size: pixelSize,
+          color: colorValue,
+          attributes: { renderable: true, z_index: 20030 }
+        });
+      }
+    });
+
     const dateText = {
       uid: `timeline_card_date_${modalUid}_${index}`,
       type: 'text',
@@ -111,28 +124,26 @@ function generateTimelineCards(timelineData, modalUid) {
     };
     elements.push(dateText);
 
-    // Population life text (Entity vivi) - darker green
     const lifeText = {
       uid: `timeline_card_life_${modalUid}_${index}`,
       type: 'text',
       x: cardX + 10,
       y: cardY + imageHeight + 35,
       text: `Entity vivi: ${detail.population_life || 0}`,
-      color: 0x008800, // Darker green
+      color: 0x008800,
       fontSize: 11,
       fontFamily: 'Arial',
       attributes: { renderable: true, z_index: 20024 }
     };
     elements.push(lifeText);
 
-    // Population death text (Entity morti)
     const deathText = {
       uid: `timeline_card_death_${modalUid}_${index}`,
       type: 'text',
       x: cardX + 10,
       y: cardY + imageHeight + 55,
       text: `Entity morti: ${detail.population_death || 0}`,
-      color: 0xAA0000, // Red
+      color: 0xAA0000,
       fontSize: 11,
       fontFamily: 'Arial',
       attributes: { renderable: true, z_index: 20024 }
