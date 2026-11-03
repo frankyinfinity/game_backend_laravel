@@ -89,33 +89,19 @@ function generateTimelineCards(timelineData, modalUid) {
     };
     elements.push(imageBorder);
 
-    if (detail.image_url) {
-      const imageSprite = {
-        uid: `timeline_card_image_${modalUid}_${index}`,
-        type: 'sprite',
-        x: imageX + 2,
-        y: imageY + 2,
-        width: imageWidth - 4,
-        height: imageHeight - 4,
-        image_url: detail.image_url,
-        attributes: { renderable: true, z_index: 20023 }
-      };
-      elements.push(imageSprite);
-    } else {
-      // Image placeholder (gray rectangle) if no image
-      const imagePlaceholder = {
-        uid: `timeline_card_image_${modalUid}_${index}`,
-        type: 'rounded_rectangle',
-        x: imageX + 2,
-        y: imageY + 2,
-        width: imageWidth - 4,
-        height: imageHeight - 4,
-        color: 0xD0D0D0, // Light gray
-        border_radius: 5,
-        attributes: { renderable: true, z_index: 20023 }
-      };
-      elements.push(imagePlaceholder);
-    }
+    // Image placeholder (gray rectangle) - no sprite loading
+    const imagePlaceholder = {
+      uid: `timeline_card_image_${modalUid}_${index}`,
+      type: 'rounded_rectangle',
+      x: imageX + 2,
+      y: imageY + 2,
+      width: imageWidth - 4,
+      height: imageHeight - 4,
+      color: 0xD0D0D0, // Light gray
+      border_radius: 5,
+      attributes: { renderable: true, z_index: 20023 }
+    };
+    elements.push(imagePlaceholder);
 
     // Creation date text
     const dateText = {
