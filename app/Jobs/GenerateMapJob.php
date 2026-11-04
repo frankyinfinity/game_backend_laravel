@@ -7,11 +7,13 @@ use App\Custom\Draw\Complex\ButtonDraw;
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\Appbar\HomeAppbarDraw;
 use App\Custom\Draw\Complex\TilePanelDraw;
+use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Primitive\BasicDraw;
 use App\Custom\Draw\Primitive\Image;
 use App\Custom\Draw\Primitive\MultiLine;
 use App\Custom\Draw\Primitive\Square;
 use App\Custom\Draw\Primitive\Rectangle;
+use App\Custom\Draw\Primitive\Text;
 use App\Custom\Manipulation\ObjectCode;
 use App\Custom\Manipulation\ObjectDraw;
 use App\Custom\Draw\Support\ScrollGroup;
@@ -427,6 +429,32 @@ class GenerateMapJob implements ShouldQueue
         }
 
         ObjectCache::flush($player->actual_session_id);
+
+        // Add Timeline Evolutiva modal
+        $modal = new ModalDraw('timeline_evolutiva_modal');
+        $modal->setOrigin(20, 20);
+        $modal->setSize(1120, 680);
+        $modal->setTitle('Timeline Evolutiva');
+        $modal->setRenderable(false);
+
+        // Add timeline content based on birth region
+        $timelineText = new Text('timeline_evolutiva_text');
+        $timelineText->setOrigin(40, 40);
+        $timelineText->setFontSize(20);
+        $timelineText->setFontFamily('Outfit');
+        $timelineText->setColor(0x1F2937);
+
+        $regionName = $birthRegion ? $birthRegion->name : 'Nessuna regione';
+        $timelineText->setText("Timeline Evolutiva\nRegione: $regionName\nClimate: $birthClimate\nTile count: " . count($tiles));
+
+        $modal->addContentItem($timelineText, 0, 0);
+        $modal->setBackgroundColor(0xF8F9FA);
+        $modal->setBorderColor(0x1F2937);
+        $modal->build();
+
+        foreach ($modal->getDrawItems() as $drawItem) {
+            $drawItems[] = $drawItem;
+        }
 
         $request_id = Str::random(20);
         DrawRequest::query()->create([
