@@ -73,6 +73,20 @@ class HomeAppbarDraw extends AppbarDraw
         // Set onClick function to toggle sidebar
         $jsPathOnClickMenu = resource_path('js/function/appbar/on_click_menu.blade.php');
         $jsContentOnClickMenu = file_get_contents($jsPathOnClickMenu);
+        $jsContentOnClickMenu = str_replace('__PLAYER_ID__', (string) $this->player->id, $jsContentOnClickMenu);
+
+        // Get player container for ws_port
+        $playerContainer = \App\Models\Container::query()
+            ->where('parent_type', \App\Models\Container::PARENT_TYPE_PLAYER)
+            ->where('parent_id', $this->player->id)
+            ->first();
+        $playerWsPort = $playerContainer ? $playerContainer->ws_port : null;
+        $jsContentOnClickMenu = str_replace('__PLAYER_WS_PORT__', $playerWsPort ?? 'null', $jsContentOnClickMenu);
+
+        // Add gateway base URL
+        $gatewayBaseUrl = 'ws://' . config('remote_docker.docker_host_ip') . ':' . config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $jsContentOnClickMenu = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentOnClickMenu);
+
         $jsContentOnClickMenu = Helper::setCommonJsCode($jsContentOnClickMenu, Str::random(20));
 
         $menuButton->setOnClick($jsContentOnClickMenu);

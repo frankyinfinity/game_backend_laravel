@@ -43,6 +43,7 @@ class SidebarDraw
 
         // Add buttons
         $this->addObjectivesButton();
+        $this->addTimelineButton();
         $this->addLogoutButton();
 
         // Add background to draw items first (behind everything)
@@ -94,10 +95,38 @@ class SidebarDraw
         }
     }
 
+    private function addTimelineButton(): void
+    {
+        $timelineButton = new ButtonDraw($this->uid . '_timeline_button');
+        $timelineButton->setOrigin(20, self::START_Y + self::BUTTON_HEIGHT + self::BUTTON_SPACING); // Below objectives button
+        $timelineButton->setSize(self::BUTTON_WIDTH, self::BUTTON_HEIGHT);
+        $timelineButton->setString('Timeline');
+        $timelineButton->setColorButton(0xFF8C00); // Dark orange
+        $timelineButton->setColorString(Colors::WHITE);
+        $timelineButton->setTextFontSize(16);
+
+        $jsPathOnClickTimeline = resource_path('js/function/sidebar/click_timeline.blade.php');
+        $jsContentOnClickTimeline = file_get_contents($jsPathOnClickTimeline);
+        $jsContentOnClickTimeline = Helper::setCommonJsCode($jsContentOnClickTimeline, Str::random(20));
+        $timelineButton->setOnClick($jsContentOnClickTimeline);
+        $timelineButton->build();
+
+        foreach ($timelineButton->getDrawItems() as $drawItem) {
+            $this->background->addChild($drawItem);
+            $json = $drawItem->buildJson();
+            // Set z-index higher than container and renderable false by default
+            if (isset($json['attributes'])) {
+                $json['attributes']['z_index'] = 26000;
+                $json['attributes']['renderable'] = false;
+            }
+            $this->drawItems[] = $json;
+        }
+    }
+
     private function addLogoutButton(): void
     {
         $logoutButton = new ButtonDraw($this->uid . '_logout_button');
-        $logoutButton->setOrigin(20, self::START_Y + self::BUTTON_HEIGHT + self::BUTTON_SPACING); // Relative to sidebar (left side)
+        $logoutButton->setOrigin(20, self::START_Y + (self::BUTTON_HEIGHT + self::BUTTON_SPACING) * 2); // Below timeline button
         $logoutButton->setSize(self::BUTTON_WIDTH, self::BUTTON_HEIGHT);
         $logoutButton->setString('Logout');
         $logoutButton->setColorButton(Colors::RED);

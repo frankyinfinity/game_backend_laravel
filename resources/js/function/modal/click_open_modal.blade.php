@@ -345,6 +345,8 @@ window['__name__'] = function() {
             const sidebarButtonUids = [
                 'appbar_' + resolvedPlayerId + '_sidebar_objectives_button_rect',
                 'appbar_' + resolvedPlayerId + '_sidebar_objectives_button_text',
+                'appbar_' + resolvedPlayerId + '_sidebar_timeline_button_rect',
+                'appbar_' + resolvedPlayerId + '_sidebar_timeline_button_text',
                 'appbar_' + resolvedPlayerId + '_sidebar_logout_button_rect',
                 'appbar_' + resolvedPlayerId + '_sidebar_logout_button_text'
             ];
@@ -373,6 +375,13 @@ window['__name__'] = function() {
                             }
                         });
                         sidebarBackground.x = targetX;
+
+                        // Stop PlayerValue polling for sidebar
+                        if (AppData && AppData._playerValuePollingIntervals && AppData._playerValuePollingIntervals['sidebar_' + resolvedPlayerId]) {
+                            clearInterval(AppData._playerValuePollingIntervals['sidebar_' + resolvedPlayerId]);
+                            delete AppData._playerValuePollingIntervals['sidebar_' + resolvedPlayerId];
+                            console.log('[PlayerValue Polling] Stopped for sidebar (objectives modal opened)');
+                        }
                     }
                 };
 
