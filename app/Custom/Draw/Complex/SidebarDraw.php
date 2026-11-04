@@ -107,6 +107,7 @@ class SidebarDraw
 
         $jsPathOnClickTimeline = resource_path('js/function/sidebar/click_timeline.blade.php');
         $jsContentOnClickTimeline = file_get_contents($jsPathOnClickTimeline);
+        $jsContentOnClickTimeline = str_replace('__PLAYER_ID__', (string) $this->playerId, $jsContentOnClickTimeline);
         $jsContentOnClickTimeline = Helper::setCommonJsCode($jsContentOnClickTimeline, Str::random(20));
         $timelineButton->setOnClick($jsContentOnClickTimeline);
         $timelineButton->build();
