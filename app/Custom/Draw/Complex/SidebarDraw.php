@@ -109,6 +109,10 @@ class SidebarDraw
         $jsContentOnClickTimeline = file_get_contents($jsPathOnClickTimeline);
         $jsContentOnClickTimeline = str_replace('__PLAYER_ID__', (string) $this->playerId, $jsContentOnClickTimeline);
 
+        // Inline the shared modal element renderer (pseudo-include).
+        $jsAddElementsToModal = file_get_contents(resource_path('js/function/modal/add_elements_to_modal.blade.php'));
+        $jsContentOnClickTimeline = str_replace('// __INCLUDE_ADD_ELEMENTS_TO_MODAL__', $jsAddElementsToModal, $jsContentOnClickTimeline);
+
         // Info websocket del container Evolution legato al player
         $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
         $evolutionContainer = \App\Models\Container::query()
