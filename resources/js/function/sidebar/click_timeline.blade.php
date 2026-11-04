@@ -226,6 +226,13 @@ window['__name__'] = function() {
                     if (shapes[uid]) shapes[uid].renderable = false;
                 });
                 sidebarBackground.x = targetX;
+
+                // Stop PlayerValue polling for sidebar
+                if (typeof AppData !== 'undefined' && AppData._playerValuePollingIntervals && AppData._playerValuePollingIntervals['sidebar_' + playerId]) {
+                    clearInterval(AppData._playerValuePollingIntervals['sidebar_' + playerId]);
+                    delete AppData._playerValuePollingIntervals['sidebar_' + playerId];
+                    console.log('[PlayerValue Polling] Stopped for sidebar (timeline clicked)');
+                }
             }
         };
 
