@@ -437,23 +437,15 @@ class GenerateMapJob implements ShouldQueue
         $modal->setTitle('Timeline Evolutiva');
         $modal->setRenderable(false);
 
-        // Add timeline content based on birth region
-        $timelineText = new Text('timeline_evolutiva_text');
-        $timelineText->setOrigin(40, 40);
-        $timelineText->setFontSize(20);
-        $timelineText->setFontFamily('Outfit');
-        $timelineText->setColor(0x1F2937);
-
-        $regionName = $birthRegion ? $birthRegion->name : 'Nessuna regione';
-        $timelineText->setText("Timeline Evolutiva\nRegione: $regionName\nClimate: $birthClimate\nTile count: " . count($tiles));
-
-        $modal->addContentItem($timelineText, 0, 0);
+        // No static content: the modal opens empty, content is drawn
+        // client-side from the evolution container 'get_timeline' response.
         $modal->setBackgroundColor(0xF8F9FA);
         $modal->setBorderColor(0x1F2937);
         $modal->build();
 
         foreach ($modal->getDrawItems() as $drawItem) {
-            $drawItems[] = $drawItem;
+            $objectDraw = new ObjectDraw($drawItem->buildJson(), $player->actual_session_id);
+            $drawItems[] = $objectDraw->get();
         }
 
         $request_id = Str::random(20);

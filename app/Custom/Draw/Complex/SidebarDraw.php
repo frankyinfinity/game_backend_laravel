@@ -108,6 +108,17 @@ class SidebarDraw
         $jsPathOnClickTimeline = resource_path('js/function/sidebar/click_timeline.blade.php');
         $jsContentOnClickTimeline = file_get_contents($jsPathOnClickTimeline);
         $jsContentOnClickTimeline = str_replace('__PLAYER_ID__', (string) $this->playerId, $jsContentOnClickTimeline);
+
+        // Info websocket del container Evolution legato al player
+        $gatewayBaseUrl = 'ws://' . (string) config('remote_docker.docker_host_ip') . ':' . (int) config('remote_docker.websocket_gateway_port', 9001) . '/?port=';
+        $evolutionContainer = \App\Models\Container::query()
+            ->where('parent_type', \App\Models\Container::PARENT_TYPE_EVOLUTION)
+            ->where('parent_id', $this->playerId)
+            ->first();
+        $evolutionWsPort = $evolutionContainer ? $evolutionContainer->ws_port : null;
+        $jsContentOnClickTimeline = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentOnClickTimeline);
+        $jsContentOnClickTimeline = str_replace('__port__', $evolutionWsPort ?? '', $jsContentOnClickTimeline);
+
         $jsContentOnClickTimeline = Helper::setCommonJsCode($jsContentOnClickTimeline, Str::random(20));
         $timelineButton->setOnClick($jsContentOnClickTimeline);
         $timelineButton->build();
