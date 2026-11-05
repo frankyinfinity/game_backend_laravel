@@ -17,6 +17,11 @@
         </div>
     </div>
     <div class="card-body p-0">
+        <div class="preset-bar">
+            <span class="preset-bar-title"><i class="fas fa-bolt"></i> Preset:</span>
+            <div id="preset-buttons" class="preset-buttons"></div>
+            <small class="text-muted ml-auto preset-hint">click = carica il comando &middot; Invio = esegui</small>
+        </div>
         <div id="terminal" class="terminal">
             <div id="terminal-output"></div>
             <div class="terminal-input-line">
@@ -100,6 +105,45 @@
         color: #dcdcaa;
         font-style: italic;
     }
+
+    .preset-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 15px;
+        background: #f4f6f9;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .preset-bar-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #6c757d;
+        margin-right: 4px;
+    }
+
+    .preset-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .preset-buttons .btn {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 5px;
+    }
+
+    .preset-buttons .btn .preset-desc {
+        font-weight: 400;
+        font-size: 11px;
+        opacity: 0.75;
+    }
+
+    @media (max-width: 768px) {
+        .preset-hint { display: none; }
+    }
 </style>
 @stop
 
@@ -118,6 +162,35 @@
 
         function appendCommand(command) {
             appendLine('$ ' + command, 'command');
+        }
+
+        const presets = [
+            { label: 'Container attivi', command: 'docker ps', description: 'elenca i container in esecuzione', danger: false },
+            { label: 'Tutti i container', command: 'docker ps -a', description: 'elenca anche i container fermati', danger: false },
+            { label: 'Stats', command: 'docker stats --no-stream', description: 'uso CPU/RAM dei container (snapshot)', danger: false },
+            { label: 'Immagini', command: 'docker images', description: 'elenca le immagini docker presenti', danger: false },
+            { label: 'Stop all', command: 'docker stop $(docker ps -q)', description: 'FERMA tutti i container attivi', danger: true },
+            { label: 'Restart all', command: 'docker restart $(docker ps -aq)', description: 'riavvia tutti i container', danger: true },
+            { label: 'Prune stopped', command: 'docker container prune -f', description: 'elimina i container fermati', danger: true },
+            { label: 'Rimuovi TUTTI', command: 'docker rm -f $(docker ps -aq)', description: 'forza rimozione di TUTTI i container', danger: true },
+            { label: 'System prune', command: 'docker system prune -af', description: 'pulizia completa: container, reti, immagini', danger: true },
+            { label: 'Disco', command: 'df -h', description: 'spazio disco disponibile', danger: false },
+            { label: 'RAM', command: 'free -h', description: 'memoria RAM usata/disponibile', danger: false }
+        ];
+
+        function renderPresets() {
+            const container = $('#preset-buttons');
+            container.empty();
+            presets.forEach(function (preset) {
+                const btnClass = preset.danger ? 'btn-outline-danger' : 'btn-outline-secondary';
+                const btn = $('<button type="button">')
+                    .addClass('btn ' + btnClass + ' btn-sm js-preset')
+                    .attr('data-command', preset.command)
+                    .attr('title', preset.command);
+                btn.append($('<b>').text(preset.label));
+                btn.append($('<span>').addClass('preset-desc').text(preset.description));
+                container.append(btn);
+            });
         }
 
         function executeCommand(command) {
@@ -165,6 +238,11 @@
             }
         });
 
+        $(document).on('click', '.js-preset', function () {
+            terminalInput.val($(this).attr('data-command') || '');
+            terminalInput.focus();
+        });
+
         $('#btn-clear').on('click', function () {
             terminalOutput.empty();
             terminalInput.focus();
@@ -179,6 +257,8 @@
         appendLine('Console collegata a GCloud Compute Engine', 'success');
         appendLine('Zona: europe-west12-c | Istanza: instance-game | Progetto: game-500515', '');
         appendLine('Digita un comando e premi Invio per eseguirlo sulla macchina remota.', '');
+        appendLine('Usa i preset sopra per caricare i comandi piu comuni.', '');
+        renderPresets();
         appendLine('', '');
         terminalInput.focus();
     });
