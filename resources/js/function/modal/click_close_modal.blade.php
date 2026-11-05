@@ -17,41 +17,67 @@ window['__name__'] = function() {
         modalUid + '_content_viewport',
     ];
 
+    // When the placeholder is not replaced (other draw classes), default to false.
+    const clearContentOnClose = (typeof __CLEAR_CONTENT_ON_CLOSE__ !== 'undefined') ? !!__CLEAR_CONTENT_ON_CLOSE__ : false;
+
     const viewportObject = objects[modalUid + '_content_viewport'];
     if (viewportObject && viewportObject.attributes && Array.isArray(viewportObject.attributes.scroll_child_uids)) {
-        // Destroy all child elements to completely clear the modal content
-        viewportObject.attributes.scroll_child_uids.forEach(function(uid) {
-            if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
-                shapes[uid].destroy();
-            }
-            delete shapes[uid];
-            delete objects[uid];
-        });
+        if (clearContentOnClose) {
+            // Destroy all child elements to completely clear the modal content
+            viewportObject.attributes.scroll_child_uids.forEach(function(uid) {
+                if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
+                    shapes[uid].destroy();
+                }
+                delete shapes[uid];
+                delete objects[uid];
+            });
 
-        // Reset scroll attributes
-        viewportObject.attributes.scroll_child_uids = [];
-        viewportObject.attributes.scroll_base_positions_x = {};
-        viewportObject.attributes.scroll_base_positions_y = {};
-        viewportObject.attributes.scroll_item_widths = {};
-        viewportObject.attributes.scroll_item_heights = {};
-        viewportObject.attributes.scroll_base_points = {};
-        viewportObject.attributes.scroll_initial_renderables = {};
-        viewportObject.attributes.scroll_content_left = viewportObject.attributes.scroll_viewport_left;
-        viewportObject.attributes.scroll_content_right = viewportObject.attributes.scroll_viewport_left;
-        viewportObject.attributes.scroll_content_top = viewportObject.attributes.scroll_viewport_top;
-        viewportObject.attributes.scroll_content_bottom = viewportObject.attributes.scroll_viewport_top;
+            // Reset scroll attributes
+            viewportObject.attributes.scroll_child_uids = [];
+            viewportObject.attributes.scroll_base_positions_x = {};
+            viewportObject.attributes.scroll_base_positions_y = {};
+            viewportObject.attributes.scroll_item_widths = {};
+            viewportObject.attributes.scroll_item_heights = {};
+            viewportObject.attributes.scroll_base_points = {};
+            viewportObject.attributes.scroll_initial_renderables = {};
+            viewportObject.attributes.scroll_content_left = viewportObject.attributes.scroll_viewport_left;
+            viewportObject.attributes.scroll_content_right = viewportObject.attributes.scroll_viewport_left;
+            viewportObject.attributes.scroll_content_top = viewportObject.attributes.scroll_viewport_top;
+            viewportObject.attributes.scroll_content_bottom = viewportObject.attributes.scroll_viewport_top;
+        } else {
+            // Keep the content: just hide the child elements
+            viewportObject.attributes.scroll_child_uids.forEach(function(uid) {
+                if (shapes[uid]) {
+                    shapes[uid].renderable = false;
+                }
+                if (objects[uid] && objects[uid].attributes) {
+                    objects[uid].attributes.renderable = false;
+                }
+            });
+        }
     }
 
-    // Destroy dynamically added elements tracked in modalDynamicElements array
+    // Dynamically added elements tracked in modalDynamicElements array
     if (window.modalDynamicElements && window.modalDynamicElements[modalUid]) {
         window.modalDynamicElements[modalUid].forEach(function(uid) {
-            if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
-                shapes[uid].destroy();
+            if (clearContentOnClose) {
+                if (shapes[uid] && typeof shapes[uid].destroy === 'function') {
+                    shapes[uid].destroy();
+                }
+                delete shapes[uid];
+                delete objects[uid];
+            } else {
+                if (shapes[uid]) {
+                    shapes[uid].renderable = false;
+                }
+                if (objects[uid] && objects[uid].attributes) {
+                    objects[uid].attributes.renderable = false;
+                }
             }
-            delete shapes[uid];
-            delete objects[uid];
         });
-        window.modalDynamicElements[modalUid] = [];
+        if (clearContentOnClose) {
+            window.modalDynamicElements[modalUid] = [];
+        }
     }
 
     // Hide the modal itself

@@ -436,6 +436,7 @@ class GenerateMapJob implements ShouldQueue
         $modal->setSize(1120, 680);
         $modal->setTitle('Timeline Evolutiva');
         $modal->setRenderable(false);
+        $modal->setClearContentOnClose(true);
 
         // No static content: the modal opens empty, content is drawn
         // client-side from the evolution container 'get_timeline' response.

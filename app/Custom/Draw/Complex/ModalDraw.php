@@ -24,6 +24,7 @@ class ModalDraw
     private int $screenHeight = 720;
     private bool $autoCenter = true;
     private bool $renderable = true;
+    private bool $clearContentOnClose = false;
 
     private ?int $playerId = null;
 
@@ -79,6 +80,11 @@ class ModalDraw
     public function setRenderable(bool $renderable): void
     {
         $this->renderable = $renderable;
+    }
+
+    public function setClearContentOnClose(bool $clearContentOnClose): void
+    {
+        $this->clearContentOnClose = $clearContentOnClose;
     }
 
     public function setBackgroundColor(int $color): void
@@ -180,6 +186,7 @@ class ModalDraw
 
         $jsClose = file_get_contents(resource_path('js/function/modal/click_close_modal.blade.php'));
         $jsClose = str_replace('__MODAL_UID__', $uid, $jsClose);
+        $jsClose = str_replace('__CLEAR_CONTENT_ON_CLOSE__', $this->clearContentOnClose ? 'true' : 'false', $jsClose);
         $jsClose = Helper::setCommonJsCode($jsClose, Str::random(20));
         $closeButton->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsClose);
         $closeText->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $jsClose);
