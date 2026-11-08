@@ -428,7 +428,7 @@ return [
             'icon_color' => 'purple',
             'submenu' => [
                 [
-                    'text'    => 'Entity',
+                    'text'    => 'Entity (Giocatore)',
                     'icon'    => 'fas fa-dna',
                     'icon_color' => 'purple',
                     'submenu' => [
@@ -450,7 +450,7 @@ return [
                     ]
                 ],
                 [
-                    'text'    => 'Elementi',
+                    'text'    => 'Elementi (CPU)',
                     'icon'    => 'fas fa-cubes',
                     'icon_color' => 'purple',
                     'submenu' => [
