@@ -438,13 +438,14 @@ trait ManagesBrain
         if (!$owner->brain || (int) $circuit->{$S['circuit_owner_fk']} !== $this->brainCircuitOwnerId($owner)) {
             return response()->json(['success' => false, 'message' => 'Circuito non trovato'], 404);
         }
-        if ($S['circuit_active']) {
-            $circuit->{$S['circuit_active']} = !$circuit->{$S['circuit_active']};
-            $circuit->save();
+        if (!$S['circuit_active']) {
+            return response()->json(['success' => false, 'message' => 'Attivazione circuito non supportata'], 403);
         }
+        $circuit->{$S['circuit_active']} = !$circuit->{$S['circuit_active']};
+        $circuit->save();
         return response()->json([
             'success'  => true,
-            'active'   => $S['circuit_active'] ? (bool) $circuit->{$S['circuit_active']} : true,
+            'active'   => (bool) $circuit->{$S['circuit_active']},
             'circuits' => $this->getCircuitsArray($owner),
         ]);
     }
