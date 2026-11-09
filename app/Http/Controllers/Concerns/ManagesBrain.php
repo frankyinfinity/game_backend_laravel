@@ -6,29 +6,91 @@ use App\Helpers\NeuronTooltipHelper;
 use App\Models\Brain;
 use App\Models\Neuron;
 use App\Models\NeuronCircuit;
-use App\Models\NeuronCircuitDetail;
+use App\Models\NeuronConditionOrder;
 use App\Models\NeuronLink;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /**
  * API condivisa dell'editor Cervello (vista: shared.brain_editor).
  *
  * Il controller che usa questo trait deve esporre metodi pubblici con la
  * firma attesa dalle route (route model binding sul proprietario) e
- * delegare a questi metodi protetti, passando il modello proprietario:
+ * delegare a questi metodi, passando il modello proprietario:
  *
  *     public function saveBrainNeuron(Request $request, ElementComponent $elementComponent) {
  *         return $this->brainSaveNeuron($request, $elementComponent);
  *     }
  *
- * Il modello proprietario deve avere una colonna brain_id e la relazione
- * brain() belongsTo(Brain::class). Per una regola di lock diversa,
- * sovrascrivere isBrainLocked().
+ * Il modello proprietario deve avere la relazione brain().
+ *
+ * Le classi dei modelli e i nomi delle colonne sono parametrizzati da
+ * brainSchema(): per riusare l'editor su una famiglia di modelli diversa
+ * (es. ElementHasPosition*), sovrascrivere brainSchema() e gli hook
+ * brainCircuitOwner()/createBrainFor() — vedi ManagesEhpBrain.
  */
 trait ManagesBrain
 {
+    /**
+     * Stato circuiti calcolato dall'ultimo updateBrainCircuit(), usato quando
+     * lo schema non prevede una colonna state persistita (circuit_state=null).
+     *
+     * @var array<int,string>
+     */
+    private array $brainComputedCircuitStates = [];
+
+    // ─── SCHEMA / HOOKS ─────────────────────────────────────────────────────────
+
+    /**
+     * Schema di default: famiglia Brain / Neuron* (es. ElementComponent).
+     * Le chiavi *_classi sono classi Eloquent; le chiavi colonna/tabella sono
+     * usate da endpoint, validazione e serializzazione. Le chiavi
+     * circuit_state/circuit_active/circuit_color = null indicano attributi
+     * non persistiti (calcolati/derivati a runtime).
+     */
+    protected function defaultBrainSchema(): array
+    {
+        return [
+            'neuron'           => Neuron::class,
+            'link'             => NeuronLink::class,
+            'order'            => NeuronConditionOrder::class,
+            'circuit'          => NeuronCircuit::class,
+            'circuit_detail'   => \App\Models\NeuronCircuitDetail::class,
+            'neuron_table'     => 'neurons',
+            'info_table'       => 'genes',
+            'info_owner_fk'    => null,
+            'rule_table'       => 'rule_chimical_elements',
+            'rule_owner_fk'    => null,
+            'neuron_fk'        => 'brain_id',
+            'neuron_info'      => 'element_infomation_id',
+            'neuron_rule'      => 'element_has_rule_chimical_element_id',
+            'neuron_relations' => ['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene'],
+            'link_from'        => 'from_neuron_id',
+            'link_to'          => 'to_neuron_id',
+            'link_order'       => 'neuron_condition_order_id',
+            'order_neuron'     => 'neuron_id',
+            'order_rule'       => 'rule_chimical_element_detail_id',
+            'circuit_owner_fk' => 'brain_id',
+            'circuit_start'    => 'start_neuron_id',
+            'circuit_state'    => 'state',
+            'circuit_active'   => 'active',
+            'circuit_color'    => 'color',
+            'detail_circuit'   => 'neuron_circuit_id',
+            'detail_neuron'    => 'neuron_id',
+        ];
+    }
+
+    /**
+     * Schema effettivo usato dagli endpoint. Sovrascrivibile per passare
+     * all'editor le classi dei modelli da usare (vedi ManagesEhpBrain).
+     */
+    protected function brainSchema(): array
+    {
+        return $this->defaultBrainSchema();
+    }
+
     /**
      * Regola di blocco del cervello per il proprietario.
      * Default: usa isCompleted() se esiste sul modello.
@@ -37,6 +99,39 @@ trait ManagesBrain
     {
         return method_exists($owner, 'isCompleted') ? (bool) $owner->isCompleted() : false;
     }
+
+    /**
+     * Modello che possiede i circuiti. Default: il Brain stesso.
+     * Per gli ElementHasPosition i circuiti appartengono al proprietario.
+     */
+    protected function brainCircuitOwner(Model $owner): ?Model
+    {
+        return $owner->brain;
+    }
+
+    protected function brainCircuitOwnerId(Model $owner): ?int
+    {
+        $circuitOwner = $this->brainCircuitOwner($owner);
+        return $circuitOwner ? (int) $circuitOwner->getKey() : null;
+    }
+
+    /**
+     * Crea un nuovo cervello per il proprietario.
+     * Default: crea un Brain e collega owner.brain_id.
+     */
+    protected function createBrainFor(Model $owner, int $gridWidth, int $gridHeight): Model
+    {
+        $brain = Brain::create([
+            'uid'         => (string) Str::uuid(),
+            'grid_width'  => $gridWidth,
+            'grid_height' => $gridHeight,
+        ]);
+        $owner->update(['brain_id' => $brain->id]);
+        $owner->setRelation('brain', $brain);
+        return $brain;
+    }
+
+    // ─── ENDPOINTS ──────────────────────────────────────────────────────────────
 
     public function brainSaveGrid(Request $request, Model $owner)
     {
@@ -62,23 +157,25 @@ trait ManagesBrain
             return response()->json(['success' => false, 'message' => 'Elemento completato, cervello bloccato.'], 403);
         }
 
+        $S = $this->brainSchema();
+
         $request->validate([
-            'id'                                  => 'nullable|integer|exists:neurons,id',
-            'brain_grid_width'                    => 'nullable|integer|min:1',
-            'brain_grid_height'                   => 'nullable|integer|min:1',
-            'type'                                => 'required|string',
-            'grid_i'                              => 'required|integer|min:0',
-            'grid_j'                              => 'required|integer|min:0',
-            'radius'                              => 'nullable|integer|min:1',
-            'stop_before_target'                  => 'nullable|boolean',
-            'target_type'                         => 'nullable|string',
-            'target_element_id'                   => 'nullable|integer|min:1',
-            'chemical_element_id'                 => 'nullable|integer|exists:chimical_elements,id',
-            'complex_chemical_element_id'         => 'nullable|integer|exists:complex_chimical_elements,id',
-            'gene_life_id'                        => 'nullable|integer|exists:genes,id',
-            'gene_attack_id'                      => 'nullable|integer|exists:genes,id',
-            'element_infomation_id'               => 'nullable|integer|exists:genes,id',
-            'element_has_rule_chimical_element_id'=> 'nullable|integer|exists:rule_chimical_elements,id',
+            'id'                                   => 'nullable|integer|exists:' . $S['neuron_table'] . ',id',
+            'brain_grid_width'                     => 'nullable|integer|min:1',
+            'brain_grid_height'                    => 'nullable|integer|min:1',
+            'type'                                 => 'required|string',
+            'grid_i'                               => 'required|integer|min:0',
+            'grid_j'                               => 'required|integer|min:0',
+            'radius'                               => 'nullable|integer|min:1',
+            'stop_before_target'                   => 'nullable|boolean',
+            'target_type'                          => 'nullable|string',
+            'target_element_id'                    => 'nullable|integer|min:1',
+            'chemical_element_id'                  => 'nullable|integer|exists:chimical_elements,id',
+            'complex_chemical_element_id'          => 'nullable|integer|exists:complex_chimical_elements,id',
+            'gene_life_id'                         => 'nullable|integer|exists:genes,id',
+            'gene_attack_id'                       => 'nullable|integer|exists:genes,id',
+            'element_infomation_id'                => ['nullable', 'integer', $this->brainExistsRule($S['info_table'], $S['info_owner_fk'], $owner)],
+            'element_has_rule_chimical_element_id' => ['nullable', 'integer', $this->brainExistsRule($S['rule_table'], $S['rule_owner_fk'], $owner)],
         ]);
 
         $gridWidth  = max(1, (int) $request->input('brain_grid_width', optional($owner->brain)->grid_width ?? 5));
@@ -125,51 +222,54 @@ trait ManagesBrain
         }
 
         $neuronFields = [
-            'type'                                => $type,
-            'radius'                              => $radius,
-            'stop_before_target'                  => $stopBeforeTarget,
-            'target_type'                         => $targetType,
-            'target_element_id'                   => $targetElementId,
-            'chemical_element_id'                 => $chemicalElementId,
-            'complex_chemical_element_id'         => $complexChemicalElementId,
-            'gene_life_id'                        => $geneLifeId,
-            'gene_attack_id'                      => $geneAttackId,
-            'element_infomation_id'               => $elementInfomationId,
-            'element_has_rule_chimical_element_id'=> $elementHasRuleChimicalElementId,
+            'type'                      => $type,
+            'radius'                    => $radius,
+            'stop_before_target'        => $stopBeforeTarget,
+            'target_type'               => $targetType,
+            'target_element_id'         => $targetElementId,
+            'chemical_element_id'       => $chemicalElementId,
+            'complex_chemical_element_id'=> $complexChemicalElementId,
+            'gene_life_id'              => $geneLifeId,
+            'gene_attack_id'            => $geneAttackId,
+            $S['neuron_info']           => $elementInfomationId,
+            $S['neuron_rule']           => $elementHasRuleChimicalElementId,
         ];
 
         $neuronId = $request->input('id');
         if ($neuronId) {
-            $neuron = Neuron::where('brain_id', $brain->id)
-                ->with(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene'])
+            $neuron = $S['neuron']::where($S['neuron_fk'], $brain->id)
+                ->with($S['neuron_relations'])
                 ->find($neuronId);
             if ($neuron) {
                 $neuron->update(array_merge(['grid_i' => $gridI, 'grid_j' => $gridJ], $neuronFields));
-                $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
+                $neuron->load($S['neuron_relations']);
+                $this->updateBrainCircuit($owner);
                 return response()->json([
-                    'success' => true,
-                    'neuron'  => $this->neuronToArray($neuron),
-                    'circuits'=> $this->getCircuitsArray($brain),
+                    'success'  => true,
+                    'neuron'   => $this->neuronToArray($neuron),
+                    'circuits' => $this->getCircuitsArray($owner),
                 ]);
             }
         }
 
-        $neuron = Neuron::updateOrCreate(
-            ['brain_id' => $brain->id, 'grid_i' => $gridI, 'grid_j' => $gridJ],
+        $neuron = $S['neuron']::updateOrCreate(
+            [$S['neuron_fk'] => $brain->id, 'grid_i' => $gridI, 'grid_j' => $gridJ],
             $neuronFields
         );
-        $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
-        $this->updateBrainCircuit($brain);
+        $neuron->load($S['neuron_relations']);
+        $this->updateBrainCircuit($owner);
 
         return response()->json([
-            'success' => true,
-            'neuron'  => $this->neuronToArray($neuron),
-            'circuits'=> $this->getCircuitsArray($brain),
+            'success'  => true,
+            'neuron'   => $this->neuronToArray($neuron),
+            'circuits' => $this->getCircuitsArray($owner),
         ]);
     }
 
-    public function brainMoveNeuron(Request $request, Model $owner, Neuron $neuron)
+    public function brainMoveNeuron(Request $request, Model $owner, Model $neuron)
     {
+        $S = $this->brainSchema();
+
         $request->validate([
             'grid_i' => 'required|integer|min:0',
             'grid_j' => 'required|integer|min:0',
@@ -177,7 +277,7 @@ trait ManagesBrain
 
         $brain = $owner->brain;
         if (!$brain) return response()->json(['success' => false, 'message' => 'Cervello non trovato'], 404);
-        if ((int) $neuron->brain_id !== (int) $brain->id) {
+        if ((int) $neuron->{$S['neuron_fk']} !== (int) $brain->id) {
             return response()->json(['success' => false, 'message' => 'Neurone non trovato'], 404);
         }
 
@@ -187,17 +287,17 @@ trait ManagesBrain
             return response()->json(['success' => false, 'message' => 'Coordinate fuori griglia'], 422);
         }
 
-        $occupied = Neuron::where('brain_id', $brain->id)->where('grid_i', $gridI)->where('grid_j', $gridJ)->where('id', '!=', $neuron->id)->first();
+        $occupied = $S['neuron']::where($S['neuron_fk'], $brain->id)->where('grid_i', $gridI)->where('grid_j', $gridJ)->where('id', '!=', $neuron->id)->first();
         if ($occupied) return response()->json(['success' => false, 'message' => 'Cella già occupata'], 422);
 
         $neuron->update(['grid_i' => $gridI, 'grid_j' => $gridJ]);
-        $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
-        $this->updateBrainCircuit($brain);
+        $neuron->load($S['neuron_relations']);
+        $this->updateBrainCircuit($owner);
 
         return response()->json([
-            'success' => true,
-            'neuron'  => $this->neuronToArray($neuron),
-            'circuits'=> $this->getCircuitsArray($brain),
+            'success'  => true,
+            'neuron'   => $this->neuronToArray($neuron),
+            'circuits' => $this->getCircuitsArray($owner),
         ]);
     }
 
@@ -205,27 +305,31 @@ trait ManagesBrain
     {
         if (!$owner->brain) return response()->json(['success' => true]);
 
+        $S = $this->brainSchema();
+
         $request->validate([
             'grid_i' => 'required|integer|min:0',
             'grid_j' => 'required|integer|min:0',
         ]);
 
-        Neuron::where('brain_id', $owner->brain->id)
+        $S['neuron']::where($S['neuron_fk'], $owner->brain->id)
             ->where('grid_i', (int) $request->input('grid_i'))
             ->where('grid_j', (int) $request->input('grid_j'))
             ->delete();
 
-        $this->updateBrainCircuit($owner->brain);
+        $this->updateBrainCircuit($owner);
 
         return response()->json([
             'success'  => true,
-            'circuits' => $this->getCircuitsArray($owner->brain),
+            'circuits' => $this->getCircuitsArray($owner),
         ]);
     }
 
     public function brainSaveLink(Request $request, Model $owner)
     {
         if (!$owner->brain) return response()->json(['success' => false, 'message' => 'Brain non disponibile'], 422);
+
+        $S = $this->brainSchema();
 
         $request->validate([
             'from_neuron_id' => 'required|integer|min:1',
@@ -235,8 +339,8 @@ trait ManagesBrain
         ]);
 
         $brain = $owner->brain;
-        $fromNeuron = Neuron::where('id', (int) $request->input('from_neuron_id'))->where('brain_id', $brain->id)->first();
-        $toNeuron   = Neuron::where('id', (int) $request->input('to_neuron_id'))->where('brain_id', $brain->id)->first();
+        $fromNeuron = $S['neuron']::where('id', (int) $request->input('from_neuron_id'))->where($S['neuron_fk'], $brain->id)->first();
+        $toNeuron   = $S['neuron']::where('id', (int) $request->input('to_neuron_id'))->where($S['neuron_fk'], $brain->id)->first();
 
         if (!$fromNeuron || !$toNeuron) return response()->json(['success' => false, 'message' => 'Neuroni non validi'], 422);
 
@@ -244,36 +348,38 @@ trait ManagesBrain
 
         [$condition, $ruleDetailId] = $this->resolveCondition($fromNeuron, $request->input('condition'));
 
-        $conditionOrder = \App\Models\NeuronConditionOrder::updateOrCreate(
-            ['neuron_id' => $fromNeuron->id, 'condition' => $condition],
-            ['rule_chimical_element_detail_id' => $ruleDetailId, 'color' => $request->input('color')]
+        $conditionOrder = $S['order']::updateOrCreate(
+            [$S['order_neuron'] => $fromNeuron->id, 'condition' => $condition],
+            [$S['order_rule'] => $ruleDetailId, 'color' => $request->input('color')]
         );
 
-        $link = NeuronLink::firstOrCreate([
-            'from_neuron_id'           => $fromNeuron->id,
-            'to_neuron_id'             => $toNeuron->id,
-            'neuron_condition_order_id'=> $conditionOrder->id,
+        $link = $S['link']::firstOrCreate([
+            $S['link_from']  => $fromNeuron->id,
+            $S['link_to']    => $toNeuron->id,
+            $S['link_order'] => $conditionOrder->id,
         ]);
 
-        $this->updateBrainCircuit($brain);
+        $this->updateBrainCircuit($owner);
 
         return response()->json([
-            'success'  => true,
-            'link'     => [
-                'id'                        => (int) $link->id,
-                'from_neuron_id'            => (int) $link->from_neuron_id,
-                'to_neuron_id'              => (int) $link->to_neuron_id,
-                'neuron_condition_order_id' => (int) $link->neuron_condition_order_id,
-                'condition'                 => $condition,
-                'rule_chimical_element_detail_id' => $ruleDetailId,
+            'success' => true,
+            'link'    => [
+                'id'                                  => (int) $link->id,
+                'from_neuron_id'                      => (int) $link->{$S['link_from']},
+                'to_neuron_id'                        => (int) $link->{$S['link_to']},
+                'neuron_condition_order_id'           => (int) $link->{$S['link_order']},
+                'condition'                           => $condition,
+                'rule_chimical_element_detail_id'     => $ruleDetailId,
             ],
-            'circuits' => $this->getCircuitsArray($brain),
+            'circuits' => $this->getCircuitsArray($owner),
         ]);
     }
 
     public function brainDeleteLink(Request $request, Model $owner)
     {
         if (!$owner->brain) return response()->json(['success' => true]);
+
+        $S = $this->brainSchema();
 
         $request->validate([
             'from_neuron_id' => 'required|integer|min:1',
@@ -284,87 +390,197 @@ trait ManagesBrain
         $brain = $owner->brain;
         $condition = $request->input('condition');
 
-        NeuronLink::where('from_neuron_id', (int) $request->input('from_neuron_id'))
-            ->where('to_neuron_id', (int) $request->input('to_neuron_id'))
+        $S['link']::where($S['link_from'], (int) $request->input('from_neuron_id'))
+            ->where($S['link_to'], (int) $request->input('to_neuron_id'))
             ->when($condition, fn($q) => $q->whereHas('conditionOrder', fn($sq) => $sq->where('condition', $condition)))
-            ->whereHas('fromNeuron', fn($q) => $q->where('brain_id', $brain->id))
-            ->whereHas('toNeuron',   fn($q) => $q->where('brain_id', $brain->id))
+            ->whereHas('fromNeuron', fn($q) => $q->where($S['neuron_fk'], $brain->id))
+            ->whereHas('toNeuron',   fn($q) => $q->where($S['neuron_fk'], $brain->id))
             ->delete();
 
-        $this->updateBrainCircuit($brain);
+        $this->updateBrainCircuit($owner);
 
         return response()->json([
             'success'  => true,
-            'circuits' => $this->getCircuitsArray($brain),
+            'circuits' => $this->getCircuitsArray($owner),
         ]);
     }
 
-    public function brainSaveConditionOrders(Request $request, Model $owner, Neuron $neuron)
+    public function brainSaveConditionOrders(Request $request, Model $owner, Model $neuron)
     {
-        if (!$owner->brain || (int) $neuron->brain_id !== (int) $owner->brain->id) {
+        $S = $this->brainSchema();
+
+        if (!$owner->brain || (int) $neuron->{$S['neuron_fk']} !== (int) $owner->brain->id) {
             return response()->json(['success' => false, 'message' => 'Neurone non trovato'], 404);
         }
         foreach ($request->input('orders', []) as $orderData) {
-            \App\Models\NeuronConditionOrder::updateOrCreate(
-                ['neuron_id' => $neuron->id, 'condition' => $orderData['condition']],
-                ['sort_order' => (int) $orderData['sort_order'], 'rule_chimical_element_detail_id' => $orderData['rule_chimical_element_detail_id'] ?? null]
+            $S['order']::updateOrCreate(
+                [$S['order_neuron'] => $neuron->id, 'condition' => $orderData['condition']],
+                ['sort_order' => (int) $orderData['sort_order'], $S['order_rule'] => $orderData['rule_chimical_element_detail_id'] ?? null]
             );
         }
         $neuron->load('conditionOrders');
-        return response()->json(['success' => true, 'orders' => $neuron->conditionOrders]);
-    }
-
-    public function brainToggleCircuit(Request $request, Model $owner, NeuronCircuit $circuit)
-    {
-        if (!$owner->brain || $circuit->brain_id !== $owner->brain->id) {
-            return response()->json(['success' => false, 'message' => 'Circuito non trovato'], 404);
-        }
-        $circuit->active = !$circuit->active;
-        $circuit->save();
         return response()->json([
-            'success'  => true,
-            'active'   => (bool) $circuit->active,
-            'circuits' => $this->getCircuitsArray($owner->brain),
+            'success' => true,
+            'orders'  => $neuron->conditionOrders->map(fn($co) => [
+                'id'                              => $co->id,
+                'condition'                       => $co->condition,
+                'sort_order'                      => (int) $co->sort_order,
+                'color'                           => $co->color,
+                'rule_chimical_element_detail_id' => $co->{$S['order_rule']},
+            ])->values()->all(),
         ]);
     }
 
-    public function brainDeleteCircuit(Request $request, Model $owner, NeuronCircuit $circuit)
+    public function brainToggleCircuit(Request $request, Model $owner, Model $circuit)
     {
-        if (!$owner->brain || $circuit->brain_id !== $owner->brain->id) {
+        $S = $this->brainSchema();
+
+        if (!$owner->brain || (int) $circuit->{$S['circuit_owner_fk']} !== $this->brainCircuitOwnerId($owner)) {
             return response()->json(['success' => false, 'message' => 'Circuito non trovato'], 404);
         }
-        $neuronIds = $circuit->details()->pluck('neuron_id')->toArray();
+        if ($S['circuit_active']) {
+            $circuit->{$S['circuit_active']} = !$circuit->{$S['circuit_active']};
+            $circuit->save();
+        }
+        return response()->json([
+            'success'  => true,
+            'active'   => $S['circuit_active'] ? (bool) $circuit->{$S['circuit_active']} : true,
+            'circuits' => $this->getCircuitsArray($owner),
+        ]);
+    }
+
+    public function brainDeleteCircuit(Request $request, Model $owner, Model $circuit)
+    {
+        $S = $this->brainSchema();
+
+        if (!$owner->brain || (int) $circuit->{$S['circuit_owner_fk']} !== $this->brainCircuitOwnerId($owner)) {
+            return response()->json(['success' => false, 'message' => 'Circuito non trovato'], 404);
+        }
+        $neuronIds = $circuit->details()->pluck($S['detail_neuron'])->toArray();
         if (!empty($neuronIds)) {
             $owner->brain->neurons()->whereIn('id', $neuronIds)->delete();
         }
         $circuit->delete();
-        $brain = $owner->brain;
         // I neuroni eliminati possono appartenere anche ad altri circuiti:
         // risincronizza details e stato di quelli rimanenti.
-        $this->updateBrainCircuit($brain);
+        $this->updateBrainCircuit($owner);
         return response()->json([
             'success'  => true,
-            'neurons'  => $brain->neurons()->get()->map(fn($n) => $this->neuronToArray($n))->toArray(),
-            'links'    => NeuronLink::whereHas('fromNeuron', fn($q) => $q->where('brain_id', $brain->id))->get()->map(fn($l) => ['id' => $l->id, 'from_neuron_id' => (int) $l->from_neuron_id, 'to_neuron_id' => (int) $l->to_neuron_id, 'neuron_condition_order_id' => (int) $l->neuron_condition_order_id, 'condition' => $l->condition, 'color' => $l->color])->toArray(),
-            'circuits' => $this->getCircuitsArray($brain),
+            'neurons'  => $owner->brain->neurons()->with($S['neuron_relations'])->get()->map(fn($n) => $this->neuronToArray($n))->toArray(),
+            'links'    => $S['link']::whereHas('fromNeuron', fn($q) => $q->where($S['neuron_fk'], $owner->brain->id))->get()->map(fn($l) => $this->linkToArray($l))->toArray(),
+            'circuits' => $this->getCircuitsArray($owner),
         ]);
+    }
+
+    // ─── HELPERS CONDIVISI ──────────────────────────────────────────────────────
+
+    /**
+     * Dati normalizzati per la vista shared.brain_editor.
+     * Utile per famiglie di modelli con colonne diverse: la vista può ricevere
+     * questi array già pronti invece di calcolarli dal Brain.
+     */
+    protected function brainEditorData(Model $owner): array
+    {
+        $brain = $owner->brain;
+        if (!$brain) return ['neurons' => [], 'links' => [], 'circuits' => []];
+
+        $S = $this->brainSchema();
+        $neurons = $S['neuron']::where($S['neuron_fk'], $brain->id)->with($S['neuron_relations'])->get();
+        $links   = $S['link']::whereHas('fromNeuron', fn($q) => $q->where($S['neuron_fk'], $brain->id))->get();
+
+        return [
+            'neurons'  => $neurons->map(fn($n) => $this->neuronToArray($n))->values()->all(),
+            'links'    => $links->map(fn($l) => $this->linkToArray($l))->values()->all(),
+            'circuits' => $this->getCircuitsArray($owner),
+        ];
+    }
+
+    protected function neuronToArray(Model $neuron): array
+    {
+        $S = $this->brainSchema();
+        return [
+            'id'                                   => (int) $neuron->id,
+            'type'                                 => $neuron->type,
+            'grid_i'                               => (int) $neuron->grid_i,
+            'grid_j'                               => (int) $neuron->grid_j,
+            'radius'                               => $neuron->radius !== null ? (int) $neuron->radius : null,
+            'stop_before_target'                   => (bool) $neuron->stop_before_target,
+            'target_type'                          => $neuron->target_type,
+            'target_element_id'                    => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
+            'chemical_element_id'                  => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,
+            'complex_chemical_element_id'          => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
+            'gene_life_id'                         => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
+            'gene_attack_id'                       => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
+            'element_infomation_id'                => $neuron->{$S['neuron_info']} !== null ? (int) $neuron->{$S['neuron_info']} : null,
+            'element_has_rule_chimical_element_id' => $neuron->{$S['neuron_rule']} !== null ? (int) $neuron->{$S['neuron_rule']} : null,
+            'tooltip'                              => NeuronTooltipHelper::generateText($neuron),
+            'condition_orders'                     => $neuron->conditionOrders->map(fn($co) => [
+                'id'                              => $co->id,
+                'condition'                       => $co->condition,
+                'sort_order'                      => (int) $co->sort_order,
+                'color'                           => $co->color,
+                'rule_chimical_element_detail_id' => $co->{$S['order_rule']},
+            ])->values()->all(),
+        ];
+    }
+
+    protected function linkToArray(Model $link): array
+    {
+        $S = $this->brainSchema();
+        return [
+            'id'                        => (int) $link->id,
+            'from_neuron_id'            => (int) $link->{$S['link_from']},
+            'to_neuron_id'              => (int) $link->{$S['link_to']},
+            'neuron_condition_order_id' => (int) $link->{$S['link_order']},
+            'condition'                 => $link->condition,
+            'color'                     => $link->color ?? null,
+        ];
+    }
+
+    protected function getCircuitsArray(Model $owner): array
+    {
+        $S = $this->brainSchema();
+        $circuitOwner = $this->brainCircuitOwner($owner);
+        if (!$circuitOwner) return [];
+
+        return $circuitOwner->circuits()->with('details')->get()->map(function ($c) use ($S) {
+            return [
+                'id'              => $c->id,
+                'uid'             => $c->uid,
+                'state'           => $S['circuit_state']
+                                        ? $c->{$S['circuit_state']}
+                                        : ($this->brainComputedCircuitStates[$c->id] ?? NeuronCircuit::STATE_CLOSED),
+                'active'          => $S['circuit_active'] ? (bool) $c->{$S['circuit_active']} : true,
+                'color'           => $S['circuit_color'] ? $c->{$S['circuit_color']} : $this->circuitDisplayColor($c),
+                'start_neuron_id' => $c->{$S['circuit_start']},
+                'neuron_ids'      => $c->details->pluck($S['detail_neuron'])->toArray(),
+            ];
+        })->values()->toArray();
     }
 
     // ─── PRIVATE HELPERS ────────────────────────────────────────────────────────
 
-    private function ensureBrain(Model $owner, int $gridWidth, int $gridHeight): Brain
+    private function ensureBrain(Model $owner, int $gridWidth, int $gridHeight): Model
     {
         if ($owner->brain) {
             $owner->brain->update(['grid_width' => $gridWidth, 'grid_height' => $gridHeight]);
             return $owner->brain;
         }
-        $brain = Brain::create(['uid' => (string) Str::uuid(), 'grid_width' => $gridWidth, 'grid_height' => $gridHeight]);
-        $owner->update(['brain_id' => $brain->id]);
-        $owner->setRelation('brain', $brain);
-        return $brain;
+        return $this->createBrainFor($owner, $gridWidth, $gridHeight);
     }
 
-    private function resolveCondition(Neuron $fromNeuron, ?string $raw): array
+    private function brainExistsRule(string $table, ?string $ownerFk, Model $owner)
+    {
+        $rule = Rule::exists($table, 'id');
+        return $ownerFk ? $rule->where($ownerFk, $owner->id) : $rule;
+    }
+
+    private function circuitDisplayColor(Model $circuit): string
+    {
+        return '#' . substr(md5((string) ($circuit->uid ?: $circuit->id)), 0, 6);
+    }
+
+    private function resolveCondition(Model $fromNeuron, ?string $raw): array
     {
         $ruleDetailId = null;
         if ($fromNeuron->type === Neuron::TYPE_DETECTION) {
@@ -391,84 +607,69 @@ trait ManagesBrain
         return [NeuronLink::PORT_TRIGGER, null];
     }
 
-    private function neuronToArray(Neuron $neuron): array
+    private function syncCircuitDetails(Model $circuit, array $currentNeuronIds): void
     {
-        return [
-            'id'                                   => (int) $neuron->id,
-            'type'                                 => $neuron->type,
-            'grid_i'                               => (int) $neuron->grid_i,
-            'grid_j'                               => (int) $neuron->grid_j,
-            'radius'                               => $neuron->radius !== null ? (int) $neuron->radius : null,
-            'stop_before_target'                   => (bool) $neuron->stop_before_target,
-            'target_type'                          => $neuron->target_type,
-            'target_element_id'                    => $neuron->target_element_id !== null ? (int) $neuron->target_element_id : null,
-            'chemical_element_id'                  => $neuron->chemical_element_id !== null ? (int) $neuron->chemical_element_id : null,
-            'complex_chemical_element_id'          => $neuron->complex_chemical_element_id !== null ? (int) $neuron->complex_chemical_element_id : null,
-            'gene_life_id'                         => $neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : null,
-            'gene_attack_id'                       => $neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : null,
-            'element_infomation_id'                => $neuron->element_infomation_id !== null ? (int) $neuron->element_infomation_id : null,
-            'element_has_rule_chimical_element_id' => $neuron->element_has_rule_chimical_element_id !== null ? (int) $neuron->element_has_rule_chimical_element_id : null,
-            'tooltip'                              => NeuronTooltipHelper::generateTextFromNeuron($neuron),
-            'condition_orders'                     => $neuron->conditionOrders->map(fn($co) => [
-                'id'                              => $co->id,
-                'condition'                       => $co->condition,
-                'sort_order'                      => (int) $co->sort_order,
-                'color'                           => $co->color,
-                'rule_chimical_element_detail_id' => $co->rule_chimical_element_detail_id,
-            ])->values()->all(),
-        ];
+        $S         = $this->brainSchema();
+        $detailCol = $S['detail_neuron'];
+        $existing  = $circuit->details()->pluck($detailCol)->toArray();
+        $toRemove  = array_diff($existing, $currentNeuronIds);
+        $toAdd     = array_diff($currentNeuronIds, $existing);
+        if (!empty($toRemove)) $circuit->details()->whereIn($detailCol, $toRemove)->delete();
+        foreach ($toAdd as $nId) {
+            $circuit->details()->create([$detailCol => $nId]);
+        }
     }
 
-    private function getCircuitsArray(Brain $brain): array
+    protected function updateBrainCircuit(Model $owner): void
     {
-        return $brain->circuits()->with('details')->get()->map(fn($c) => [
-            'id'              => $c->id,
-            'uid'             => $c->uid,
-            'state'           => $c->state,
-            'active'          => (bool) $c->active,
-            'color'           => $c->color,
-            'start_neuron_id' => $c->start_neuron_id,
-            'neuron_ids'      => $c->details->pluck('neuron_id')->toArray(),
-        ])->values()->toArray();
-    }
+        $S           = $this->brainSchema();
+        $brain       = $owner->brain;
+        if (!$brain) return;
+        $circuitOwner = $this->brainCircuitOwner($owner);
+        if (!$circuitOwner) return;
 
-    private function updateBrainCircuit(Brain $brain): void
-    {
+        $startCol = $S['circuit_start'];
+        $stateCol = $S['circuit_state'];
+        $colorCol = $S['circuit_color'];
+        $linkToCol = $S['link_to'];
+
         $startNeurons = $brain->neurons()->where('type', Neuron::TYPE_START)->get();
 
         if ($startNeurons->isEmpty()) {
-            $circuit = $brain->circuits()->whereNull('start_neuron_id')->first();
-            $brain->circuits()->whereNotNull('start_neuron_id')->delete();
+            $circuit = $circuitOwner->circuits()->whereNull($startCol)->first();
+            $circuitOwner->circuits()->whereNotNull($startCol)->delete();
             if (!$circuit && $brain->neurons()->exists()) {
-                $circuit = $brain->circuits()->create([
-                    'uid'             => Str::uuid()->toString(),
-                    'state'           => NeuronCircuit::STATE_CLOSED,
-                    'start_neuron_id' => null,
-                    'color'           => NeuronCircuit::generateRandomColor(),
-                ]);
+                $attrs = ['uid' => Str::uuid()->toString(), $startCol => null];
+                if ($stateCol) $attrs[$stateCol] = NeuronCircuit::STATE_CLOSED;
+                if ($colorCol) $attrs[$colorCol] = NeuronCircuit::generateRandomColor();
+                $circuit = $circuitOwner->circuits()->create($attrs);
             }
             if ($circuit) {
-                $existing = $circuit->details()->pluck('neuron_id')->toArray();
-                $current  = $brain->neurons()->pluck('id')->toArray();
-                $toAdd    = array_diff($current, $existing);
-                $toRemove = array_diff($existing, $current);
-                if (!empty($toRemove)) $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
-                foreach ($toAdd as $nId) NeuronCircuitDetail::create(['neuron_circuit_id' => $circuit->id, 'neuron_id' => $nId]);
-                if ($circuit->state !== NeuronCircuit::STATE_CLOSED) $circuit->update(['state' => NeuronCircuit::STATE_CLOSED]);
+                $this->syncCircuitDetails($circuit, $brain->neurons()->pluck('id')->toArray());
+                if ($stateCol) {
+                    if ($circuit->{$stateCol} !== NeuronCircuit::STATE_CLOSED) {
+                        $circuit->update([$stateCol => NeuronCircuit::STATE_CLOSED]);
+                    }
+                } else {
+                    $this->brainComputedCircuitStates[$circuit->id] = NeuronCircuit::STATE_CLOSED;
+                }
             }
             return;
         }
 
-        $brain->circuits()->whereNull('start_neuron_id')->delete();
+        $circuitOwner->circuits()->whereNull($startCol)->delete();
         $startIds = $startNeurons->pluck('id')->toArray();
-        $brain->circuits()->whereNotNull('start_neuron_id')->whereNotIn('start_neuron_id', $startIds)->delete();
+        $circuitOwner->circuits()->whereNotNull($startCol)->whereNotIn($startCol, $startIds)->delete();
 
         $allNeurons = $brain->neurons()->with('outgoingLinks')->get()->keyBy('id');
 
         foreach ($startNeurons as $startNeuron) {
-            $circuit = $brain->circuits()->firstOrCreate(
-                ['start_neuron_id' => $startNeuron->id],
-                ['uid' => Str::uuid()->toString(), 'state' => NeuronCircuit::STATE_CREATED, 'color' => NeuronCircuit::generateRandomColor()]
+            $defaults = ['uid' => Str::uuid()->toString()];
+            if ($stateCol) $defaults[$stateCol] = NeuronCircuit::STATE_CREATED;
+            if ($colorCol) $defaults[$colorCol] = NeuronCircuit::generateRandomColor();
+            $circuit = $circuitOwner->circuits()->firstOrCreate(
+                [$startCol => $startNeuron->id],
+                $defaults
             );
 
             $visited = [];
@@ -479,19 +680,15 @@ trait ManagesBrain
                 $visited[$currId] = true;
                 $currNode = $allNeurons->get($currId);
                 if ($currNode) foreach ($currNode->outgoingLinks as $link) {
-                    if (!isset($visited[$link->to_neuron_id])) $queue[] = $link->to_neuron_id;
+                    $toId = $link->{$linkToCol};
+                    if (!isset($visited[$toId])) $queue[] = $toId;
                 }
             }
 
-            $existing = $circuit->details()->pluck('neuron_id')->toArray();
-            $current  = array_keys($visited);
-            $toAdd    = array_diff($current, $existing);
-            $toRemove = array_diff($existing, $current);
-            if (!empty($toRemove)) $circuit->details()->whereIn('neuron_id', $toRemove)->delete();
-            foreach ($toAdd as $nId) {
-                if (!$allNeurons->has($nId)) continue;
-                NeuronCircuitDetail::create(['neuron_circuit_id' => $circuit->id, 'neuron_id' => $nId]);
-            }
+            $this->syncCircuitDetails(
+                $circuit,
+                array_values(array_filter(array_keys($visited), fn($nId) => $allNeurons->has($nId)))
+            );
 
             $isClosed = true;
             foreach ($visited as $nId => $_) {
@@ -501,7 +698,11 @@ trait ManagesBrain
             if (count($visited) === 1 && $startNeuron->type !== Neuron::TYPE_END) $isClosed = false;
 
             $newState = $isClosed ? NeuronCircuit::STATE_CLOSED : NeuronCircuit::STATE_CREATED;
-            if ($circuit->state !== $newState) $circuit->update(['state' => $newState]);
+            if ($stateCol) {
+                if ($circuit->{$stateCol} !== $newState) $circuit->update([$stateCol => $newState]);
+            } else {
+                $this->brainComputedCircuitStates[$circuit->id] = $newState;
+            }
         }
     }
 }

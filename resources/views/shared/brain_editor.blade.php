@@ -17,6 +17,9 @@
      */
     $brain       = $model->brain;
     $brainLocked = $brainLocked ?? false;
+    // true (default): mostra il pulsante Attivo/Disattivo sui circuiti.
+    // Passare false per famiglie di modelli senza colonna active (es. EHP).
+    $circuitToggleEnabled = $circuitToggleEnabled ?? true;
 
     $brainTargetElements           = $brainTargetElements ?? \App\Models\Element::orderBy('name')->get(['id', 'name']);
     $brainGenes                    = $brainGenes ?? \App\Models\Gene::where('type', \App\Models\Gene::DYNAMIC_MAX)->orderBy('name')->get(['id', 'name']);
@@ -25,7 +28,7 @@
     $allRuleChimicalElements       = $allRuleChimicalElements ?? \App\Models\RuleChimicalElement::with(['details', 'chimicalElement', 'complexChimicalElement'])->orderBy('id')->get();
     $informationGenes              = $informationGenes ?? \App\Models\Gene::where('type', \App\Models\Gene::DYNAMIC_MAX)->orderBy('name')->get();
 
-    $existingNeuronItems = $brain && $brain->neurons
+    $existingNeuronItems = $existingNeuronItems ?? ($brain && $brain->neurons
         ? $brain->neurons->map(function ($n) {
             return [
                 'id'                                   => (int) $n->id,
@@ -42,7 +45,7 @@
                 'gene_attack_id'                       => $n->gene_attack_id !== null ? (int) $n->gene_attack_id : null,
                 'element_infomation_id'                => $n->element_infomation_id !== null ? (int) $n->element_infomation_id : null,
                 'element_has_rule_chimical_element_id' => $n->element_has_rule_chimical_element_id !== null ? (int) $n->element_has_rule_chimical_element_id : null,
-                'tooltip'                              => NeuronTooltipHelper::generateTextFromNeuron($n),
+                'tooltip'                              => NeuronTooltipHelper::generateText($n),
                 'condition_orders'                     => $n->conditionOrders->map(function ($co) {
                     return [
                         'id'                              => $co->id,
@@ -54,9 +57,9 @@
                 })->values()->all(),
             ];
         })->values()->all()
-        : [];
+        : []);
 
-    $existingNeuronLinks = $brain && $brain->neurons
+    $existingNeuronLinks = $existingNeuronLinks ?? ($brain && $brain->neurons
         ? $brain->neurons->flatMap(function ($n) {
             return $n->outgoingLinks->map(function ($l) {
                 return [
@@ -69,9 +72,9 @@
                 ];
             });
         })->values()->all()
-        : [];
+        : []);
 
-    $existingCircuits = $brain && $brain->circuits
+    $existingCircuits = $existingCircuits ?? ($brain && $brain->circuits
         ? $brain->circuits->map(function ($c) {
             return [
                 'id'              => $c->id,
@@ -83,7 +86,7 @@
                 'neuron_ids'      => $c->details->pluck('neuron_id')->toArray(),
             ];
         })->values()->all()
-        : [];
+        : []);
 @endphp
 
 @if($brainLocked)
@@ -334,6 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof PIXI === 'undefined') { console.error('PIXI.js not loaded'); return; }
 
     const brainLocked = {{ $brainLocked ? 'true' : 'false' }};
+    const circuitToggleEnabled = {{ $circuitToggleEnabled ? 'true' : 'false' }};
 
     // ── Constants ─────────────────────────────────────────────────────────────
     const fixedCellSize = 40;
@@ -467,16 +471,21 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Circuits table ────────────────────────────────────────────────────────
     function renderCircuitsTable() {
         if (!circuitsTableBody) return;
-        const dtAvailable = window.jQuery && $.fn && $.fn.DataTable;
-        if (dtAvailable && $.fn.DataTable.isDataTable('#circuits-table-{{ $idPrefix }}')) $('#circuits-table-{{ $idPrefix }}').DataTable().destroy();
         circuitsTableBody.innerHTML = '';
+        if (!neuronCircuits.length) {
+            circuitsTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nessun circuito</td></tr>';
+            return;
+        }
         neuronCircuits.forEach(circuit => {
             const color = circuit.color || '#aaaaaa';
             const tr = document.createElement('tr');
             tr.dataset.circuitId = circuit.id;
+            const toggleBtn = circuitToggleEnabled
+                ? `<button type="button" class="btn btn-xs ${circuit.active?'btn-success':'btn-secondary'} btn-toggle-circuit-{{ $idPrefix }}" data-id="${circuit.id}">${circuit.active?'<i class="fas fa-check-circle"></i> Attivo':'<i class="fas fa-times-circle"></i> Disattivo'}</button>`
+                : '';
             const actionsHtml = brainLocked
                 ? ''
-                : `<button type="button" class="btn btn-xs ${circuit.active?'btn-success':'btn-secondary'} btn-toggle-circuit-{{ $idPrefix }}" data-id="${circuit.id}">${circuit.active?'<i class="fas fa-check-circle"></i> Attivo':'<i class="fas fa-times-circle"></i> Disattivo'}</button>
+                : `${toggleBtn}
                    <button type="button" class="btn btn-xs btn-danger ml-1 btn-delete-circuit-{{ $idPrefix }}" data-id="${circuit.id}" title="Elimina"><i class="fas fa-trash"></i></button>`;
             tr.innerHTML = `
                 <td title="${circuit.uid||''}"><small class="text-monospace">${(circuit.uid||'').substring(0,8)}...</small></td>
@@ -485,7 +494,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td class="text-right">${actionsHtml}</td>`;
             circuitsTableBody.appendChild(tr);
         });
-        if (dtAvailable) $('#circuits-table-{{ $idPrefix }}').DataTable({paging:false,searching:false,info:false,ordering:true,autoWidth:false,destroy:true,language:{emptyTable:'Nessun circuito'}});
     }
 
     $(document).on('mouseenter','#circuits-table-body-{{ $idPrefix }} tr', function(){ highlightedCircuitId=$(this).data('circuit-id'); renderGrid(); });

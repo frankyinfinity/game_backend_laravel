@@ -209,6 +209,18 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/element-components/{elementComponent}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\ElementComponentController::class, 'toggleCircuitActive'])->name('element-components.brain.circuits.toggle-active');
     Route::delete('/element-components/{elementComponent}/brain/circuits/{circuit}', [App\Http\Controllers\ElementComponentController::class, 'deleteBrainCircuit'])->name('element-components.brain.circuits.delete');
 
+    // ElementHasPosition Brain (Cervello istanza di gioco)
+    Route::get('/element-has-positions/{elementHasPosition}/brain', [App\Http\Controllers\ElementHasPositionBrainController::class, 'edit'])->name('ehp.brain.edit');
+    Route::post('/element-has-positions/{elementHasPosition}/brain/grid', [App\Http\Controllers\ElementHasPositionBrainController::class, 'saveBrainGrid'])->name('ehp.brain.grid.save');
+    Route::post('/element-has-positions/{elementHasPosition}/brain/neurons', [App\Http\Controllers\ElementHasPositionBrainController::class, 'saveBrainNeuron'])->name('ehp.brain.neurons.save');
+    Route::patch('/element-has-positions/{elementHasPosition}/brain/neurons/{neuron}/move', [App\Http\Controllers\ElementHasPositionBrainController::class, 'moveBrainNeuron'])->name('ehp.brain.neurons.move');
+    Route::post('/element-has-positions/{elementHasPosition}/brain/neurons/{neuron}/condition-orders', [App\Http\Controllers\ElementHasPositionBrainController::class, 'saveNeuronConditionOrders'])->name('ehp.brain.neurons.condition-orders.save');
+    Route::delete('/element-has-positions/{elementHasPosition}/brain/neurons', [App\Http\Controllers\ElementHasPositionBrainController::class, 'deleteBrainNeuron'])->name('ehp.brain.neurons.delete');
+    Route::post('/element-has-positions/{elementHasPosition}/brain/neuron-links', [App\Http\Controllers\ElementHasPositionBrainController::class, 'saveNeuronLink'])->name('ehp.brain.neuron-links.save');
+    Route::delete('/element-has-positions/{elementHasPosition}/brain/neuron-links', [App\Http\Controllers\ElementHasPositionBrainController::class, 'deleteNeuronLink'])->name('ehp.brain.neuron-links.delete');
+    Route::post('/element-has-positions/{elementHasPosition}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\ElementHasPositionBrainController::class, 'toggleCircuitActive'])->name('ehp.brain.circuits.toggle-active');
+    Route::delete('/element-has-positions/{elementHasPosition}/brain/circuits/{circuit}', [App\Http\Controllers\ElementHasPositionBrainController::class, 'deleteBrainCircuit'])->name('ehp.brain.circuits.delete');
+
     //Chimical Elements
     Route::resource('chimical-elements', App\Http\Controllers\ChimicalElementController::class);
     Route::post('/chimical-elements/list/table', [App\Http\Controllers\ChimicalElementController::class, 'listDataTable'])->name('chimical-elements.datatable');

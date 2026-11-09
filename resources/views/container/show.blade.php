@@ -700,6 +700,9 @@
                 <button type="button" class="btn btn-success btn-sm ml-2" id="btn-add-element" data-toggle="modal" data-target="#addElementModal">
                     <i class="fa fa-plus"></i> Nuovo Elemento Interattivo
                 </button>
+                <button type="button" class="btn btn-primary btn-sm ml-2 js-selected-brain" disabled>
+                    <i class="fas fa-brain"></i> Modifica cervello
+                </button>
                 <span class="ml-auto text-muted small" id="visible-count">0 visibili</span>
             </div>
             <div class="card-body p-2">
@@ -805,6 +808,7 @@
             delete: "{{ route('containers.delete') }}",
             bulk: "{{ route('containers.bulk-action') }}",
         };
+        const EHP_BRAIN_URL = "{{ url('/element-has-positions/_ehp_/brain') }}";
         const SNAPSHOT_URL = "{{ route('containers.snapshot', $player) }}";
         const VOLUME_SNAPSHOT_URL = "{{ route('containers.volume-snapshot', $player) }}";
         const VOLUME_FILE_URL = "{{ route('containers.volume-file', $player) }}";
@@ -1122,7 +1126,7 @@
                 fields.mem.textContent = '-';
                 fields.net.textContent = '-';
                 fields.pids.textContent = '-';
-                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-recreate, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = true);
+                document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-recreate, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-selected-brain, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = true);
                 return;
             }
 
@@ -1143,6 +1147,8 @@
             fields.pids.textContent = stats.pids || '-';
 
             document.querySelectorAll('.js-selected-action, .js-selected-delete, .js-selected-recreate, .js-selected-logs, .js-selected-inspect, .js-selected-exec, .js-copy-field, .js-copy-exec').forEach((btn) => btn.disabled = false);
+            const brainBtn = document.querySelector('.js-selected-brain');
+            if (brainBtn) brainBtn.disabled = !(container.parent_type === 'ElementHasPosition' && container.parent_id);
         }
 
         function updatePlayerVolume(volume) {
@@ -2325,6 +2331,11 @@
 
             $(document).on('click', '.js-selected-inspect', function () {
                 fetchInspect();
+            });
+
+            $(document).on('click', '.js-selected-brain', function () {
+                if (!selectedContainer || selectedContainer.parent_type !== 'ElementHasPosition' || !selectedContainer.parent_id) return;
+                window.location.href = EHP_BRAIN_URL.replace('_ehp_', selectedContainer.parent_id);
             });
 
             $(document).on('click', '.js-selected-exec', function () {
