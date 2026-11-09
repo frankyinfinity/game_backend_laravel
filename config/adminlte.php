@@ -489,6 +489,18 @@ return [
             ]
         ],
         [
+            'text'    => 'Gestione Cervelli',
+            'icon'    => 'fas fa-brain',
+            'icon_color' => 'pink',
+            'submenu' => [
+                [
+                    'text' => 'Template',
+                    'url'  => '/template-brains',
+                    'icon' => 'fas fa-brain',
+                ],
+            ]
+        ],
+        [
             'text'    => 'Gestione Giocatori',
             'icon'    => 'fas fa-gamepad',
             'icon_color' => 'cyan',
