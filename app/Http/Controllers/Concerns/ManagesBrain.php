@@ -177,6 +177,9 @@ trait ManagesBrain
 
         $brain = $owner->brain;
         if (!$brain) return response()->json(['success' => false, 'message' => 'Cervello non trovato'], 404);
+        if ((int) $neuron->brain_id !== (int) $brain->id) {
+            return response()->json(['success' => false, 'message' => 'Neurone non trovato'], 404);
+        }
 
         $gridI = (int) $request->input('grid_i');
         $gridJ = (int) $request->input('grid_j');
@@ -255,8 +258,8 @@ trait ManagesBrain
         $this->updateBrainCircuit($brain);
 
         return response()->json([
-            'success' => true,
-            'link'    => [
+            'success'  => true,
+            'link'     => [
                 'id'                        => (int) $link->id,
                 'from_neuron_id'            => (int) $link->from_neuron_id,
                 'to_neuron_id'              => (int) $link->to_neuron_id,
@@ -264,6 +267,7 @@ trait ManagesBrain
                 'condition'                 => $condition,
                 'rule_chimical_element_detail_id' => $ruleDetailId,
             ],
+            'circuits' => $this->getCircuitsArray($brain),
         ]);
     }
 
@@ -297,6 +301,9 @@ trait ManagesBrain
 
     public function brainSaveConditionOrders(Request $request, Model $owner, Neuron $neuron)
     {
+        if (!$owner->brain || (int) $neuron->brain_id !== (int) $owner->brain->id) {
+            return response()->json(['success' => false, 'message' => 'Neurone non trovato'], 404);
+        }
         foreach ($request->input('orders', []) as $orderData) {
             \App\Models\NeuronConditionOrder::updateOrCreate(
                 ['neuron_id' => $neuron->id, 'condition' => $orderData['condition']],
@@ -332,6 +339,9 @@ trait ManagesBrain
         }
         $circuit->delete();
         $brain = $owner->brain;
+        // I neuroni eliminati possono appartenere anche ad altri circuiti:
+        // risincronizza details e stato di quelli rimanenti.
+        $this->updateBrainCircuit($brain);
         return response()->json([
             'success'  => true,
             'neurons'  => $brain->neurons()->get()->map(fn($n) => $this->neuronToArray($n))->toArray(),

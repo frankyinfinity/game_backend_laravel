@@ -467,7 +467,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Circuits table ────────────────────────────────────────────────────────
     function renderCircuitsTable() {
         if (!circuitsTableBody) return;
-        if ($.fn.DataTable.isDataTable('#circuits-table-{{ $idPrefix }}')) $('#circuits-table-{{ $idPrefix }}').DataTable().destroy();
+        const dtAvailable = window.jQuery && $.fn && $.fn.DataTable;
+        if (dtAvailable && $.fn.DataTable.isDataTable('#circuits-table-{{ $idPrefix }}')) $('#circuits-table-{{ $idPrefix }}').DataTable().destroy();
         circuitsTableBody.innerHTML = '';
         neuronCircuits.forEach(circuit => {
             const color = circuit.color || '#aaaaaa';
@@ -478,13 +479,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 : `<button type="button" class="btn btn-xs ${circuit.active?'btn-success':'btn-secondary'} btn-toggle-circuit-{{ $idPrefix }}" data-id="${circuit.id}">${circuit.active?'<i class="fas fa-check-circle"></i> Attivo':'<i class="fas fa-times-circle"></i> Disattivo'}</button>
                    <button type="button" class="btn btn-xs btn-danger ml-1 btn-delete-circuit-{{ $idPrefix }}" data-id="${circuit.id}" title="Elimina"><i class="fas fa-trash"></i></button>`;
             tr.innerHTML = `
-                <td title="${circuit.uid}"><small class="text-monospace">${circuit.uid.substring(0,8)}...</small></td>
+                <td title="${circuit.uid||''}"><small class="text-monospace">${(circuit.uid||'').substring(0,8)}...</small></td>
                 <td class="text-center"><span class="badge ${circuit.state==='closed'?'badge-success':'badge-warning'}">${circuit.state}</span></td>
                 <td class="text-center"><div style="width:20px;height:20px;background:${color};border-radius:4px;margin:0 auto;border:1px solid #ccc;"></div></td>
                 <td class="text-right">${actionsHtml}</td>`;
             circuitsTableBody.appendChild(tr);
         });
-        $('#circuits-table-{{ $idPrefix }}').DataTable({paging:false,searching:false,info:false,ordering:true,autoWidth:false,destroy:true,language:{emptyTable:'Nessun circuito'}});
+        if (dtAvailable) $('#circuits-table-{{ $idPrefix }}').DataTable({paging:false,searching:false,info:false,ordering:true,autoWidth:false,destroy:true,language:{emptyTable:'Nessun circuito'}});
     }
 
     $(document).on('mouseenter','#circuits-table-body-{{ $idPrefix }} tr', function(){ highlightedCircuitId=$(this).data('circuit-id'); renderGrid(); });
@@ -812,7 +813,7 @@ document.addEventListener('DOMContentLoaded', function () {
         saveNeuronBtn.disabled=true;
         try {
             const saved = await reqSaveNeuron({id:currentNeuronId, brain_grid_width:normalize(widthInput.value||5), brain_grid_height:normalize(heightInput.value||5), type:t, grid_i:i, grid_j:j, radius, stop_before_target:neuronStopInput.checked, target_type:targetType, target_element_id:targetElementId, chemical_element_id:chemicalElementId, complex_chemical_element_id:complexChemicalElementId, gene_life_id:geneLifeId, gene_attack_id:geneAttackId, element_infomation_id:elementInfomationId, element_has_rule_chimical_element_id:elementHasRuleChimicalElementId});
-            neuronItems=neuronItems.filter(n=>!(+n.grid_i===i&&+n.grid_j===j)); neuronItems.push(saved); updateNeuronInput(); renderGrid(); $(neuronModalEl).modal('hide');
+            neuronItems=neuronItems.filter(n=>!(+n.grid_i===i&&+n.grid_j===j)); neuronItems.push(saved); updateNeuronInput(); renderGrid(); renderCircuitsTable(); $(neuronModalEl).modal('hide');
         } catch(e) { alert(e.message||'Errore'); } finally { saveNeuronBtn.disabled=false; }
     });
 
@@ -825,7 +826,7 @@ document.addEventListener('DOMContentLoaded', function () {
             await reqDeleteNeuron({grid_i:i, grid_j:j});
             neuronItems=neuronItems.filter(n=>!(+n.grid_i===i&&+n.grid_j===j));
             if(neuron) neuronLinks=neuronLinks.filter(l=>+l.from_neuron_id!==+neuron.id&&+l.to_neuron_id!==+neuron.id);
-            updateNeuronInput(); updateLinksInput(); renderGrid(); $(neuronModalEl).modal('hide');
+            updateNeuronInput(); updateLinksInput(); renderGrid(); renderCircuitsTable(); $(neuronModalEl).modal('hide');
         } catch(e){ alert(e.message||'Errore'); } finally{ deleteNeuronBtn.disabled=false; }
     });
 
