@@ -644,7 +644,7 @@
     </div>
 </div>
 
-@section('js')
+@push('js')
 <script>
     $(function () {
         let currentSlide = 0;
@@ -708,9 +708,9 @@
         });
     });
 </script>
-@stop
+@endpush
 
-@section('css')
+@push('css')
 <style>
     #brainGuideCarousel .carousel-item {
         display: none;
@@ -762,4 +762,4 @@
         margin-right: 8px;
     }
 </style>
-@stop
+@endpush
