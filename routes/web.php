@@ -105,6 +105,17 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/template-brains/list/table', [App\Http\Controllers\TemplateBrainController::class, 'listDataTable'])->name('template-brains.datatable');
     Route::post('/template-brains/delete', [App\Http\Controllers\TemplateBrainController::class, 'delete'])->name('template-brains.delete');
 
+    //Template Brain - Editor cervello (shared.brain_editor)
+    Route::post('/template-brains/{templateBrain}/brain/grid', [App\Http\Controllers\TemplateBrainController::class, 'saveBrainGrid'])->name('template-brains.brain.grid.save');
+    Route::post('/template-brains/{templateBrain}/brain/neurons', [App\Http\Controllers\TemplateBrainController::class, 'saveBrainNeuron'])->name('template-brains.brain.neurons.save');
+    Route::patch('/template-brains/{templateBrain}/brain/neurons/{neuron}/move', [App\Http\Controllers\TemplateBrainController::class, 'moveBrainNeuron'])->name('template-brains.brain.neurons.move');
+    Route::post('/template-brains/{templateBrain}/brain/neurons/{neuron}/condition-orders', [App\Http\Controllers\TemplateBrainController::class, 'saveNeuronConditionOrders'])->name('template-brains.brain.neurons.condition-orders.save');
+    Route::delete('/template-brains/{templateBrain}/brain/neurons', [App\Http\Controllers\TemplateBrainController::class, 'deleteBrainNeuron'])->name('template-brains.brain.neurons.delete');
+    Route::post('/template-brains/{templateBrain}/brain/neuron-links', [App\Http\Controllers\TemplateBrainController::class, 'saveNeuronLink'])->name('template-brains.brain.neuron-links.save');
+    Route::delete('/template-brains/{templateBrain}/brain/neuron-links', [App\Http\Controllers\TemplateBrainController::class, 'deleteNeuronLink'])->name('template-brains.brain.neuron-links.delete');
+    Route::post('/template-brains/{templateBrain}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\TemplateBrainController::class, 'toggleCircuitActive'])->name('template-brains.brain.circuits.toggle-active');
+    Route::delete('/template-brains/{templateBrain}/brain/circuits/{circuit}', [App\Http\Controllers\TemplateBrainController::class, 'deleteBrainCircuit'])->name('template-brains.brain.circuits.delete');
+
     //Region
     Route::post('/regions/list/table/{planet_id}', [App\Http\Controllers\RegionController::class, 'listDataTable'])->name(name: 'regions.datatable');
     Route::get('/regions/page/create/{planet_id}', [App\Http\Controllers\RegionController::class, 'create'])->name(name: 'regions.create');
