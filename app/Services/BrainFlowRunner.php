@@ -33,7 +33,7 @@ use App\Helper\Helper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class BrainFlowRunner
+class BrainFlowRunnerOld
 {
     private array $processedNeuronsById = [];
     private array $queuedDrawBySession = [];
@@ -2376,6 +2376,15 @@ class BrainFlowRunner
 
         return '';
     }
+}
+
+/**
+ * Stub WIP: implementazione in fase di riscrittura.
+ * Il codice precedente è preservato in BrainFlowRunnerOld.
+ */
+class BrainFlowRunner
+{
+    // WIP
 }
 
 
