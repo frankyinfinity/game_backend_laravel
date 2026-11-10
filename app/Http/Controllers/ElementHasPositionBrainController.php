@@ -98,4 +98,9 @@ class ElementHasPositionBrainController extends Controller
     {
         return $this->brainDeleteCircuit($request, $elementHasPosition, $circuit);
     }
+
+    public function applyBrainTemplate(Request $request, ElementHasPosition $elementHasPosition)
+    {
+        return $this->brainApplyTemplate($request, $elementHasPosition);
+    }
 }

@@ -54,6 +54,7 @@
                     'idPrefix'            => 'tb',
                     'routeBase'           => url('/template-brains/' . $templateBrain->id . '/brain'),
                     'brainLocked'         => false,
+                    'brainTemplateEnabled' => false,
                     'existingNeuronItems' => $existingNeuronItems ?? [],
                     'existingNeuronLinks' => $existingNeuronLinks ?? [],
                     'existingCircuits'    => $existingCircuits ?? [],

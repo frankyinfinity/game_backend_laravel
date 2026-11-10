@@ -224,6 +224,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::delete('/element-components/{elementComponent}/brain/neuron-links', [App\Http\Controllers\ElementComponentController::class, 'deleteNeuronLink'])->name('element-components.brain.neuron-links.delete');
     Route::post('/element-components/{elementComponent}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\ElementComponentController::class, 'toggleCircuitActive'])->name('element-components.brain.circuits.toggle-active');
     Route::delete('/element-components/{elementComponent}/brain/circuits/{circuit}', [App\Http\Controllers\ElementComponentController::class, 'deleteBrainCircuit'])->name('element-components.brain.circuits.delete');
+    Route::post('/element-components/{elementComponent}/brain/apply-template', [App\Http\Controllers\ElementComponentController::class, 'applyBrainTemplate'])->name('element-components.brain.apply-template');
 
     // ElementHasPosition Brain (Cervello istanza di gioco)
     Route::get('/element-has-positions/{elementHasPosition}/brain', [App\Http\Controllers\ElementHasPositionBrainController::class, 'edit'])->name('ehp.brain.edit');
@@ -236,6 +237,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::delete('/element-has-positions/{elementHasPosition}/brain/neuron-links', [App\Http\Controllers\ElementHasPositionBrainController::class, 'deleteNeuronLink'])->name('ehp.brain.neuron-links.delete');
     Route::post('/element-has-positions/{elementHasPosition}/brain/circuits/{circuit}/toggle-active', [App\Http\Controllers\ElementHasPositionBrainController::class, 'toggleCircuitActive'])->name('ehp.brain.circuits.toggle-active');
     Route::delete('/element-has-positions/{elementHasPosition}/brain/circuits/{circuit}', [App\Http\Controllers\ElementHasPositionBrainController::class, 'deleteBrainCircuit'])->name('ehp.brain.circuits.delete');
+    Route::post('/element-has-positions/{elementHasPosition}/brain/apply-template', [App\Http\Controllers\ElementHasPositionBrainController::class, 'applyBrainTemplate'])->name('ehp.brain.apply-template');
 
     //Chimical Elements
     Route::resource('chimical-elements', App\Http\Controllers\ChimicalElementController::class);

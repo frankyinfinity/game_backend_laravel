@@ -302,4 +302,9 @@ class ElementComponentController extends Controller
     {
         return $this->brainDeleteCircuit($request, $elementComponent, $circuit);
     }
+
+    public function applyBrainTemplate(Request $request, ElementComponent $elementComponent)
+    {
+        return $this->brainApplyTemplate($request, $elementComponent);
+    }
 }

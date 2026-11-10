@@ -20,6 +20,37 @@
     // true (default): mostra il pulsante Attivo/Disattivo sui circuiti.
     // Passare false per famiglie di modelli senza colonna active (es. EHP).
     $circuitToggleEnabled = $circuitToggleEnabled ?? true;
+    // true (default): mostra la select per applicare un TemplateBrain.
+    $brainTemplateEnabled = $brainTemplateEnabled ?? true;
+    $brainTemplates = $brainTemplates ?? \App\Models\TemplateBrain::whereHas('brain.neurons')->orderBy('name')->get(['id', 'name']);
+    // Layout dei template (neuroni + bounding box) per l'anteprima ghost in JS.
+    // Mostra solo i neuroni posizionabili: quelli che fanno parte esclusivamente
+    // di circuiti disattivati sono esclusi (stessa regola di brainApplyTemplate).
+    $brainTemplateLayouts = $brainTemplateLayouts ?? \App\Models\TemplateBrain::whereHas('brain.neurons')
+        ->with('brain.neurons', 'brain.circuits.details')
+        ->orderBy('name')
+        ->get()
+        ->map(function ($t) {
+            $inCircuit = $inActive = [];
+            foreach ($t->brain->circuits as $c) {
+                foreach ($c->details->pluck('neuron_id') as $nid) {
+                    $inCircuit[$nid] = true;
+                    if ($c->active) $inActive[$nid] = true;
+                }
+            }
+            $neurons = $t->brain->neurons
+                ->reject(fn($n) => isset($inCircuit[$n->id]) && !isset($inActive[$n->id]))
+                ->map(fn($n) => [
+                    'type' => $n->type, 'grid_i' => (int) $n->grid_i, 'grid_j' => (int) $n->grid_j,
+                ])->values();
+            return [
+                'id'      => $t->id,
+                'name'    => $t->name,
+                'min_i'   => (int) ($neurons->min('grid_i') ?? 0),
+                'min_j'   => (int) ($neurons->min('grid_j') ?? 0),
+                'neurons' => $neurons,
+            ];
+        })->values();
 
     $brainTargetElements           = $brainTargetElements ?? \App\Models\Element::orderBy('name')->get(['id', 'name']);
     $brainGenes                    = $brainGenes ?? \App\Models\Gene::where('type', \App\Models\Gene::DYNAMIC_MAX)->orderBy('name')->get(['id', 'name']);
@@ -119,6 +150,7 @@
 <input type="hidden" id="neuron_items_{{ $idPrefix }}"    value="{{ old('neuron_items',    json_encode($existingNeuronItems)) }}">
 <input type="hidden" id="neuron_links_{{ $idPrefix }}"    value="{{ old('neuron_links',    json_encode($existingNeuronLinks)) }}">
 <input type="hidden" id="neuron_circuits_{{ $idPrefix }}" value="{{ json_encode($existingCircuits) }}">
+<input type="hidden" id="template_layouts_{{ $idPrefix }}" value="{{ json_encode($brainTemplateLayouts) }}">
 
 @if(!$brainLocked)
 <div class="row mb-3">
@@ -160,6 +192,21 @@
                                 <tbody id="circuits-table-body-{{ $idPrefix }}"></tbody>
                             </table>
                         </div>
+                        @if(!$brainLocked && $brainTemplateEnabled)
+                        <div class="mt-3">
+                            <h5><i class="fas fa-brain"></i> Template</h5>
+                            <select id="brain_template_{{ $idPrefix }}" class="form-control mb-2">
+                                <option value="">— Seleziona template —</option>
+                                @foreach($brainTemplates as $tpl)
+                                    <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-secondary btn-block" id="btn-apply-template-{{ $idPrefix }}">
+                                <i class="fas fa-download"></i> Applica
+                            </button>
+                            <small class="text-muted d-block mt-1">Scegli un template, premi Applica e clicca sulla griglia per posizionarlo (ESC per annullare).</small>
+                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -299,6 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── DOM refs ──────────────────────────────────────────────────────────────
     const widthInput  = document.getElementById('brain_grid_width_{{ $idPrefix }}');
     const heightInput = document.getElementById('brain_grid_height_{{ $idPrefix }}');
+    const templateLayoutsInput = document.getElementById('template_layouts_{{ $idPrefix }}');
     const container   = document.getElementById('brain-grid-pixi-{{ $idPrefix }}');
     const neuronItemsInput   = document.getElementById('neuron_items_{{ $idPrefix }}');
     const neuronLinksInput   = document.getElementById('neuron_links_{{ $idPrefix }}');
@@ -377,6 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveLinkUrl      = brainBase + '/neuron-links';
     const deleteLinkUrl    = brainBase + '/neuron-links';
     const toggleCircuitUrl = brainBase + '/circuits/';
+    const applyTemplateUrl = brainBase + '/apply-template';
 
     // ── State ─────────────────────────────────────────────────────────────────
     let app = null, selectedCell = null, currentNeuronId = null;
@@ -385,10 +434,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let draggedNeuron = null, draggedLayer = null;
     let dragOrigI = null, dragOrigJ = null, dragOffX = 0, dragOffY = 0, dragStarted = false;
     let highlightedCircuitId = null;
+    let placingTemplate = null, ghostAnchor = null, ghostLayer = null;
+    let templateLayouts = [];
 
     try { const p = JSON.parse(neuronItemsInput.value || '[]'); neuronItems = Array.isArray(p) ? p : []; } catch(e) { neuronItems = []; }
     try { const p = JSON.parse(neuronLinksInput.value  || '[]'); neuronLinks  = Array.isArray(p) ? p : []; } catch(e) { neuronLinks  = []; }
     try { const p = JSON.parse(neuronCircuitsInput ? neuronCircuitsInput.value : '[]'); neuronCircuits = Array.isArray(p) ? p : []; } catch(e) { neuronCircuits = []; }
+    try { const p = JSON.parse(templateLayoutsInput ? templateLayoutsInput.value : '[]'); templateLayouts = Array.isArray(p) ? p : []; } catch(e) { templateLayouts = []; }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function normalize(v) { const n = parseInt(v, 10); return (isNaN(n) || n < 1) ? 1 : n; }
@@ -668,7 +720,7 @@ document.addEventListener('DOMContentLoaded', function () {
             nb.beginFill(inactive?0xd1d5db:0xFFFFFF,1);
             nb.drawRect(j*cs+1,i*cs+1,cs-2,cs-2); nb.endFill();
             nb.eventMode='static'; nb.cursor=brainLocked?'default':'grab'; nb.isInteractiveElement=true;
-            nb.on('pointerdown', e=>{ if(brainLocked)return; e.stopPropagation(); if(e.button===0){ draggedNeuron=nb; draggedLayer=layer; dragOrigI=i; dragOrigJ=j; dragOffX=e.global.x-(j*cs+1); dragOffY=e.global.y-(i*cs+1); dragStarted=false; nb.cursor='grabbing'; nb.alpha=0.7; } });
+            nb.on('pointerdown', e=>{ if(brainLocked||placingTemplate)return; e.stopPropagation(); if(e.button===0){ draggedNeuron=nb; draggedLayer=layer; dragOrigI=i; dragOrigJ=j; dragOffX=e.global.x-(j*cs+1); dragOffY=e.global.y-(i*cs+1); dragStarted=false; nb.cursor='grabbing'; nb.alpha=0.7; } });
             nb.on('pointerover', ()=>{ if(!tooltipText||!tooltipBg)return; tooltipText.text=neuron.tooltip||'Neurone'; tooltipText.visible=true; tooltipBg.visible=true; const px=6,py=4; tooltipBg.clear(); tooltipBg.lineStyle(1,0,1); tooltipBg.beginFill(0xFFFFFF,1); tooltipBg.drawRect(0,0,tooltipText.width+px*2,tooltipText.height+py*2); tooltipBg.endFill(); tooltipBg.x=tooltipText.x-px; tooltipBg.y=tooltipText.y-py; });
             nb.on('pointerout', ()=>{ if(tooltipText)tooltipText.visible=false; if(tooltipBg)tooltipBg.visible=false; });
             nb.on('pointermove', e=>{ if(!tooltipText||!tooltipText.visible||!tooltipBg)return; const ox=12,oy=12,px=6,py=4; const tw=tooltipText.width+px*2,th=tooltipText.height+py*2; const mX=app?app.renderer.width:Infinity,mY=app?app.renderer.height:Infinity; let x=e.global.x+ox,y=e.global.y+oy; if(x+tw>mX)x=Math.max(0,mX-tw); if(y+th>mY)y=Math.max(0,mY-th); tooltipText.x=x; tooltipText.y=y; tooltipBg.x=x-px; tooltipBg.y=y-py; });
@@ -701,9 +753,26 @@ document.addEventListener('DOMContentLoaded', function () {
             app=new PIXI.Application({width:cw,height:ch,antialias:true,backgroundAlpha:1,backgroundColor:0xffffff});
             container.innerHTML=''; container.appendChild(app.view);
             app.stage.eventMode='static'; app.stage.hitArea=new PIXI.Rectangle(0,0,cw,ch);
-            app.stage.on('pointerdown', e=>{ if(brainLocked||draggedNeuron)return; const i=Math.floor(e.global.y/cs),j=Math.floor(e.global.x/cs); const mr=normalize(heightInput.value||5),mc=normalize(widthInput.value||5); if(i<0||j<0||i>=mr||j>=mc)return; openNeuronModal(i,j); });
+            app.stage.on('pointerdown', e=>{ if(brainLocked||draggedNeuron||placingTemplate)return; const i=Math.floor(e.global.y/cs),j=Math.floor(e.global.x/cs); const mr=normalize(heightInput.value||5),mc=normalize(widthInput.value||5); if(i<0||j<0||i>=mr||j>=mc)return; openNeuronModal(i,j); });
             app.view.addEventListener('pointermove', e=>{ if(!draggedNeuron)return; const rect=app.view.getBoundingClientRect(); const x=e.clientX-rect.left,y=e.clientY-rect.top; const dx=Math.abs(x-dragOffX-(dragOrigJ*cs+1)),dy=Math.abs(y-dragOffY-(dragOrigI*cs+1)); if(dx>3||dy>3)dragStarted=true; if(!dragStarted)return; draggedNeuron.x=x-dragOffX-(dragOrigJ*cs+1); draggedNeuron.y=y-dragOffY-(dragOrigI*cs+1); });
             app.view.addEventListener('pointerup', async e=>{ if(!draggedNeuron)return; draggedNeuron.cursor='grab'; draggedNeuron.alpha=1; if(!dragStarted){const tn=draggedNeuron,ti=dragOrigI,tj=dragOrigJ;draggedNeuron=null;draggedLayer=null;openNeuronModal(ti,tj);return;} const neuron=findAtCell(dragOrigI,dragOrigJ); if(neuron){const nj=Math.floor((draggedNeuron.x+dragOrigJ*cs+1+cs/2)/cs),ni=Math.floor((draggedNeuron.y+dragOrigI*cs+1+cs/2)/cs); const mr=normalize(heightInput.value||5),mc=normalize(widthInput.value||5); const ci=Math.max(0,Math.min(ni,mr-1)),cj=Math.max(0,Math.min(nj,mc-1)); if(ci!==dragOrigI||cj!==dragOrigJ){const occ=findAtCell(ci,cj); if(!occ||+occ.id===+neuron.id){try{const un=await reqMoveNeuron(neuron.id,ci,cj);neuronItems=neuronItems.filter(n=>+n.id!==+neuron.id);neuronItems.push(un);updateNeuronInput();}catch(err){alert(err.message||'Errore spostamento');}}} } draggedNeuron=null;draggedLayer=null;dragStarted=false;renderGrid();renderCircuitsTable(); });
+            // ── Posizionamento template (placement mode) ──
+            app.view.addEventListener('pointerdown', e=>{
+                if (!placingTemplate) return;
+                const rect=app.view.getBoundingClientRect();
+                const j=Math.floor((e.clientX-rect.left)/cs), i=Math.floor((e.clientY-rect.top)/cs);
+                const mr=normalize(heightInput.value||5), mc=normalize(widthInput.value||5);
+                if(i<0||j<0||i>=mr||j>=mc)return;
+                placeTemplateAt(i,j);
+            });
+            app.view.addEventListener('pointermove', e=>{
+                if (!placingTemplate) return;
+                const rect=app.view.getBoundingClientRect();
+                const j=Math.floor((e.clientX-rect.left)/cs), i=Math.floor((e.clientY-rect.top)/cs);
+                if(ghostAnchor&&ghostAnchor.i===i&&ghostAnchor.j===j)return;
+                ghostAnchor={i,j}; drawGhosts();
+            });
+            app.view.addEventListener('pointerleave', ()=>{ if(!placingTemplate)return; ghostAnchor=null; drawGhosts(); });
         } else { app.renderer.resize(cw,ch); app.stage.removeChildren(); }
         const bg=new PIXI.Graphics(); bg.beginFill(0xFFFFFF); bg.drawRect(0,0,cw,ch); bg.endFill(); app.stage.addChild(bg);
         const lines=new PIXI.Graphics(); lines.lineStyle(1,0xdddddd,1);
@@ -712,9 +781,62 @@ document.addEventListener('DOMContentLoaded', function () {
         app.stage.addChild(lines);
         const ll=new PIXI.Container(); app.stage.addChild(ll); drawNeuronLinks(ll,cs);
         const sl=new PIXI.Container(); app.stage.addChild(sl); drawNeuronSymbols(sl,cs);
+        ghostLayer=new PIXI.Graphics(); app.stage.addChild(ghostLayer); drawGhosts();
         tooltipBg=new PIXI.Graphics(); tooltipBg.visible=false; tooltipBg.zIndex=19999; app.stage.addChild(tooltipBg);
         tooltipText=new PIXI.Text('',{fill:0,fontSize:12,fontWeight:'bold',fontFamily:'Consolas',align:'left'}); tooltipText.visible=false; tooltipText.zIndex=20000; app.stage.addChild(tooltipText);
         app.stage.sortChildren();
+    }
+
+    // ── Posizionamento template ───────────────────────────────────────────
+    function drawGhosts() {
+        if (!ghostLayer) return;
+        ghostLayer.clear();
+        if (!placingTemplate || !ghostAnchor) return;
+        const cs=fixedCellSize, mr=normalize(heightInput.value||5), mc=normalize(widthInput.value||5);
+        (placingTemplate.neurons||[]).forEach(n=>{
+            const gi=ghostAnchor.i+(+n.grid_i-placingTemplate.min_i), gj=ghostAnchor.j+(+n.grid_j-placingTemplate.min_j);
+            if(gi<0||gj<0||gi>=mr||gj>=mc)return;
+            const blocked=!!findAtCell(gi,gj);
+            ghostLayer.beginFill(blocked?0xef4444:0x22c55e,0.45);
+            ghostLayer.drawRect(gj*cs+1,gi*cs+1,cs-2,cs-2);
+            ghostLayer.endFill();
+        });
+    }
+
+    function exitPlacementMode() {
+        placingTemplate=null; ghostAnchor=null;
+        if (ghostLayer) ghostLayer.clear();
+        if (app) app.view.style.cursor='';
+        if (applyTemplateBtn) { applyTemplateBtn.classList.remove('btn-warning'); applyTemplateBtn.classList.add('btn-secondary'); }
+    }
+
+    async function placeTemplateAt(i, j) {
+        const tpl = placingTemplate;
+        exitPlacementMode();
+        try {
+            const r = await fetch(applyTemplateUrl, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':csrfToken},
+                body: JSON.stringify({template_brain_id: tpl.id, offset_i: i, offset_j: j})
+            });
+            const d = await r.json();
+            if (d.success) {
+                neuronItems    = Array.isArray(d.neurons)  ? d.neurons  : [];
+                neuronLinks    = Array.isArray(d.links)    ? d.links    : [];
+                neuronCircuits = Array.isArray(d.circuits) ? d.circuits : [];
+                updateNeuronInput();
+                updateLinksInput();
+                selectedCell = null;
+                currentNeuronId = null;
+                renderGrid();
+                renderCircuitsTable();
+                if (typeof toastr !== 'undefined') toastr.success(d.message || 'Template applicato.');
+                else alert(d.message || 'Template applicato.');
+            } else {
+                if (typeof toastr !== 'undefined') toastr.error(d.message || 'Errore');
+                else alert(d.message || 'Errore');
+            }
+        } catch(e) { alert('Errore: ' + e.message); }
     }
 
     // ── Modal open ────────────────────────────────────────────────────────────
@@ -877,6 +999,31 @@ document.addEventListener('DOMContentLoaded', function () {
             finally { saveGridBtn.disabled = false; }
         });
     }
+
+    const applyTemplateBtn = document.getElementById('btn-apply-template-{{ $idPrefix }}');
+    const templateSelect = document.getElementById('brain_template_{{ $idPrefix }}');
+    if (applyTemplateBtn && templateSelect) {
+        applyTemplateBtn.addEventListener('click', function() {
+            const tplId = parseInt(templateSelect.value, 10);
+            if (!tplId) { alert('Seleziona un template da applicare.'); return; }
+            const tpl = templateLayouts.find(t => +t.id === tplId);
+            if (!tpl || !(tpl.neurons||[]).length) { alert('Il template selezionato non contiene neuroni.'); return; }
+            // Secondo click sul pulsante = annulla la modalità posizionamento.
+            if (placingTemplate && +placingTemplate.id === +tpl.id) { exitPlacementMode(); return; }
+            placingTemplate = tpl;
+            ghostAnchor = null;
+            applyTemplateBtn.classList.remove('btn-secondary');
+            applyTemplateBtn.classList.add('btn-warning');
+            if (app) app.view.style.cursor = 'crosshair';
+            const msg = 'Modalità posizionamento: clicca sulla griglia dove ancorare il template. ESC per annullare.';
+            if (typeof toastr !== 'undefined') toastr.info(msg);
+            else alert(msg);
+        });
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && placingTemplate) exitPlacementMode();
+    });
 });
 </script>
 @endpush

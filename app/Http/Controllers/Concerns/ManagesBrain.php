@@ -473,6 +473,189 @@ trait ManagesBrain
         ]);
     }
 
+    /**
+     * Posiziona un TemplateBrain sul cervello del proprietario (MERGE):
+     * i neuroni del template vengono ancorati a offset_i/offset_j
+     * (angolo del bounding box del template) e copiati solo nelle celle
+     * libere e dentro la griglia. Nulla di esistente viene rimosso.
+     * I circuiti rigenerati ereditano attivo/colore dal template dove
+     * le colonne esistono.
+     */
+    public function brainApplyTemplate(Request $request, Model $owner)
+    {
+        $S = $this->brainSchema();
+        if ($this->isBrainLocked($owner)) {
+            return response()->json(['success' => false, 'message' => 'Cervello bloccato, impossibile applicare il template.'], 403);
+        }
+
+        $request->validate([
+            'template_brain_id' => ['required', 'integer', Rule::exists('template_brains', 'id')],
+            'offset_i'          => ['nullable', 'integer'],
+            'offset_j'          => ['nullable', 'integer'],
+        ]);
+
+        $template  = \App\Models\TemplateBrain::find($request->input('template_brain_id'));
+        $templateBrain = $template?->brain;
+        if (!$templateBrain) {
+            return response()->json(['success' => false, 'message' => 'Il template selezionato non ha un cervello.'], 422);
+        }
+
+        $SS = $this->defaultBrainSchema(); // il template è sempre famiglia Brain
+
+        [$brain, $placed, $skipped, $excluded] = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $owner, $templateBrain, $S, $SS) {
+            // Brain esistente: mantieni le sue dimensioni. Se assente, crealo
+            // con le dimensioni del template.
+            $brain = $owner->brain
+                ?: $this->createBrainFor($owner, (int) $templateBrain->grid_width, (int) $templateBrain->grid_height);
+            $owner->setRelation('brain', $brain);
+
+            $templateNeurons = $SS['neuron']::where($SS['neuron_fk'], $templateBrain->id)
+                ->with('conditionOrders')
+                ->get();
+
+            // Applicazione solo dei circuiti ATTIVI: i neuroni che fanno parte
+            // esclusivamente di circuiti disattivati non vengono posizionati.
+            // I neuroni fuori da ogni circuito (o in almeno un circuito attivo)
+            // vengono copiati normalmente.
+            $tplCircuits = $SS['circuit']::where($SS['circuit_owner_fk'], $templateBrain->id)
+                ->with('details')
+                ->get();
+            $inCircuit = $inActiveCircuit = [];
+            foreach ($tplCircuits as $c) {
+                foreach ($c->details->pluck($SS['detail_neuron']) as $nid) {
+                    $inCircuit[$nid] = true;
+                    if ($c->{$SS['circuit_active']}) {
+                        $inActiveCircuit[$nid] = true;
+                    }
+                }
+            }
+
+            $placeableNeurons = $templateNeurons
+                ->reject(fn($n) => isset($inCircuit[$n->id]) && !isset($inActiveCircuit[$n->id]))
+                ->values();
+            $excluded = $templateNeurons->count() - $placeableNeurons->count();
+
+            // Anchor: angolo superiore sinistro del bounding box dei neuroni posizionabili.
+            $shiftI = (int) $request->input('offset_i', 0) - (int) ($placeableNeurons->min('grid_i') ?? 0);
+            $shiftJ = (int) $request->input('offset_j', 0) - (int) ($placeableNeurons->min('grid_j') ?? 0);
+
+            $occupied = $S['neuron']::where($S['neuron_fk'], $brain->id)
+                ->get(['grid_i', 'grid_j'])
+                ->keyBy(fn($n) => $n->grid_i . '_' . $n->grid_j);
+
+            // Copia info/regola solo se le due famiglie puntano alla stessa
+            // tabella di riferimento (stesso dominio di FK).
+            $sameInfoDomain = $S['info_table'] === $SS['info_table'] && $S['info_owner_fk'] === $SS['info_owner_fk'];
+            $sameRuleDomain = $S['rule_table'] === $SS['rule_table'] && $S['rule_owner_fk'] === $SS['rule_owner_fk'];
+
+            $dstNeuronTable = (new ($S['neuron']))->getTable();
+            $dstColumns     = \Illuminate\Support\Facades\Schema::getColumnListing($dstNeuronTable);
+            $sharedColumns  = ['type', 'radius', 'stop_before_target', 'target_type',
+                'target_element_id', 'gene_life_id', 'gene_attack_id', 'chemical_element_id', 'complex_chemical_element_id'];
+
+            // ── Copia neuroni + ordini condizione (merge) ───────────────
+            $idMap = $orderIdMap = [];
+            $placed = $skipped = 0;
+
+            foreach ($placeableNeurons as $srcNeuron) {
+                $ni = (int) $srcNeuron->grid_i + $shiftI;
+                $nj = (int) $srcNeuron->grid_j + $shiftJ;
+                if ($ni < 0 || $nj < 0
+                    || $ni >= (int) $brain->grid_height || $nj >= (int) $brain->grid_width
+                    || $occupied->has($ni . '_' . $nj)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $fields = [$S['neuron_fk'] => $brain->id, 'grid_i' => $ni, 'grid_j' => $nj];
+                foreach ($sharedColumns as $col) {
+                    if (in_array($col, $dstColumns, true) && !is_null($srcNeuron->getAttribute($col))) {
+                        $fields[$col] = $srcNeuron->getAttribute($col);
+                    }
+                }
+                if (in_array($S['neuron_info'], $dstColumns, true)) {
+                    $fields[$S['neuron_info']] = $sameInfoDomain ? $srcNeuron->{$SS['neuron_info']} : null;
+                }
+                if (in_array($S['neuron_rule'], $dstColumns, true)) {
+                    $fields[$S['neuron_rule']] = $sameRuleDomain ? $srcNeuron->{$SS['neuron_rule']} : null;
+                }
+
+                $newNeuron = $S['neuron']::create($fields);
+                $idMap[$srcNeuron->id] = $newNeuron->id;
+                $occupied->put($ni . '_' . $nj, true);
+                $placed++;
+
+                foreach ($srcNeuron->conditionOrders as $srcOrder) {
+                    $newOrder = $S['order']::create([
+                        $S['order_neuron'] => $newNeuron->id,
+                        'condition'        => $srcOrder->condition,
+                        'sort_order'       => (int) $srcOrder->sort_order,
+                        'color'            => $srcOrder->color,
+                        $S['order_rule']   => ($S['order_rule'] === $SS['order_rule'] && $sameRuleDomain)
+                                                ? $srcOrder->{$SS['order_rule']} : null,
+                    ]);
+                    $orderIdMap[$srcOrder->id] = $newOrder->id;
+                }
+            }
+
+            // ── Copia collegamenti (solo fra neuroni posizionati) ───────
+            $templateLinks = $SS['link']::whereHas('fromNeuron', fn($q) => $q->where($SS['neuron_fk'], $templateBrain->id))->get();
+            foreach ($templateLinks as $srcLink) {
+                $from = $idMap[$srcLink->{$SS['link_from']}] ?? null;
+                $to   = $idMap[$srcLink->{$SS['link_to']}] ?? null;
+                if (!$from || !$to) continue;
+                $S['link']::create([
+                    $S['link_from']  => $from,
+                    $S['link_to']    => $to,
+                    $S['link_order'] => $orderIdMap[$srcLink->{$SS['link_order']}] ?? null,
+                    'condition'      => $srcLink->condition,
+                    'color'          => $srcLink->color,
+                ]);
+            }
+
+            // ── Circuiti: risincronizza e riapplica attivo/colore ───────
+            $this->updateBrainCircuit($owner);
+
+            $circuitOwner = $this->brainCircuitOwner($owner);
+            if ($circuitOwner && $S['circuit_active']) {
+                $newCircuits = $S['circuit']::where($S['circuit_owner_fk'], $circuitOwner->getKey())->get();
+                foreach ($newCircuits as $circuit) {
+                    $srcStart = array_search((int) $circuit->{$S['circuit_start']}, $idMap, true);
+                    $tpl = $tplCircuits->firstWhere($SS['circuit_start'], $srcStart);
+                    if (!$tpl) continue;
+                    $circuit->{$S['circuit_active']} = (bool) $tpl->{$SS['circuit_active']};
+                    if ($S['circuit_color'] && $SS['circuit_color']) {
+                        $circuit->{$S['circuit_color']} = $tpl->{$SS['circuit_color']};
+                    }
+                    $circuit->save();
+                }
+            }
+
+            return [$brain, $placed, $skipped, $excluded];
+        });
+
+        $message = "Template «{$template->name}» posizionato: {$placed} neuroni aggiunti";
+        if ($skipped) {
+            $message .= " ({$skipped} saltati: cella occupata o fuori griglia)";
+        }
+        if ($excluded) {
+            $message .= " ({$excluded} esclusi: circuito disattivato)";
+        }
+
+        return response()->json([
+            'success'  => true,
+            'message'  => $message . '.',
+            'placed'   => $placed,
+            'skipped'  => $skipped,
+            'excluded' => $excluded,
+            'neurons'  => $S['neuron']::where($S['neuron_fk'], $brain->id)->with($S['neuron_relations'])->get()
+                            ->map(fn($n) => $this->neuronToArray($n))->toArray(),
+            'links'    => $S['link']::whereHas('fromNeuron', fn($q) => $q->where($S['neuron_fk'], $brain->id))->get()
+                            ->map(fn($l) => $this->linkToArray($l))->toArray(),
+            'circuits' => $this->getCircuitsArray($owner),
+        ]);
+    }
+
     // ─── HELPERS CONDIVISI ──────────────────────────────────────────────────────
 
     /**
