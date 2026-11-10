@@ -153,7 +153,7 @@ class BrainPanelDraw
 
     private function addConnections(array $circuitNeuronIds = []): void
     {
-        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'outgoingLinks.conditionOrder', 'conditionOrders', 'chemicalRule.details'])->orderBy('grid_i')->orderBy('grid_j')->get();
+        $neurons = $this->brain->neurons()->with(['outgoingLinks.toNeuron', 'outgoingLinks.conditionOrder', 'conditionOrders', 'chemicalRule.details'])->get()->sortBy(fn($n) => [(int) $n->grid_i, (int) $n->grid_j])->values();
 
         if (!empty($circuitNeuronIds)) {
             $neurons = $neurons->filter(fn($n) => in_array((int) $n->id, $circuitNeuronIds));
@@ -242,10 +242,10 @@ class BrainPanelDraw
         }
 
         $neurons = $this->brain->neurons()
-            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'information.gene'])
-            ->orderBy('grid_i')
-            ->orderBy('grid_j')
-            ->get();
+            ->with(['outgoingLinks', 'incomingLinks', 'conditionOrders', 'chemicalRule.details', 'chemicalRule.chimicalElement', 'chemicalRule.complexChimicalElement', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'positionInformation.gene'])
+            ->get()
+            ->sortBy(fn($n) => [(int) $n->grid_i, (int) $n->grid_j])
+            ->values();
 
         if (!empty($circuitNeuronIds)) {
             $neurons = $neurons->filter(fn($n) => in_array((int) $n->id, $circuitNeuronIds));

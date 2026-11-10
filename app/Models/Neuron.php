@@ -92,20 +92,72 @@ class Neuron extends Model
 
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
-    protected $casts = [
-        'brain_id' => 'integer',
-        'grid_i' => 'integer',
-        'grid_j' => 'integer',
-        'radius' => 'integer',
-        'target_element_id' => 'integer',
-        'gene_life_id' => 'integer',
-        'gene_attack_id' => 'integer',
-        'element_has_rule_chimical_element_id' => 'integer',
-        'chemical_element_id' => 'integer',
-        'complex_chemical_element_id' => 'integer',
-        'element_infomation_id' => 'integer',
-        'stop_before_target' => 'boolean',
+    /**
+     * Le chiavi dentro `information` non sono colonne reali: senza $fillable
+     * esplicito, isGuardableColumn() le scarterebbe in mass assignment.
+     */
+    protected $fillable = [
+        'brain_id', 'information', 'type', 'grid_i', 'grid_j', 'radius',
+        'stop_before_target', 'target_type', 'target_element_id',
+        'gene_life_id', 'gene_attack_id', 'chemical_element_id',
+        'complex_chemical_element_id', 'element_has_rule_chimical_element_id',
+        'element_infomation_id',
     ];
+
+    protected $casts = [
+        'brain_id'    => 'integer',
+        'information' => 'array',
+    ];
+
+    /**
+     * Campi storati dentro la colonna JSON `information`
+     * (tutto tranne id, brain_id, created_at, updated_at).
+     */
+    public const INFORMATION_FIELDS = [
+        'type', 'grid_i', 'grid_j', 'radius', 'stop_before_target',
+        'target_type', 'target_element_id', 'gene_life_id', 'gene_attack_id',
+        'chemical_element_id', 'complex_chemical_element_id',
+        'element_has_rule_chimical_element_id', 'element_infomation_id',
+    ];
+
+    /** Accesso trasparente: $neuron->type legge information['type']. */
+    public function getAttribute($key)
+    {
+        if (is_string($key) && in_array($key, self::INFORMATION_FIELDS, true)) {
+            return $this->informationData()[$key] ?? null;
+        }
+        return parent::getAttribute($key);
+    }
+
+    /** Scrittura trasparente: $neuron->type = 'x' scrive information['type']. */
+    public function setAttribute($key, $value)
+    {
+        if (is_string($key) && in_array($key, self::INFORMATION_FIELDS, true)) {
+            $info = $this->informationData();
+            if ($value === null) {
+                unset($info[$key]);
+            } else {
+                $info[$key] = $value;
+            }
+            return parent::setAttribute('information', $info);
+        }
+        return parent::setAttribute($key, $value);
+    }
+
+    /** Necessario perché isset()/data_get() funzionino sui campi JSON (es. Collection::min/sortBy). */
+    public function offsetExists($key): bool
+    {
+        if (is_string($key) && in_array($key, self::INFORMATION_FIELDS, true)) {
+            return array_key_exists($key, $this->informationData());
+        }
+        return parent::offsetExists($key);
+    }
+
+    protected function informationData(): array
+    {
+        $info = parent::getAttribute('information');
+        return is_array($info) ? $info : [];
+    }
 
     public function brain()
     {

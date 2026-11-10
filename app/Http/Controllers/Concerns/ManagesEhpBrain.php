@@ -41,7 +41,7 @@ trait ManagesEhpBrain
             'neuron_fk'        => 'element_has_position_brain_id',
             'neuron_info'      => 'element_has_position_information_id',
             'neuron_rule'      => 'element_has_position_rule_chimical_element_id',
-            'neuron_relations' => ['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'information', 'information.gene'],
+            'neuron_relations' => ['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'positionInformation', 'positionInformation.gene'],
             'link_from'        => 'from_element_has_position_neuron_id',
             'link_to'          => 'to_element_has_position_neuron_id',
             'link_order'       => 'element_has_position_neuron_condition_order_id',

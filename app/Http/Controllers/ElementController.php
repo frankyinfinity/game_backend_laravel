@@ -879,7 +879,7 @@ class ElementController extends Controller
             $targetJ = $srcNeuron->grid_j + $offsetJ;
 
             // Skip if a neuron already exists at this position in the element brain
-            $existing = Neuron::where('brain_id', $brain->id)->where('grid_i', $targetI)->where('grid_j', $targetJ)->first();
+            $existing = Neuron::where('brain_id', $brain->id)->where('information->grid_i', $targetI)->where('information->grid_j', $targetJ)->first();
             if ($existing) {
                 $neuronIdMap[$srcNeuron->id] = $existing->id;
                 continue;
@@ -1504,26 +1504,33 @@ class ElementController extends Controller
             }
         }
 
-        $neuron = Neuron::query()->updateOrCreate(
-            [
-                'brain_id' => $brain->id,
-                'grid_i' => $gridI,
-                'grid_j' => $gridJ,
-            ],
-            [
-                'type' => $type,
-                'radius' => $radius,
-                'stop_before_target' => $stopBeforeTarget,
-                'target_type' => $targetType,
-                'target_element_id' => $targetElementId,
-                'chemical_element_id' => $chemicalElementId,
-                'complex_chemical_element_id' => $complexChemicalElementId,
-                'gene_life_id' => $geneLifeId,
-                'gene_attack_id' => $geneAttackId,
-                'element_infomation_id' => $elementInfomationId,
-                'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
-            ]
-        );
+        $neuronFields = [
+            'type' => $type,
+            'radius' => $radius,
+            'stop_before_target' => $stopBeforeTarget,
+            'target_type' => $targetType,
+            'target_element_id' => $targetElementId,
+            'chemical_element_id' => $chemicalElementId,
+            'complex_chemical_element_id' => $complexChemicalElementId,
+            'gene_life_id' => $geneLifeId,
+            'gene_attack_id' => $geneAttackId,
+            'element_infomation_id' => $elementInfomationId,
+            'element_has_rule_chimical_element_id' => $elementHasRuleChimicalElementId,
+        ];
+
+        $neuron = Neuron::query()
+            ->where('brain_id', $brain->id)
+            ->where('information->grid_i', $gridI)
+            ->where('information->grid_j', $gridJ)
+            ->first();
+        if ($neuron) {
+            $neuron->update($neuronFields);
+        } else {
+            $neuron = Neuron::query()->create(array_merge(
+                ['brain_id' => $brain->id, 'grid_i' => $gridI, 'grid_j' => $gridJ],
+                $neuronFields
+            ));
+        }
 
         // Load relationships for tooltip
         $neuron->load(['conditionOrders', 'targetElement', 'chemicalElement', 'complexChemicalElement', 'chemicalRule', 'informationGene']);
@@ -1596,8 +1603,8 @@ class ElementController extends Controller
         // Check if target cell is occupied by another neuron
         $existingNeuron = Neuron::query()
             ->where('brain_id', $brain->id)
-            ->where('grid_i', $gridI)
-            ->where('grid_j', $gridJ)
+            ->where('information->grid_i', $gridI)
+            ->where('information->grid_j', $gridJ)
             ->where('id', '!=', $neuron->id)
             ->first();
 
@@ -1663,8 +1670,8 @@ class ElementController extends Controller
 
         Neuron::query()
             ->where('brain_id', $element->brain->id)
-            ->where('grid_i', (int) $request->input('grid_i'))
-            ->where('grid_j', (int) $request->input('grid_j'))
+            ->where('information->grid_i', (int) $request->input('grid_i'))
+            ->where('information->grid_j', (int) $request->input('grid_j'))
             ->delete();
 
         $this->updateBrainCircuit($element->brain);
@@ -2220,7 +2227,7 @@ class ElementController extends Controller
 
     private function updateBrainCircuit(Brain $brain): void
     {
-        $startNeurons = $brain->neurons()->where('type', Neuron::TYPE_START)->get();
+        $startNeurons = $brain->neurons()->where('information->type', Neuron::TYPE_START)->get();
         $legacyMode = $startNeurons->isEmpty();
 
         if ($legacyMode) {

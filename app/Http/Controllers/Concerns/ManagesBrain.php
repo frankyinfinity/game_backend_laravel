@@ -252,10 +252,18 @@ trait ManagesBrain
             }
         }
 
-        $neuron = $S['neuron']::updateOrCreate(
-            [$S['neuron_fk'] => $brain->id, 'grid_i' => $gridI, 'grid_j' => $gridJ],
-            $neuronFields
-        );
+        $neuron = $S['neuron']::where($S['neuron_fk'], $brain->id)
+            ->where('information->grid_i', $gridI)
+            ->where('information->grid_j', $gridJ)
+            ->first();
+        if ($neuron) {
+            $neuron->update($neuronFields);
+        } else {
+            $neuron = $S['neuron']::create(array_merge(
+                [$S['neuron_fk'] => $brain->id, 'grid_i' => $gridI, 'grid_j' => $gridJ],
+                $neuronFields
+            ));
+        }
         $neuron->load($S['neuron_relations']);
         $this->updateBrainCircuit($owner);
 
@@ -287,7 +295,7 @@ trait ManagesBrain
             return response()->json(['success' => false, 'message' => 'Coordinate fuori griglia'], 422);
         }
 
-        $occupied = $S['neuron']::where($S['neuron_fk'], $brain->id)->where('grid_i', $gridI)->where('grid_j', $gridJ)->where('id', '!=', $neuron->id)->first();
+        $occupied = $S['neuron']::where($S['neuron_fk'], $brain->id)->where('information->grid_i', $gridI)->where('information->grid_j', $gridJ)->where('id', '!=', $neuron->id)->first();
         if ($occupied) return response()->json(['success' => false, 'message' => 'Cella già occupata'], 422);
 
         $neuron->update(['grid_i' => $gridI, 'grid_j' => $gridJ]);
@@ -313,8 +321,8 @@ trait ManagesBrain
         ]);
 
         $S['neuron']::where($S['neuron_fk'], $owner->brain->id)
-            ->where('grid_i', (int) $request->input('grid_i'))
-            ->where('grid_j', (int) $request->input('grid_j'))
+            ->where('information->grid_i', (int) $request->input('grid_i'))
+            ->where('information->grid_j', (int) $request->input('grid_j'))
             ->delete();
 
         $this->updateBrainCircuit($owner);
@@ -540,7 +548,7 @@ trait ManagesBrain
             $shiftJ = (int) $request->input('offset_j', 0) - (int) ($placeableNeurons->min('grid_j') ?? 0);
 
             $occupied = $S['neuron']::where($S['neuron_fk'], $brain->id)
-                ->get(['grid_i', 'grid_j'])
+                ->get()
                 ->keyBy(fn($n) => $n->grid_i . '_' . $n->grid_j);
 
             // Copia info/regola solo se le due famiglie puntano alla stessa
@@ -548,8 +556,8 @@ trait ManagesBrain
             $sameInfoDomain = $S['info_table'] === $SS['info_table'] && $S['info_owner_fk'] === $SS['info_owner_fk'];
             $sameRuleDomain = $S['rule_table'] === $SS['rule_table'] && $S['rule_owner_fk'] === $SS['rule_owner_fk'];
 
-            $dstNeuronTable = (new ($S['neuron']))->getTable();
-            $dstColumns     = \Illuminate\Support\Facades\Schema::getColumnListing($dstNeuronTable);
+            // Con il rework JSON i campi vivono in `information` su entrambe le
+            // famiglie: la copia va sempre a buon fine via accessor trasparente.
             $sharedColumns  = ['type', 'radius', 'stop_before_target', 'target_type',
                 'target_element_id', 'gene_life_id', 'gene_attack_id', 'chemical_element_id', 'complex_chemical_element_id'];
 
@@ -569,16 +577,12 @@ trait ManagesBrain
 
                 $fields = [$S['neuron_fk'] => $brain->id, 'grid_i' => $ni, 'grid_j' => $nj];
                 foreach ($sharedColumns as $col) {
-                    if (in_array($col, $dstColumns, true) && !is_null($srcNeuron->getAttribute($col))) {
+                    if (!is_null($srcNeuron->getAttribute($col))) {
                         $fields[$col] = $srcNeuron->getAttribute($col);
                     }
                 }
-                if (in_array($S['neuron_info'], $dstColumns, true)) {
-                    $fields[$S['neuron_info']] = $sameInfoDomain ? $srcNeuron->{$SS['neuron_info']} : null;
-                }
-                if (in_array($S['neuron_rule'], $dstColumns, true)) {
-                    $fields[$S['neuron_rule']] = $sameRuleDomain ? $srcNeuron->{$SS['neuron_rule']} : null;
-                }
+                $fields[$S['neuron_info']] = $sameInfoDomain ? $srcNeuron->{$SS['neuron_info']} : null;
+                $fields[$S['neuron_rule']] = $sameRuleDomain ? $srcNeuron->{$SS['neuron_rule']} : null;
 
                 $newNeuron = $S['neuron']::create($fields);
                 $idMap[$srcNeuron->id] = $newNeuron->id;
@@ -817,7 +821,7 @@ trait ManagesBrain
         $colorCol = $S['circuit_color'];
         $linkToCol = $S['link_to'];
 
-        $startNeurons = $brain->neurons()->where('type', Neuron::TYPE_START)->get();
+        $startNeurons = $brain->neurons()->where('information->type', Neuron::TYPE_START)->get();
 
         if ($startNeurons->isEmpty()) {
             $circuit = $circuitOwner->circuits()->whereNull($startCol)->first();

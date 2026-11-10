@@ -108,7 +108,7 @@ class ElementDraw
                 'brain.neurons.chemicalElement',
                 'brain.neurons.complexChemicalElement',
                 'brain.neurons.chemicalRule',
-                'brain.neurons.information.gene',
+                'brain.neurons.positionInformation.gene',
             ]);
         }
 

@@ -25,9 +25,9 @@ class NeuronController extends Controller
 
         // Recuperiamo tutti i neuroni ordinati nello stesso modo di BrainPanelDraw
         $neurons = $brain->neurons()
-            ->orderBy('grid_i')
-            ->orderBy('grid_j')
-            ->get();
+            ->get()
+            ->sortBy(fn($n) => [(int) $n->grid_i, (int) $n->grid_j])
+            ->values();
 
         $index = $neurons->search(fn($n) => (int) $n->id === (int) $neuron->id);
 

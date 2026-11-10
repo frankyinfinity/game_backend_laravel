@@ -8,21 +8,74 @@ class ElementHasPositionNeuron extends Model
 {
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    /**
+     * Le chiavi dentro `information` non sono colonne reali: senza $fillable
+     * esplicito, isGuardableColumn() le scarterebbe in mass assignment.
+     */
+    protected $fillable = [
+        'element_has_position_brain_id', 'information', 'active', 'type',
+        'grid_i', 'grid_j', 'radius', 'stop_before_target', 'target_type',
+        'target_element_id', 'gene_life_id', 'gene_attack_id',
+        'chemical_element_id', 'complex_chemical_element_id',
+        'element_has_position_rule_chimical_element_id',
+        'element_has_position_information_id',
+    ];
+
     protected $casts = [
         'element_has_position_brain_id' => 'integer',
-        'grid_i' => 'integer',
-        'grid_j' => 'integer',
-        'radius' => 'integer',
-        'target_element_id' => 'integer',
-        'gene_life_id' => 'integer',
-        'gene_attack_id' => 'integer',
-        'element_has_position_rule_chimical_element_id' => 'integer',
-        'chemical_element_id' => 'integer',
-        'complex_chemical_element_id' => 'integer',
-        'element_has_position_information_id' => 'integer',
-        'active' => 'boolean',
-        'stop_before_target' => 'boolean',
+        'information' => 'array',
     ];
+
+    /**
+     * Campi storati dentro la colonna JSON `information`
+     * (tutto tranne id, element_has_position_brain_id, created_at, updated_at).
+     */
+    public const INFORMATION_FIELDS = [
+        'active', 'type', 'grid_i', 'grid_j', 'radius', 'stop_before_target',
+        'target_type', 'target_element_id', 'gene_life_id', 'gene_attack_id',
+        'chemical_element_id', 'complex_chemical_element_id',
+        'element_has_position_rule_chimical_element_id',
+        'element_has_position_information_id',
+    ];
+
+    /** Accesso trasparente: $neuron->type legge information['type']. */
+    public function getAttribute($key)
+    {
+        if (is_string($key) && in_array($key, self::INFORMATION_FIELDS, true)) {
+            return $this->informationData()[$key] ?? null;
+        }
+        return parent::getAttribute($key);
+    }
+
+    /** Scrittura trasparente: $neuron->type = 'x' scrive information['type']. */
+    public function setAttribute($key, $value)
+    {
+        if (is_string($key) && in_array($key, self::INFORMATION_FIELDS, true)) {
+            $info = $this->informationData();
+            if ($value === null) {
+                unset($info[$key]);
+            } else {
+                $info[$key] = $value;
+            }
+            return parent::setAttribute('information', $info);
+        }
+        return parent::setAttribute($key, $value);
+    }
+
+    /** Necessario perché isset()/data_get() funzionino sui campi JSON (es. Collection::min/sortBy). */
+    public function offsetExists($key): bool
+    {
+        if (is_string($key) && in_array($key, self::INFORMATION_FIELDS, true)) {
+            return array_key_exists($key, $this->informationData());
+        }
+        return parent::offsetExists($key);
+    }
+
+    protected function informationData(): array
+    {
+        $info = parent::getAttribute('information');
+        return is_array($info) ? $info : [];
+    }
 
     public function brain()
     {
@@ -64,15 +117,20 @@ class ElementHasPositionNeuron extends Model
         return $this->belongsTo(\App\Models\ElementHasPositionRuleChimicalElement::class, 'element_has_position_rule_chimical_element_id');
     }
 
-    public function information()
+    /**
+     * Rinominata da information() a positionInformation() perché il nome
+     * collide con la colonna JSON `information` del rework.
+     * La FK dentro information[] resta `element_has_position_information_id`.
+     */
+    public function positionInformation()
     {
         return $this->belongsTo(ElementHasPositionInformation::class, 'element_has_position_information_id');
     }
 
     public function getInformationGeneAttribute()
     {
-        // Accessor per compatibilità: usa information->gene
-        return $this->information->gene ?? null;
+        // Accessor per compatibilità: usa positionInformation->gene
+        return $this->positionInformation->gene ?? null;
     }
 
     public function getOutputConditions(): array
