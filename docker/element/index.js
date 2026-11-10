@@ -2,6 +2,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
+const { executeBrain } = require('./brain.js');
 
 const backendUrl = process.env.BACKEND_URL;
 const apiUserEmail = process.env.API_USER_EMAIL;
@@ -623,6 +624,20 @@ if (wsPort > 0) {
               chimical_elements: currentChimicalElements
             }));
             break;
+          case 'execute-brain': {
+            // Avvia l'esecuzione del brain per lo schedule indicato.
+            const brainScheduleId = params.brain_schedule_id !== undefined
+              ? parseInt(params.brain_schedule_id, 10)
+              : null;
+            if (!brainScheduleId) {
+              ws.send(JSON.stringify({ success: false, command: 'execute-brain', error: 'brain_schedule_id mancante' }));
+              break;
+            }
+            console.log(`[Element ${elementHasPositionId}] Execute brain requested (brain_schedule_id: ${brainScheduleId})`);
+            executeBrain(brainScheduleId, { elementHasPositionId });
+            ws.send(JSON.stringify({ success: true, command: 'execute-brain', brain_schedule_id: brainScheduleId }));
+            break;
+          }
           default:
             ws.send(JSON.stringify({
               success: false,

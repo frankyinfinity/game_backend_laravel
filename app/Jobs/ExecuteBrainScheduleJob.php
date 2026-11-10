@@ -47,7 +47,7 @@ class ExecuteBrainScheduleJob implements ShouldQueue
         }
 
         try {
-            $runner->run((int) $brainSchedule->element_has_position_id);
+            $runner->run((int) $brainSchedule->element_has_position_id, (int) $brainSchedule->id);
         } catch (\Throwable $e) {
             Log::error('BrainSchedule execution failed', [
                 'brain_schedule_id' => $brainSchedule->id,
