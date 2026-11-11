@@ -6,6 +6,7 @@ use App\Models\BrainSchedule;
 use App\Models\BrainScheduleDetail;
 use App\Models\ElementHasPositionNeuronCircuit;
 use App\Services\BrainFlowRunner;
+use App\Services\BrainPathService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -24,7 +25,7 @@ class ExecuteBrainScheduleJob implements ShouldQueue
     {
     }
 
-    public function handle(BrainFlowRunner $runner): void
+    public function handle(BrainFlowRunner $runner, BrainPathService $brainPathService): void
     {
         ini_set('memory_limit', '-1');
         $brainSchedule = BrainSchedule::query()->find($this->brainScheduleId);
@@ -43,6 +44,15 @@ class ExecuteBrainScheduleJob implements ShouldQueue
             BrainScheduleDetail::create([
                 'brain_schedule_id' => $brainSchedule->id,
                 'element_has_position_neuron_circuit_id' => $circuit->id,
+            ]);
+        }
+
+        try {
+            $brainPathService->generateForSchedule($brainSchedule);
+        } catch (\Throwable $e) {
+            Log::error('BrainSchedule path enumeration failed', [
+                'brain_schedule_id' => $brainSchedule->id,
+                'error' => $e->getMessage(),
             ]);
         }
 
