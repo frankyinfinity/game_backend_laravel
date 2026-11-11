@@ -6,39 +6,58 @@ const { URL } = require('url');
 
 /**
  * Esegue il brain per lo schedule indicato.
- * WIP: log + marcatura dello BrainSchedule come terminato via API.
+ * WIP: log -> fetch percorsi possibili -> marcatura finale via API.
  *
  * @param {number} brainScheduleId - id della brain_schedule da eseguire
  * @param {object} context - contesto del container (elementHasPositionId,
  *                           backendUrl, getSessionCookie, getXsrfToken)
  */
-function executeBrain(brainScheduleId, context = {}) {
+async function executeBrain(brainScheduleId, context = {}) {
     const ehpLabel = context.elementHasPositionId ? ` (ehp: ${context.elementHasPositionId})` : '';
     console.log(`[Brain] executeBrain — brain_schedule_id: ${brainScheduleId}${ehpLabel}`);
 
-    finishBrainSchedule(brainScheduleId, context);
+    const pathsJson = await fetchBrainPaths(brainScheduleId, context);
+    console.log(`[Brain] brain_flow/paths (brain_schedule_id: ${brainScheduleId}):`, JSON.stringify(pathsJson));
+
+    await finishBrainSchedule(brainScheduleId, context);
+}
+
+/**
+ * Scarica i percorsi possibili dello BrainSchedule dall'API brain_flow/paths.
+ * @returns {Promise<object|null>} il JSON della risposta, null se non disponibile
+ */
+function fetchBrainPaths(brainScheduleId, context) {
+    return postJson('/api/auth/game/brain_flow/paths', { brain_schedule_id: brainScheduleId }, context);
 }
 
 /**
  * Chiama l'API che porta lo BrainSchedule allo stato finale.
  */
 function finishBrainSchedule(brainScheduleId, context) {
+    return postJson('/api/auth/game/brain_flow/finish', { brain_schedule_id: brainScheduleId }, context);
+}
+
+/**
+ * POST JSON verso il backend con session cookie + XSRF.
+ * @returns {Promise<object|null>} risposta decodificata, null su errore/sessione assente
+ */
+function postJson(path, payload, context) {
     const backendUrl = context.backendUrl;
     const sessionCookie = context.getSessionCookie ? context.getSessionCookie() : null;
     const xsrfToken = context.getXsrfToken ? context.getXsrfToken() : null;
 
     if (!backendUrl || !sessionCookie) {
-        console.warn(`[Brain] finishBrainSchedule skipped — no backend session available (brain_schedule_id: ${brainScheduleId})`);
-        return;
+        console.warn(`[Brain] ${path} skipped — no backend session available`);
+        return Promise.resolve(null);
     }
 
     const url = new URL(backendUrl);
-    const postData = JSON.stringify({ brain_schedule_id: brainScheduleId });
+    const postData = JSON.stringify(payload);
 
     const options = {
         hostname: url.hostname,
         port: url.port || 80,
-        path: '/api/auth/game/brain_flow/finish',
+        path,
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -49,25 +68,28 @@ function finishBrainSchedule(brainScheduleId, context) {
         },
     };
 
-    const req = http.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-            try {
-                const response = data ? JSON.parse(data) : {};
-                console.log(`[Brain] brain_flow/finish response (brain_schedule_id: ${brainScheduleId}):`, JSON.stringify(response));
-            } catch (error) {
-                console.error(`[Brain] brain_flow/finish parse error: ${error.message}`);
-            }
+    return new Promise((resolve) => {
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    resolve(data ? JSON.parse(data) : {});
+                } catch (error) {
+                    console.error(`[Brain] ${path} parse error: ${error.message}`);
+                    resolve(null);
+                }
+            });
         });
-    });
 
-    req.on('error', (error) => {
-        console.error(`[Brain] brain_flow/finish request error: ${error.message}`);
-    });
+        req.on('error', (error) => {
+            console.error(`[Brain] ${path} request error: ${error.message}`);
+            resolve(null);
+        });
 
-    req.write(postData);
-    req.end();
+        req.write(postData);
+        req.end();
+    });
 }
 
 module.exports = { executeBrain };

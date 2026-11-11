@@ -639,6 +639,8 @@ if (wsPort > 0) {
               backendUrl,
               getSessionCookie: () => sessionCookie,
               getXsrfToken: () => xsrfToken,
+            }).catch((error) => {
+              console.error(`[Brain] executeBrain failed (brain_schedule_id: ${brainScheduleId}): ${error.message}`);
             });
             ws.send(JSON.stringify({ success: true, command: 'execute-brain', brain_schedule_id: brainScheduleId }));
             break;
