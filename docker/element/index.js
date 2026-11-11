@@ -634,7 +634,12 @@ if (wsPort > 0) {
               break;
             }
             console.log(`[Element ${elementHasPositionId}] Execute brain requested (brain_schedule_id: ${brainScheduleId})`);
-            executeBrain(brainScheduleId, { elementHasPositionId });
+            executeBrain(brainScheduleId, {
+              elementHasPositionId,
+              backendUrl,
+              getSessionCookie: () => sessionCookie,
+              getXsrfToken: () => xsrfToken,
+            });
             ws.send(JSON.stringify({ success: true, command: 'execute-brain', brain_schedule_id: brainScheduleId }));
             break;
           }

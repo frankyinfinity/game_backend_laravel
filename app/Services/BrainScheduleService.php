@@ -66,6 +66,38 @@ class BrainScheduleService
         ];
     }
 
+    public function finishById(int $brainScheduleId): array
+    {
+        $brainSchedule = BrainSchedule::query()
+            ->where('id', $brainScheduleId)
+            ->whereIn('state', [BrainSchedule::STATE_CREATE, BrainSchedule::STATE_IN_PROGRESS])
+            ->first();
+
+        if ($brainSchedule === null) {
+            return [
+                'status' => 200,
+                'body' => [
+                    'success' => true,
+                    'updated' => false,
+                    'message' => 'BrainSchedule non trovato o già terminato',
+                ],
+            ];
+        }
+
+        $brainSchedule->update([
+            'state' => BrainSchedule::STATE_FINISH,
+        ]);
+
+        return [
+            'status' => 200,
+            'body' => [
+                'success' => true,
+                'updated' => true,
+                'brain_schedule_id' => (int) $brainSchedule->id,
+            ],
+        ];
+    }
+
     private function activeScheduleQuery(int $elementHasPositionId)
     {
         return BrainSchedule::query()

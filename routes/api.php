@@ -47,6 +47,7 @@ Route::group(['prefix' => 'auth'], function () {
   Route::post('/game/objective/check', [App\Http\Controllers\Api\GameController::class, 'checkObjective'])->name('game.objective.check');
   Route::post('/game/brain', [App\Http\Controllers\Api\GameController::class, 'brain'])->name('game.brain');
   Route::post('/game/brain_schedule/finish', [App\Http\Controllers\Api\GameController::class, 'finishBrainSchedule'])->name('game.brain_schedule.finish');
+  Route::post('/game/brain_flow/finish', [App\Http\Controllers\Api\BrainFlowController::class, 'finish'])->name('game.brain_flow.finish');
   Route::post('/game/sync_object_cache', [App\Http\Controllers\Api\GameController::class, 'syncObjectCache'])->name('game.sync_object_cache');
   Route::post('/game/entity/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkEntityDegradation'])->name('game.entity.check_degradation');
   Route::post('/game/element/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkElementDegradation'])->name('game.element.check_degradation');
