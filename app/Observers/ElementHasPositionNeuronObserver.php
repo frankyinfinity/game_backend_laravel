@@ -12,6 +12,7 @@ use WebSocket\Client;
 
 class ElementHasPositionNeuronObserver
 {
+    /*
     public function updated(ElementHasPositionNeuron $elementHasPositionNeuron): void
     {
         if ($elementHasPositionNeuron->wasChanged('active')) {
@@ -33,7 +34,6 @@ class ElementHasPositionNeuronObserver
                 return;
             }
 
-            /** @var Container|null $container */
             $container = Container::query()
                 ->where('parent_type', Container::PARENT_TYPE_ELEMENT_HAS_POSITION)
                 ->where('parent_id', $elementPosition->id)
@@ -89,4 +89,5 @@ class ElementHasPositionNeuronObserver
             }
         }
     }
+    */
 }

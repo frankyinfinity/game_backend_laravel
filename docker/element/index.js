@@ -636,9 +636,12 @@ if (wsPort > 0) {
             console.log(`[Element ${elementHasPositionId}] Execute brain requested (brain_schedule_id: ${brainScheduleId})`);
             executeBrain(brainScheduleId, {
               elementHasPositionId,
+              elementHasPositionUid,
               backendUrl,
               getSessionCookie: () => sessionCookie,
               getXsrfToken: () => xsrfToken,
+              playerId: params && params.player_id ? Number(params.player_id) : null,
+              fetchNeuronBorderUid,
             }).catch((error) => {
               console.error(`[Brain] executeBrain failed (brain_schedule_id: ${brainScheduleId}): ${error.message}`);
             });

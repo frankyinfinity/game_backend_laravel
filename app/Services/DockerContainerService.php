@@ -510,6 +510,13 @@ class DockerContainerService
         $imageName = 'element:latest';
         $this->ensureImageExists($imageName);
 
+        // Stesso pattern di createEntityContainer: Reverb su loopback della VM.
+        $dockerHostIp = (string) (config('remote_docker.docker_host_ip') ?: '127.0.0.1');
+        $reverbHost = env('REVERB_HOST') ?: 'localhost';
+        if ($reverbHost === 'localhost' || $reverbHost === '127.0.0.1') {
+            $reverbHost = '127.0.0.1';
+        }
+
         $wsPort = $this->nextWsPort();
         $name = 'element_' . $elementHasPosition->uid;
         $env = [
@@ -518,7 +525,24 @@ class DockerContainerService
             'API_USER_PASSWORD=' . (env('API_USER_PASSWORD') ?: 'api'),
             'ELEMENT_HAS_POSITION_ID=' . $elementHasPosition->id,
             'ELEMENT_HAS_POSITION_UID=' . $elementHasPosition->uid,
+            'PLAYER_ID=' . (int) $elementHasPosition->player_id,
             'WS_PORT=' . $wsPort,
+            'REVERB_HOST=' . $reverbHost,
+            'REVERB_PORT=' . (env('REVERB_PORT') ?: '8081'),
+            'REVERB_SCHEME=' . (env('REVERB_SCHEME') ?: 'http'),
+            'REVERB_APP_ID=' . (env('REVERB_APP_ID') ?: 'game'),
+            'REVERB_APP_KEY=' . (env('REVERB_APP_KEY') ?: 'game-key'),
+            'REVERB_APP_SECRET=' . (env('REVERB_APP_SECRET') ?: 'game-secret'),
+            'DOCKER_HOST_IP=' . $dockerHostIp,
+            'WS_GATEWAY_HOST=' . $dockerHostIp,
+            'WS_GATEWAY_PORT=' . (env('WS_GATEWAY_PORT') ?: '9001'),
+            'MAP_WS_PORT=' . ($this->resolveMapWsPort((int) $elementHasPosition->player_id) ?: (env('MAP_WS_PORT') ?: '8080')),
+            'MAP_DIRECT_HOST=' . $dockerHostIp,
+            'MAP_DIRECT_PORT=' . ($this->resolveMapWsPort((int) $elementHasPosition->player_id) ?: (env('MAP_WS_PORT') ?: '8080')),
+            'TILE_SIZE=' . Helper::TILE_SIZE,
+            'MAP_START_X=' . Helper::MAP_START_X,
+            'MAP_START_Y=' . Helper::MAP_START_Y,
+            'MAP_SCROLL_GROUP=' . Helper::MAP_SCROLL_GROUP_MAIN,
         ];
         $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
 

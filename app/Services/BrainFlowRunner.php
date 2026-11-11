@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Container;
+use App\Models\ElementHasPosition;
 use WebSocket\Client;
 
 /**
@@ -38,7 +39,10 @@ class BrainFlowRunner
 
         $payload = json_encode([
             'command' => 'execute-brain',
-            'params'  => ['brain_schedule_id' => $brainScheduleId],
+            'params'  => [
+                'brain_schedule_id' => $brainScheduleId,
+                'player_id' => ElementHasPosition::query()->find($elementHasPositionId)?->player_id,
+            ],
         ]);
 
         $client = new Client($wsUrl, ['timeout' => 10]);
