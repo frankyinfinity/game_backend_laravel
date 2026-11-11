@@ -68,6 +68,36 @@ class BrainFlowController extends Controller
     }
 
     /**
+     * Aggiorna la posizione persistente (tile_i, tile_j) dell'elemento dopo il
+     * movimento: stesso ruolo di entity update_position (una chiamata a fine
+     * movimento con la posizione finale).
+     */
+    public function updatePosition(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'element_has_position_id' => ['required', 'integer'],
+            'tile_i' => ['required', 'integer'],
+            'tile_j' => ['required', 'integer'],
+        ]);
+
+        $elementHasPosition = ElementHasPosition::query()->find((int) $validated['element_has_position_id']);
+        if (!$elementHasPosition) {
+            return response()->json(['success' => false, 'message' => 'element_has_position not found'], 404);
+        }
+
+        $elementHasPosition->update([
+            'tile_i' => (int) $validated['tile_i'],
+            'tile_j' => (int) $validated['tile_j'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'tile_i' => (int) $elementHasPosition->tile_i,
+            'tile_j' => (int) $elementHasPosition->tile_j,
+        ]);
+    }
+
+    /**
      * Attiva/disattiva un neurone e invia via pusher l'update del suo border
      * (stesso payload di NeuronController::broadcastNeuronUpdate).
      */

@@ -32,6 +32,16 @@ const pusher = new Pusher({
 const TILE_SIZE = parseInt(process.env.TILE_SIZE || '40', 10);
 const MAP_START_X = parseInt(process.env.MAP_START_X || '0', 10);
 const MAP_START_Y = parseInt(process.env.MAP_START_Y || '80', 10);
+const MAP_SCROLL_GROUP = process.env.MAP_SCROLL_GROUP || 'map_main';
+// Z-index come entity: path rosso a 9000, elemento sopra il path (9500)
+const PATH_Z_INDEX = parseInt(process.env.PATH_Z_INDEX || '9000', 10);
+const ELEMENT_Z_INDEX = parseInt(process.env.ELEMENT_Z_INDEX || '9500', 10);
+
+// requestId dell'ultimo path disegnato (per poterlo cancellare, come entity)
+let lastPathRequestId = null;
+// Ultima posizione persistita sul DB: evita chiamate ripetute (come entity)
+let lastPersistedTileI = null;
+let lastPersistedTileJ = null;
 
 // Accesso al map container via ws-gateway / direct (stesso pattern entity)
 const wsGatewayHost = process.env.WS_GATEWAY_HOST || '127.0.0.1';
@@ -117,7 +127,7 @@ async function executeNeuronSteps(pathsJson, context) {
                 element_has_position_neuron_id: neuronId,
                 active: false,
             }, context);
-            await updateNeuronBorder(neuronId, '0xFFFFFF', context);
+            await updateNeuronBorder(neuronId, '0x000000', context);
 
             // 5) prossimo neurone: segui il link 'trigger' uscente dal neurone
             // corrente. Se non esiste nel path corrente (END), il link può
@@ -229,9 +239,14 @@ async function executeMovementNeuron(neuronId, context) {
 
     if (!from) {
         // Posizione corrente sconosciuta: salto diretto (un solo update).
-        await sendDrawInterface(buildMoveItems(context.elementHasPositionUid, null, target), 'brain_move_' + Date.now(), context);
+        await sendDrawInterface(buildMoveItems(context.elementHasPositionUid, null, target, null), 'brain_move_' + Date.now(), context);
+        await updateElementPositionOnApi(target.i, target.j, context);
         return;
     }
+
+    // Come entity: prima le coordinate pixel dei tile, poi la matrice walkable.
+    const coordinatesResult = await getTileCoordinatesFromMap();
+    const tileCoordinates = coordinatesResult && coordinatesResult.success ? coordinatesResult.tile_coordinates : null;
 
     const walkableResult = await getWalkableFromMap();
     const tileWalkable = walkableResult && walkableResult.success ? walkableResult.tile_walkable : null;
@@ -246,50 +261,320 @@ async function executeMovementNeuron(neuronId, context) {
 
     if (!path) {
         // Map non raggiungibile o nessun path: fallback salto diretto.
-        await sendDrawInterface(buildMoveItems(context.elementHasPositionUid, from, target), 'brain_move_' + Date.now(), context);
+        await sendDrawInterface(buildMoveItems(context.elementHasPositionUid, from, target, tileCoordinates), 'brain_move_' + Date.now(), context);
+        await updateElementPositionOnApi(target.i, target.j, context);
         return;
     }
 
-    await moveElementAlongPath(path, from.i, from.j, context);
+    // Disegna il path rosso tramite Pusher (linea + punti al centro dei tile),
+    // come drawPathViaPusher di entity.
+    drawElementPathViaPusher(path, from.i, from.j, target.i, target.j, tileCoordinates, context);
+
+    // Stessa firma di moveEntityAlongPath: callback chiamata a movimento finito.
+    await new Promise((resolve) => {
+        moveElementAlongPath(path, from.i, from.j, tileCoordinates, context, resolve);
+    });
 }
 
 /**
- * Muove l'elemento tile per tile lungo il path (come moveEntityAlongPath):
- * un evento 'entity_movement' con tutti gli step, poi un draw_interface
- * per ogni tile a intervalli di MOVE_INTERVAL_MS.
+ * Port di moveEntityAlongPath (entity/index.js): un trigger 'entity_movement'
+ * con tutti gli step, poi un draw_interface per tile via setTimeout a
+ * intervalli di MOVE_INTERVAL_MS (400ms). Alla fine chiama `callback`.
  */
-async function moveElementAlongPath(path, startI, startJ, context) {
+function moveElementAlongPath(path, startI, startJ, tileCoordinates, context, callback) {
     const elementUid = context.elementHasPositionUid;
-    const totalSteps = path.length;
-    const requestId = 'brain_move_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    if (!path || path.length === 0) {
+        console.log('[Brain] No path to move along');
+        if (callback) callback();
+        return;
+    }
 
+    // Tile di partenza: serve per spostare l'elementDraw tra un tile e l'altro.
+    let previousTileI = startI;
+    let previousTileJ = startJ;
+    // Posizione corrente locale: persistita sul DB una sola volta alla fine
+    // (come localCurrentTileI/J + updateEntityPositionOnApi di entity).
+    let localCurrentTileI = startI;
+    let localCurrentTileJ = startJ;
+
+    const totalSteps = path.length;
+    const moveInterval = MOVE_INTERVAL_MS; // 400ms per tile
+
+    console.log(`[Brain] Starting movement along ${totalSteps} tiles`);
+
+    // Prepara tutti gli step del movimento
     const movementSteps = path.map((step, index) => ({
         tile_i: step.i,
         tile_j: step.j,
         step: index + 1,
-        delay_ms: (index + 1) * MOVE_INTERVAL_MS,
+        delay_ms: (index + 1) * moveInterval,
     }));
 
-    await sendPusherEvent('entity_movement', {
+    // Invia tutti i dati del movimento in un'unica chiamata Pusher
+    const movePayload = {
         type: 'entity_movement',
         entity_uid: elementUid,
         steps: movementSteps,
         total_steps: totalSteps,
-        interval_ms: MOVE_INTERVAL_MS,
+        interval_ms: moveInterval,
         path_length: totalSteps,
-    }, context);
+    };
 
-    // Sub-for lungo il path: un trigger per tile (elemento + square eventi).
-    let previous = { i: startI, j: startJ };
-    for (const step of path) {
-        await sleep(MOVE_INTERVAL_MS);
-        await sendDrawInterface(buildMoveItems(elementUid, previous, step), requestId, context);
-        previous = step;
-    }
+    sendPusherEvent('entity_movement', movePayload, context)
+        .then((ok) => {
+            if (ok) console.log('[Brain] Movement data sent successfully via Pusher');
+        });
+
+    // Aggiorna la posizione locale dopo l'invio
+    let currentStep = 0;
+    const updatePosition = () => {
+        if (currentStep >= totalSteps) {
+            console.log('[Brain] Movement completed!');
+            // Movimento terminato: persisti la posizione finale con UNA SOLA
+            // chiamata API e cancella il path disegnato (come entity).
+            updateElementPositionOnApi(localCurrentTileI, localCurrentTileJ, context);
+            clearPathViaPusher(totalSteps, context);
+            if (callback) callback();
+            return;
+        }
+
+        const step = path[currentStep];
+        localCurrentTileI = step.i;
+        localCurrentTileJ = step.j;
+
+        // Sposta l'elementDraw dal tile precedente a quello appena raggiunto
+        moveElementDrawBetweenTiles(previousTileI, previousTileJ, step.i, step.j, tileCoordinates, context);
+        previousTileI = step.i;
+        previousTileJ = step.j;
+
+        currentStep++;
+
+        setTimeout(updatePosition, moveInterval);
+    };
+
+    // Inizia l'aggiornamento della posizione locale
+    setTimeout(updatePosition, moveInterval);
 }
 
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Port di drawPathViaPusher di entity: disegna il path come linea rossa
+ * (multi_line) con punti al centro dei tile. I centri arrivano da
+ * tile_coordinates del map container; fallback griglia teorica.
+ */
+function drawElementPathViaPusher(path, currentI, currentJ, targetI, targetJ, tileCoordinates, context) {
+    if (!path || path.length === 0) {
+        console.log('[Brain] No path to draw');
+        return;
+    }
+
+    const requestId = 'path_' + Date.now();
+    lastPathRequestId = requestId; // Salva il requestId per poterlo cancellare dopo
+    const pathColor = '0xEF4444'; // Rosso per il path
+
+    // Il path fa parte dello scroll group della mappa: così resta allineato ai tile
+    const pathAttributes = { scroll_group: MAP_SCROLL_GROUP, z_index: PATH_Z_INDEX };
+
+    // Centri (pixel) di tutti i tile del path, incluso quello di partenza
+    const centers = [getTileCenter(currentI, currentJ, tileCoordinates)];
+    path.forEach((step) => {
+        centers.push(getTileCenter(step.i, step.j, tileCoordinates));
+    });
+
+    const pathItems = [];
+
+    // Disegna le linee che collegano i punti: un unico multi_line con tutti i centri
+    pathItems.push({
+        type: 'draw',
+        object: {
+            uid: `${requestId}_line`,
+            type: 'multi_line',
+            points: centers.map((center) => ({ x: center.x, y: center.y })),
+            color: pathColor,
+            thickness: 3,
+            attributes: pathAttributes,
+        },
+    });
+
+    // Disegna i punti (cerchi) al centro di ogni tile
+    centers.forEach((center, index) => {
+        const isStart = index === 0;
+        pathItems.push({
+            type: 'draw',
+            object: {
+                uid: `${requestId}_dot_${index}`,
+                type: 'circle',
+                x: center.x,
+                y: center.y,
+                radius: isStart ? 8 : 6,
+                color: pathColor,
+                attributes: pathAttributes,
+            },
+        });
+    });
+
+    console.log(`[Brain] Drawing path with ${centers.length} points`);
+    sendDrawInterface(pathItems, requestId, context);
+}
+
+/**
+ * Port di clearPathViaPusher di entity: cancella la linea e i punti del path
+ * disegnato (update renderable=false con lo stesso requestId del draw).
+ */
+function clearPathViaPusher(pathLength, context) {
+    if (!lastPathRequestId) {
+        console.log('[Brain] No path to clear');
+        return;
+    }
+
+    const requestId = lastPathRequestId;
+    const clearItems = [];
+
+    clearItems.push({
+        type: 'update',
+        uid: `${requestId}_line`,
+        attributes: { renderable: false },
+    });
+
+    const totalDots = pathLength + 1;
+    for (let i = 0; i < totalDots; i++) {
+        clearItems.push({
+            type: 'update',
+            uid: `${requestId}_dot_${i}`,
+            attributes: { renderable: false },
+        });
+    }
+
+    sendDrawInterface(clearItems, requestId, context);
+}
+
+/**
+ * Port di updateEntityPositionOnApi di entity: persiste sul DB la posizione
+ * finale dell'elemento (POST brain_flow/update_position), una sola volta a
+ * fine movimento. Fire-and-forget con log.
+ */
+function updateElementPositionOnApi(tileI, tileJ, context) {
+    if (tileI === lastPersistedTileI && tileJ === lastPersistedTileJ) {
+        return Promise.resolve(true);
+    }
+    if (!context.elementHasPositionId) {
+        console.error('[Brain] update_position: elementHasPositionId mancante nel context');
+        return Promise.resolve(false);
+    }
+    return postJson('/api/auth/game/brain_flow/update_position', {
+        element_has_position_id: context.elementHasPositionId,
+        tile_i: tileI,
+        tile_j: tileJ,
+    }, context).then((result) => {
+        if (result && result.success) {
+            lastPersistedTileI = tileI;
+            lastPersistedTileJ = tileJ;
+            console.log(`[Brain] Posizione persistita: (${tileI}, ${tileJ})`);
+            return true;
+        }
+        console.error('[Brain] update_position FAILED:', JSON.stringify(result));
+        return false;
+    }).catch((err) => {
+        console.error('[Brain] update_position FAILED:', err.message);
+        return false;
+    });
+}
+
+/**
+ * Port di moveEntityDrawBetweenTiles: invia al frontend lo spostamento
+ * dell'elementDraw dal tile (fromI,fromJ) al tile (toI,toJ).
+ */
+function moveElementDrawBetweenTiles(fromI, fromJ, toI, toJ, tileCoordinates, context) {
+    const requestId = 'element_move_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    const items = buildMoveItems(context.elementHasPositionUid, { i: fromI, j: fromJ }, { i: toI, j: toJ }, tileCoordinates);
+    sendDrawInterface(items, requestId, context)
+        .then((ok) => {
+            if (ok) console.log(`[Brain] ElementDraw moved to tile (${toI}, ${toJ})`);
+        });
+}
+
+/**
+ * Coordinate pixel dei tile dal map container (command get_tile_coordinates,
+ * come getTileCoordinatesFromMap di entity).
+ */
+function getTileCoordinatesFromMap() {
+    return requestMapData({
+        requestIdPrefix: 'coordinates',
+        command: 'get_tile_coordinates',
+        responseKey: 'tile_coordinates',
+    });
+}
+
+/**
+ * Centro (pixel) del tile (i, j) letto dalla matrice tile_coordinates del map
+ * container (port di getTileCenter di entity: fallback griglia teorica).
+ */
+function getTileCenter(i, j, tileCoordinates) {
+    const coordinates = (tileCoordinates && tileCoordinates[i]) ? tileCoordinates[i][j] : null;
+    const center = coordinates ? coordinates.center : null;
+
+    if (center && typeof center.x === 'number' && typeof center.y === 'number') {
+        return { x: center.x, y: center.y, fromCoordinates: true };
+    }
+
+    return {
+        x: MAP_START_X + (j * TILE_SIZE) + (TILE_SIZE / 2),
+        y: MAP_START_Y + (i * TILE_SIZE) + (TILE_SIZE / 2),
+        fromCoordinates: false,
+    };
+}
+
+/**
+ * Port di buildResetTilesOverColorCode di entity: ripristina il colore
+ * originale dei tile di origine e arrivo dopo un movimento (toglie
+ * l'over-color lasciato da un hover precedente).
+ */
+function buildResetTilesOverColorCode(fromTileUid, toTileUid) {
+    return [
+        '(function () {',
+        `  var tileUids = ${JSON.stringify([fromTileUid, toTileUid])};`,
+        '  tileUids.forEach(function (uid) {',
+        '    var shape = (typeof shapes !== "undefined") ? shapes[uid] : null;',
+        '    var object = (typeof objects !== "undefined") ? objects[uid] : null;',
+        '    if (shape && object && object.color !== undefined && object.color !== null) {',
+        '      shape.tint = object.color;',
+        '    }',
+        '  });',
+        '})();',
+    ].join('\n');
+}
+
+/**
+ * Port di buildMoveEntityDrawCode di entity: sposta di (deltaX, deltaY) tutti
+ * gli oggetti collegati al draw dell'elemento (attributes.uids), esclusa
+ * l'immagine root che viene posizionata dall'item update assoluto.
+ */
+function buildMoveElementDrawCode(elementUid, fromI, fromJ, toI, toJ, tileCoordinates) {
+    const fromCenter = getTileCenter(fromI, fromJ, tileCoordinates);
+    const toCenter = getTileCenter(toI, toJ, tileCoordinates);
+    const deltaX = toCenter.x - fromCenter.x;
+    const deltaY = toCenter.y - fromCenter.y;
+
+    return [
+        '(function () {',
+        `  var rootUid = ${JSON.stringify(elementUid)};`,
+        `  var deltaX = ${deltaX};`,
+        `  var deltaY = ${deltaY};`,
+        '  var rootObject = (typeof objects !== "undefined") ? objects[rootUid] : null;',
+        '  if (!rootObject) { console.warn("[ElementDraw] immagine element non trovata:", rootUid); return; }',
+        '  var uids = (rootObject.attributes && Array.isArray(rootObject.attributes.uids)) ? rootObject.attributes.uids : [];',
+        '  uids.forEach(function (uid) {',
+        '    if (uid === rootUid) return; // immagine aggiornata dall\'item update (x/y assoluti)',
+        '    var elementObject = objects[uid];',
+        '    if (!elementObject) return;',
+        '    if (typeof elementObject.x === "number") elementObject.x += deltaX;',
+        '    if (typeof elementObject.y === "number") elementObject.y += deltaY;',
+        '    if (Array.isArray(elementObject.points)) {',
+        '      elementObject.points = elementObject.points.map(function (point) { return { x: point.x + deltaX, y: point.y + deltaY }; });',
+        '    }',
+        '    if (typeof redrawShapeFromObject === "function") redrawShapeFromObject(uid);',
+        '  });',
+        '})();',
+    ].join('\n');
 }
 
 /**
@@ -445,31 +730,46 @@ async function updateNeuronBorder(neuronId, borderColor, context) {
 }
 
 /**
- * Items 'draw_interface' per lo spostamento dell'elemento da `from` a `target`:
- * update posizione (origin top-left, come ElementDraw) + interactive_events
- * dei tile di partenza/arrivo (come moveEntityAlongPath del container entity).
+ * Items 'draw_interface' per lo spostamento dell'elemento (port di
+ * buildEntityDrawMoveItems di entity): update posizione (origin top-left,
+ * come ElementDraw), interactive_events dei tile di partenza/arrivo, reset
+ * over-color e spostamento degli oggetti collegati al draw (uids).
  */
-function buildMoveItems(elementUid, from, target) {
+function buildMoveItems(elementUid, from, target, tileCoordinates) {
     const items = [{
         type: 'update',
         uid: elementUid,
         attributes: {
             x: TILE_SIZE * target.j + MAP_START_X,
             y: TILE_SIZE * target.i + MAP_START_Y,
-            z_index: 100,
+            z_index: ELEMENT_Z_INDEX,
         },
     }];
 
+    const toTileUid = 'square_' + target.i + '_' + target.j;
+
     if (from) {
+        const fromTileUid = 'square_' + from.i + '_' + from.j;
+        // Tile di partenza: l'elemento lo ha lasciato -> riaggancia over
         items.push({
             type: 'update',
-            uid: 'square_' + from.i + '_' + from.j,
+            uid: fromTileUid,
             attributes: { interactive_events: { add: ['pointerover', 'pointerout'] } },
         });
+        items.push({
+            type: 'code',
+            code: buildResetTilesOverColorCode(fromTileUid, toTileUid),
+        });
+        items.push({
+            type: 'code',
+            code: buildMoveElementDrawCode(elementUid, from.i, from.j, target.i, target.j, tileCoordinates),
+        });
     }
+
+    // Tile di arrivo: ora occupato -> rimuove gli eventi over
     items.push({
         type: 'update',
-        uid: 'square_' + target.i + '_' + target.j,
+        uid: toTileUid,
         attributes: { interactive_events: { remove: ['pointerover', 'pointerout'] } },
     });
 
