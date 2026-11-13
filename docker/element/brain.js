@@ -86,9 +86,20 @@ async function executeBrain(brainScheduleId, context = {}) {
     const pathsJson = await fetchBrainPaths(brainScheduleId, context);
     console.log(`[Brain] brain_flow/paths (brain_schedule_id: ${brainScheduleId}):`, JSON.stringify(pathsJson));
 
-    await executeNeuronSteps(pathsJson, context);
+    // Se uno step lancia (es. detection su dati malformati) lo schedule deve
+    // comunque chiudersi: altrimenti resta in_progress -> "Step is still
+    // running" per sempre e il neurone resta attivo.
+    try {
+        await executeNeuronSteps(pathsJson, context);
+    } catch (error) {
+        console.error(`[Brain] executeNeuronSteps error (brain_schedule_id: ${brainScheduleId}): ${error.message}`);
+    }
 
-    await finishBrainSchedule(brainScheduleId, context);
+    try {
+        await finishBrainSchedule(brainScheduleId, context);
+    } catch (error) {
+        console.error(`[Brain] finishBrainSchedule error (brain_schedule_id: ${brainScheduleId}): ${error.message}`);
+    }
 }
 
 /**
@@ -100,6 +111,10 @@ async function executeNeuronSteps(pathsJson, context) {
     // Flat di tutti i path: serve per risolvere il salto verso un nuovo
     // circuito quando un path termina con END.
     const allPaths = circuits.flatMap((circuit) => Array.isArray(circuit.paths) ? circuit.paths : []);
+
+    // Posizione corrente: letta live a ogni step via ensureElementPosition
+    // (lastPersistedTileI/J aggiornate dopo ogni movimento; al primo uso
+    // vengono seedate dall'API con la posizione reale su DB).
 
     // neurone id -> step processato (come processedNeuronsById del runner:
     // serve a passare gene_value dal read_gene al max_value_gene successivo)
@@ -160,6 +175,20 @@ async function executeNeuronSteps(pathsJson, context) {
                     console.log(`[Brain] max_value_gene (neuron ${neuronId}): result=${result}`);
                     break;
                 }
+                case NEURON_TYPE_DETECTION: {
+                    // 3) scan delle tile entro range dal map container: se
+                    // c'è un match -> "(i,j)" su detection_result (lo usa il
+                    // prossimo neurone, es. path); null -> failure al punto 5
+                    const result = await executeDetectionNeuron(actualNeuron, context, await ensureElementPosition(context));
+                    console.log(`[Brain] detection (neuron ${neuronId}): result=${result}`);
+                    break;
+                }
+                case NEURON_TYPE_PATH: {
+                    // 3) muove l'elemento verso la tile del detection_result
+                    // prodotto dal neurone sorgente (read del runner)
+                    await executePathNeuron(actualNeuron, context, processedByNeuronId, await ensureElementPosition(context));
+                    break;
+                }
                 default:
                     break;
             }
@@ -204,6 +233,7 @@ const REQUIRED_NEXT_CONDITION_BY_TYPE = {
     [NEURON_TYPE_START]: 'trigger',
     [NEURON_TYPE_MOVEMENT]: 'trigger',
     [NEURON_TYPE_READ_GENE]: 'trigger',
+    [NEURON_TYPE_PATH]: 'trigger',
 };
 
 function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
@@ -214,6 +244,12 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
     // (range min/max sui link + link default), come nel runner.
     if (neuronType === NEURON_TYPE_READ_CHIMICAL_ELEMENT) {
         return resolveChemicalNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
+    }
+
+    // detection: link success (found/main) se detection_result != null,
+    // link failure (not_found/else) altrimenti, come nel runner.
+    if (neuronType === NEURON_TYPE_DETECTION) {
+        return resolveDetectionNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
     }
 
     // max_value_gene: link 'yes'/'no' in base al risultato del check;
@@ -476,6 +512,324 @@ function executeMaxValueGeneNeuron(actualNeuron, context, processedByNeuronId) {
     const result = value >= effectiveMax;
     console.log(`[Brain] MaxValueGene (neuron ${neuronId}): ${value} >= ${effectiveMax} (${baseMax}+${modifier}) -> ${result}`);
     return setResult(result);
+}
+
+/**
+ * Next neuron per detection (port di isLinkActiveFromNeuron del runner):
+ * found -> link 'success_detection'/'found'/'main'; not found ->
+ * 'failure_detection'/'not_found'/'else'. Success porta la posizione al
+ * prossimo neurone, failure avanza comunque senza valore.
+ */
+function resolveDetectionNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
+    const result = actualNeuron.detection_result;
+    const found = typeof result === 'string' && result.trim() !== '';
+
+    const next = findNextStepByDetectionLink(currentSteps, neuronId, found);
+    if (next) {
+        return { step: next, steps: currentSteps };
+    }
+
+    for (const link of outgoingLinksOf(actualNeuron)) {
+        if (!detectionConditionMatches(linkCondition(link), found)) {
+            continue;
+        }
+        const toId = link.to_element_has_position_neuron_id || null;
+        if (!toId) {
+            continue;
+        }
+        const target = findStepInPaths(allPaths, toId);
+        if (target) {
+            return target;
+        }
+    }
+    return null;
+}
+
+/** Match condition del link: uniche uscite di detection sono 'success' e 'failure'. */
+function detectionConditionMatches(condition, found) {
+    if (condition === 'success') {
+        return found;
+    }
+    if (condition === 'failure') {
+        return !found;
+    }
+    return false;
+}
+
+function findNextStepByDetectionLink(steps, fromNeuronId, found) {
+    return steps.find((s) => {
+        const link = s.via_link || null;
+        if (!link) {
+            return false;
+        }
+        return Number(link.from_element_has_position_neuron_id) === Number(fromNeuronId)
+            && detectionConditionMatches(s.condition || null, found);
+    }) || null;
+}
+
+/**
+ * Port di handleDetectionNeuron + findTargetAroundPosition del runner:
+ * scansiona le tile del quadrato (range x range) intorno all'elemento via
+ * map container ('get_tile_info', + 'get_birth_region_details' per i target
+ * chimici). I match vanno ordinati per distanza Manhattan poi i,j ->
+ * "(i,j)" su actualNeuron.detection_result; null se nessun match.
+ */
+async function executeDetectionNeuron(actualNeuron, context, elementPosition) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+    const info = (actualNeuron.neuron && actualNeuron.neuron.information) ? actualNeuron.neuron.information : {};
+
+    const setResult = (result) => {
+        actualNeuron.detection_result = result;
+        return result;
+    };
+
+    if (!elementPosition) {
+        console.log(`[Brain] Detection (neuron ${neuronId}): element_position mancante`);
+        return setResult(null);
+    }
+
+    let range = Number(info.range !== undefined && info.range !== null ? info.range : (info.radius || 0));
+    if (!Number.isFinite(range) || range < 0) {
+        range = 0;
+    }
+    range = Math.floor(range);
+    const targetType = String(info.target_type || '');
+    const targetElementId = info.target_element_id ? Number(info.target_element_id) : null;
+    const chemicalElementId = info.chemical_element_id ? Number(info.chemical_element_id) : null;
+    const complexChemicalElementId = info.complex_chemical_element_id ? Number(info.complex_chemical_element_id) : null;
+    const isChemicalTarget = targetType === 'chemical_element' || targetType === 'complex_chemical_element';
+
+    const centerI = Number(elementPosition.i);
+    const centerJ = Number(elementPosition.j);
+
+    // Come il runner: UNA sessione ws per tutta la scansione (prima la lista
+    // delle query, poi le risposte allineate), non una connessione per tile.
+    const tiles = [];
+    const queries = [];
+    for (let i = centerI - range; i <= centerI + range; i++) {
+        for (let j = centerJ - range; j <= centerJ + range; j++) {
+            if (i < 0 || j < 0) {
+                continue;
+            }
+            tiles.push({ i, j });
+            queries.push({ command: 'get_tile_info', params: { tile_i: i, tile_j: j } });
+            if (isChemicalTarget) {
+                queries.push({ command: 'get_birth_region_details', params: { tile_i: i, tile_j: j } });
+            }
+        }
+    }
+
+    const replies = await requestMapCommands(queries);
+
+    const matches = [];
+    let qi = 0;
+    for (const tilePos of tiles) {
+        const reply = replies[qi++] || null;
+        let detail = null;
+        if (isChemicalTarget) {
+            const chemReply = replies[qi++] || null;
+            detail = chemReply ? (chemReply.detail || null) : null;
+        }
+        try {
+            if (isTileMatchingTarget(reply, detail, targetType, targetElementId, context.elementHasPositionUid, chemicalElementId, complexChemicalElementId)) {
+                matches.push({ i: tilePos.i, j: tilePos.j, distance: Math.abs(tilePos.i - centerI) + Math.abs(tilePos.j - centerJ) });
+            }
+        } catch (error) {
+            console.error(`[Brain] Detection (neuron ${neuronId}): tile (${tilePos.i},${tilePos.j}) match error: ${error.message}`);
+        }
+    }
+
+    if (matches.length === 0) {
+        console.log(`[Brain] Detection (neuron ${neuronId}): nessun match (type=${targetType})`);
+        return setResult(null);
+    }
+
+    matches.sort((a, b) => (a.distance - b.distance) || (a.i - b.i) || (a.j - b.j));
+    const best = matches[0];
+    return setResult(`(${best.i},${best.j})`);
+}
+
+/** Port di isTileMatchingTarget del runner. */
+function isTileMatchingTarget(reply, detail, targetType, targetElementId, selfElementUid, chemicalElementId, complexChemicalElementId) {
+    if (!reply || reply.success !== true) {
+        return false;
+    }
+    const tile = reply.tile;
+    if (!tile || typeof tile !== 'object') {
+        return false;
+    }
+    const tileInfo = tile.tile;
+    if (!tileInfo || Number(tileInfo.type) !== 1) {
+        return false;
+    }
+
+    if (targetType === 'entity') {
+        return !!tile.entity;
+    }
+
+    if (targetType === 'element') {
+        const tileElement = tile.element;
+        if (!tileElement || typeof tileElement !== 'object') {
+            return false;
+        }
+        if (targetElementId !== null && targetElementId > 0 && Number(tileElement.id || 0) !== targetElementId) {
+            return false;
+        }
+        // Ignora il tile dell'elemento stesso.
+        if (tileElement.uid && selfElementUid && String(tileElement.uid) === String(selfElementUid)) {
+            return false;
+        }
+        return true;
+    }
+
+    const detailData = (detail && Array.isArray(detail.birth_region_detail_data)) ? detail.birth_region_detail_data : [];
+
+    if (targetType === 'chemical_element') {
+        if (!chemicalElementId || chemicalElementId <= 0) {
+            return false;
+        }
+        for (const item of detailData) {
+            if (Number(item.quantity || 0) <= 0) {
+                continue;
+            }
+            const ce = parseJsonSafe(item.json_chimical_element);
+            if (ce && Number(ce.id || 0) === chemicalElementId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (targetType === 'complex_chemical_element') {
+        if (!complexChemicalElementId || complexChemicalElementId <= 0) {
+            return false;
+        }
+        for (const item of detailData) {
+            if (Number(item.quantity || 0) <= 0) {
+                continue;
+            }
+            const cce = parseJsonSafe(item.json_complex_chimical_element);
+            if (cce && Number(cce.id || 0) === complexChemicalElementId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return false;
+}
+
+/**
+ * Posizione corrente dell'elemento {i,j}: usa lastPersistedTileI/J (aggiornate
+ * dopo ogni movimento via updateElementPositionOnApi). Se ancora null — mai
+ * mosso in questa esecuzione — le seeda dalla posizione reale su DB tramite
+ * l'API /game/entity/get_position con element_uid (stesso endpoint usato da
+ * entity/fetchElementPositionFromApi). Riletta a ogni chiamata: sempre
+ * aggiornata dopo movement/path.
+ */
+async function ensureElementPosition(context) {
+    if (lastPersistedTileI !== null && lastPersistedTileJ !== null) {
+        return { i: lastPersistedTileI, j: lastPersistedTileJ };
+    }
+    const pos = await fetchElementPositionFromApi(context);
+    if (pos && Number.isFinite(pos.tile_i) && Number.isFinite(pos.tile_j)) {
+        lastPersistedTileI = pos.tile_i;
+        lastPersistedTileJ = pos.tile_j;
+        console.log(`[Brain] Posizione element inizializzata da API: (${pos.tile_i}, ${pos.tile_j})`);
+        return { i: lastPersistedTileI, j: lastPersistedTileJ };
+    }
+    return null;
+}
+
+/** GET posizione dell'elemento dal DB via API (element_uid). */
+function fetchElementPositionFromApi(context) {
+    if (!context.elementHasPositionUid) {
+        return Promise.resolve(null);
+    }
+    return postJson('/api/auth/game/entity/get_position', {
+        element_uid: context.elementHasPositionUid,
+    }, context).then((response) => {
+        if (response && response.success) {
+            return { tile_i: Number(response.tile_i), tile_j: Number(response.tile_j) };
+        }
+        return null;
+    });
+}
+
+/** JSON.parse safe: non oggetto/stringa malformata -> null. */
+function parseJsonSafe(value) {
+    if (value === null || typeof value !== 'string') {
+        return value;
+    }
+    try {
+        return JSON.parse(value);
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Port di handlePathNeuron del runner: legge il detection_result del neurone
+ * sorgente (neuron_from) e muove l'elemento verso quel tile (BFS walkable,
+ * disegno path rosso, movimento tile per tile, persistenza posizione finale).
+ * Senza detection_result o path vuoto non fa nulla e il flusso prosegue.
+ */
+async function executePathNeuron(actualNeuron, context, processedByNeuronId, elementPosition) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+    const info = (actualNeuron.neuron && actualNeuron.neuron.information) ? actualNeuron.neuron.information : {};
+
+    const fromId = Number(actualNeuron.via_link ? actualNeuron.via_link.from_element_has_position_neuron_id : 0);
+    const fromStep = fromId > 0 && processedByNeuronId ? (processedByNeuronId.get(fromId) || null) : null;
+    const to = parseCoordinateString(fromStep ? fromStep.detection_result : null);
+    if (!to) {
+        console.log(`[Brain] Path (neuron ${neuronId}): no detection_result dal neurone sorgente (from ${fromId})`);
+        return;
+    }
+    if (!elementPosition) {
+        console.log(`[Brain] Path (neuron ${neuronId}): element_position mancante`);
+        return;
+    }
+    const from = { i: Number(elementPosition.i), j: Number(elementPosition.j) };
+
+    const coordinatesResult = await getTileCoordinatesFromMap();
+    const tileCoordinates = coordinatesResult && coordinatesResult.success ? coordinatesResult.tile_coordinates : null;
+    const walkableResult = await getWalkableFromMap();
+    const tileWalkable = walkableResult && walkableResult.success ? walkableResult.tile_walkable : null;
+    if (!tileWalkable) {
+        console.log(`[Brain] Path (neuron ${neuronId}): walkable non disponibile`);
+        return;
+    }
+
+    const pathResult = findPathBFS(tileWalkable, from.i, from.j, to.i, to.j);
+    let path = (pathResult && pathResult.success) ? pathResult.path : null;
+    if (!path || path.length === 0) {
+        console.log(`[Brain] Path (neuron ${neuronId}): nessun path verso (${to.i},${to.j})`);
+        return;
+    }
+
+    // stop_before_target (default true): fermati un tile prima del target.
+    const stopBeforeTarget = info.stop_before_target !== false && info.stop_before_target !== 0 && info.stop_before_target !== '0';
+    if (stopBeforeTarget && path.length > 1) {
+        path = path.slice(0, -1);
+    }
+    if (path.length === 0) {
+        return;
+    }
+
+    const target = path[path.length - 1];
+    drawElementPathViaPusher(path, from.i, from.j, target.i, target.j, tileCoordinates, context);
+    await new Promise((resolve) => {
+        moveElementAlongPath(path, from.i, from.j, tileCoordinates, context, resolve);
+    });
+}
+
+/** Port di parseCoordinateString del runner: "(i,j)" -> {i,j} o null. */
+function parseCoordinateString(value) {
+    const match = typeof value === 'string' ? value.trim().match(/^\(\s*(\d+)\s*,\s*(\d+)\s*\)$/) : null;
+    if (!match) {
+        return null;
+    }
+    return { i: Number(match[1]), j: Number(match[2]) };
 }
 
 /** Condition del link (condition_order.condition, fallback link.condition). */
@@ -928,6 +1282,83 @@ function getWalkableFromMap() {
         requestIdPrefix: 'walkable',
         command: 'get_tile_walkable',
         responseKey: 'tile_walkable',
+    });
+}
+
+/**
+ * Sessione unica verso il map container (port di openMapWebSocket +
+ * queryTileInfo del runner): legge il welcome frame, poi invia le query
+ * {command, params} una alla volta e raccoglie le risposte nello stesso
+ * ordine. Ogni risposta ha timeout proprio; in caso di errore/close si
+ * riprova col trasporto diretto.
+ * @param {Array<{command:string, params:object}>} queries
+ * @returns {Promise<Array<object|null>>} risposte allineate a queries (null se irraggiungibile)
+ */
+function requestMapCommands(queries) {
+    if (!Array.isArray(queries) || queries.length === 0) {
+        return Promise.resolve([]);
+    }
+    const transports = [
+        () => `ws://${wsGatewayHost}:${wsGatewayPort}?port=${mapWsPort}`,
+        () => `ws://${mapDirectHost}:${mapDirectPort}`,
+    ];
+
+    return new Promise((resolve) => {
+        const results = new Array(queries.length).fill(null);
+        const tryTransport = (transportIndex) => {
+            if (transportIndex >= transports.length) {
+                resolve(results);
+                return;
+            }
+            const ws = new WebSocket(transports[transportIndex]());
+            let index = -1; // -1: in attesa del welcome frame
+            let done = false;
+            let timeout = null;
+            const arm = () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => finish(false), WALKABLE_RESPONSE_TIMEOUT_MS);
+            };
+            const finish = (ok) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timeout);
+                try { ws.close(); } catch (e) { /* già chiuso */ }
+                if (ok) {
+                    resolve(results);
+                } else {
+                    tryTransport(transportIndex + 1);
+                }
+            };
+            const sendNext = () => {
+                index++;
+                if (index >= queries.length) {
+                    finish(true);
+                    return;
+                }
+                arm();
+                try {
+                    ws.send(JSON.stringify({ command: queries[index].command, params: queries[index].params }));
+                } catch (e) {
+                    finish(false);
+                }
+            };
+            ws.on('open', arm);
+            ws.on('message', (data) => {
+                if (index < 0) {
+                    // Welcome frame del map container: il runner lo legge e lo
+                    // scarta prima di inviare i comandi.
+                    sendNext();
+                    return;
+                }
+                let response;
+                try { response = JSON.parse(data.toString()); } catch (e) { return; }
+                results[index] = response;
+                sendNext();
+            });
+            ws.on('error', () => finish(false));
+            ws.on('close', () => finish(false));
+        };
+        tryTransport(0);
     });
 }
 
