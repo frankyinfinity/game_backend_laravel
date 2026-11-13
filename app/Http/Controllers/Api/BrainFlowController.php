@@ -45,8 +45,9 @@ class BrainFlowController extends Controller
             ->where('brain_schedule_id', (int) $validated['brain_schedule_id'])
             ->with([
                 'steps' => fn($q) => $q->orderBy('seq'),
-                'steps.neuron.outgoingLinks.conditionOrder',
-                'steps.viaLink',
+                'steps.neuron.chemicalRule',
+                'steps.neuron.outgoingLinks.conditionOrder.ruleChimicalElementDetail',
+                'steps.viaLink.conditionOrder.ruleChimicalElementDetail',
             ])
             ->get();
 

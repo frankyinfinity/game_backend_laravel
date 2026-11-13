@@ -642,6 +642,7 @@ if (wsPort > 0) {
               getXsrfToken: () => xsrfToken,
               playerId: params && params.player_id ? Number(params.player_id) : null,
               fetchNeuronBorderUid,
+              getChimicalElements: () => currentChimicalElements,
             }).catch((error) => {
               console.error(`[Brain] executeBrain failed (brain_schedule_id: ${brainScheduleId}): ${error.message}`);
             });

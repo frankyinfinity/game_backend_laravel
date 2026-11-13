@@ -48,6 +48,8 @@ const NEURON_TYPE_READ_CHIMICAL_ELEMENT = process.env.NEURON_TYPE_READ_CHIMICAL_
 const NEURON_TYPE_READ_GENE = process.env.NEURON_TYPE_READ_GENE || 'read_gene';
 const NEURON_TYPE_MAX_VALUE_GENE = process.env.NEURON_TYPE_MAX_VALUE_GENE || 'max_value_gene';
 const NEURON_TYPE_CONSUME = process.env.NEURON_TYPE_CONSUME || 'consume';
+// Condition 'default' del neurone read_chimical_element (NeuronLink::DEFAULT_CHIMICAL_ELEMENT)
+const NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT = process.env.NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT || 'default_chimical_element';
 
 // requestId dell'ultimo path disegnato (per poterlo cancellare, come entity)
 let lastPathRequestId = null;
@@ -130,6 +132,13 @@ async function executeNeuronSteps(pathsJson, context) {
                     console.log(`[Brain] move (neuron ${neuronId}):`, JSON.stringify(moveResult));
                     break;
                 }
+                case NEURON_TYPE_READ_CHIMICAL_ELEMENT: {
+                    // 3) leggi il chimical element dai chimical_elements del
+                    // container (valore usato al punto 5 per scegliere il link)
+                    const value = executeReadChimicalElementNeuron(actualNeuron, context);
+                    console.log(`[Brain] read_chimical_element (neuron ${neuronId}): value=${value}`);
+                    break;
+                }
                 default:
                     break;
             }
@@ -175,6 +184,12 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
     const neuronType = actualNeuron.neuron && actualNeuron.neuron.information
         ? actualNeuron.neuron.information.type
         : null;
+    // read_chimical_element: il prossimo neurone dipende dal valore letto
+    // (range min/max sui link + link default), come nel runner.
+    if (neuronType === NEURON_TYPE_READ_CHIMICAL_ELEMENT) {
+        return resolveChemicalNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
+    }
+
     // Tipo sconosciuto: stessa regola stringente ('trigger'), niente 'main'.
     const requiredCondition = REQUIRED_NEXT_CONDITION_BY_TYPE[neuronType] || 'trigger';
 
@@ -183,12 +198,9 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
         return { step: next, steps: currentSteps };
     }
 
-    const links = actualNeuron.neuron && Array.isArray(actualNeuron.neuron.outgoing_links)
-        ? actualNeuron.neuron.outgoing_links
-        : [];
+    const links = outgoingLinksOf(actualNeuron);
     for (const link of links) {
-        const condition = link.condition
-            || (link.condition_order ? link.condition_order.condition : null);
+        const condition = linkCondition(link);
         if (condition !== requiredCondition) {
             continue;
         }
@@ -202,6 +214,186 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
         }
     }
     return null;
+}
+
+/**
+ * Prossimo step dopo un neurone read_chimical_element (port di
+ * processChemicalElementOutgoingLinks del runner):
+ * 1) i link con range (min/max) che contengono il valore letto hanno priorità;
+ * 2) se nessun range matcha si usa il link 'default_chimical_element';
+ * 3) valore null -> nessun link attivo -> fine percorso.
+ * Il range arriva da condition_order.rule_chimical_element_detail, altrimenti
+ * si parsa la condition testuale "[min/max]" / "[min, max]".
+ * @returns {{step:object, steps:Array}|null}
+ */
+function resolveChemicalNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
+    const value = actualNeuron.chemical_element_value;
+    if (value === null || value === undefined) {
+        console.log(`[Brain] read_chimical_element (neuron ${neuronId}): value null -> no link attivo`);
+        return null;
+    }
+
+    let defaultStep = null;   // step 'default_chimical_element' nel path corrente
+    let defaultToId = null;   // target del link default cross-circuit
+
+    // 1) Step del path corrente raggiunti dai link uscenti dal neurone.
+    for (const step of currentSteps) {
+        const link = step.via_link || null;
+        if (!link || Number(link.from_element_has_position_neuron_id) !== Number(neuronId)) {
+            continue;
+        }
+        const condition = step.condition || linkCondition(link);
+        if (condition === NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT) {
+            if (!defaultStep) {
+                defaultStep = step;
+            }
+            continue;
+        }
+        const range = linkRange(link) || parseConditionRange(condition);
+        if (range && value >= range.min && value <= range.max) {
+            return { step, steps: currentSteps };
+        }
+    }
+
+    // 2) Cross-circuit: outgoing_links del neurone verso altri circuiti.
+    for (const link of outgoingLinksOf(actualNeuron)) {
+        const condition = linkCondition(link);
+        const toId = link.to_element_has_position_neuron_id;
+        if (condition === NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT) {
+            if (!defaultToId && toId) {
+                defaultToId = toId;
+            }
+            continue;
+        }
+        const range = linkRange(link) || parseConditionRange(condition);
+        if (range && toId && value >= range.min && value <= range.max) {
+            const hit = findStepInPaths(allPaths, toId);
+            if (hit) {
+                return hit;
+            }
+        }
+    }
+
+    // Nessun range matcha: link default (prima nel path, poi cross-circuit).
+    if (defaultStep) {
+        return { step: defaultStep, steps: currentSteps };
+    }
+    if (defaultToId) {
+        return findStepInPaths(allPaths, defaultToId);
+    }
+    return null;
+}
+
+/**
+ * Legge il valore del chimical element indicato dalla rule del neurone dai
+ * chimical_elements dell'elemento (stesso dato del command ws
+ * 'get_chimical_elements' del container, come nel runner).
+ * Il valore è salvato su actualNeuron.chemical_element_value e usato al
+ * punto 5 per scegliere il link uscente.
+ */
+function executeReadChimicalElementNeuron(actualNeuron, context) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+    const info = (actualNeuron.neuron && actualNeuron.neuron.information) ? actualNeuron.neuron.information : {};
+    const ruleId = Number(info.element_has_position_rule_chimical_element_id || 0);
+
+    const setValue = (value) => {
+        actualNeuron.chemical_element_value = value;
+        return value;
+    };
+
+    if (ruleId <= 0) {
+        console.log(`[Brain] ReadChemical (neuron ${neuronId}): no rule_id`);
+        return setValue(null);
+    }
+
+    // Rule -> quale chimical element cercare (id + tipo), come nel runner.
+    const ruleElement = actualNeuron.neuron.chemical_rule || null;
+    if (!ruleElement) {
+        console.log(`[Brain] ReadChemical (neuron ${neuronId}): rule element not found`, ruleId);
+        return setValue(null);
+    }
+
+    let expectedId = null;
+    let expectedType = null;
+    if (ruleElement.chimical_element_id !== null && ruleElement.chimical_element_id !== undefined) {
+        expectedId = Number(ruleElement.chimical_element_id);
+        expectedType = 'chimical_element';
+    } else if (ruleElement.complex_chimical_element_id !== null && ruleElement.complex_chimical_element_id !== undefined) {
+        expectedId = Number(ruleElement.complex_chimical_element_id);
+        expectedType = 'complex_chimical_element';
+    }
+    if (!expectedId) {
+        console.log(`[Brain] ReadChemical (neuron ${neuronId}): rule ${ruleId} senza chimical/complex id`);
+        return setValue(null);
+    }
+
+    const chimicalElements = typeof context.getChimicalElements === 'function'
+        ? (context.getChimicalElements() || [])
+        : [];
+
+    // Cerca l'elemento atteso nella lista dell'elemento (nessuna lettura tile).
+    for (const element of chimicalElements) {
+        if (!element || typeof element !== 'object') {
+            continue;
+        }
+        const elementType = element.type || '';
+        let elementId = null;
+        if (elementType === 'chimical_element') {
+            elementId = Number(element.chimical_element_id || 0);
+        } else if (elementType === 'complex_chimical_element') {
+            elementId = Number(element.complex_chimical_element_id || 0);
+        }
+        if (elementId > 0 && elementId === expectedId && elementType === expectedType) {
+            console.log(`[Brain] ReadChemical (neuron ${neuronId}): ${expectedType}#${expectedId} -> ${element.value}`);
+            return setValue(Number(element.value || 0));
+        }
+    }
+
+    console.log(`[Brain] ReadChemical (neuron ${neuronId}): ${expectedType}#${expectedId} non trovato nei chimical_elements`);
+    return setValue(null);
+}
+
+/** Condition del link (condition_order.condition, fallback link.condition). */
+function linkCondition(link) {
+    return link.condition
+        || (link.condition_order ? link.condition_order.condition : null)
+        || null;
+}
+
+/** Range {min,max} strutturato dal rule_chimical_element_detail del link. */
+function linkRange(link) {
+    const detail = link.condition_order ? (link.condition_order.rule_chimical_element_detail || null) : null;
+    if (detail && detail.min !== null && detail.min !== undefined && detail.max !== null && detail.max !== undefined) {
+        return { min: Number(detail.min), max: Number(detail.max) };
+    }
+    return null;
+}
+
+function outgoingLinksOf(actualNeuron) {
+    return actualNeuron.neuron && Array.isArray(actualNeuron.neuron.outgoing_links)
+        ? actualNeuron.neuron.outgoing_links
+        : [];
+}
+
+/**
+ * Port di parseConditionRange del runner: "[min/max]" o "[min, max]" ->
+ * {min,max}, null se non parsabile.
+ */
+function parseConditionRange(condition) {
+    if (!condition || typeof condition !== 'string') {
+        return null;
+    }
+    const cleaned = condition.trim().replace(/^[\[\]\s]+|[\[\]\s]+$/g, '');
+    const parts = cleaned.includes(',') ? cleaned.split(',') : cleaned.split('/');
+    if (parts.length !== 2) {
+        return null;
+    }
+    const min = Number(parts[0].trim());
+    const max = Number(parts[1].trim());
+    if (Number.isNaN(min) || Number.isNaN(max)) {
+        return null;
+    }
+    return { min, max };
 }
 
 /**
