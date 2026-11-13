@@ -8,6 +8,9 @@ use App\Models\Gene;
 
 class ElementHasPositionInformation extends Model
 {
+    // La tabella è singolare (FKs puntano a element_has_position_information).
+    protected $table = 'element_has_position_information';
+
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
     protected static function booted(): void

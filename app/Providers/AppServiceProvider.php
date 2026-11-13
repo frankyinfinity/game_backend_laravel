@@ -21,7 +21,6 @@ use App\Observers\AlertObserver;
 use App\Observers\BrainScheduleObserver;
 use App\Observers\DrawRequestObserver;
 use App\Observers\ElementHasPositionChimicalElementObserver;
-use App\Observers\ElementHasPositionNeuronObserver;
 use App\Observers\ElementHasPositionObserver;
 use App\Observers\ElementModifierObserver;
 use App\Observers\EntityChimicalElementObserver;
@@ -56,7 +55,6 @@ class AppServiceProvider extends ServiceProvider
         ElementHasPosition::observe(ElementHasPositionObserver::class);
         BrainSchedule::observe(BrainScheduleObserver::class);
         DrawRequest::observe(DrawRequestObserver::class);
-        ElementHasPositionNeuron::observe(ElementHasPositionNeuronObserver::class);
         RuleChimicalElement::observe(RuleChimicalElementObserver::class);
         EntityChimicalElement::observe(EntityChimicalElementObserver::class);
         PlayerModifier::observe(PlayerModifierObserver::class);

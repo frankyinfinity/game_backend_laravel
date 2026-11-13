@@ -34,7 +34,7 @@ trait ManagesEhpBrain
             'circuit'          => ElementHasPositionNeuronCircuit::class,
             'circuit_detail'   => ElementHasPositionNeuronCircuitDetail::class,
             'neuron_table'     => 'element_has_position_neurons',
-            'info_table'       => 'element_has_position_informations',
+            'info_table'       => 'element_has_position_information',
             'info_owner_fk'    => 'element_has_position_id',
             'rule_table'       => 'element_has_position_rule_chimical_elements',
             'rule_owner_fk'    => 'element_has_position_id',

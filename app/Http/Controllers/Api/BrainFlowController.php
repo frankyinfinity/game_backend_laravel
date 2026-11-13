@@ -46,6 +46,7 @@ class BrainFlowController extends Controller
             ->with([
                 'steps' => fn($q) => $q->orderBy('seq'),
                 'steps.neuron.chemicalRule',
+                'steps.neuron.positionInformation',
                 'steps.neuron.outgoingLinks.conditionOrder.ruleChimicalElementDetail',
                 'steps.viaLink.conditionOrder.ruleChimicalElementDetail',
             ])

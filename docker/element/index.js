@@ -643,6 +643,7 @@ if (wsPort > 0) {
               playerId: params && params.player_id ? Number(params.player_id) : null,
               fetchNeuronBorderUid,
               getChimicalElements: () => currentChimicalElements,
+              getGenes: () => currentGenes,
             }).catch((error) => {
               console.error(`[Brain] executeBrain failed (brain_schedule_id: ${brainScheduleId}): ${error.message}`);
             });

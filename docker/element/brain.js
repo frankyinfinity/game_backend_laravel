@@ -50,6 +50,9 @@ const NEURON_TYPE_MAX_VALUE_GENE = process.env.NEURON_TYPE_MAX_VALUE_GENE || 'ma
 const NEURON_TYPE_CONSUME = process.env.NEURON_TYPE_CONSUME || 'consume';
 // Condition 'default' del neurone read_chimical_element (NeuronLink::DEFAULT_CHIMICAL_ELEMENT)
 const NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT = process.env.NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT || 'default_chimical_element';
+// Condition di uscita del neurone max_value_gene (Neuron::MAX_VALUE_GENE_YES/NO)
+const NEURON_MAX_VALUE_GENE_YES = 'yes';
+const NEURON_MAX_VALUE_GENE_NO = 'no';
 
 // requestId dell'ultimo path disegnato (per poterlo cancellare, come entity)
 let lastPathRequestId = null;
@@ -98,6 +101,10 @@ async function executeNeuronSteps(pathsJson, context) {
     // circuito quando un path termina con END.
     const allPaths = circuits.flatMap((circuit) => Array.isArray(circuit.paths) ? circuit.paths : []);
 
+    // neurone id -> step processato (come processedNeuronsById del runner:
+    // serve a passare gene_value dal read_gene al max_value_gene successivo)
+    const processedByNeuronId = new Map();
+
     for (const circuit of circuits) {
         const circuitPaths = Array.isArray(circuit.paths) ? circuit.paths : [];
         for (const path of circuitPaths) {
@@ -139,6 +146,20 @@ async function executeNeuronSteps(pathsJson, context) {
                     console.log(`[Brain] read_chimical_element (neuron ${neuronId}): value=${value}`);
                     break;
                 }
+                case NEURON_TYPE_READ_GENE: {
+                    // 3) leggi il valore del gene dai genes del container
+                    // (stesso dato del command ws 'get_genes', come nel runner)
+                    const value = executeReadGeneNeuron(actualNeuron, context);
+                    console.log(`[Brain] read_gene (neuron ${neuronId}): value=${value}`);
+                    break;
+                }
+                case NEURON_TYPE_MAX_VALUE_GENE: {
+                    // 3) confronta il gene_value in ingresso (dal neurone
+                    // sorgente) con max+modifier dell'info -> yes/no al punto 5
+                    const result = executeMaxValueGeneNeuron(actualNeuron, context, processedByNeuronId);
+                    console.log(`[Brain] max_value_gene (neuron ${neuronId}): result=${result}`);
+                    break;
+                }
                 default:
                     break;
             }
@@ -149,6 +170,10 @@ async function executeNeuronSteps(pathsJson, context) {
                 active: false,
             }, context);
             await updateNeuronBorder(neuronId, '0x000000', context);
+
+            // Registra lo step processato: i neuroni successivi (es.
+            // max_value_gene) leggono i valori prodotti (gene_value).
+            processedByNeuronId.set(neuronId, actualNeuron);
 
             // 5) prossimo neurone: segui SOLO il link con condition 'trigger'
             // uscente dal neurone corrente (start/begin: 'trigger'; movement:
@@ -178,6 +203,7 @@ async function executeNeuronSteps(pathsJson, context) {
 const REQUIRED_NEXT_CONDITION_BY_TYPE = {
     [NEURON_TYPE_START]: 'trigger',
     [NEURON_TYPE_MOVEMENT]: 'trigger',
+    [NEURON_TYPE_READ_GENE]: 'trigger',
 };
 
 function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
@@ -190,8 +216,11 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
         return resolveChemicalNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
     }
 
-    // Tipo sconosciuto: stessa regola stringente ('trigger'), niente 'main'.
-    const requiredCondition = REQUIRED_NEXT_CONDITION_BY_TYPE[neuronType] || 'trigger';
+    // max_value_gene: link 'yes'/'no' in base al risultato del check;
+    // per gli altri tipi regola stringente ('trigger'), niente 'main'.
+    const requiredCondition = neuronType === NEURON_TYPE_MAX_VALUE_GENE
+        ? (actualNeuron.gene_max_value_result ? NEURON_MAX_VALUE_GENE_YES : NEURON_MAX_VALUE_GENE_NO)
+        : (REQUIRED_NEXT_CONDITION_BY_TYPE[neuronType] || 'trigger');
 
     const next = findNextStepByLink(currentSteps, neuronId, requiredCondition);
     if (next) {
@@ -351,6 +380,102 @@ function executeReadChimicalElementNeuron(actualNeuron, context) {
 
     console.log(`[Brain] ReadChemical (neuron ${neuronId}): ${expectedType}#${expectedId} non trovato nei chimical_elements`);
     return setValue(null);
+}
+
+/**
+ * Legge il valore del gene indicato dal neurone dai genes dell'elemento
+ * (stesso dato del command ws 'get_genes' del container, come nel runner):
+ * information.element_has_position_information_id -> position_information.gene_id
+ * -> gene con quell'id nella lista. Il valore è salvato su
+ * actualNeuron.gene_value (lo usa il neurone successivo, es. max_value_gene).
+ */
+function executeReadGeneNeuron(actualNeuron, context) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+    const info = (actualNeuron.neuron && actualNeuron.neuron.information) ? actualNeuron.neuron.information : {};
+    const infoId = Number(info.element_has_position_information_id || 0);
+
+    const setValue = (value) => {
+        actualNeuron.gene_value = value;
+        return value;
+    };
+
+    if (infoId <= 0) {
+        console.log(`[Brain] ReadGene (neuron ${neuronId}): no element_has_position_information_id`);
+        return setValue(null);
+    }
+
+    // Relazione positionInformation -> gene_id (ElementHasPositionInformation).
+    const positionInformation = actualNeuron.neuron.position_information || null;
+    if (!positionInformation) {
+        console.log(`[Brain] ReadGene (neuron ${neuronId}): position_information not found`, infoId);
+        return setValue(null);
+    }
+
+    const geneId = Number(positionInformation.gene_id || 0);
+    if (geneId <= 0) {
+        console.log(`[Brain] ReadGene (neuron ${neuronId}): no gene_id in position_information`, infoId);
+        return setValue(null);
+    }
+
+    const genes = typeof context.getGenes === 'function' ? (context.getGenes() || []) : [];
+    for (const gene of genes) {
+        if (!gene || typeof gene !== 'object') {
+            continue;
+        }
+        if (Number(gene.id || 0) === geneId) {
+            const value = gene.value !== null && gene.value !== undefined ? Number(gene.value) : null;
+            console.log(`[Brain] ReadGene (neuron ${neuronId}): gene#${geneId} -> ${value}`);
+            return setValue(value);
+        }
+    }
+
+    console.log(`[Brain] ReadGene (neuron ${neuronId}): gene#${geneId} non trovato nei genes`);
+    return setValue(null);
+}
+
+/**
+ * Port di handleMaxValueGeneNeuron del runner: confronta il gene_value in
+ * ingresso (prodotto dal neurone sorgente del link, tipicamente read_gene)
+ * con max + modifier di position_information -> gene_max_value_result.
+ * Al punto 5 il risultato sceglie il link 'yes' (>=) o 'no' (<).
+ */
+function executeMaxValueGeneNeuron(actualNeuron, context, processedByNeuronId) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+    const info = (actualNeuron.neuron && actualNeuron.neuron.information) ? actualNeuron.neuron.information : {};
+    const geneInfoId = Number(info.element_has_position_information_id || 0);
+
+    const setResult = (result) => {
+        actualNeuron.gene_max_value_result = result;
+        return result;
+    };
+
+    if (geneInfoId <= 0) {
+        console.log(`[Brain] MaxValueGene (neuron ${neuronId}): no element_has_position_information_id`);
+        return setResult(false);
+    }
+
+    // Valore in ingresso dal neurone sorgente del link (neuron_from del runner).
+    const fromId = Number(actualNeuron.via_link ? actualNeuron.via_link.from_element_has_position_neuron_id : 0);
+    const fromStep = fromId > 0 && processedByNeuronId ? (processedByNeuronId.get(fromId) || null) : null;
+    const incomingValue = fromStep ? fromStep.gene_value : null;
+    if (incomingValue === null || incomingValue === undefined) {
+        console.log(`[Brain] MaxValueGene (neuron ${neuronId}): no incoming gene_value (from ${fromId})`);
+        return setResult(false);
+    }
+
+    // position_information: max + modifier -> max effettivo (come nel runner).
+    const positionInformation = actualNeuron.neuron.position_information || null;
+    if (!positionInformation) {
+        console.log(`[Brain] MaxValueGene (neuron ${neuronId}): position_information not found`, geneInfoId);
+        return setResult(false);
+    }
+    const baseMax = Number(positionInformation.max || 0);
+    const modifier = Number(positionInformation.modifier || 0);
+    const effectiveMax = baseMax + modifier;
+    const value = Number(incomingValue);
+    const result = value >= effectiveMax;
+    console.log(`[Brain] MaxValueGene (neuron ${neuronId}): ${value} >= ${effectiveMax} (${baseMax}+${modifier}) -> ${result}`);
+    return setResult(result);
 }
 
 /** Condition del link (condition_order.condition, fallback link.condition). */
