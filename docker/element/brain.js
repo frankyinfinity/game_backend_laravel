@@ -37,6 +37,18 @@ const MAP_SCROLL_GROUP = process.env.MAP_SCROLL_GROUP || 'map_main';
 const PATH_Z_INDEX = parseInt(process.env.PATH_Z_INDEX || '9000', 10);
 const ELEMENT_Z_INDEX = parseInt(process.env.ELEMENT_Z_INDEX || '9500', 10);
 
+// Tipi neurone (App\Models\Neuron): passati dal backend via env
+const NEURON_TYPE_DETECTION = process.env.NEURON_TYPE_DETECTION || 'detection';
+const NEURON_TYPE_PATH = process.env.NEURON_TYPE_PATH || 'path';
+const NEURON_TYPE_ATTACK = process.env.NEURON_TYPE_ATTACK || 'attack';
+const NEURON_TYPE_MOVEMENT = process.env.NEURON_TYPE_MOVEMENT || 'movement';
+const NEURON_TYPE_START = process.env.NEURON_TYPE_START || 'start';
+const NEURON_TYPE_END = process.env.NEURON_TYPE_END || 'end';
+const NEURON_TYPE_READ_CHIMICAL_ELEMENT = process.env.NEURON_TYPE_READ_CHIMICAL_ELEMENT || 'read_chimical_element';
+const NEURON_TYPE_READ_GENE = process.env.NEURON_TYPE_READ_GENE || 'read_gene';
+const NEURON_TYPE_MAX_VALUE_GENE = process.env.NEURON_TYPE_MAX_VALUE_GENE || 'max_value_gene';
+const NEURON_TYPE_CONSUME = process.env.NEURON_TYPE_CONSUME || 'consume';
+
 // requestId dell'ultimo path disegnato (per poterlo cancellare, come entity)
 let lastPathRequestId = null;
 // Ultima posizione persistita sul DB: evita chiamate ripetute (come entity)
@@ -112,7 +124,7 @@ async function executeNeuronSteps(pathsJson, context) {
             // 2) azione per tipo di neurone
             const neuronType = actualNeuron.neuron && actualNeuron.neuron.information ? actualNeuron.neuron.information.type : null;
             switch (neuronType) {
-                case 'movement': {
+                case NEURON_TYPE_MOVEMENT: {
                     // 3) muovi di una cella a caso entro radius (scelta lato container)
                     const moveResult = await executeMovementNeuron(neuronId, context);
                     console.log(`[Brain] move (neuron ${neuronId}):`, JSON.stringify(moveResult));
@@ -147,7 +159,7 @@ async function executeNeuronSteps(pathsJson, context) {
 /**
  * Risolve lo step successivo di `actualNeuron` con controlli stringenti:
  * il neurone corrente segue SOLO il link con la condition prevista per il
- * suo tipo (start/begin -> 'trigger'; movement -> 'trigger'), nessun fallback
+ * suo tipo (start -> 'trigger'; movement -> 'trigger'), nessun fallback
  * su altre condition.
  * 1) dentro il path corrente: step raggiunto dal link con quella condition;
  * 2) cross-circuit (END): tra gli outgoing_links cerca un link con la stessa
@@ -155,8 +167,8 @@ async function executeNeuronSteps(pathsJson, context) {
  * @returns {{step:object, steps:Array}|null}
  */
 const REQUIRED_NEXT_CONDITION_BY_TYPE = {
-    start: 'trigger',
-    movement: 'trigger',
+    [NEURON_TYPE_START]: 'trigger',
+    [NEURON_TYPE_MOVEMENT]: 'trigger',
 };
 
 function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {

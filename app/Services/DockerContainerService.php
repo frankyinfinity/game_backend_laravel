@@ -8,6 +8,7 @@ use App\Models\Container;
 use App\Models\Entity;
 use App\Models\ElementHasPosition;
 use App\Models\Image;
+use App\Models\Neuron;
 use App\Models\Player;
 use RuntimeException;
 use InvalidArgumentException;
@@ -543,6 +544,17 @@ class DockerContainerService
             'MAP_START_X=' . Helper::MAP_START_X,
             'MAP_START_Y=' . Helper::MAP_START_Y,
             'MAP_SCROLL_GROUP=' . Helper::MAP_SCROLL_GROUP_MAIN,
+            // Tipi neurone (App\Models\Neuron) usati da brain.js
+            'NEURON_TYPE_DETECTION=' . Neuron::TYPE_DETECTION,
+            'NEURON_TYPE_PATH=' . Neuron::TYPE_PATH,
+            'NEURON_TYPE_ATTACK=' . Neuron::TYPE_ATTACK,
+            'NEURON_TYPE_MOVEMENT=' . Neuron::TYPE_MOVEMENT,
+            'NEURON_TYPE_START=' . Neuron::TYPE_START,
+            'NEURON_TYPE_END=' . Neuron::TYPE_END,
+            'NEURON_TYPE_READ_CHIMICAL_ELEMENT=' . Neuron::TYPE_READ_CHIMICAL_ELEMENT,
+            'NEURON_TYPE_READ_GENE=' . Neuron::TYPE_READ_GENE,
+            'NEURON_TYPE_MAX_VALUE_GENE=' . Neuron::TYPE_MAX_VALUE_GENE,
+            'NEURON_TYPE_CONSUME=' . Neuron::TYPE_CONSUME,
         ];
         $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
 

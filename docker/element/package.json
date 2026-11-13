@@ -1,6 +1,6 @@
 {
   "name": "element-service",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Element Docker service",
   "main": "index.js",
   "dependencies": {
