@@ -129,9 +129,10 @@ async function executeNeuronSteps(pathsJson, context) {
             }, context);
             await updateNeuronBorder(neuronId, '0x000000', context);
 
-            // 5) prossimo neurone: segui il link 'trigger' uscente dal neurone
-            // corrente. Se non esiste nel path corrente (END), il link può
-            // puntare a un neurone di un altro circuito -> entra in quel path.
+            // 5) prossimo neurone: segui SOLO il link con condition 'trigger'
+            // uscente dal neurone corrente (start/begin: 'trigger'; movement:
+            // 'trigger'). Se non esiste nel path corrente (END), può puntare a
+            // un neurone di un altro circuito -> entra in quel path.
             const resolved = resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
             if (!resolved) {
                 break;
@@ -144,16 +145,28 @@ async function executeNeuronSteps(pathsJson, context) {
 }
 
 /**
- * Risolve lo step successivo di `actualNeuron`:
- * 1) dentro il path corrente: step raggiunto dal link trigger/main del neurone;
- * 2) cross-circuit (END): tra gli outgoing_links del neurone cerca un link
- *    trigger/main verso un neurone di un altro circuito e entra nello step
- *    corrispondente nel path di quel circuito.
+ * Risolve lo step successivo di `actualNeuron` con controlli stringenti:
+ * il neurone corrente segue SOLO il link con la condition prevista per il
+ * suo tipo (start/begin -> 'trigger'; movement -> 'trigger'), nessun fallback
+ * su altre condition.
+ * 1) dentro il path corrente: step raggiunto dal link con quella condition;
+ * 2) cross-circuit (END): tra gli outgoing_links cerca un link con la stessa
+ *    condition verso un neurone di un altro circuito e entra in quel path.
  * @returns {{step:object, steps:Array}|null}
  */
+const REQUIRED_NEXT_CONDITION_BY_TYPE = {
+    start: 'trigger',
+    movement: 'trigger',
+};
+
 function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
-    const next = findNextStepByLink(currentSteps, neuronId, 'trigger')
-        || findNextStepByLink(currentSteps, neuronId, 'main');
+    const neuronType = actualNeuron.neuron && actualNeuron.neuron.information
+        ? actualNeuron.neuron.information.type
+        : null;
+    // Tipo sconosciuto: stessa regola stringente ('trigger'), niente 'main'.
+    const requiredCondition = REQUIRED_NEXT_CONDITION_BY_TYPE[neuronType] || 'trigger';
+
+    const next = findNextStepByLink(currentSteps, neuronId, requiredCondition);
     if (next) {
         return { step: next, steps: currentSteps };
     }
@@ -164,7 +177,7 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
     for (const link of links) {
         const condition = link.condition
             || (link.condition_order ? link.condition_order.condition : null);
-        if (condition !== 'trigger' && condition !== 'main') {
+        if (condition !== requiredCondition) {
             continue;
         }
         const toId = link.to_element_has_position_neuron_id;
