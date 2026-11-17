@@ -205,6 +205,12 @@ async function executeNeuronSteps(pathsJson, context) {
                     await executeAttackNeuron(actualNeuron, context, await ensureElementPosition(context));
                     break;
                 }
+                case NEURON_TYPE_CONSUME: {
+                    // 3) consuma l'elemento vivo sulla stessa tile:
+                    // chiamata API + inoltro items (clear + reward code)
+                    await executeConsumeNeuron(actualNeuron, context);
+                    break;
+                }
                 case NEURON_TYPE_END: {
                     // 3) il flusso ha raggiunto un END: marca used=true sul
                     // path effettivamente eseguito (quello di currentSteps; dopo
@@ -1031,6 +1037,36 @@ async function executeAttackNeuron(actualNeuron, context, elementPosition) {
         const requestId = `attack_clear_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
         await sendDrawInterface(response.items, requestId, context);
     }
+
+    // 4) dopo l'attacco: movimento random entro raggio 3 (path rosso +
+    // movimento tile per tile + update posizione, come il neurone movement).
+    await executeMovementNeuron(neuronId, context, 3);
+}
+
+/**
+ * Neurone consume: l'elemento consuma un ElementHasPosition vivo sulla
+ * stessa tile. POST brain_flow/consume (il target è risolto lato backend)
+ * e inoltro degli items (clear del target + reward code) via draw_interface.
+ * Nessun movimento dopo il consumo.
+ */
+async function executeConsumeNeuron(actualNeuron, context) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+
+    const response = await postJson('/api/auth/game/brain_flow/consume', {
+        element_has_position_id: context.elementHasPositionId,
+    }, context);
+
+    if (!response || response.success !== true) {
+        console.error(`[Brain] consume (neuron ${neuronId}): API fallita: ${response && response.message ? response.message : 'no response'}`);
+        return;
+    }
+
+    console.log(`[Brain] consume (neuron ${neuronId}): consumed ${response.target_uid} (element ${response.target_element_id})`);
+
+    if (Array.isArray(response.items) && response.items.length > 0) {
+        const requestId = `consume_draw_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+        await sendDrawInterface(response.items, requestId, context);
+    }
 }
 
 /**
@@ -1038,10 +1074,16 @@ async function executeAttackNeuron(actualNeuron, context, elementPosition) {
  * move_candidates -> scelta random -> walkable dal map -> BFS path ->
  * movimento tile per tile lungo il path (entity_movement + update per tile).
  */
-async function executeMovementNeuron(neuronId, context) {
-    const candidatesJson = await postJson('/api/auth/game/brain_flow/move_candidates', {
+async function executeMovementNeuron(neuronId, context, radiusOverride) {
+    const payload = {
         element_has_position_neuron_id: neuronId,
-    }, context);
+    };
+    // Radius esplicito (es. movimento post-attack) -> override lato API.
+    if (Number(radiusOverride) > 0) {
+        payload.radius = Number(radiusOverride);
+    }
+
+    const candidatesJson = await postJson('/api/auth/game/brain_flow/move_candidates', payload, context);
 
     const candidates = candidatesJson && Array.isArray(candidatesJson.candidates) ? candidatesJson.candidates : [];
     if (candidates.length === 0) {

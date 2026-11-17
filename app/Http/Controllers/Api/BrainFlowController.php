@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Custom\Manipulation\ObjectCache;
 use App\Custom\Manipulation\ObjectClear;
+use App\Custom\Manipulation\ObjectCode;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
 use App\Models\BrainSchedulePath;
@@ -269,6 +270,74 @@ class BrainFlowController extends Controller
     }
 
     /**
+     * L'elemento consuma un ElementHasPosition vivo sulla stessa tile (port di
+     * handleConsumeNeuron del runner): items di clear del target + ObjectCode
+     * reward (apply_gene_effects), target -> STATE_DEATH. Gli items vengono
+     * inoltrati al frontend via pusher dal container element.
+     */
+    public function consume(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'element_has_position_id' => ['required', 'integer'],
+        ]);
+
+        $consumer = ElementHasPosition::query()
+            ->where('id', (int) $validated['element_has_position_id'])
+            ->where('state', ElementHasPosition::STATE_LIFE)
+            ->first();
+        if ($consumer === null) {
+            return response()->json(['success' => false, 'message' => 'Consumer ElementHasPosition non trovato'], 404);
+        }
+
+        $target = ElementHasPosition::query()
+            ->where('player_id', (int) $consumer->player_id)
+            ->where('tile_i', (int) $consumer->tile_i)
+            ->where('tile_j', (int) $consumer->tile_j)
+            ->where('id', '!=', (int) $consumer->id)
+            ->where('state', ElementHasPosition::STATE_LIFE)
+            ->first();
+        if ($target === null) {
+            return response()->json(['success' => false, 'message' => 'Nessun elemento vivo sulla stessa tile'], 404);
+        }
+        if ($target->element === null) {
+            return response()->json(['success' => false, 'message' => 'Element del target non trovato'], 404);
+        }
+
+        $player = Player::query()->find((int) $consumer->player_id);
+        $sessionId = $player !== null ? (string) ($player->actual_session_id ?? '') : '';
+
+        $items = [];
+        $targetUid = (string) $target->uid;
+
+        if ($sessionId !== '') {
+            // 1) clear del target (uid reali da ObjectCache o fallback suffix)
+            $fallbackUids = $this->buildElementClearFallbackUids($target, $targetUid);
+            $idsToClear = $this->resolveDrawUidsForObject($sessionId, $targetUid, $fallbackUids);
+            foreach ($idsToClear as $uid) {
+                $items[] = (new ObjectClear($uid, $sessionId))->get();
+                ObjectCache::forget($sessionId, $uid);
+            }
+
+            // 2) reward code: applica gli effetti del consumo al consumer
+            $rewardCode = app(GameController::class)
+                ->buildApplyElementGeneEffectsCode((string) $consumer->uid, $targetUid);
+            if ($rewardCode !== '') {
+                $items[] = (new ObjectCode($rewardCode, 500))->get();
+            }
+        }
+
+        $target->update(['state' => ElementHasPosition::STATE_DEATH]);
+
+        return response()->json([
+            'success' => true,
+            'consumed' => true,
+            'target_uid' => $targetUid,
+            'target_element_id' => (int) $target->element_id,
+            'items' => $items,
+        ]);
+    }
+
+    /**
      * Celle valide per il neurone TYPE_MOVEMENT: entro `radius`, liquide,
      * non solide, non occupate. La scelta casuale è lato container (brain.js).
      */
@@ -277,6 +346,7 @@ class BrainFlowController extends Controller
         ini_set('memory_limit', '-1');
         $validated = $request->validate([
             'element_has_position_neuron_id' => ['required', 'integer'],
+            'radius' => ['nullable', 'integer', 'min:1'],
         ]);
 
         [$neuron, $elementHasPosition, $error] = $this->resolveMovementNeuron((int) $validated['element_has_position_neuron_id']);
@@ -284,7 +354,17 @@ class BrainFlowController extends Controller
             return $error;
         }
 
-        $candidates = $this->movementCandidates($elementHasPosition, (int) $neuron->radius);
+        // Il radius esplicito fa override di quello del neurone (es. neurone
+        // attack che muove dopo il colpo e non ha radius configurato).
+        $radius = (int) ($validated['radius'] ?? 0);
+        if ($radius <= 0) {
+            $radius = (int) ($neuron->radius ?? 0);
+        }
+        if ($radius <= 0) {
+            return response()->json(['success' => false, 'message' => 'Radius non valido'], 422);
+        }
+
+        $candidates = $this->movementCandidates($elementHasPosition, $radius);
         if ($candidates === null) {
             return response()->json(['success' => false, 'message' => 'Player/birthRegion non trovati'], 404);
         }
@@ -315,11 +395,6 @@ class BrainFlowController extends Controller
         $elementHasPosition = $neuron->brain?->elementHasPosition;
         if ($elementHasPosition === null) {
             return [null, null, response()->json(['success' => false, 'message' => 'ElementHasPosition non trovato'], 404)];
-        }
-
-        $range = (int) ($neuron->radius ?? 0);
-        if ($range <= 0) {
-            return [null, null, response()->json(['success' => false, 'message' => 'Radius non valido'], 422)];
         }
 
         return [$neuron, $elementHasPosition, null];
@@ -429,6 +504,41 @@ class BrainFlowController extends Controller
                 continue;
             }
             $progressUid = $targetUid . '_progress_bar_' . $gene->key;
+            $fallback[] = $progressUid;
+            $fallback[] = $progressUid . '_border';
+            $fallback[] = $progressUid . '_bar';
+            $fallback[] = $progressUid . '_text';
+            $fallback[] = $progressUid . '_range';
+        }
+
+        return array_values(array_unique($fallback));
+    }
+
+    /** UID di fallback per il clear draw di un element (stesso set del runner). */
+    private function buildElementClearFallbackUids(ElementHasPosition $targetElementPosition, string $targetUid): array
+    {
+        $fallback = [
+            $targetUid,
+            $targetUid . '_panel',
+            $targetUid . '_text_name',
+            $targetUid . '_btn_attack',
+            $targetUid . '_btn_attack_rect',
+            $targetUid . '_btn_attack_text',
+            $targetUid . '_btn_consume',
+            $targetUid . '_btn_consume_rect',
+            $targetUid . '_btn_consume_text',
+        ];
+
+        $elementInfos = ElementHasPositionInformation::query()
+            ->where('element_has_position_id', (int) $targetElementPosition->id)
+            ->with(['gene'])
+            ->get();
+        foreach ($elementInfos as $elementInfo) {
+            $gene = $elementInfo->gene;
+            if ($gene === null) {
+                continue;
+            }
+            $progressUid = 'gene_progress_' . $gene->key . '_element_' . $targetUid;
             $fallback[] = $progressUid;
             $fallback[] = $progressUid . '_border';
             $fallback[] = $progressUid . '_bar';

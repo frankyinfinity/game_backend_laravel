@@ -54,6 +54,7 @@ Route::group(['prefix' => 'auth'], function () {
   Route::post('/game/brain_flow/move_candidates', [App\Http\Controllers\Api\BrainFlowController::class, 'moveCandidates'])->name('game.brain_flow.move_candidates');
   Route::post('/game/brain_flow/update_position', [App\Http\Controllers\Api\BrainFlowController::class, 'updatePosition'])->name('game.brain_flow.update_position');
   Route::post('/game/brain_flow/attack', [App\Http\Controllers\Api\BrainFlowController::class, 'attack'])->name('game.brain_flow.attack');
+  Route::post('/game/brain_flow/consume', [App\Http\Controllers\Api\BrainFlowController::class, 'consume'])->name('game.brain_flow.consume');
   Route::post('/game/sync_object_cache', [App\Http\Controllers\Api\GameController::class, 'syncObjectCache'])->name('game.sync_object_cache');
   Route::post('/game/entity/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkEntityDegradation'])->name('game.entity.check_degradation');
   Route::post('/game/element/check_degradation', [App\Http\Controllers\Api\GameController::class, 'checkElementDegradation'])->name('game.element.check_degradation');
