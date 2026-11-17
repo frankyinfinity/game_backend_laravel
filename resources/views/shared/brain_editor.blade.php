@@ -52,7 +52,7 @@
             ];
         })->values();
 
-    $brainTargetElements           = $brainTargetElements ?? \App\Models\Element::orderBy('name')->get(['id', 'name']);
+    $brainTargetElements           = $brainTargetElements ?? \App\Models\Element::where('state', \App\Models\Element::STATE_COMPLETED)->orderBy('name')->get(['id', 'name']);
     $brainGenes                    = $brainGenes ?? \App\Models\Gene::where('type', \App\Models\Gene::DYNAMIC_MAX)->orderBy('name')->get(['id', 'name']);
     $brainChimicalElements         = $brainChimicalElements ?? \App\Models\ChimicalElement::orderBy('name')->get(['id', 'name', 'symbol']);
     $brainComplexChimicalElements  = $brainComplexChimicalElements ?? \App\Models\ComplexChimicalElement::orderBy('name')->get(['id', 'name', 'symbol']);

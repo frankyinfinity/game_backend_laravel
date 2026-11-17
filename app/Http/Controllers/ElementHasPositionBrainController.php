@@ -43,7 +43,7 @@ class ElementHasPositionBrainController extends Controller
             'existingNeuronItems'           => $editor['neurons'],
             'existingNeuronLinks'           => $editor['links'],
             'existingCircuits'              => $editor['circuits'],
-            'brainTargetElements'           => \App\Models\Element::orderBy('name')->get(['id', 'name']),
+            'brainTargetElements'           => \App\Models\Element::where('state', \App\Models\Element::STATE_COMPLETED)->orderBy('name')->get(['id', 'name']),
             'brainGenes'                    => Gene::where('type', Gene::DYNAMIC_MAX)->orderBy('name')->get(['id', 'name']),
             'brainChimicalElements'         => \App\Models\ChimicalElement::orderBy('name')->get(['id', 'name', 'symbol']),
             'brainComplexChimicalElements'  => \App\Models\ComplexChimicalElement::orderBy('name')->get(['id', 'name', 'symbol']),

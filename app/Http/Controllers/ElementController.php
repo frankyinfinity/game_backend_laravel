@@ -269,6 +269,7 @@ class ElementController extends Controller
         $allScores = Score::orderBy('name')->get();
 
         $brainTargetElements = Element::query()
+            ->where('state', Element::STATE_COMPLETED)
             ->orderBy('name')
             ->get(['id', 'name']);
 
