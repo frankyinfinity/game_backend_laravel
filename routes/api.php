@@ -49,6 +49,7 @@ Route::group(['prefix' => 'auth'], function () {
   Route::post('/game/brain_schedule/finish', [App\Http\Controllers\Api\GameController::class, 'finishBrainSchedule'])->name('game.brain_schedule.finish');
   Route::post('/game/brain_flow/finish', [App\Http\Controllers\Api\BrainFlowController::class, 'finish'])->name('game.brain_flow.finish');
   Route::post('/game/brain_flow/paths', [App\Http\Controllers\Api\BrainFlowController::class, 'paths'])->name('game.brain_flow.paths');
+  Route::post('/game/brain_flow/path_used', [App\Http\Controllers\Api\BrainFlowController::class, 'pathUsed'])->name('game.brain_flow.path_used');
   Route::post('/game/brain_flow/neuron_state', [App\Http\Controllers\Api\BrainFlowController::class, 'neuronState'])->name('game.brain_flow.neuron_state');
   Route::post('/game/brain_flow/move_candidates', [App\Http\Controllers\Api\BrainFlowController::class, 'moveCandidates'])->name('game.brain_flow.move_candidates');
   Route::post('/game/brain_flow/update_position', [App\Http\Controllers\Api\BrainFlowController::class, 'updatePosition'])->name('game.brain_flow.update_position');

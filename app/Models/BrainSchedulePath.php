@@ -16,12 +16,14 @@ class BrainSchedulePath extends Model
         'steps_count',
         'hash',
         'closed_reason',
+        'used',
     ];
 
     protected $casts = [
         'brain_schedule_id' => 'integer',
         'element_has_position_neuron_circuit_id' => 'integer',
         'steps_count' => 'integer',
+        'used' => 'boolean',
     ];
 
     public const CLOSED_END = 'end';

@@ -125,6 +125,11 @@ async function executeNeuronSteps(pathsJson, context) {
     // serve a passare gene_value dal read_gene al max_value_gene successivo)
     const processedByNeuronId = new Map();
 
+    // Tra gli N path enumerati uno solo per circuito è quello effettivamente
+    // eseguito: il primo che raggiunge un neurone END viene marcato used=true
+    // (chiave: element_has_position_neuron_circuit_id del path marcato).
+    const usedCircuits = new Set();
+
     for (const circuit of circuits) {
         const circuitPaths = Array.isArray(circuit.paths) ? circuit.paths : [];
         for (const path of circuitPaths) {
@@ -192,6 +197,28 @@ async function executeNeuronSteps(pathsJson, context) {
                     // 3) muove l'elemento verso la tile del detection_result
                     // prodotto dal neurone sorgente (read del runner)
                     await executePathNeuron(actualNeuron, context, processedByNeuronId, await ensureElementPosition(context));
+                    break;
+                }
+                case NEURON_TYPE_END: {
+                    // 3) il flusso ha raggiunto un END: marca used=true sul
+                    // path effettivamente eseguito (quello di currentSteps; dopo
+                    // un salto cross-circuit è il path di destinazione). Solo il
+                    // primo END raggiunto marca il path del suo circuito: un
+                    // solo path usato per circuito.
+                    const usedPath = allPaths.find((p) => p.steps === currentSteps)
+                        || allPaths.find((p) => Array.isArray(p.steps)
+                            && p.steps.some((s) => Number(s.element_has_position_neuron_id) === Number(neuronId)))
+                        || path;
+                    const usedCircuitId = usedPath
+                        ? (usedPath.element_has_position_neuron_circuit_id ?? circuit.element_has_position_neuron_circuit_id)
+                        : null;
+                    if (usedPath && usedPath.id && !usedCircuits.has(usedCircuitId)) {
+                        console.log(`[Brain] end (neuron ${neuronId}): path ${usedPath.id} (circuit ${usedCircuitId}) -> used=true`);
+                        await postJson('/api/auth/game/brain_flow/path_used', {
+                            brain_schedule_path_id: usedPath.id,
+                        }, context);
+                        usedCircuits.add(usedCircuitId);
+                    }
                     break;
                 }
                 default:

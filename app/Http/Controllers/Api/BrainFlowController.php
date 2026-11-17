@@ -100,6 +100,30 @@ class BrainFlowController extends Controller
     }
 
     /**
+     * Marca come usato (used=true) il BrainSchedulePath effettivamente
+     * eseguito: il container element lo chiama quando attraversa un neurone END.
+     */
+    public function pathUsed(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'brain_schedule_path_id' => ['required', 'integer'],
+        ]);
+
+        $path = BrainSchedulePath::query()->find((int) $validated['brain_schedule_path_id']);
+        if ($path === null) {
+            return response()->json(['success' => false, 'message' => 'BrainSchedulePath not found'], 404);
+        }
+
+        $path->update(['used' => true]);
+
+        return response()->json([
+            'success' => true,
+            'brain_schedule_path_id' => (int) $path->id,
+            'used' => true,
+        ]);
+    }
+
+    /**
      * Attiva/disattiva un neurone e invia via pusher l'update del suo border
      * (stesso payload di NeuronController::broadcastNeuronUpdate).
      */
