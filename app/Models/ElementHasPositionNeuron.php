@@ -127,6 +127,16 @@ class ElementHasPositionNeuron extends Model
         return $this->belongsTo(ElementHasPositionInformation::class, 'element_has_position_information_id');
     }
 
+    public function geneLife()
+    {
+        return $this->belongsTo(Gene::class, 'gene_life_id');
+    }
+
+    public function geneAttack()
+    {
+        return $this->belongsTo(Gene::class, 'gene_attack_id');
+    }
+
     public function getInformationGeneAttribute()
     {
         // Accessor per compatibilità: usa positionInformation->gene

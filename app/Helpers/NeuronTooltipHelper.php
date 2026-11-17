@@ -38,8 +38,8 @@ class NeuronTooltipHelper
                 break;
 
             case Neuron::TYPE_ATTACK:
-                $lines[] = 'Gene Vita: ' . ($neuron->gene_life_id !== null ? (int) $neuron->gene_life_id : '-');
-                $lines[] = 'Gene Attacco: ' . ($neuron->gene_attack_id !== null ? (int) $neuron->gene_attack_id : '-');
+                $lines[] = 'Gene Vita: ' . ($neuron->geneLife ? $neuron->geneLife->name : '-');
+                $lines[] = 'Gene Attacco: ' . ($neuron->geneAttack ? $neuron->geneAttack->name : '-');
                 break;
 
             case Neuron::TYPE_MOVEMENT:

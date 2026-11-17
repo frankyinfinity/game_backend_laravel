@@ -204,6 +204,16 @@ class Neuron extends Model
         return $this->belongsTo(Gene::class, 'element_infomation_id');
     }
 
+    public function geneLife()
+    {
+        return $this->belongsTo(Gene::class, 'gene_life_id');
+    }
+
+    public function geneAttack()
+    {
+        return $this->belongsTo(Gene::class, 'gene_attack_id');
+    }
+
     public function getOutputConditions(): array
     {
         if ((string) $this->type === self::TYPE_DETECTION) {
