@@ -2,6 +2,7 @@
 
 namespace App\Custom\Draw\Complex;
 
+use App\Models\BrainSchedule;
 use App\Models\Element;
 use App\Models\ElementHasPosition;
 use App\Models\ElementHasPositionInformation;
@@ -60,6 +61,16 @@ class ElementDraw
      */
     private function build(): void
     {
+        // Prima di tutto: elimina i BrainSchedule non terminati (state != 'finish')
+        // di questo element_has_position — evita schedule bloccati in
+        // create/in_progress che impedirebbero un nuovo enqueue.
+        if ($this->elementHasPosition !== null) {
+            BrainSchedule::query()
+                ->where('element_has_position_id', $this->elementHasPosition->id)
+                ->where('state', '!=', BrainSchedule::STATE_FINISH)
+                ->delete();
+        }
+
         // UNIQUE UID: adds coordinates to avoid overwriting elements in the frontend
         $uid = 'element_' . $this->element->id . '_' . $this->tileI . '_' . $this->tileJ;
         $imagePath = '/storage/elements/' . $this->element->id . '.png';
