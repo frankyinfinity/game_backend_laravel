@@ -246,8 +246,9 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
         return resolveChemicalNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
     }
 
-    // detection: link success (found/main) se detection_result != null,
-    // link failure (not_found/else) altrimenti, come nel runner.
+    // detection: link 'success_detection' se detection_result != null
+    // (porta la coordinata al prossimo neurone), 'failure_detection'
+    // altrimenti (avanza senza valore), come nel runner.
     if (neuronType === NEURON_TYPE_DETECTION) {
         return resolveDetectionNextNeuron(currentSteps, allPaths, neuronId, actualNeuron);
     }
@@ -517,8 +518,8 @@ function executeMaxValueGeneNeuron(actualNeuron, context, processedByNeuronId) {
 /**
  * Next neuron per detection (port di isLinkActiveFromNeuron del runner):
  * found -> link 'success_detection'/'found'/'main'; not found ->
- * 'failure_detection'/'not_found'/'else'. Success porta la posizione al
- * prossimo neurone, failure avanza comunque senza valore.
+ * 'failure_detection'. Success porta la posizione al prossimo neurone,
+ * failure avanza comunque senza valore.
  */
 function resolveDetectionNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
     const result = actualNeuron.detection_result;
@@ -545,12 +546,16 @@ function resolveDetectionNextNeuron(currentSteps, allPaths, neuronId, actualNeur
     return null;
 }
 
-/** Match condition del link: uniche uscite di detection sono 'success' e 'failure'. */
+/**
+ * Match condition del link: le uniche uscite di detection sono
+ * 'success_detection' (NeuronLink::PORT_DETECTION_SUCCESS) e
+ * 'failure_detection' (PORT_DETECTION_FAILURE). Null'altro matcha.
+ */
 function detectionConditionMatches(condition, found) {
-    if (condition === 'success') {
+    if (condition === 'success_detection') {
         return found;
     }
-    if (condition === 'failure') {
+    if (condition === 'failure_detection') {
         return !found;
     }
     return false;
