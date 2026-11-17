@@ -9,6 +9,7 @@ use App\Models\Entity;
 use App\Models\ElementHasPosition;
 use App\Models\Image;
 use App\Models\Neuron;
+use App\Models\NeuronLink;
 use App\Models\Player;
 use RuntimeException;
 use InvalidArgumentException;
@@ -555,6 +556,11 @@ class DockerContainerService
             'NEURON_TYPE_READ_GENE=' . Neuron::TYPE_READ_GENE,
             'NEURON_TYPE_MAX_VALUE_GENE=' . Neuron::TYPE_MAX_VALUE_GENE,
             'NEURON_TYPE_CONSUME=' . Neuron::TYPE_CONSUME,
+            // Condition dei link (App\Models\NeuronLink) usate da brain.js
+            'NEURON_CONDITION_TRIGGER=' . NeuronLink::PORT_TRIGGER,
+            'NEURON_CONDITION_DETECTION_SUCCESS=' . NeuronLink::PORT_DETECTION_SUCCESS,
+            'NEURON_CONDITION_DETECTION_FAILURE=' . NeuronLink::PORT_DETECTION_FAILURE,
+            'NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT=' . NeuronLink::DEFAULT_CHIMICAL_ELEMENT,
         ];
         $labels = $this->playerGroupingLabels((int) $elementHasPosition->player_id, 'element');
 

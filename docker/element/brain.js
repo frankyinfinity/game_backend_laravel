@@ -50,6 +50,11 @@ const NEURON_TYPE_MAX_VALUE_GENE = process.env.NEURON_TYPE_MAX_VALUE_GENE || 'ma
 const NEURON_TYPE_CONSUME = process.env.NEURON_TYPE_CONSUME || 'consume';
 // Condition 'default' del neurone read_chimical_element (NeuronLink::DEFAULT_CHIMICAL_ELEMENT)
 const NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT = process.env.NEURON_CONDITION_DEFAULT_CHIMICAL_ELEMENT || 'default_chimical_element';
+// Condition 'trigger' dei link sequenziali (NeuronLink::PORT_TRIGGER)
+const NEURON_CONDITION_TRIGGER = process.env.NEURON_CONDITION_TRIGGER || 'trigger';
+// Uscite del neurone detection (NeuronLink::PORT_DETECTION_SUCCESS/FAILURE)
+const NEURON_CONDITION_DETECTION_SUCCESS = process.env.NEURON_CONDITION_DETECTION_SUCCESS || 'success_detection';
+const NEURON_CONDITION_DETECTION_FAILURE = process.env.NEURON_CONDITION_DETECTION_FAILURE || 'failure_detection';
 // Condition di uscita del neurone max_value_gene (Neuron::MAX_VALUE_GENE_YES/NO)
 const NEURON_MAX_VALUE_GENE_YES = 'yes';
 const NEURON_MAX_VALUE_GENE_NO = 'no';
@@ -230,10 +235,10 @@ async function executeNeuronSteps(pathsJson, context) {
  * @returns {{step:object, steps:Array}|null}
  */
 const REQUIRED_NEXT_CONDITION_BY_TYPE = {
-    [NEURON_TYPE_START]: 'trigger',
-    [NEURON_TYPE_MOVEMENT]: 'trigger',
-    [NEURON_TYPE_READ_GENE]: 'trigger',
-    [NEURON_TYPE_PATH]: 'trigger',
+    [NEURON_TYPE_START]: NEURON_CONDITION_TRIGGER,
+    [NEURON_TYPE_MOVEMENT]: NEURON_CONDITION_TRIGGER,
+    [NEURON_TYPE_READ_GENE]: NEURON_CONDITION_TRIGGER,
+    [NEURON_TYPE_PATH]: NEURON_CONDITION_TRIGGER,
 };
 
 function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
@@ -257,7 +262,7 @@ function resolveNextNeuron(currentSteps, allPaths, neuronId, actualNeuron) {
     // per gli altri tipi regola stringente ('trigger'), niente 'main'.
     const requiredCondition = neuronType === NEURON_TYPE_MAX_VALUE_GENE
         ? (actualNeuron.gene_max_value_result ? NEURON_MAX_VALUE_GENE_YES : NEURON_MAX_VALUE_GENE_NO)
-        : (REQUIRED_NEXT_CONDITION_BY_TYPE[neuronType] || 'trigger');
+        : (REQUIRED_NEXT_CONDITION_BY_TYPE[neuronType] || NEURON_CONDITION_TRIGGER);
 
     const next = findNextStepByLink(currentSteps, neuronId, requiredCondition);
     if (next) {
@@ -552,10 +557,10 @@ function resolveDetectionNextNeuron(currentSteps, allPaths, neuronId, actualNeur
  * 'failure_detection' (PORT_DETECTION_FAILURE). Null'altro matcha.
  */
 function detectionConditionMatches(condition, found) {
-    if (condition === 'success_detection') {
+    if (condition === NEURON_CONDITION_DETECTION_SUCCESS) {
         return found;
     }
-    if (condition === 'failure_detection') {
+    if (condition === NEURON_CONDITION_DETECTION_FAILURE) {
         return !found;
     }
     return false;
