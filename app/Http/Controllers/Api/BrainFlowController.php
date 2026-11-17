@@ -2,16 +2,25 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Custom\Manipulation\ObjectCache;
+use App\Custom\Manipulation\ObjectClear;
 use App\Helper\Helper;
 use App\Http\Controllers\Controller;
 use App\Models\BrainSchedulePath;
+use App\Models\Container;
 use App\Models\ElementHasPosition;
+use App\Models\ElementHasPositionInformation;
 use App\Models\ElementHasPositionNeuron;
 use App\Models\Entity;
+use App\Models\EntityInformation;
+use App\Models\Gene;
+use App\Models\Genome;
 use App\Models\Player;
 use App\Services\BrainScheduleService;
+use App\Services\DockerContainerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class BrainFlowController extends Controller
 {
@@ -150,6 +159,116 @@ class BrainFlowController extends Controller
     }
 
     /**
+     * L'elemento attacca l'entity presente su una tile adiacente (port del
+     * ramo entity di performAttackForElement del runner). Danno dal gene
+     * attack dell'attaccante, vita entity da Genome/EntityInformation.
+     * Se uccisa: state DEATH + stop container + items di clear per
+     * l'interfaccia (inviati via pusher dal container element).
+     */
+    public function attack(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'element_has_position_id' => ['required', 'integer'],
+            'tile_i' => ['required', 'integer'],
+            'tile_j' => ['required', 'integer'],
+            'gene_attack_id' => ['nullable', 'integer'],
+            'gene_life_id' => ['nullable', 'integer'],
+        ]);
+
+        $attacker = ElementHasPosition::query()
+            ->where('id', (int) $validated['element_has_position_id'])
+            ->where('state', ElementHasPosition::STATE_LIFE)
+            ->first();
+        if ($attacker === null) {
+            return response()->json(['success' => false, 'message' => 'Attacker ElementHasPosition non trovato'], 404);
+        }
+
+        $targetEntity = Entity::query()
+            ->where('state', Entity::STATE_LIFE)
+            ->where('tile_i', (int) $validated['tile_i'])
+            ->where('tile_j', (int) $validated['tile_j'])
+            ->first();
+        if ($targetEntity === null) {
+            return response()->json(['success' => false, 'message' => 'Nessuna entity viva sulla tile'], 404);
+        }
+
+        $attackGeneId = (int) ($validated['gene_attack_id'] ?? 0);
+        $lifeGeneId = (int) ($validated['gene_life_id'] ?? 0);
+        if ($attackGeneId <= 0) {
+            $attackGeneId = (int) (Gene::query()->where('key', Gene::KEY_ATTACK)->value('id') ?? 0);
+        }
+        if ($lifeGeneId <= 0) {
+            $lifeGeneId = (int) (Gene::query()->where('key', Gene::KEY_LIFEPOINT)->value('id') ?? 0);
+        }
+
+        // Danno dal gene attack dell'attaccante (ElementHasPositionInformation).
+        $attackInfo = ElementHasPositionInformation::query()
+            ->where('element_has_position_id', (int) $attacker->id)
+            ->where('gene_id', $attackGeneId)
+            ->first();
+        $damage = (int) ($attackInfo->value ?? 0);
+        if ($damage <= 0) {
+            return response()->json([
+                'success' => true,
+                'attacked' => false,
+                'damage' => 0,
+                'entity_killed' => false,
+                'entity_uid' => (string) $targetEntity->uid,
+                'items' => [],
+            ]);
+        }
+
+        $lifeGenome = Genome::query()
+            ->where('entity_id', (int) $targetEntity->id)
+            ->where('gene_id', $lifeGeneId)
+            ->first();
+        $lifeInfo = $lifeGenome !== null
+            ? EntityInformation::query()->where('genome_id', (int) $lifeGenome->id)->first()
+            : null;
+        if ($lifeInfo === null) {
+            return response()->json(['success' => false, 'message' => 'Entity senza informazione vita'], 422);
+        }
+
+        $newLife = ((int) $lifeInfo->value) - $damage;
+        $lifeInfo->update(['value' => $newLife]);
+
+        $player = Player::query()->find((int) $attacker->player_id);
+        $sessionId = $player !== null ? (string) ($player->actual_session_id ?? '') : '';
+
+        $entityKilled = false;
+        $items = [];
+        $targetUid = (string) $targetEntity->uid;
+
+        if ($newLife <= 0) {
+            $entityKilled = true;
+            $targetEntity->update(['state' => Entity::STATE_DEATH]);
+
+            if ($sessionId !== '') {
+                $fallbackUids = $this->buildEntityClearFallbackUids($targetEntity, $targetUid);
+                $idsToClear = $this->resolveDrawUidsForObject($sessionId, $targetUid, $fallbackUids);
+                foreach ($idsToClear as $uid) {
+                    $items[] = (new ObjectClear($uid, $sessionId))->get();
+                    ObjectCache::forget($sessionId, $uid);
+                }
+            }
+
+            $this->stopContainerByParent(Container::PARENT_TYPE_ENTITY, (int) $targetEntity->id);
+        }
+
+        return response()->json([
+            'success' => true,
+            'attacked' => true,
+            'damage' => $damage,
+            'new_health' => $newLife,
+            'entity_killed' => $entityKilled,
+            'entity_uid' => $targetUid,
+            'entity_tile_i' => (int) $targetEntity->tile_i,
+            'entity_tile_j' => (int) $targetEntity->tile_j,
+            'items' => $items,
+        ]);
+    }
+
+    /**
      * Celle valide per il neurone TYPE_MOVEMENT: entro `radius`, liquide,
      * non solide, non occupate. La scelta casuale è lato container (brain.js).
      */
@@ -275,5 +394,123 @@ class BrainFlowController extends Controller
         }
 
         return false;
+    }
+
+    /** UID di fallback per il clear draw di una entity (stesso set del runner). */
+    private function buildEntityClearFallbackUids(Entity $targetEntity, string $targetUid): array
+    {
+        $fallback = [
+            $targetUid,
+            $targetUid . '_panel',
+            $targetUid . '_text_row_1',
+            $targetUid . '_text_row_2',
+        ];
+
+        $buttonBases = [
+            $targetUid . '_button_up',
+            $targetUid . '_button_left',
+            $targetUid . '_button_down',
+            $targetUid . '_button_right',
+            $targetUid . '_button_division',
+        ];
+        foreach ($buttonBases as $base) {
+            $fallback[] = $base;
+            $fallback[] = $base . '_rect';
+            $fallback[] = $base . '_text';
+        }
+
+        $genomes = Genome::query()
+            ->where('entity_id', (int) $targetEntity->id)
+            ->with(['gene'])
+            ->get();
+        foreach ($genomes as $genome) {
+            $gene = $genome->gene;
+            if ($gene === null || ($gene->type ?? null) !== Gene::DYNAMIC_MAX) {
+                continue;
+            }
+            $progressUid = $targetUid . '_progress_bar_' . $gene->key;
+            $fallback[] = $progressUid;
+            $fallback[] = $progressUid . '_border';
+            $fallback[] = $progressUid . '_bar';
+            $fallback[] = $progressUid . '_text';
+            $fallback[] = $progressUid . '_range';
+        }
+
+        return array_values(array_unique($fallback));
+    }
+
+    /** Risolve gli uid draw reali dall'ObjectCache, con fallback sui suffix noti. */
+    private function resolveDrawUidsForObject(string $sessionId, string $rootUid, array $fallbackUids = []): array
+    {
+        $uids = [];
+        $rootObject = ObjectCache::find($sessionId, $rootUid);
+        if (is_array($rootObject)) {
+            $attributes = $rootObject['attributes'] ?? null;
+            $cachedUids = is_array($attributes) ? ($attributes['uids'] ?? null) : null;
+            if (is_array($cachedUids)) {
+                foreach ($cachedUids as $uid) {
+                    if (is_string($uid) && $uid !== '') {
+                        $uids[] = $uid;
+                    }
+                }
+            }
+        }
+
+        if (empty($uids)) {
+            foreach ($fallbackUids as $uid) {
+                if (is_string($uid) && $uid !== '') {
+                    $uids[] = $uid;
+                }
+            }
+        }
+
+        if ($rootUid !== '') {
+            $uids[] = $rootUid;
+        }
+
+        return array_values(array_unique($uids));
+    }
+
+    /** Ferma e rimuove il container docker associato a parent_type/parent_id. */
+    private function stopContainerByParent(string $parentType, int $parentId): void
+    {
+        $container = Container::query()
+            ->where('parent_type', $parentType)
+            ->where('parent_id', $parentId)
+            ->orderByDesc('id')
+            ->first();
+        if ($container === null) {
+            return;
+        }
+
+        try {
+            try {
+                app(DockerContainerService::class)->stopContainer($container);
+            } catch (\Throwable $e) {
+                Log::warning('Unable to stop container', [
+                    'parent_type' => $parentType,
+                    'parent_id' => $parentId,
+                    'container_id' => $container->container_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            try {
+                app(DockerContainerService::class)->deleteContainer($container, true);
+            } catch (\Throwable $e) {
+                Log::warning('Unable to delete container', [
+                    'parent_type' => $parentType,
+                    'parent_id' => $parentId,
+                    'container_id' => $container->container_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('stopContainerByParent failed', [
+                'parent_type' => $parentType,
+                'parent_id' => $parentId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

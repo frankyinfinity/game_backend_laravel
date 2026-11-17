@@ -199,6 +199,12 @@ async function executeNeuronSteps(pathsJson, context) {
                     await executePathNeuron(actualNeuron, context, processedByNeuronId, await ensureElementPosition(context));
                     break;
                 }
+                case NEURON_TYPE_ATTACK: {
+                    // 3) cerca un'entity nelle 8 celle adiacenti e chiama
+                    // l'API attack; se uccisa inoltra gli items di clear
+                    await executeAttackNeuron(actualNeuron, context, await ensureElementPosition(context));
+                    break;
+                }
                 case NEURON_TYPE_END: {
                     // 3) il flusso ha raggiunto un END: marca used=true sul
                     // path effettivamente eseguito (quello di currentSteps; dopo
@@ -948,6 +954,83 @@ function findNextStepByLink(steps, fromNeuronId, condition) {
         return Number(link.from_element_has_position_neuron_id) === Number(fromNeuronId)
             && (s.condition || null) === condition;
     }) || null;
+}
+
+/**
+ * Neurone attack: scansiona le 8 celle intorno all'elemento (get_tile_info
+ * come il detection con range 1). Prima entity trovata -> POST
+ * brain_flow/attack con i geni configurati sul neurone. Se entity_killed
+ * inoltra gli items di clear al frontend via draw_interface (stesso
+ * pattern del container entity dopo attackElement).
+ */
+async function executeAttackNeuron(actualNeuron, context, elementPosition) {
+    const neuronId = actualNeuron.element_has_position_neuron_id;
+    const info = (actualNeuron.neuron && actualNeuron.neuron.information) ? actualNeuron.neuron.information : {};
+
+    if (!elementPosition) {
+        console.log(`[Brain] attack (neuron ${neuronId}): element_position mancante`);
+        return;
+    }
+
+    const centerI = Number(elementPosition.i);
+    const centerJ = Number(elementPosition.j);
+
+    // 1) scan delle 8 celle adiacenti (una sola sessione ws, come detection)
+    const tiles = [];
+    const queries = [];
+    for (let i = centerI - 1; i <= centerI + 1; i++) {
+        for (let j = centerJ - 1; j <= centerJ + 1; j++) {
+            if (i === centerI && j === centerJ) {
+                continue;
+            }
+            if (i < 0 || j < 0) {
+                continue;
+            }
+            tiles.push({ i, j });
+            queries.push({ command: 'get_tile_info', params: { tile_i: i, tile_j: j } });
+        }
+    }
+
+    const replies = await requestMapCommands(queries);
+
+    const matches = [];
+    for (let k = 0; k < tiles.length; k++) {
+        const reply = replies[k] || null;
+        const tile = reply && reply.tile ? reply.tile : null;
+        if (tile && tile.entity) {
+            matches.push({ i: tiles[k].i, j: tiles[k].j, distance: Math.abs(tiles[k].i - centerI) + Math.abs(tiles[k].j - centerJ) });
+        }
+    }
+
+    if (matches.length === 0) {
+        console.log(`[Brain] attack (neuron ${neuronId}): nessuna entity nelle 8 celle intorno a (${centerI},${centerJ})`);
+        return;
+    }
+
+    matches.sort((a, b) => (a.distance - b.distance) || (a.i - b.i) || (a.j - b.j));
+    const target = matches[0];
+
+    // 2) chiamata API attack: il backend risolve l'entity viva sulla tile
+    const response = await postJson('/api/auth/game/brain_flow/attack', {
+        element_has_position_id: context.elementHasPositionId,
+        tile_i: target.i,
+        tile_j: target.j,
+        gene_attack_id: info.gene_attack_id ? Number(info.gene_attack_id) : null,
+        gene_life_id: info.gene_life_id ? Number(info.gene_life_id) : null,
+    }, context);
+
+    if (!response || response.success !== true) {
+        console.error(`[Brain] attack (neuron ${neuronId}): API fallita su tile (${target.i},${target.j}): ${response && response.message ? response.message : 'no response'}`);
+        return;
+    }
+
+    console.log(`[Brain] attack (neuron ${neuronId}): entity ${response.entity_uid} damage=${response.damage} new_health=${response.new_health} killed=${response.entity_killed}`);
+
+    // 3) entity uccisa -> inoltra gli items di clear al frontend (come entity)
+    if (response.entity_killed === true && Array.isArray(response.items) && response.items.length > 0) {
+        const requestId = `attack_clear_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+        await sendDrawInterface(response.items, requestId, context);
+    }
 }
 
 /**
