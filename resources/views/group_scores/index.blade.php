@@ -36,7 +36,6 @@
                                     <input class="form-check-input" type="checkbox" onClick="toggle(this, 'selected[]')">
                                 </div>
                             </th>
-                            <th>ID</th>
                             <th>Nome</th>
                             <th>Azioni</th>
                         </tr>
@@ -80,7 +79,6 @@
                         defaultContent: "",
                         class:          "disableEdit",
                     },
-                    {data:"id", name:"id"},
                     {data:"name", name:"name"},
                     {data:"id", name:"id"},
                 ],
@@ -105,7 +103,7 @@
                         render: function(data, type, row){
                             return '<button type="button" class="btn btn-primary btn-block btn-sm btn_edit" data-id="'+data+'"><i class="fa fa-edit"></i></button>';
                         },
-                        targets:   3
+                        targets:   2
                     },
                 ],
             });

@@ -338,6 +338,12 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/group-scores/list/table', [App\Http\Controllers\GroupScoreController::class, 'listDataTable'])->name('group-scores.datatable');
     Route::post('/group-scores/delete', [App\Http\Controllers\GroupScoreController::class, 'destroy'])->name('group-scores.delete');
 
+    //Scores di un Gruppo Punteggio (CRUD scopato)
+    Route::resource('group-scores.scores', App\Http\Controllers\GroupScoreScoreController::class)->except(['show']);
+    Route::post('/group-scores/{group_score}/scores/list/table', [App\Http\Controllers\GroupScoreScoreController::class, 'listDataTable'])->name('group-scores.scores.datatable');
+    Route::post('/group-scores/{group_score}/scores/delete', [App\Http\Controllers\GroupScoreScoreController::class, 'delete'])->name('group-scores.scores.delete');
+    Route::post('/group-scores/{group_score}/scores/{score}/save-graphics', [App\Http\Controllers\GroupScoreScoreController::class, 'saveGraphics'])->name('group-scores.scores.save-graphics');
+
     // Entity Type Components
     Route::resource('entity-type-components', App\Http\Controllers\EntityTypeComponentController::class);
     Route::post('/entity-type-components/list/table', [App\Http\Controllers\EntityTypeComponentController::class, 'listDataTable'])->name('entity-type-components.datatable');

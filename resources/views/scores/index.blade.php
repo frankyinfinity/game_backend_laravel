@@ -36,9 +36,9 @@
                                     <input class="form-check-input" type="checkbox" onClick="toggle(this, 'selected[]')">
                                 </div>
                             </th>
-                            <th>ID</th>
                             <th>Immagine</th>
                             <th>Nome</th>
+                            <th>Gruppo</th>
                             <th>Azioni</th>
                         </tr>
                         </thead>
@@ -81,9 +81,9 @@
                         defaultContent: "",
                         class:          "disableEdit",
                     },
-                    {data:"id", name:"id"},
                     {data:"image_display", name:"image_display", searchable: false, orderable: false},
                     {data:"name", name:"name"},
+                    {data:"group_name", name:"group_name", searchable: false, orderable: false},
                     {data:"id", name:"id"},
                 ],
                 sDom: '<"dataTables_top"lfBr>t<"dataTables_bottom"ip><"clear">',

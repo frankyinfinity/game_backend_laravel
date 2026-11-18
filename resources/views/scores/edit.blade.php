@@ -42,11 +42,29 @@
                                 </span>
                             @enderror
                         </div>
+                        <div class="form-group">
+                            <label for="group_score_id">Gruppo Punteggio</label>
+                            <select class="form-control @error('group_score_id') is-invalid @enderror"
+                                    id="group_score_id"
+                                    name="group_score_id">
+                                <option value="">— Nessun gruppo —</option>
+                                @foreach($groupScores as $groupScore)
+                                    <option value="{{ $groupScore->id }}" {{ (string) old('group_score_id', $score->group_score_id) === (string) $groupScore->id ? 'selected' : '' }}>
+                                        {{ $groupScore->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('group_score_id')
+                                <span class="invalid-feedback" role="alert">
+                                    <strong>{{ $message }}</strong>
+                                </span>
+                            @enderror
+                        </div>
                     </div>
 
                     <!-- TAB GRAPHICS -->
                     <div class="tab-pane fade" id="tab-graphics" role="tabpanel" aria-labelledby="tab-graphics-link">
-                        @include('scores.tabs.graphics')
+                        @include('shared.graphics_editor', ['model' => $score, 'modelType' => 'score'])
                     </div>
 
                 </div>

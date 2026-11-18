@@ -527,14 +527,10 @@ return [
         ],
         [
             'text'    => 'Punteggi',
+            'key'     => 'scores',
             'icon'    => 'fas fa-star',
             'icon_color' => 'yellow',
             'submenu' => [
-                [
-                    'text' => 'Punteggio',
-                    'url'  => '/scores',
-                    'icon' => 'fas fa-trophy',
-                ],
                 [
                     'text' => 'Gruppo Punteggio',
                     'url'  => '/group-scores',

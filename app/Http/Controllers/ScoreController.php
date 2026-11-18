@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\GroupScore;
 use App\Models\Score;
 use Illuminate\Http\Request;
 
@@ -21,9 +22,12 @@ class ScoreController extends Controller
 
     public function listDataTable(Request $request)
     {
-        $query = Score::query();
+        $query = Score::query()->with('groupScore');
 
         return datatables($query)
+            ->addColumn('group_name', function($row) {
+                return $row->groupScore?->name ?? '';
+            })
             ->addColumn('image_display', function($row) {
                 if ($row->image && \Storage::disk('scores')->exists($row->image)) {
                     $url = \Storage::disk('public')->url('scores/' . $row->image . '?v=' . time());
@@ -31,23 +35,25 @@ class ScoreController extends Controller
                 }
                 return '<div style="width: 32px; height: 32px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
             })
-            ->rawColumns(['image_display'])
+            ->rawColumns(['image_display', 'group_name'])
             ->toJson();
     }
 
     public function create()
     {
-        return view('scores.create');
+        $groupScores = GroupScore::orderBy('name')->get();
+        return view('scores.create', compact('groupScores'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'group_score_id' => 'nullable|exists:group_scores,id',
             'image' => 'nullable|image|mimes:png,jpg,jpeg,gif|max:2048',
         ]);
 
-        $data = $request->only('name');
+        $data = $request->only('name', 'group_score_id');
 
         // Handle image upload
         if ($request->hasFile('image')) {
@@ -70,17 +76,19 @@ class ScoreController extends Controller
 
     public function edit(Score $score)
     {
-        return view('scores.edit', compact('score'));
+        $groupScores = GroupScore::orderBy('name')->get();
+        return view('scores.edit', compact('score', 'groupScores'));
     }
 
     public function update(Request $request, Score $score)
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'group_score_id' => 'nullable|exists:group_scores,id',
             'image_base64' => 'nullable|string',
         ]);
 
-        $data = $request->only('name');
+        $data = $request->only('name', 'group_score_id');
 
         // Handle base64 image from canvas editor
         if ($request->has('image_base64') && !empty($request->image_base64)) {
