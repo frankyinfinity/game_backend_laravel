@@ -8,7 +8,7 @@ use WebSocket\Client;
 
 /**
  * WIP: implementazione in fase di riscrittura.
- * Il codice precedente è preservato in App\Services\BrainFlowRunnerOld.
+ * Il codice precedente (BrainFlowRunnerOld) è stato rimosso.
  */
 class BrainFlowRunner
 {
