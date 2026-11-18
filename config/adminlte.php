@@ -534,6 +534,11 @@ return [
                     'text' => 'Punteggio',
                     'url'  => '/scores',
                     'icon' => 'fas fa-trophy',
+                ],
+                [
+                    'text' => 'Gruppo Punteggio',
+                    'url'  => '/group-scores',
+                    'icon' => 'fas fa-layer-group',
                 ]
             ]
         ],

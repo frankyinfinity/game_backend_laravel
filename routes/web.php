@@ -333,6 +333,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/scores/delete', [App\Http\Controllers\ScoreController::class, 'destroy'])->name('scores.delete');
     Route::post('/scores/{score}/save-graphics', [App\Http\Controllers\ScoreController::class, 'saveGraphics'])->name('scores.save-graphics');
 
+    //Group Scores
+    Route::resource('group-scores', App\Http\Controllers\GroupScoreController::class);
+    Route::post('/group-scores/list/table', [App\Http\Controllers\GroupScoreController::class, 'listDataTable'])->name('group-scores.datatable');
+    Route::post('/group-scores/delete', [App\Http\Controllers\GroupScoreController::class, 'destroy'])->name('group-scores.delete');
+
     // Entity Type Components
     Route::resource('entity-type-components', App\Http\Controllers\EntityTypeComponentController::class);
     Route::post('/entity-type-components/list/table', [App\Http\Controllers\EntityTypeComponentController::class, 'listDataTable'])->name('entity-type-components.datatable');
