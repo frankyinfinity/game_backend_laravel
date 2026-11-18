@@ -18,7 +18,7 @@ class TargetHasScoreController extends Controller
      */
     public function index(Age $age, Phase $phase, PhaseColumn $phaseColumn, Target $target)
     {
-        $targetHasScores = $target->targetHasScores()->with('score')->get();
+        $targetHasScores = $target->targetHasScores()->with('score.groupScore')->get();
         return response()->json(['success' => true, 'target_has_scores' => $targetHasScores]);
     }
 
@@ -33,7 +33,7 @@ class TargetHasScoreController extends Controller
         ]);
 
         $targetHasScore = $target->targetHasScores()->create($request->all());
-        $targetHasScore->load('score');
+        $targetHasScore->load('score.groupScore');
 
         return response()->json(['success' => true, 'message' => 'Costo aggiunto con successo.', 'target_has_score' => $targetHasScore]);
     }
@@ -49,7 +49,7 @@ class TargetHasScoreController extends Controller
         ]);
 
         $targetHasScore->update($request->all());
-        $targetHasScore->load('score');
+        $targetHasScore->load('score.groupScore');
 
         return response()->json(['success' => true, 'message' => 'Costo aggiornato con successo.', 'target_has_score' => $targetHasScore]);
     }

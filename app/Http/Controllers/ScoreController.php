@@ -13,7 +13,7 @@ class ScoreController extends Controller
     {
         // Se la richiesta è AJAX, restituisci i dati in JSON
         if (request()->ajax()) {
-            $scores = Score::all();
+            $scores = Score::with('groupScore')->get();
             return response()->json($scores);
         }
         

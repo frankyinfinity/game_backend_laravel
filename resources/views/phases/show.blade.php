@@ -745,9 +745,10 @@
             const json = await res.json();
             const tbody = $('#targetHasScoresTableBody').empty();
             json.target_has_scores.forEach(ths => {
+                const groupName = ths.score.group_score ? ' [' + ths.score.group_score.name + ']' : '';
                 tbody.append(`<tr>
                     <td>${ths.id}</td>
-                    <td>${ths.score.name}</td>
+                    <td>${ths.score.name}${groupName}</td>
                     <td>${ths.value}</td>
                     <td>
                         <button class="btn btn-danger btn-xs" onclick="deleteTargetScore(${colId}, ${targetId}, ${ths.id})">Elimina</button>
@@ -765,7 +766,10 @@
             });
             const json = await res.json();
             const select = $('#scoreSelect').empty();
-            json.forEach(s => select.append(`<option value="${s.id}">${s.name}</option>`));
+            json.forEach(s => {
+                const groupName = s.group_score ? ' [' + s.group_score.name + ']' : '';
+                select.append('<option value="' + s.id + '">' + s.name + groupName + '</option>');
+            });
             
             $('#addEditCostForm').off('submit').on('submit', async function(e) {
                 e.preventDefault();
