@@ -30,14 +30,14 @@
                 <li class="nav-item">
                     <a class="nav-link" id="tab-assembler-link" data-toggle="pill" href="#tab-assembler" role="tab">Assemblaggio</a>
                 </li>
-                @if($element->isFinishAssembler() && $element->isConsumable())
+                @if($element->isFinishAssembler() && $element->isInteractive())
                 <li class="nav-item">
-                    <a class="nav-link" data-toggle="pill" href="#tab-reward" role="tab">Ricompensa</a>
+                    <a class="nav-link" data-toggle="pill" href="#tab-brain" role="tab">Cervello</a>
                 </li>
                 @endif
                 @if($element->isFinishAssembler() && $element->isInteractive())
                 <li class="nav-item">
-                    <a class="nav-link" data-toggle="pill" href="#tab-brain" role="tab">Cervello</a>
+                    <a class="nav-link" data-toggle="pill" href="#tab-reward" role="tab">Ricompensa</a>
                 </li>
                 @endif
             </ul>
@@ -56,17 +56,17 @@
                     @include('elements.tabs.assembler')
                 </div>
 
-                @if($element->isFinishAssembler() && $element->isConsumable())
-                <!-- TAB RICOMPENSA -->
-                <div class="tab-pane fade" id="tab-reward" role="tabpanel">
-                    @include('elements.tabs.reward')
-                </div>
-                @endif
-
                 @if($element->isFinishAssembler() && $element->isInteractive())
                 <!-- TAB CERVELLO -->
                 <div class="tab-pane fade" id="tab-brain" role="tabpanel">
                     @include('elements.tabs.brain_assembler')
+                </div>
+                @endif
+
+                @if($element->isFinishAssembler() && $element->isInteractive())
+                <!-- TAB RICOMPENSA -->
+                <div class="tab-pane fade" id="tab-reward" role="tabpanel">
+                    @include('elements.tabs.reward')
                 </div>
                 @endif
 

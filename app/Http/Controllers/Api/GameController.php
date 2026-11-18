@@ -2867,52 +2867,6 @@ class GameController extends Controller
             }
         }
 
-        // --- 2) Ricompensa (scores) al player proprietario dell'entity ---
-        // Il player si risolve come in attackElement(): tramite la specie dell'entity.
-        $player = Player::query()->find($entity->specie->player_id ?? null);
-        $playerId = $player ? (int) $player->id : null;
-        $awardedScores = [];
-
-        if ($playerId !== null) {
-            $elementScores = ElementHasPositionScore::query()
-                ->where('element_has_position_id', $elementHasPosition->id)
-                ->with(['score'])
-                ->get();
-
-            foreach ($elementScores as $elementScore) {
-                $score = $elementScore->score;
-                if (!$score)
-                    continue;
-
-                $amount = $elementScore->amount;
-
-                $playerHasScore = PlayerHasScore::query()
-                    ->where('player_id', $playerId)
-                    ->where('score_id', $score->id)
-                    ->first();
-
-                if ($playerHasScore) {
-                    $playerHasScore->increment('value', $amount);
-                } else {
-                    PlayerHasScore::create([
-                        'player_id' => $playerId,
-                        'score_id' => $score->id,
-                        'value' => $amount
-                    ]);
-                }
-
-                $awardedScores[] = [
-                    'score_id' => $score->id,
-                    'amount' => $amount,
-                ];
-            }
-        }
-
-        Log::info("applyConsumeEffects: entity {$entityUid} ha consumato {$elementHasPositionUid}", [
-            'player_id' => $playerId,
-            'awarded_scores' => $awardedScores,
-        ]);
-
         return response()->json([
             'success' => true,
             'player_id' => $playerId,
