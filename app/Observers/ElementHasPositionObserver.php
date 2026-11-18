@@ -66,9 +66,11 @@ class ElementHasPositionObserver
         //Consumable
         if ($element->isConsumable()) {
             $this->initializeRewards($elementHasPosition);
-            // Gli score sono la ricompensa accreditata al player quando l'elemento
-            // viene consumato (GameController::applyConsumeEffects), quindi valgono
-            // solo per gli elementi consumabili.
+        }
+
+        //Interactive: gli score sono la ricompensa configurata nella tab
+        //Ricompensa, visibile solo per gli elementi interattivi.
+        if ($element->isInteractive()) {
             $this->initializeScore($elementHasPosition);
         }
 
