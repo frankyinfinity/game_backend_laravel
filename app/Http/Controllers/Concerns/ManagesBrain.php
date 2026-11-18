@@ -584,12 +584,15 @@ trait ManagesBrain
                 $fields[$S['neuron_info']] = $sameInfoDomain ? $srcNeuron->{$SS['neuron_info']} : null;
                 $fields[$S['neuron_rule']] = $sameRuleDomain ? $srcNeuron->{$SS['neuron_rule']} : null;
 
-                $newNeuron = $S['neuron']::create($fields);
+                // withoutEvents: NeuronObserver::created seederebbe gli ordini
+                // di default, sdoppiandoli con la copia sorgente sotto.
+                $newNeuron = $S['neuron']::withoutEvents(fn() => $S['neuron']::create($fields));
                 $idMap[$srcNeuron->id] = $newNeuron->id;
                 $occupied->put($ni . '_' . $nj, true);
                 $placed++;
 
-                foreach ($srcNeuron->conditionOrders as $srcOrder) {
+                // unique: ordini sorgente già duplicati non si propagano.
+                foreach ($srcNeuron->conditionOrders->unique('condition') as $srcOrder) {
                     $newOrder = $S['order']::create([
                         $S['order_neuron'] => $newNeuron->id,
                         'condition'        => $srcOrder->condition,

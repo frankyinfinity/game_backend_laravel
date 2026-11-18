@@ -886,7 +886,9 @@ class ElementController extends Controller
                 continue;
             }
 
-            $newNeuron = Neuron::create([
+            // withoutEvents: NeuronObserver::created seederebbe gli ordini di
+            // default, che poi si sdoppierebbero con la copia sorgente sotto.
+            $newNeuron = Neuron::withoutEvents(fn() => Neuron::create([
                 'brain_id' => $brain->id,
                 'type' => $srcNeuron->type,
                 'grid_i' => $srcNeuron->grid_i + $offsetI,
@@ -901,10 +903,11 @@ class ElementController extends Controller
                 'gene_attack_id' => $srcNeuron->gene_attack_id,
                 'element_infomation_id' => $srcNeuron->element_infomation_id,
                 'element_has_rule_chimical_element_id' => $srcNeuron->element_has_rule_chimical_element_id,
-            ]);
+            ]));
             $neuronIdMap[$srcNeuron->id] = $newNeuron->id;
 
-            foreach ($srcNeuron->conditionOrders as $co) {
+            // unique: eventuali ordini sorgente già duplicati non si propagano.
+            foreach ($srcNeuron->conditionOrders->unique('condition') as $co) {
                 \App\Models\NeuronConditionOrder::create([
                     'neuron_id' => $newNeuron->id,
                     'condition' => $co->condition,

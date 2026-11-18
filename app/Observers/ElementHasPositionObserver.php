@@ -184,7 +184,8 @@ class ElementHasPositionObserver
 
                 $templateToClonedNeuronId[(int) $templateNeuron->id] = (int) $clonedNeuron->id;
 
-                foreach ($templateNeuron->conditionOrders as $templateOrder) {
+                // unique: ordini sorgente già duplicati non si propagano al clone.
+                foreach ($templateNeuron->conditionOrders->unique('condition') as $templateOrder) {
                     $clonedOrder = \App\Models\ElementHasPositionNeuronConditionOrder::query()->create([
                         'element_has_position_neuron_id' => $clonedNeuron->id,
                         'condition' => $templateOrder->condition,
@@ -491,7 +492,8 @@ class ElementHasPositionObserver
                     ]);
                     $compNeuronMap[$srcNeuron->id] = $n->id;
 
-                    foreach ($srcNeuron->conditionOrders as $co) {
+                    // unique: ordini sorgente già duplicati non si propagano.
+                    foreach ($srcNeuron->conditionOrders->unique('condition') as $co) {
                         \App\Models\EhpComponentBrainNeuronConditionOrder::create([
                             'ehp_component_brain_neuron_id' => $n->id,
                             'condition' => $co->condition,
