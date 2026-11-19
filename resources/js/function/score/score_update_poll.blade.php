@@ -55,6 +55,19 @@
             };
         };
 
+        // Update the group score total text on the appbar circle
+        const updateGroupScoreTotal = (total) => {
+            const countUid = 'player_' + playerId + '_group_score_text';
+            const valueStr = String(total);
+
+            if (objects[countUid]) {
+                objects[countUid].text = valueStr;
+                if (shapes[countUid]) {
+                    shapes[countUid].text = valueStr;
+                }
+            }
+        };
+
         // Update score text objects in the UI
         const updateScoreText = (scoreId, newValue) => {
             const textUid = 'player_' + playerId + '_score_' + scoreId + '_text';
@@ -82,12 +95,24 @@
             if (!scores) return;
 
             if (Array.isArray(scores)) {
+                let arrayTotal = 0;
+                scores.forEach(function (score) {
+                    if (score && score.value !== undefined) {
+                        arrayTotal += Number(score.value) || 0;
+                    }
+                });
+                updateGroupScoreTotal(arrayTotal);
                 scores.forEach(function (score) {
                     if (score && score.score_id !== undefined && score.value !== undefined) {
                         updateScoreText(score.score_id, score.value);
                     }
                 });
             } else if (typeof scores === 'object') {
+                let mapTotal = 0;
+                Object.keys(scores).forEach(function (scoreId) {
+                    mapTotal += Number(scores[scoreId]) || 0;
+                });
+                updateGroupScoreTotal(mapTotal);
                 Object.keys(scores).forEach(function (scoreId) {
                     const value = scores[scoreId];
                     if (value !== null && value !== undefined) {

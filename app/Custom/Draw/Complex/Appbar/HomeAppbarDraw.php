@@ -4,6 +4,7 @@ namespace App\Custom\Draw\Complex\Appbar;
 
 use App\Custom\Draw\Complex\AppbarDraw;
 use App\Custom\Draw\Complex\ButtonDraw;
+use App\Custom\Draw\Complex\GroupScoreDraw;
 use App\Custom\Draw\Complex\ModalDraw;
 use App\Custom\Draw\Complex\Objective\ObjectiveTreeDraw;
 use App\Custom\Draw\Complex\ScoreDraw;
@@ -11,6 +12,7 @@ use App\Custom\Draw\Complex\SidebarDraw;
 use App\Custom\Draw\Primitive\Text;
 use App\Custom\Colors;
 use App\Helper\Helper;
+use App\Models\GroupScore;
 use App\Models\PlayerHasScore;
 use Illuminate\Support\Str;
 
@@ -127,7 +129,8 @@ class HomeAppbarDraw extends AppbarDraw
 
     /**
      * Add elements to the center section of the appbar
-     * Shows three ScoreDraw elements for the player's scores
+     * Shows a GroupScoreDraw (circle with the player's score count) that
+     * opens a modal containing all the ScoreDraw grouped by GroupScore.
      */
     protected function addCenterSection(): void
     {
@@ -144,62 +147,135 @@ class HomeAppbarDraw extends AppbarDraw
             ->get();
         
         \Log::info('Found ' . $playerScores->count() . ' scores for player');
-        
-        if (!$playerScores->isEmpty()) {
-            // Center section dimensions
-            $startX = 400; // LEFT_SECTION_WIDTH
-            $centerY = 15; // Vertically centered in appbar (height 80)
-            $scoreWidth = 120;
-            $scoreHeight = 50;
-            $spacing = 130;
-            
-            $index = 0;
-            foreach ($playerScores as $playerScore) {
-                
-                $score = $playerScore->score;
-                if (!$score) {
-                    continue;
-                }
-                
-                $x = $startX + ($index * $spacing);
-                
-                $scoreDraw = new ScoreDraw('player_'.$playerScore->player_id.'_score_' . $playerScore->score_id);
-                $scoreDraw->setOrigin($x, $centerY);
-                $scoreDraw->setSize($scoreWidth, $scoreHeight);
-                $scoreDraw->setBackgroundColor(0x00000000); // Transparent background
-                $scoreDraw->setBorderColor('#5B7FE8'); // Blue border
-                $scoreDraw->setBorderWidth(3); // Thicker border for visibility
-                $scoreDraw->setBorderRadius(10);
-                $scoreDraw->setImageSize(35); // Slightly smaller image
 
-                // Get image path for this score
-                $imagePath = '/storage/scores/' . $score->id . '.png';
-                $scoreDraw->setScoreImage($imagePath);
+        $modalUid = 'group_scores_modal_' . $this->player->id;
 
-                // Use the value from player_score table if available, else 0
-                $scoreValue = $playerScore->value ?? 0;
-                $scoreDraw->setScoreValue((string) $scoreValue);
+        // JS che apre la modal degli score al click sul cerchio
+        $jsPathOpenModal = resource_path('js/function/modal/click_open_modal.blade.php');
+        $jsOpenModal = file_get_contents($jsPathOpenModal);
+        $jsOpenModal = str_replace('__MODAL_UID__', $modalUid, $jsOpenModal);
+        $jsOpenModal = Helper::setCommonJsCode($jsOpenModal, Str::random(20));
 
-                // Score name for tooltip
-                $scoreDraw->setScoreName($score->name ?? 'Score ' . $score->id);
+        // Cerchio con il numero degli score del player (centrato nella center section 400..1520)
+        $groupScoreDraw = new GroupScoreDraw('player_' . $this->player->id . '_group_score');
+        $groupScoreDraw->setOrigin(930, 10);
+        $groupScoreDraw->setRadius(30);
+        $groupScoreDraw->setCountValue($playerScores->sum('value'));
+        $groupScoreDraw->setOnClick($jsOpenModal);
+        $groupScoreDraw->build();
 
-                // White text
-                $scoreDraw->setTextColor('#FFFFFF');
-                $scoreDraw->setTextFontSize(16);
-                $scoreDraw->build();
-                
-                // Add all draw items to center section
-                foreach ($scoreDraw->getDrawItems() as $drawItem) {
-                    $this->addCenterElement($drawItem);
-                }
-                
-                $index++;
-            }
+        foreach ($groupScoreDraw->getDrawItems() as $drawItem) {
+            $this->addCenterElement($drawItem);
         }
+
+        // Modal con tutti gli ScoreDraw raggruppati per gruppo
+        $this->addGroupScoresModal($modalUid, $playerScores);
 
         // Add objectives modal (button is now in sidebar)
         $modalUid = 'objective_modal_' . $this->player->id;
         $this->addObjectiveModal($modalUid);
+    }
+
+    /**
+     * Modal contenente gli ScoreDraw del player raggruppati per GroupScore.
+     * Gli ScoreDraw usano gli stessi uid dell'appbar precedente
+     * (player_{pid}_score_{sid}_*), quindi vengono aggiornati in tempo reale
+     * dal polling websocket esistente.
+     */
+    private function addGroupScoresModal(string $modalUid, $playerScores): void
+    {
+        $modal = new ModalDraw($modalUid);
+        $modal->setOrigin(20, 90);
+        $modal->setSize(760, 560);
+        $modal->setTitle('Punteggi');
+        $modal->setRenderable(false);
+
+        $scoreWidth = 120;
+        $scoreHeight = 50;
+        $colSpacing = 140;
+        $rowSpacing = 66;
+        $perRow = 4;
+        $titleHeight = 34;
+        $rowGap = 10;
+
+        $addScoreItem = function ($playerScore, int $lx, int $ly) use ($modal, $scoreWidth, $scoreHeight) {
+            $score = $playerScore->score;
+            if (!$score) {
+                return;
+            }
+
+            $scoreDraw = new ScoreDraw('player_' . $playerScore->player_id . '_score_' . $playerScore->score_id);
+            $scoreDraw->setOrigin($lx, $ly);
+            $scoreDraw->setSize($scoreWidth, $scoreHeight);
+            $scoreDraw->setTransparentBackground(true);
+            $scoreDraw->setBorderColor('#5B7FE8'); // Blue border
+            $scoreDraw->setBorderWidth(3);
+            $scoreDraw->setBorderRadius(10);
+            $scoreDraw->setImageSize(35);
+            $scoreDraw->setScoreImage('/storage/scores/' . $score->id . '.png');
+            $scoreDraw->setScoreValue((string) ($playerScore->value ?? 0));
+            $scoreDraw->setScoreName($score->name ?? 'Score ' . $score->id);
+            $scoreDraw->setTextColor('#1A1A1A'); // Dark text on light modal background
+            $scoreDraw->setTextFontSize(16);
+            $scoreDraw->build();
+
+            foreach ($scoreDraw->getDrawItems() as $drawItem) {
+                $json = $drawItem->buildJson();
+                $offsetX = isset($json['x']) ? (int) $json['x'] : 0;
+                $offsetY = isset($json['y']) ? (int) $json['y'] : 0;
+                $modal->addContentItem($drawItem, $offsetX, $offsetY);
+            }
+        };
+
+        $cursorY = 0;
+
+        $addGroup = function (string $title, string $groupKey, $items) use ($modal, $modalUid, $addScoreItem, &$cursorY, $perRow, $colSpacing, $rowSpacing, $titleHeight, $rowGap) {
+            if ($items->isEmpty()) {
+                return;
+            }
+
+            // Titolo del gruppo
+            $titleDraw = new Text($modalUid . '_group_' . $groupKey . '_title');
+            $titleDraw->setOrigin(0, $cursorY);
+            $titleDraw->setText($title);
+            $titleDraw->setColor(Colors::BLACK);
+            $titleDraw->setFontSize(20);
+            $titleDraw->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+            $json = $titleDraw->buildJson();
+            $modal->addContentItem($titleDraw, (int) $json['x'], (int) $json['y']);
+
+            $cursorY += $titleHeight;
+
+            $i = 0;
+            foreach ($items as $playerScore) {
+                $lx = ($i % $perRow) * $colSpacing;
+                $ly = $cursorY + intdiv($i, $perRow) * $rowSpacing;
+                $addScoreItem($playerScore, $lx, $ly);
+                $i++;
+            }
+
+            $cursorY += (int) (ceil($items->count() / $perRow) * $rowSpacing) + $rowGap;
+        };
+
+        // Una sezione per ogni GroupScore, poi gli score senza gruppo
+        $groups = GroupScore::orderBy('name')->get();
+        foreach ($groups as $group) {
+            $items = $playerScores->filter(function ($playerScore) use ($group) {
+                return $playerScore->score && $playerScore->score->group_score_id == $group->id;
+            });
+            $addGroup($group->name, (string) $group->id, $items);
+        }
+
+        $ungrouped = $playerScores->filter(function ($playerScore) {
+            return $playerScore->score && $playerScore->score->group_score_id === null;
+        });
+        $addGroup('Senza gruppo', 'none', $ungrouped);
+
+        $modal->build();
+
+        foreach ($modal->getDrawItems() as $drawItem) {
+            $this->addCenterElement($drawItem);
+        }
     }
 
     private function addObjectiveModal(string $modalUid): void

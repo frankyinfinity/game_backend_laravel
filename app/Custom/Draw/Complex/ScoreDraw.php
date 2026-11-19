@@ -197,6 +197,10 @@ class ScoreDraw {
         $image->setOrigin($imageX, $imageY);
         $image->setRenderable($this->renderable);
 
+        if ($this->transparentBackground && $this->scoreName !== null) {
+            $image->addAttributes('tooltip_text', $this->scoreName);
+        }
+
         $this->drawItems[] = $image;
 
         // Text (score value) - centered vertically, positioned after image
