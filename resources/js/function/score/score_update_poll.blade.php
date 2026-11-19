@@ -73,6 +73,10 @@
             const textUid = 'player_' + playerId + '_score_' + scoreId + '_text';
             const valueStr = String(newValue);
 
+            // Track latest values for the live GroupScoreDraw tooltip
+            if (!window.__scoreValuesById) window.__scoreValuesById = {};
+            window.__scoreValuesById[String(scoreId)] = newValue;
+
             // Update visible text
             if (objects[textUid]) {
                 objects[textUid].text = valueStr;

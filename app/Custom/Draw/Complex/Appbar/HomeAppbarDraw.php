@@ -143,7 +143,7 @@ class HomeAppbarDraw extends AppbarDraw
         // Get player's scores from PlayerHasScore
         $playerScores = PlayerHasScore::query()
             ->where('player_id', $this->player->id)
-            ->with('score')
+            ->with('score.groupScore')
             ->get();
         
         \Log::info('Found ' . $playerScores->count() . ' scores for player');
@@ -161,6 +161,15 @@ class HomeAppbarDraw extends AppbarDraw
         $groupScoreDraw->setOrigin(930, 10);
         $groupScoreDraw->setRadius(30);
         $groupScoreDraw->setCountValue($playerScores->sum('value'));
+        $groupScoreDraw->setTooltipScores(
+            $playerScores->sortBy(fn ($ps) => (($ps->score->groupScore->name ?? '') . '|' . ($ps->score->name ?? '')))
+                ->map(fn ($ps) => [
+                    'score_id' => $ps->score_id,
+                    'name' => $ps->score->name ?? ('Score ' . $ps->score_id),
+                    'group' => $ps->score->groupScore->name ?? '',
+                    'value' => (int) ($ps->value ?? 0),
+                ])->values()->all()
+        );
         $groupScoreDraw->setOnClick($jsOpenModal);
         $groupScoreDraw->build();
 

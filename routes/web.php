@@ -318,6 +318,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/elements/{element}/brain/place-component', [App\Http\Controllers\ElementController::class, 'placeBrainComponent'])->name('elements.brain.place-component');
     Route::post('/elements/{element}/brain/remove-component', [App\Http\Controllers\ElementController::class, 'removeBrainComponent'])->name('elements.brain.remove-component');
     Route::post('/elements/{element}/complete', [App\Http\Controllers\ElementController::class, 'complete'])->name('elements.complete');
+    Route::post('/elements/{element}/reward-scores', [App\Http\Controllers\ElementController::class, 'addRewardScore'])->name('elements.reward-scores.store');
+    Route::post('/elements/{element}/reward-scores/remove', [App\Http\Controllers\ElementController::class, 'removeRewardScore'])->name('elements.reward-scores.remove');
     Route::post('/elements/{element}/brain/neurons', [App\Http\Controllers\ElementController::class, 'saveBrainNeuron'])->name('elements.brain.neurons.save');
     Route::patch('/elements/{element}/brain/neurons/{neuron}/move', [App\Http\Controllers\ElementController::class, 'moveBrainNeuron'])->name('elements.brain.neurons.move');
     Route::post('/elements/{element}/brain/neurons/{neuron}/condition-orders', [App\Http\Controllers\ElementController::class, 'saveNeuronConditionOrders'])->name('elements.brain.neurons.condition-orders.save');

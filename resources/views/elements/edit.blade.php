@@ -101,8 +101,8 @@
 </form>
 @endif
 
-@if($element->isFinishAssembler() && $element->isConsumable() && !$element->isCompleted())
-<!-- Form separato per complete consumable -->
+@if($element->isFinishAssembler() && $element->isInteractive() && !$element->isCompleted())
+<!-- Form separato per complete interattivo (ricompense) -->
 <form action="{{ route('elements.complete', $element) }}" method="POST" id="el-reward-complete-form" style="display:none;">
     @csrf
     <div id="el-reward-complete-inputs"></div>

@@ -10,6 +10,7 @@ use App\Models\ElementHasTile;
 use App\Models\ElementType;
 use App\Models\Entity;
 use App\Models\Gene;
+use App\Models\GroupScore;
 use App\Models\Neuron;
 use App\Models\NeuronCircuit;
 use App\Models\NeuronCircuitDetail;
@@ -267,6 +268,7 @@ class ElementController extends Controller
 
         // Fetch Scores for reward tab
         $allScores = Score::orderBy('name')->get();
+        $groupScores = GroupScore::orderBy('name')->get();
 
         $brainTargetElements = Element::query()
             ->where('state', Element::STATE_COMPLETED)
@@ -469,6 +471,7 @@ class ElementController extends Controller
             'allGenes',
             'geneData',
             'allScores',
+            'groupScores',
             'brainTargetElements',
             'brainTargetEntities',
             'brainGenes',
@@ -1121,6 +1124,15 @@ class ElementController extends Controller
             return redirect()->route('elements.edit', $element)->with('success', 'Elemento completato.');
         }
 
+        // For interactive: save reward scores when provided (reward tab submits them)
+        if ($element->isInteractive() && $request->has('reward_scores')) {
+            $sync = [];
+            foreach (collect($request->input('reward_scores', []))->filter(fn($r) => !empty($r['score_id'])) as $r) {
+                $sync[$r['score_id']] = ['amount' => (int) ($r['amount'] ?? 1)];
+            }
+            $element->scores()->sync($sync);
+        }
+
         // For interactive: check all component brains are placed
         $compDetails = $element->details()
             ->where('detailable_type', \App\Models\ElementComponent::class)
@@ -1140,6 +1152,37 @@ class ElementController extends Controller
 
         $element->update(['state' => Element::STATE_COMPLETED]);
         return redirect()->route('elements.edit', $element)->with('success', 'Elemento completato e bloccato.');
+    }
+
+    /**
+     * Add or update a reward score for the element (reward tab, interactive).
+     */
+    public function addRewardScore(Request $request, Element $element)
+    {
+        $request->validate([
+            'score_id' => 'required|exists:scores,id',
+            'amount' => 'required|integer|min:1',
+        ]);
+
+        $element->scores()->syncWithoutDetaching([
+            $request->input('score_id') => ['amount' => (int) $request->input('amount')],
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Remove a reward score from the element (reward tab, interactive).
+     */
+    public function removeRewardScore(Request $request, Element $element)
+    {
+        $request->validate([
+            'score_id' => 'required|exists:scores,id',
+        ]);
+
+        $element->scores()->detach($request->input('score_id'));
+
+        return response()->json(['success' => true]);
     }
 
     public function finishAssembler(Request $request, Element $element)

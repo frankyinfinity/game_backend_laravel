@@ -32,6 +32,7 @@ class GroupScoreDraw {
     private $circleColor = 0x5B7FE8;
     private $textColor;
     private string $tooltipText = 'Punteggi';
+    private ?array $tooltipScores = null;
     private ?string $onClickJs = null;
     private string $textFontFamily;
     private int $textFontSize;
@@ -71,6 +72,16 @@ class GroupScoreDraw {
         $this->tooltipText = $text;
     }
 
+    /**
+     * Scores shown in the tooltip as "[group] name: value".
+     * Each item: ['score_id' => int, 'name' => string, 'group' => string, 'value' => int|string]
+     * The frontend rebuilds the text live using the latest polled values.
+     */
+    public function setTooltipScores(array $items): void
+    {
+        $this->tooltipScores = $items;
+    }
+
     public function setTextFontSize(int $value): void
     {
         $this->textFontSize = $value;
@@ -101,7 +112,17 @@ class GroupScoreDraw {
         $circle->setRadius($this->radius);
         $circle->setColor($this->circleColor);
         $circle->setRenderable($this->renderable);
-        $circle->addAttributes('tooltip_text', $this->tooltipText);
+        $tooltipText = $this->tooltipText;
+        if (!empty($this->tooltipScores)) {
+            $circle->addAttributes('tooltip_scores', $this->tooltipScores);
+            $lines = array_map(function ($s) {
+                $group = $s['group'] ?? '';
+                $prefix = $group !== '' ? '[' . $group . '] ' : '';
+                return $prefix . ($s['name'] ?? '') . ': ' . ($s['value'] ?? 0);
+            }, $this->tooltipScores);
+            $tooltipText = implode("\n", $lines);
+        }
+        $circle->addAttributes('tooltip_text', $tooltipText);
         if ($this->onClickJs !== null) {
             $circle->setInteractive(BasicDraw::INTERACTIVE_POINTER_DOWN, $this->onClickJs);
         }

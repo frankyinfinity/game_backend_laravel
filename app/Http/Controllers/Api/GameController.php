@@ -2106,6 +2106,29 @@ class GameController extends Controller
             }
         }
 
+        // Assegna al player gli score configurati sull'elemento
+        // (ElementHasPositionScore -> PlayerHasScore), come ultima cosa prima del response
+        $awardedScores = [];
+        if ($elementDied) {
+            $elementScores = ElementHasPositionScore::query()
+                ->where('element_has_position_id', $elementPosition->id)
+                ->get();
+
+            foreach ($elementScores as $elementScore) {
+                $playerScore = PlayerHasScore::query()->firstOrNew([
+                    'player_id' => $player->id,
+                    'score_id' => $elementScore->score_id,
+                ]);
+                $playerScore->value = ($playerScore->value ?? 0) + (int) $elementScore->amount;
+                $playerScore->save();
+
+                $awardedScores[] = [
+                    'score_id' => $elementScore->score_id,
+                    'amount' => (int) $elementScore->amount,
+                ];
+            }
+        }
+
         return response()->json([
             'success' => true,
             'damage' => $damage,
@@ -2114,6 +2137,7 @@ class GameController extends Controller
             'element_uid' => $elementPosition->uid,
             'element_tile_i' => $elementPosition->tile_i,
             'element_tile_j' => $elementPosition->tile_j,
+            'awarded_scores' => $awardedScores,
             'items' => $items,
         ]);
     }
