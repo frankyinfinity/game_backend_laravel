@@ -321,6 +321,11 @@ return [
             ]
         ],
         [
+            'text' => 'Impostazioni',
+            'url'  => '/settings',
+            'icon' => 'fas fa-cog',
+        ],
+        [
             'header' => 'GESTIONE DATI',
         ],
         [

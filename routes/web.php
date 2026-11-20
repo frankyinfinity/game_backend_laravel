@@ -34,6 +34,10 @@ Route::post('/test/unset-favorite', [App\Http\Controllers\TestController::class,
 
 Route::group(['middleware' => ['auth']], function () {
 
+    //Settings
+    Route::get('/settings', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.index');
+    Route::put('/settings', [App\Http\Controllers\SettingController::class, 'update'])->name('settings.update');
+
     //Broadcasting
     Route::post('/broadcasting/auth', [App\Http\Controllers\BroadcastingController::class, 'auth']);
 
