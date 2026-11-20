@@ -9,6 +9,9 @@ use App\Helper\Helper;
 use App\Models\Entity;
 use App\Models\EntityBody;
 use App\Models\EntityDetail;
+use App\Models\PlayerHasScore;
+use App\Models\Score;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -155,7 +158,7 @@ class EntityEvolutionDraw
         $cx=$mx+16;$cy=$my+60+16;
 
         $modal = new ModalDraw($modalUid);
-        $modal->setTitle('Evoluzione - '.$entity->uid.' - Step: 0');
+        $modal->setTitle('Evoluzione - '.$entity->uid);
         $modal->setSize($mw,$mh);
         $modal->setOrigin($mx,$my);
         $modal->setRenderable(false);
@@ -322,6 +325,15 @@ class EntityEvolutionDraw
             ->first();
         $evolutionWsPort = $evolutionContainer ? $evolutionContainer->ws_port : null;
 
+        // Score scelto per l'evoluzione e costo per step (da Settings)
+        $evolutionScoreId = (int) Setting::getValue(Setting::KEY_EVOLUTION_SCORE, '0');
+        $evolutionStepCost = (int) Setting::getValue(Setting::KEY_EVOLUTION_STEP_COST, '10');
+        $evolutionScore = $evolutionScoreId ? Score::find($evolutionScoreId) : null;
+        $evolutionScoreName = $evolutionScore->name ?? 'Score';
+        $currentScoreValue = $evolutionScoreId
+            ? (int) (PlayerHasScore::query()->where('player_id', $playerId)->where('score_id', $evolutionScoreId)->value('value') ?? 0)
+            : 0;
+
         $jsContentSave = str_replace('__gateway_base__', $gatewayBaseUrl, $jsContentSave);
         $jsContentSave = str_replace('__port__', $evolutionWsPort ?? '', $jsContentSave);
         $jsContentSave = str_replace('__PLAYER_ID__', (string) $playerId, $jsContentSave);
@@ -344,6 +356,40 @@ class EntityEvolutionDraw
         foreach($saveBtn->getDrawItems() as $it){
             $it->addAttributes('z_index',50060);
             $this->drawItems[]=$it;
+        }
+
+        // ===== STEP COUNTER + SCORE COST (in tempo reale) =====
+        // Screen-space (come il bottone Salva): NON sono figli del content
+        // viewport quindi non scrollano mai. Un UNICO Text con tutta la
+        // riga "Step: N - Costo: N" + icona dello score subito dopo
+        // (riposizionata via JS in base alla larghezza del testo).
+        $counterX = $gx;
+        $counterY = $gy + $gth + 10;
+
+        $stepText = new Text($modalUid . '_step_count_text');
+        $stepText->setCenterAnchor(false);
+        $stepText->setFontFamily(Helper::DEFAULT_FONT_FAMILY);
+        $stepText->setFontSize(16);
+        $stepText->setOrigin($counterX, $counterY);
+        $stepText->setText('Step: 0 - Costo: 0');
+        $stepText->setColor(0x1A1A1A);
+        $stepText->setRenderable(false);
+        $stepText->addAttributes('z_index', 50060);
+        $this->drawItems[] = $stepText;
+
+        $scoreImageUrl = null;
+        if ($evolutionScore) {
+            $scoreImageUrl = '/storage/scores/' . ($evolutionScore->image ?? ($evolutionScoreId . '.png'));
+        }
+        if ($scoreImageUrl) {
+            $scoreImg = new \App\Custom\Draw\Primitive\Image($modalUid . '_score_image');
+            $scoreImg->setSrc($scoreImageUrl);
+            $scoreImg->setSize(20, 20);
+            $scoreImg->setOrigin($counterX + 140, $counterY - 2);
+            $scoreImg->setRenderable(false);
+            $scoreImg->addAttributes('z_index', 50060);
+            $scoreImg->addAttributes('tooltip_text', (string) $evolutionScoreName);
+            $this->drawItems[] = $scoreImg;
         }
 
         // ===== JS HANDLERS =====
@@ -426,9 +472,40 @@ class EntityEvolutionDraw
         $js.="totalSteps+=stepsR+stepsG+stepsB;";
         $js.="}";
         $js.="}";
-        $js.="var titleObj=objects['{$modalUid}_title'];";
-        $js.="if(titleObj){titleObj.text='Evoluzione - {$entity->uid} - Step: '+totalSteps;if(shapes['{$modalUid}_title'])shapes['{$modalUid}_title'].text='Evoluzione - {$entity->uid} - Step: '+totalSteps;}";
+        $js.="window['_evoTotalSteps_{$modalUid}']=totalSteps;";
+        $js.="window['_updateScoreCounter_{$modalUid}']();";
         $js.="};";
+
+        // Reset completo dello stato ad ogni apertura della modal: zone
+        // modificate, contatore step/costo, pannello zona e slider RGB
+        // tornano ai valori iniziali.
+        $js.="window['_resetEvolutionState_{$modalUid}']=function(){";
+        $js.="window['_evoModifiedZones_{$modalUid}']={};";
+        $js.="window['_evoTotalSteps_{$modalUid}']=0;";
+        $js.="window['closeZonePanel_{$modalUid}']();";
+        $js.="window['_setSliderVal_{$modalUid}'](0,0,0);";
+        $js.="window['_updateStepsCount_{$modalUid}']();";
+        $js.="};";
+
+        // ===== SCORE COUNTER JS (live da __scoreValuesById del poll) =====
+        $js.="window['_evoScoreValue_{$modalUid}']={$currentScoreValue};";
+        $js.="window['_evoStepCost_{$modalUid}']={$evolutionStepCost};";
+        $js.="window['_evoTotalSteps_{$modalUid}']=0;";
+        $js.="window['_updateScoreCounter_{$modalUid}']=function(){";
+        $js.="var live=(window.__scoreValuesById||{})['{$evolutionScoreId}'];";
+        $js.="if(live!==undefined)window['_evoScoreValue_{$modalUid}']=live;";
+        $js.="var cur=window['_evoScoreValue_{$modalUid}'];";
+        $js.="var need=window['_evoTotalSteps_{$modalUid}']*window['_evoStepCost_{$modalUid}'];";
+        $js.="var txt='Step: '+window['_evoTotalSteps_{$modalUid}']+' - Costo: '+need;";
+        $js.="var uid='{$modalUid}_step_count_text';";
+        $js.="if(objects[uid]){objects[uid].text=txt;if(shapes[uid]){shapes[uid].text=txt;";
+        $js.="shapes[uid].style.fill=(cur>=need)?'#2E7D32':'#C62828';}}";
+        // Posiziona l'icona dello score subito dopo la fine del testo
+        $js.="var iuid='{$modalUid}_score_image';var img=shapes[iuid];var ts=shapes[uid];";
+        $js.="if(img&&ts){img.x=ts.x+ts.width+16;img.y=ts.y-2;if(objects[iuid])objects[iuid].x=img.x;}";
+        $js.="};";
+        $js.="window['_evoScoreTimer_{$modalUid}']=setInterval(window['_updateScoreCounter_{$modalUid}'],1000);";
+        $js.="window['_updateScoreCounter_{$modalUid}']();";
 
         $this->initJs.=$gsJs.$js;
 

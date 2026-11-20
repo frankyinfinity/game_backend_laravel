@@ -32,6 +32,7 @@
                 modalUid + '_body', modalUid + '_header', modalUid + '_title',
                 modalUid + '_close_button', modalUid + '_close_text', modalUid + '_content_viewport',
                 modalUid + '_save_button_rect', modalUid + '_save_button_text',
+                modalUid + '_step_count_text', modalUid + '_score_image',
             ];
 
             idsToToggle.forEach(function(uid) {
@@ -42,6 +43,12 @@
             // Show/hide the grid
             if (typeof window['showGrid_' + modalUid] === 'function') {
                 window['showGrid_' + modalUid](show);
+            }
+
+            // Ad ogni apertura riparte da stato pulito: zone modificate,
+            // contatore Step/Costo, slider RGB e pannello zona resettati
+            if (show && typeof window['_resetEvolutionState_' + modalUid] === 'function') {
+                window['_resetEvolutionState_' + modalUid]();
             }
 
             if (typeof AppData !== 'undefined') AppData.open_modals[modalUid] = show;

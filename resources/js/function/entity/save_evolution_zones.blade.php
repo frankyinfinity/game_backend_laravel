@@ -71,7 +71,8 @@ window['__name__'] = function() {
         ws.send(JSON.stringify({
             command: 'save',
             entity_id: parseInt('__ENTITY_ID__', 10),
-            zones: modifiedZones
+            zones: modifiedZones,
+            steps: window['_evoTotalSteps_' + modalUid] || 0
         }));
     };
 
@@ -91,6 +92,7 @@ window['__name__'] = function() {
             modalUid + '_body', modalUid + '_header', modalUid + '_title',
             modalUid + '_close_button', modalUid + '_close_text', modalUid + '_content_viewport',
             modalUid + '_save_button_rect', modalUid + '_save_button_text',
+            modalUid + '_step_count_text', modalUid + '_score_image',
         ];
 
         idsToHide.forEach(function(uid) {
@@ -139,6 +141,19 @@ window['__name__'] = function() {
         console.log('[Evolution Save] Evolution button grayed out for entity:', entityUid);
     };
 
+    // Chiude la modal e grigia il pulsante SOLO se la risposta API e'
+    // di successo (se il punteggio era insufficiente evolutionSave
+    // risponde success:false e crea una riga di Alert).
+    var handleSaveResponse = function(response) {
+        var api = (response && response.response) ? response.response : response;
+        if (api && api.success === false) {
+            console.warn('[Evolution Save] Salvataggio rifiutato:', api);
+            return;
+        }
+        closeModal();
+        grayOutEvolutionButton();
+    };
+
     if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
         ws = new WebSocket(wsUrl);
         window.gameWebSockets[port] = ws;
@@ -149,10 +164,9 @@ window['__name__'] = function() {
         };
         ws.onmessage = function(event) {
             onMessage(event);
-            // Chiude la modal dopo aver ricevuto la risposta dal server
-            closeModal();
-            // Rende grigio il pulsante 'evoluzione'
-            grayOutEvolutionButton();
+            var parsed;
+            try { parsed = JSON.parse(event.data); } catch (e) { parsed = null; }
+            handleSaveResponse(parsed);
         };
         ws.onerror = function(error) {
             console.error('[Evolution Save] WS Error:', error);
@@ -168,9 +182,9 @@ window['__name__'] = function() {
         var originalOnMessage = ws.onmessage;
         ws.onmessage = function(event) {
             if (originalOnMessage) originalOnMessage(event);
-            closeModal();
-            // Rende grigio il pulsante 'evoluzione'
-            grayOutEvolutionButton();
+            var parsed;
+            try { parsed = JSON.parse(event.data); } catch (e) { parsed = null; }
+            handleSaveResponse(parsed);
         };
     }
 };

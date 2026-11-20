@@ -3293,6 +3293,44 @@ class GameController extends Controller
         $playerId = (int) ($request->input('player_id') ?? $request->input('playerId') ?? 0);
         $payload = $request->except(['_token']);
 
+        // Controllo costo evoluzione: il numero di step arriva dal client
+        // (stesso conteggio mostrato nel contatore della modal), il costo
+        // per step e lo Score usato vengono dai Settings.
+        $evolutionScoreId = (int) \App\Models\Setting::getValue(\App\Models\Setting::KEY_EVOLUTION_SCORE, '0');
+        $stepCost = (int) \App\Models\Setting::getValue(\App\Models\Setting::KEY_EVOLUTION_STEP_COST, '10');
+        $steps = max(0, (int) ($payload['steps'] ?? 0));
+        $totalCost = $steps * $stepCost;
+
+        if ($playerId > 0 && $evolutionScoreId > 0 && $totalCost > 0) {
+            $available = (int) (PlayerHasScore::query()
+                ->where('player_id', $playerId)
+                ->where('score_id', $evolutionScoreId)
+                ->value('value') ?? 0);
+
+            if ($available < $totalCost) {
+                \App\Models\Alert::create([
+                    'player_id' => $playerId,
+                    'title'     => 'Punteggio insufficiente',
+                    'body'      => 'Evoluzione non avviata: servono ' . $totalCost . ' punti (' . $steps . ' step x ' . $stepCost . ') ma ne hai ' . $available . '.',
+                    'type'      => \App\Models\Alert::TYPE_WARNING,
+                ]);
+
+                return response()->json([
+                    'success'   => false,
+                    'message'   => 'Punteggio insufficiente',
+                    'required'  => $totalCost,
+                    'available' => $available,
+                    'player_id' => $playerId,
+                ], 422);
+            }
+
+            // Scala il costo dell'evoluzione dal punteggio selezionato
+            PlayerHasScore::query()
+                ->where('player_id', $playerId)
+                ->where('score_id', $evolutionScoreId)
+                ->decrement('value', $totalCost);
+        }
+
         // Tutto il JSON viene passato al job: il log avviene dentro il job
         EvolutionSaveJob::dispatch($playerId, $payload);
 

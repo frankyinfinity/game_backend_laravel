@@ -135,6 +135,12 @@ window['__name__'] = function() {
         if (shapes[uid]) shapes[uid].renderable = false;
     });
 
+    // Hide the evolution step/score counter elements if present
+    ['_step_count_text', '_score_image'].forEach(function(suffix) {
+        var uid = modalUid + suffix;
+        if (shapes[uid]) shapes[uid].renderable = false;
+    });
+
     // Hide direction buttons if the modal has them
     var dirButtons = ['dir_up', 'dir_down', 'dir_left', 'dir_right'];
     dirButtons.forEach(function(dir) {
