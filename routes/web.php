@@ -104,6 +104,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/planets/list/table', [App\Http\Controllers\PlanetController::class, 'listDataTable'])->name(name: 'planets.datatable');
     Route::post('/planets/delete', action: [App\Http\Controllers\PlanetController::class, 'delete'])->name('planets.delete');
 
+    //Star
+    Route::resource('stars', App\Http\Controllers\StarController::class);
+    Route::post('/stars/list/table', [App\Http\Controllers\StarController::class, 'listDataTable'])->name('stars.datatable');
+    Route::post('/stars/delete', [App\Http\Controllers\StarController::class, 'delete'])->name('stars.delete');
+
     //Template Brain
     Route::resource('template-brains', App\Http\Controllers\TemplateBrainController::class);
     Route::post('/template-brains/list/table', [App\Http\Controllers\TemplateBrainController::class, 'listDataTable'])->name('template-brains.datatable');

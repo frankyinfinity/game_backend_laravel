@@ -363,10 +363,15 @@ return [
                     ]
                 ],
                 [
-                    'text'    => 'Gestione Pianeti',
+                    'text'    => 'Gestione Sistema',
                     'icon'    => 'fas fa-globe',
                     'icon_color' => 'teal',
                     'submenu' => [
+                        [
+                            'text' => 'Stella',
+                            'url'  => '/stars',
+                            'icon' => 'fas fa-star',
+                        ],
                         [
                             'text' => 'Clima',
                             'url'  => '/climates',
