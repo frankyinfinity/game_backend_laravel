@@ -1,15 +1,22 @@
 @extends('adminlte::page')
 
-@section('title', 'Modifica Stella')
+@php $locked = $star->isZones(); @endphp
+
+@section('title', $locked ? 'Fascie Stella' : 'Modifica Stella')
 
 @section('content_header')@stop
 
 @section('content')
 <div class="card">
     <div class="card-header pb-0">
-        <h4 class="mb-0">Modifica Stella</h5>
+        <h4 class="mb-0">{{ $locked ? 'Fascie Stella' : 'Modifica Stella' }}</h5>
     </div>
     <div class="card-body">
+        @if($locked)
+            <div class="alert alert-info">
+                <i class="fas fa-lock"></i> Le informazioni della stella sono bloccate mentre e' attiva la gestione delle fascie.
+            </div>
+        @endif
         <form method="POST" action="{{ route('stars.update', [$star->id]) }}">
             @csrf
             @method('PUT')
@@ -20,7 +27,7 @@
                         <div class="input-group-prepend">
                           <span class="input-group-text"><i class="fas fa-font"></i></span>
                         </div>
-                        <input type="text" id="name" name="name" class="form-control" value="{{$star->name}}" placeholder="Nome" required>
+                        <input type="text" id="name" name="name" class="form-control" value="{{$star->name}}" placeholder="Nome" required {{ $locked ? 'disabled' : '' }}>
                     </div>
                 </div>
                 <div class="col-12">
@@ -35,8 +42,8 @@
                                 ? sprintf('#%02x%02x%02x', $rgbParts[0], $rgbParts[1], $rgbParts[2])
                                 : '#000000';
                         @endphp
-                        <input type="color" id="rgb_picker" class="form-control" value="{{$rgbHex}}" style="padding:0.15rem;height:calc(1.6em + 0.75rem + 2px)">
-                        <input type="hidden" id="rgb" name="rgb" value="{{$star->rgb}}">
+                        <input type="color" id="rgb_picker" class="form-control" value="{{$rgbHex}}" style="padding:0.15rem;height:calc(1.6em + 0.75rem + 2px)" {{ $locked ? 'disabled' : '' }}>
+                        <input type="hidden" id="rgb" name="rgb" value="{{$star->rgb}}" {{ $locked ? 'disabled' : '' }}>
                         <div class="input-group-append">
                           <span class="input-group-text" id="rgb_value">{{$star->rgb}}</span>
                         </div>
@@ -45,14 +52,16 @@
                 <div class="col-12">
                     <label for="description">Descrizione</label>
                     <div class="form-group">
-                        <textarea class="form-control" rows="4" id="description" name="description">{{$star->description}}</textarea>
+                        <textarea class="form-control" rows="4" id="description" name="description" {{ $locked ? 'disabled' : '' }}>{{$star->description}}</textarea>
                     </div>
                 </div>
                 <div class="col-12">
                     <div class="row">
+                        @if(!$locked)
                         <div class="col-3">
                             <button type="submit" class="btn btn-primary btn-block btn-sm"><i class="fa fa-save"></i> Salva</button>
                         </div>
+                        @endif
                         <div class="col-3">
                             <a href="{{route('stars.show', [$star->id])}}">
                                 <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
@@ -64,12 +73,17 @@
         </form>
     </div>
 </div>
+
+@if($locked)
+    @include('star.zone.index')
+@endif
 @stop
 
 @section('js')
     <script>
         $(document).ready(function () {
 
+            @if(!$locked)
             $('#rgb_picker').on('input', function () {
                 var hex = $(this).val();
                 var r = parseInt(hex.substr(1, 2), 16);
@@ -79,6 +93,7 @@
                 $('#rgb').val(rgb);
                 $('#rgb_value').text(rgb);
             });
+            @endif
 
         });
     </script>

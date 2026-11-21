@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Star;
+use App\Models\StarZone;
 
 class StarController extends Controller
 {
@@ -57,7 +58,8 @@ class StarController extends Controller
     public function edit(string $id)
     {
         $star = Star::query()->findOrFail($id);
-        return view("star.edit", compact("star"));
+        $zones = $star->zones()->orderBy('from')->get();
+        return view("star.edit", compact("star", "zones"));
     }
 
     /**
@@ -92,6 +94,85 @@ class StarController extends Controller
             $star->delete();
         }
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Cambia lo stato della stella (CREATED <-> ZONES).
+     */
+    public function updateState(Request $request, string $id)
+    {
+        $star = Star::query()->findOrFail($id);
+
+        $request->validate([
+            'state' => 'required|integer|in:' . Star::STATE_CREATED . ',' . Star::STATE_ZONES,
+        ]);
+
+        $star->update(['state' => $request->state]);
+
+        if ((int) $request->state === Star::STATE_ZONES) {
+            return redirect(route('stars.edit', [$star->id]));
+        }
+
+        return redirect()->back();
+    }
+
+    /**
+     * Aggiunge una fascia (StarZone) alla stella.
+     */
+    public function storeZone(Request $request, string $id)
+    {
+        $star = Star::query()->findOrFail($id);
+
+        $validated = $request->validate([
+            'name'      => 'required|string|max:255',
+            'from'      => 'required|integer|min:0',
+            'to'        => 'required|integer|gt:from',
+            'rgb'       => 'required|string|max:64',
+            'habitable' => 'required|boolean',
+        ]);
+
+        $zone = $star->zones()->create($validated);
+
+        $zones = $star->zones()->orderBy('from')->get();
+
+        return response()->json(['success' => true, 'zone' => $zone, 'zones' => $zones]);
+    }
+
+    /**
+     * Aggiorna una fascia della stella.
+     */
+    public function updateZone(Request $request, string $id, string $zoneId)
+    {
+        $star = Star::query()->findOrFail($id);
+        $zone = StarZone::query()->where('star_id', $star->id)->findOrFail($zoneId);
+
+        $validated = $request->validate([
+            'name'      => 'required|string|max:255',
+            'from'      => 'required|integer|min:0',
+            'to'        => 'required|integer|gt:from',
+            'rgb'       => 'required|string|max:64',
+            'habitable' => 'required|boolean',
+        ]);
+
+        $zone->update($validated);
+
+        $zones = $star->zones()->orderBy('from')->get();
+
+        return response()->json(['success' => true, 'zone' => $zone, 'zones' => $zones]);
+    }
+
+    /**
+     * Elimina una fascia della stella.
+     */
+    public function destroyZone(string $id, string $zoneId)
+    {
+        $star = Star::query()->findOrFail($id);
+        $zone = StarZone::query()->where('star_id', $star->id)->findOrFail($zoneId);
+        $zone->delete();
+
+        $zones = $star->zones()->orderBy('from')->get();
+
+        return response()->json(['success' => true, 'zones' => $zones]);
     }
 
 }

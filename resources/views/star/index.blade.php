@@ -119,9 +119,12 @@
                     },
                     {
                         render: function(data, type, row){
-                            var states = {0: 'CREATED'};
-                            var label = states[data] || ('STATO ' + data);
-                            return '<span class="badge badge-info">' + label + '</span>';
+                            var states = {
+                                0: {label: 'Creata', cls: 'badge-secondary'},
+                                1: {label: 'Fascie', cls: 'badge-teal'}
+                            };
+                            var s = states[data] || {label: 'Stato ' + data, cls: 'badge-dark'};
+                            return '<span class="badge ' + s.cls + '">' + s.label + '</span>';
                         },
                         targets:   3
                     },

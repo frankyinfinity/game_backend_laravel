@@ -42,9 +42,18 @@
                 <div class="row">
                     <div class="col-4">
                         <a href="{{route('stars.edit', [$star->id])}}">
-                            <button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-edit"></i> Modifica</button>
+                            <button type="button" class="btn btn-primary btn-block btn-sm"><i class="fa fa-edit"></i> {{ $star->isZones() ? 'Fascie' : 'Modifica' }}</button>
                         </a>
                     </div>
+                    @if(!$star->isZones())
+                    <div class="col-4">
+                        <form method="POST" action="{{ route('stars.state', [$star->id]) }}">
+                            @csrf
+                            <input type="hidden" name="state" value="{{ \App\Models\Star::STATE_ZONES }}">
+                            <button type="submit" class="btn btn-teal btn-block btn-sm"><i class="fa fa-bullseye"></i> Gestisci Fascie</button>
+                        </form>
+                    </div>
+                    @endif
                     <div class="col-4">
                         <a href="{{route('stars.index')}}">
                             <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
