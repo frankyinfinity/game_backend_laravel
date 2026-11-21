@@ -121,7 +121,8 @@
                         render: function(data, type, row){
                             var states = {
                                 0: {label: 'Creata', cls: 'badge-secondary'},
-                                1: {label: 'Fascie', cls: 'badge-teal'}
+                                1: {label: 'Fascie', cls: 'badge-teal'},
+                                2: {label: 'Pianeti', cls: 'badge-warning'}
                             };
                             var s = states[data] || {label: 'Stato ' + data, cls: 'badge-dark'};
                             return '<span class="badge ' + s.cls + '">' + s.label + '</span>';

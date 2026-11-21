@@ -50,7 +50,9 @@ class PlanetController extends Controller
     public function show(string $id)
     {
         $planet = Planet::query()->findOrFail($id);
-        return view("planet.show", compact("planet"));
+        $zonePlanet = $planet->zonePlanets()->with('zone.star')->first();
+        $star = optional(optional($zonePlanet)->zone)->star;
+        return view("planet.show", compact("planet", "star"));
     }
 
     /**

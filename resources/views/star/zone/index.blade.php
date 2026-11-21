@@ -1,3 +1,4 @@
+@php $szReadonly = $zoneEditorReadonly ?? false; @endphp
 <div class="card card-teal card-outline mt-3">
     <div class="card-header">
         <h4 class="mb-0"><i class="fas fa-bullseye"></i> Fascie della stella
@@ -6,16 +7,17 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <div class="col-md-7">
+            <div class="{{ $szReadonly ? 'col-md-12' : 'col-md-7' }}">
                 <div class="text-center">
                     <div id="sz_graph">
                         <svg viewBox="0 0 620 440" style="width:100%;max-width:620px;background:#0a0a14;border-radius:8px">
                             <circle cx="310" cy="220" r="34" fill="rgb({{$star->rgb}})" stroke="#fff" stroke-width="1"><title>{{$star->name}}</title></circle>
                         </svg>
                     </div>
-                    <small class="text-muted">Anteprima in tempo reale: la fascia tratteggiata e' quella in definizione.</small>
+                    <small class="text-muted">{{ $szReadonly ? "Grafico in sola lettura: la stella e' in gestione pianeti." : "Anteprima in tempo reale: la fascia tratteggiata e' quella in definizione." }}</small>
                 </div>
             </div>
+            @if(!$szReadonly)
             <div class="col-md-5">
                 <div class="card card-outline card-primary mb-3">
                     <div class="card-header py-2 d-flex align-items-center justify-content-between">
@@ -69,7 +71,9 @@
                     <small>Definisci la prima fascia dal form qui sopra.</small>
                 </div>
             </div>
+            @endif
         </div>
+        @if(!$szReadonly)
         <div class="row mt-3">
             <div class="col-3">
                 <form method="POST" action="{{ route('stars.state', [$star->id]) }}">
@@ -79,6 +83,7 @@
                 </form>
             </div>
         </div>
+        @endif
     </div>
 </div>
 
@@ -86,6 +91,7 @@
     document.addEventListener('DOMContentLoaded', function () {
 
         var SZ_CX = 310, SZ_CY = 220, SZ_MAXR = 200, SZ_STAR_R = 34;
+        var SZ_READONLY = {{ $szReadonly ? 'true' : 'false' }};
         var starRgb = @json($star->rgb);
         var starName = @json($star->name);
         var zones = @json($zones);
@@ -132,6 +138,7 @@
         }
 
         function previewZone() {
+            if (SZ_READONLY) return null;
             var from = parseInt($('#sz_from').val(), 10);
             var to = parseInt($('#sz_to').val(), 10);
             var name = $('#sz_name').val() || '(anteprima)';
@@ -207,12 +214,14 @@
             var html = '';
             zones.slice().sort(function (a, b) { return a.from - b.from; }).forEach(function (z) {
                 var editingCls = (z.id === editingId) ? ' border-primary' : '';
+                var buttons = SZ_READONLY ? '' :
+                    '<button type="button" class="btn btn-info btn-xs sz_edit mr-1" data-id="' + z.id + '" title="Modifica fascia"><i class="fa fa-pencil-alt"></i></button>' +
+                    '<button type="button" class="btn btn-danger btn-xs sz_del" data-id="' + z.id + '" title="Elimina fascia"><i class="fa fa-trash"></i></button>';
                 html += '<div class="sz_item d-flex align-items-center border rounded px-2 py-1 mb-1' + editingCls + '" data-id="' + z.id + '">' +
                     '<span style="flex:0 0 auto;width:18px;height:18px;border-radius:4px;border:1px solid #999;background:rgb(' + z.rgb + ')" title="rgb(' + z.rgb + ')"></span>' +
                     '<span class="ml-2 flex-grow-1"><strong>' + esc(z.name) + '</strong> <small class="text-muted">da ' + z.from + ' a ' + z.to + '</small></span>' +
                     '<span class="mx-2" title="Abitabile">' + (z.habitable ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-muted"></i>') + '</span>' +
-                    '<button type="button" class="btn btn-info btn-xs sz_edit mr-1" data-id="' + z.id + '" title="Modifica fascia"><i class="fa fa-pencil-alt"></i></button>' +
-                    '<button type="button" class="btn btn-danger btn-xs sz_del" data-id="' + z.id + '" title="Elimina fascia"><i class="fa fa-trash"></i></button>' +
+                    buttons +
                     '</div>';
             });
             $('#sz_list').html(html);

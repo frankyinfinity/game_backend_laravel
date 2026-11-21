@@ -377,11 +377,12 @@ return [
                             'url'  => '/climates',
                             'icon' => 'fas fa-leaf',
                         ],
-                        [
-                            'text' => 'Pianeti',
-                            'url'  => '/planets',
-                            'icon' => 'fas fa-globe',
-                        ]
+                        // I pianeti si posizionano ora dalle fasce della stella (show di Star)
+                        // [
+                        //     'text' => 'Pianeti',
+                        //     'url'  => '/planets',
+                        //     'icon' => 'fas fa-globe',
+                        // ]
                     ]
                 ],
             ]

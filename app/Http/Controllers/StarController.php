@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Star;
 use App\Models\StarZone;
+use App\Models\StarZoneHasPlanet;
+use App\Models\Planet;
 
 class StarController extends Controller
 {
@@ -49,7 +51,8 @@ class StarController extends Controller
     public function show(string $id)
     {
         $star = Star::query()->findOrFail($id);
-        return view("star.show", compact("star"));
+        $zones = $star->zones()->with('zonePlanets.planet')->orderBy('from')->get();
+        return view("star.show", compact("star", "zones"));
     }
 
     /**
@@ -58,7 +61,7 @@ class StarController extends Controller
     public function edit(string $id)
     {
         $star = Star::query()->findOrFail($id);
-        $zones = $star->zones()->orderBy('from')->get();
+        $zones = $star->zones()->with('zonePlanets.planet')->orderBy('from')->get();
         return view("star.edit", compact("star", "zones"));
     }
 
@@ -104,12 +107,16 @@ class StarController extends Controller
         $star = Star::query()->findOrFail($id);
 
         $request->validate([
-            'state' => 'required|integer|in:' . Star::STATE_CREATED . ',' . Star::STATE_ZONES,
+            'state' => 'required|integer|in:' . Star::STATE_CREATED . ',' . Star::STATE_ZONES . ',' . Star::STATE_PLANETS,
         ]);
 
         $star->update(['state' => $request->state]);
 
-        if ((int) $request->state === Star::STATE_ZONES) {
+        if ((int) $request->state === Star::STATE_PLANETS) {
+            return redirect()->to(route('stars.show', [$star->id]) . '#tab-pianeti');
+        }
+
+        if ((int) $request->state !== Star::STATE_CREATED) {
             return redirect(route('stars.edit', [$star->id]));
         }
 
@@ -159,6 +166,55 @@ class StarController extends Controller
         $zones = $star->zones()->orderBy('from')->get();
 
         return response()->json(['success' => true, 'zone' => $zone, 'zones' => $zones]);
+    }
+
+    /**
+     * Posiziona un pianeta su un'orbita (raggio) dentro una fascia della stella.
+     */
+    public function storeZonePlanet(Request $request, string $id)
+    {
+        $star = Star::query()->findOrFail($id);
+        $zoneIds = $star->zones()->pluck('id')->implode(',');
+
+        $request->validate([
+            'star_zone_id' => 'required|integer|in:' . $zoneIds,
+            'name'         => 'required|string|max:255',
+            'description'  => 'nullable|string',
+            'radius'       => 'required|integer|min:0',
+        ]);
+
+        $planet = Planet::create([
+            'name'        => $request->name,
+            'description' => $request->description,
+        ]);
+
+        $star->zones()->findOrFail($request->star_zone_id)->zonePlanets()->create([
+            'planet_id' => $planet->id,
+            'radius'    => $request->radius,
+        ]);
+
+        $zones = $star->zones()->with('zonePlanets.planet')->orderBy('from')->get();
+
+        return response()->json(['success' => true, 'zones' => $zones]);
+    }
+
+    /**
+     * Rimuove un pianeta dall'orbita.
+     */
+    public function destroyZonePlanet(string $id, string $zonePlanetId)
+    {
+        $star = Star::query()->findOrFail($id);
+
+        $zonePlanet = StarZoneHasPlanet::query()
+            ->whereHas('zone', function ($q) use ($star) {
+                $q->where('star_id', $star->id);
+            })
+            ->findOrFail($zonePlanetId);
+        $zonePlanet->delete();
+
+        $zones = $star->zones()->with('zonePlanets.planet')->orderBy('from')->get();
+
+        return response()->json(['success' => true, 'zones' => $zones]);
     }
 
     /**

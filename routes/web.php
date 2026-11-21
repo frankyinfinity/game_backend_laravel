@@ -112,6 +112,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/stars/{star}/zones', [App\Http\Controllers\StarController::class, 'storeZone'])->name('stars.zones.store');
     Route::put('/stars/{star}/zones/{zone}', [App\Http\Controllers\StarController::class, 'updateZone'])->name('stars.zones.update');
     Route::delete('/stars/{star}/zones/{zone}', [App\Http\Controllers\StarController::class, 'destroyZone'])->name('stars.zones.destroy');
+    Route::post('/stars/{star}/zone-planets', [App\Http\Controllers\StarController::class, 'storeZonePlanet'])->name('stars.zone-planets.store');
+    Route::delete('/stars/{star}/zone-planets/{zonePlanet}', [App\Http\Controllers\StarController::class, 'destroyZonePlanet'])->name('stars.zone-planets.destroy');
 
     //Template Brain
     Route::resource('template-brains', App\Http\Controllers\TemplateBrainController::class);

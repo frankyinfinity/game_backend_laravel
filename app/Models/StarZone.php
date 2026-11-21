@@ -20,4 +20,9 @@ class StarZone extends Model
     {
         return $this->belongsTo(Star::class, 'star_id');
     }
+
+    public function zonePlanets()
+    {
+        return $this->hasMany(StarZoneHasPlanet::class, 'star_zone_id');
+    }
 }

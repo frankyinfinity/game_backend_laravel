@@ -49,8 +49,8 @@
                                 </a>
                             </div>
                             <div class="col-4">
-                                <a href="{{route('planets.index')}}">
-                                    <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> Indietro</button>
+                                <a href="{{ $star ? route('stars.show', [$star->id]) . '#tab-pianeti' : route('planets.index') }}">
+                                    <button type="button" class="btn btn-danger btn-block btn-sm"><i class="fa fa-backward"></i> {{ $star ? 'Torna alla Stella' : 'Indietro' }}</button>
                                 </a>
                             </div>
                         </div>

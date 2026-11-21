@@ -12,4 +12,9 @@ class Planet extends Model
         return $this->hasMany(Region::class);
     }
 
+    public function zonePlanets()
+    {
+        return $this->hasMany(StarZoneHasPlanet::class, 'planet_id');
+    }
+
 }
